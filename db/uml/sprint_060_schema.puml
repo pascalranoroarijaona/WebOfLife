@@ -1,0 +1,61 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class StateValidator {
+    - tolerance: number
+    + __init__(tolerance: number)
+    + evaluateDiscrepancy(stockId: string, actualDelta: number, expectedDelta: number): DiscrepancyResult
+    + validateStateVector(previousVector: StateVector, currentVector: StateVector, fluxDerivedDeltas: Map<string, number>): ValidationReport
+}
+
+class StateVector {
+    - stocks: Map<string, number>
+    - fluxes: Map<string, number>
+    + getStock(stockId: string): number | undefined
+    + getStocks(): Map<string, number>
+    + setStock(stockId: string, value: number): void
+}
+
+class DiscrepancyResult {
+    + stockId: string
+    + actualDelta: number
+    + expectedDelta: number
+    + absoluteDifference: number
+    + isWithinTolerance: boolean
+}
+
+class ValidationReport {
+    + timestamp: number
+    + isValid: boolean
+    + maxDiscrepancy: number
+    + discrepancies: DiscrepancyResult[]
+}
+
+class ThermodynamicFlux {
+    + fluxId: string
+    + sourceStockId: string
+    + targetStockId: string
+    + fluxMagnitude: number
+    + isSolarInput: boolean
+    + timestamp: number
+}
+
+class BlockchainBlockSignature {
+    + blockHash: string
+    + previousBlockHash: string
+    + reportId: string
+    + merkleRoot: string
+    + transactionSignature: string
+    + minedTimestamp: number
+}
+
+StateValidator --> DiscrepancyResult : creates
+StateValidator --> ValidationReport : generates
+StateValidator ..> StateVector : inspects
+ValidationReport *-- DiscrepancyResult : contains
+StateVector "2" --> ValidationReport : evaluated within
+ThermodynamicFlux "*" --* StateVector : drives deltas
+ValidationReport -- BlockchainBlockSignature : secured by
+
+@enduml

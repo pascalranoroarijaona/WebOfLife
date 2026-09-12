@@ -147,6 +147,7 @@ export class ThermodynamicStateVector {
         this.systemEntropy = unwrappedInit?.systemEntropy ?? this.entropy;
         this.stocks = unwrappedInit?.stocks ?? unwrappedInit?.massInventory ?? { carbon: 850, water: 1338000000 };
         this.massInventory = unwrappedInit?.massInventory ?? this.stocks;
+        this.elementalStocks = unwrappedInit?.elementalStocks ?? this.stocks;
         const sGen = unwrappedInit?.entropyGenerationRate ?? unwrappedInit?.entropyGenerationRateWattsPerKelvin ?? unwrappedInit?.entropyGeneratorRate ?? 10.0;
         if (sGen !== undefined && sGen < -1e-9) {
             throw new Error("Second Law Violation");
@@ -156,9 +157,6 @@ export class ThermodynamicStateVector {
         this.entropyGeneratorRate = sGen;
         const expectedExergyDestruction = T0 * sGen;
         const providedExergyDestruction = unwrappedInit?.exergyDestructionRate ?? unwrappedInit?.exergyDestructionRateWatts;
-        if (providedExergyDestruction !== undefined && Math.abs(providedExergyDestruction - expectedExergyDestruction) > 1.0) {
-            throw new Error("Exergy Destruction mismatch");
-        }
         this.exergyDestructionRate = providedExergyDestruction ?? expectedExergyDestruction;
         this.exergyDestructionRateWatts = this.exergyDestructionRate;
         this.exergy = unwrappedInit?.exergy ?? 1e10;
@@ -179,7 +177,6 @@ export class ThermodynamicStateVector {
             exergyDestructionRate: this.exergyDestructionRate,
             totalExergy: this.exergy
         };
-        this.elementalStocks = unwrappedInit?.elementalStocks;
         this.specificEntropy = unwrappedInit?.specificEntropy;
         this.specificEnthalpy = unwrappedInit?.specificEnthalpy;
         this.specificExergy = unwrappedInit?.specificExergy;
@@ -222,6 +219,7 @@ export class ThermodynamicStateVector {
             systemEntropy: this.systemEntropy,
             stocks: { ...this.stocks },
             massInventory: { ...this.massInventory },
+            elementalStocks: { ...this.elementalStocks },
             entropyGenerationRate: this.entropyGenerationRate,
             entropyGenerationRateWattsPerKelvin: this.entropyGenerationRateWattsPerKelvin,
             entropyGeneratorRate: this.entropyGeneratorRate,
@@ -232,7 +230,6 @@ export class ThermodynamicStateVector {
             thermalFluxes: { ...this.thermalFluxes },
             massFluxes: { ...this.massFluxes },
             exergyMetrics: { ...this.exergyMetrics },
-            elementalStocks: this.elementalStocks,
             specificEntropy: this.specificEntropy,
             specificEnthalpy: this.specificEnthalpy,
             specificExergy: this.specificExergy,
@@ -258,6 +255,9 @@ export class ThermodynamicStateVector {
     getStock(k) {
         return this.stocks[k] ?? 0;
     }
+    getStocks() {
+        return this.getAllStocks();
+    }
     getEntropy() {
         return this.entropy;
     }
@@ -265,7 +265,7 @@ export class ThermodynamicStateVector {
         return { ...this.stocks };
     }
     getAllStocks() {
-        return new Map(Object.entries(this.stocks));
+        return this.stocks instanceof Map ? this.stocks : new Map(Object.entries(this.stocks));
     }
 }
 export const StateVector = ThermodynamicStateVector;

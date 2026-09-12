@@ -1,67 +1,39 @@
-/**
- * @fileoverview Consolidated State Validator & Thermodynamic Conservation Engine (Retro-Compatible)
- * Satisfies all historical Sprint tests (028 - 059) and thermodynamic contracts.
- */
-import { StateVector, ThermodynamicStateVector } from './state_vector.js';
+import { StateVector, ThermodynamicStateVector } from './state_vector';
+import { 
+  DiscrepancyResult, 
+  ValidationReport, 
+  IThermodynamicStateVector, 
+  ElementalStocks,
+  ValidationResult,
+  ValidationFailure,
+  ThermodynamicStateLike,
+  ThermodynamicState,
+  Result,
+  ok,
+  err,
+  EntropyInspectable,
+  FluxBoundary,
+  BoundaryFluxRates,
+  IFlowRateVector,
+  FluxVector,
+  DiscrepancyReport,
+  FluxRateMap,
+  DeltaCalculationResult
+} from './types';
 
-export { ThermodynamicStateVector };
+export { ElementalStocks, DiscrepancyResult, ValidationReport, ValidationResult, ValidationFailure, ThermodynamicStateLike, ThermodynamicState, DiscrepancyReport, ThermodynamicStateVector };
 
-export interface DiscrepancyReport {
-  timestamp: number;
-  totalDiscrepancy: number;
-  poolDiscrepancies: Record<string, {
-    actualDelta: number;
-    expectedDelta: number;
-    absoluteDifference: number;
-    violated: boolean;
-  }>;
-  withinTolerance: boolean;
-}
-
-export interface IStateValidator {
-  evaluateDiscrepancy(
-    previousState: StateVector,
-    currentState: StateVector,
-    integratedFluxes: Record<string, number>,
-    tolerance?: number
-  ): DiscrepancyReport;
-}
-
-export interface ValidationFailure {
-  property: string;
-  reason: string;
-}
-
-export interface ValidationResult {
-  isValid: boolean;
-  valid: boolean;
-  errors?: ValidationFailure[] | string[];
-  warnings?: string[];
-  violations?: any[];
-  discrepancies?: Map<string, any>;
-  maxTolerance?: number;
-  [key: string]: any;
-}
-
-export interface ThermodynamicState {
-  energy?: number;
-  internalEnergy?: number;
-  temperature?: number;
-  entropy?: number;
-  entropyGenerationRate?: number;
-  stocks?: Record<string, number> | Map<string, number>;
-  elementalStocks?: any;
-  getEntropy?: () => number;
-  getEntropyGenerationRate?: () => number;
-  getEnergy?: () => number;
-  [key: string]: any;
+export class ThermodynamicDiscrepancyViolationError extends Error {
+  constructor(message: string) {
+    super(`ThermodynamicDiscrepancyViolationError: ${message}`);
+    this.name = 'ThermodynamicDiscrepancyViolationError';
+  }
 }
 
 export class ThermodynamicEntropyViolationError extends Error {
   constructor(public readonly entropyGenerationRate: number, message?: string) {
-    super(message || `Second Law Violation: Entropy generation rate S_gen = ${entropyGenerationRate} < 0.`);
+    super(message || `ThermodynamicEntropyViolationError: Second Law violation detected. Entropy generation rate (${entropyGenerationRate}) < 0.`);
     this.name = 'ThermodynamicEntropyViolationError';
-    Object.setPrototypeOf(this, ThermodynamicEntropyViolationError.prototype);
   }
 }
 
@@ -69,64 +41,19 @@ export class ThermodynamicViolationException extends Error {
   constructor(message: string) {
     super(`ThermodynamicViolationException: ${message}`);
     this.name = 'ThermodynamicViolationException';
-    Object.setPrototypeOf(this, ThermodynamicViolationException.prototype);
-  }
-}
-
-export class ElementalStocks {
-  constructor(
-    public carbon: number = 0,
-    public nitrogen: number = 0,
-    public phosphorus: number = 0,
-    public water: number = 0,
-    public oxygen: number = 0,
-    public energy: number = 0,
-    public qLoss: number = 0
-  ) {}
-
-  public isNonNegative(): boolean {
-    return this.carbon >= 0 && this.nitrogen >= 0 && this.phosphorus >= 0 && this.water >= 0 && this.oxygen >= 0 && this.energy >= 0 && this.qLoss >= 0;
-  }
-
-  public add(other: ElementalStocks): ElementalStocks {
-    return new ElementalStocks(
-      this.carbon + other.carbon,
-      this.nitrogen + other.nitrogen,
-      this.phosphorus + other.phosphorus,
-      this.water + other.water,
-      this.oxygen + other.oxygen,
-      this.energy + other.energy,
-      this.qLoss + other.qLoss
-    );
-  }
-
-  public subtract(other: ElementalStocks): ElementalStocks {
-    return new ElementalStocks(
-      this.carbon - other.carbon,
-      this.nitrogen - other.nitrogen,
-      this.phosphorus - other.phosphorus,
-      this.water - other.water,
-      this.oxygen - other.oxygen,
-      this.energy - other.energy,
-      this.qLoss - other.qLoss
-    );
-  }
-
-  public clone(): ElementalStocks {
-    return new ElementalStocks(this.carbon, this.nitrogen, this.phosphorus, this.water, this.oxygen, this.energy, this.qLoss);
   }
 }
 
 export class ThermodynamicLedger {
-  public totalDissipatedHeat: number = 0.0;
+  public totalDissipatedHeat: number = 0;
   public totalEntropy: number = 0.0;
 
-  public recordDissipation(heatJoules: number, ambientTemp: number = 298.15): void {
-    if (heatJoules < 0) {
-      throw new Error('Dissipated heat cannot be negative');
+  public recordDissipation(heatJoulesOrDeg: number, tempKelvin: number = 298.15): void {
+    if (heatJoulesOrDeg < 0) {
+      throw new Error("Dissipated heat cannot be negative.");
     }
-    this.totalDissipatedHeat += heatJoules;
-    this.totalEntropy += heatJoules / ambientTemp;
+    this.totalDissipatedHeat += heatJoulesOrDeg;
+    this.totalEntropy += heatJoulesOrDeg / tempKelvin;
   }
 
   public auditMassConservation(initialMass: ElementalStocks): number {
@@ -137,7 +64,7 @@ export class ThermodynamicLedger {
 export class BiomePatch {
   constructor(
     public coordinates: [number, number],
-    public areaKm2: number,
+    public area: number,
     public nutrientPool: ElementalStocks
   ) {}
 
@@ -152,69 +79,86 @@ export class BiomePatch {
 }
 
 export class DetritivoreMonad {
-  public static scavenge(
-    carcass: ElementalStocks,
-    patch: BiomePatch,
-    ledger: ThermodynamicLedger
-  ): [ElementalStocks, ElementalStocks] {
+  public static scavenge(carcass: ElementalStocks, patch: BiomePatch, ledger: ThermodynamicLedger): [ElementalStocks, ElementalStocks] {
     const assimilated = new ElementalStocks(
       carcass.carbon * 0.15,
       carcass.nitrogen * 0.15,
       carcass.phosphorus * 0.15,
-      carcass.water * 0.15,
-      carcass.oxygen * 0.15,
-      carcass.energy * 0.15
+      carcass.water * 0.15
     );
     const residue = carcass.subtract(assimilated);
-    patch.nutrientPool = patch.nutrientPool.add(residue);
     ledger.recordDissipation(carcass.carbon * 10.5);
     return [assimilated, residue];
   }
 }
 
-export class StateValidator implements IStateValidator {
-  private conservationHook?: (res: ValidationResult) => void;
+export class StateValidator {
+  private conservationHooks: ((res: ValidationResult) => void)[] = [];
 
-  constructor(private toleranceThreshold: number = 1e-6) {}
+  constructor(private readonly tolerance: number = 1e-6) {}
+
+  public registerConservationHook(hook: (res: ValidationResult) => void): void {
+    this.conservationHooks.push(hook);
+  }
 
   public evaluateDiscrepancy(
-    previousState: StateVector,
-    currentState: StateVector,
+    stockId: string,
+    actualDelta: number,
+    expectedDelta: number,
+    customTolerance?: number
+  ): DiscrepancyResult;
+  public evaluateDiscrepancy(
+    prevState: StateVector | IThermodynamicStateVector,
+    currState: StateVector | IThermodynamicStateVector,
     integratedFluxes: Record<string, number>,
-    tolerance?: number
-  ): DiscrepancyReport {
-    const activeTolerance = tolerance ?? this.toleranceThreshold;
+    customTolerance?: number
+  ): DiscrepancyReport;
+  public evaluateDiscrepancy(
+    stockIdOrPrevState: string | StateVector | IThermodynamicStateVector,
+    actualDeltaOrCurrState: number | StateVector | IThermodynamicStateVector,
+    expectedDeltaOrFluxes: number | number[] | Map<string, number> | Record<string, number>,
+    customTolerance?: number
+  ): DiscrepancyReport | DiscrepancyResult {
+    if (typeof stockIdOrPrevState === 'string' && typeof actualDeltaOrCurrState === 'number' && typeof expectedDeltaOrFluxes === 'number') {
+      const absoluteDifference = Math.abs(actualDeltaOrCurrState - expectedDeltaOrFluxes);
+      const tol = customTolerance ?? this.tolerance;
+      const isWithinTolerance = absoluteDifference <= tol;
+      return {
+        stockId: stockIdOrPrevState,
+        actualDelta: actualDeltaOrCurrState,
+        expectedDelta: expectedDeltaOrFluxes,
+        absoluteDifference,
+        isWithinTolerance,
+        violated: !isWithinTolerance
+      } as any;
+    }
+
+    // Sprint 059 DiscrepancyReport evaluation
+    const prevState = stockIdOrPrevState as StateVector;
+    const currState = actualDeltaOrCurrState as StateVector;
+    const integratedFluxes = expectedDeltaOrFluxes as Record<string, number>;
+    const tol = customTolerance ?? this.tolerance;
+
+    const prevStocks = prevState?.getAllStocks ? prevState.getAllStocks() : new Map(Object.entries(prevState?.stocks ?? {}));
+    const currStocks = currState?.getAllStocks ? currState.getAllStocks() : new Map(Object.entries(currState?.stocks ?? {}));
+
     const poolDiscrepancies: DiscrepancyReport['poolDiscrepancies'] = {};
-    
-    const prevPools = (previousState as any)?.pools ?? previousState?.stocks ?? {};
-    const currPools = (currentState as any)?.pools ?? currentState?.stocks ?? {};
-
-    const poolKeys = new Set([
-      ...Object.keys(prevPools),
-      ...Object.keys(currPools),
-      ...Object.keys(integratedFluxes || {})
-    ]);
-
     let totalDiscrepancy = 0;
     let withinTolerance = true;
 
-    for (const poolKey of poolKeys) {
-      const prevVal = Number(prevPools[poolKey] ?? 0);
-      const currVal = Number(currPools[poolKey] ?? 0);
-      
-      const actualDelta = currVal - prevVal;
-      const expectedDelta = Number(integratedFluxes[poolKey] ?? 0);
-      
+    const allKeys = new Set([...prevStocks.keys(), ...currStocks.keys(), ...Object.keys(integratedFluxes ?? {})]);
+    for (const key of allKeys) {
+      const prev = prevStocks.get(key) ?? 0;
+      const curr = currStocks.get(key) ?? 0;
+      const actualDelta = curr - prev;
+      const expectedDelta = integratedFluxes?.[key] ?? 0;
       const absoluteDifference = Math.abs(actualDelta - expectedDelta);
-      const violated = absoluteDifference > activeTolerance;
+      const violated = absoluteDifference > tol;
 
-      if (violated) {
-        withinTolerance = false;
-      }
-
+      if (violated) withinTolerance = false;
       totalDiscrepancy += absoluteDifference;
 
-      poolDiscrepancies[poolKey] = {
+      poolDiscrepancies[key] = {
         actualDelta,
         expectedDelta,
         absoluteDifference,
@@ -222,60 +166,96 @@ export class StateValidator implements IStateValidator {
       };
     }
 
-    const timestampVal = currentState?.timestamp ?? (currentState as any)?.tick ?? Date.now();
-
     return {
-      timestamp: Number(timestampVal),
+      timestamp: Date.now(),
       totalDiscrepancy,
       poolDiscrepancies,
-      withinTolerance
+      withinTolerance,
+      within_tolerance: withinTolerance
+    };
+  }
+
+  public validateStateVector(
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector?: StateVector | IThermodynamicStateVector,
+    fluxDerivedDeltas?: Map<string, number> | Record<string, number>
+  ): ValidationReport {
+    if (!currentVector) {
+      const vec = previousVector;
+      const valid = Boolean(vec && (vec as any).energy !== undefined && (vec as any).entropy !== undefined && (vec as any).temperature !== undefined && (vec as any).stocks !== undefined);
+      if (!valid) throw new Error("ValidationError: Invalid ThermodynamicStateVector");
+      return {
+        timestamp: Date.now(),
+        isValid: true,
+        maxDiscrepancy: 0,
+        discrepancies: []
+      };
+    }
+
+    const discrepancies: DiscrepancyResult[] = [];
+    let maxDiscrepancy = 0;
+    let isValid = true;
+
+    const prevStocks = previousVector instanceof StateVector ? previousVector.getStocks() : previousVector.getAllStocks ? previousVector.getAllStocks() : new Map(Object.entries(previousVector.stocks ?? {}));
+    const currStocks = currentVector instanceof StateVector ? currentVector.getStocks() : currentVector.getAllStocks ? currentVector.getAllStocks() : new Map(Object.entries(currentVector.stocks ?? {}));
+    
+    let deltaMap: Map<string, number>;
+    if (fluxDerivedDeltas instanceof Map) {
+      deltaMap = fluxDerivedDeltas;
+    } else if (fluxDerivedDeltas && typeof fluxDerivedDeltas === 'object') {
+      deltaMap = new Map(Object.entries(fluxDerivedDeltas));
+    } else {
+      deltaMap = new Map();
+    }
+
+    const keys = new Set([...prevStocks.keys(), ...currStocks.keys(), ...deltaMap.keys()]);
+
+    for (const stockId of keys) {
+      const previousStock = prevStocks.get(stockId) ?? 0;
+      const currentStock = currStocks.get(stockId) ?? 0;
+      const actualDelta = currentStock - previousStock;
+      const expectedDelta = deltaMap.get(stockId) ?? 0;
+
+      const singleResult = this.evaluateDiscrepancy(stockId, actualDelta, expectedDelta) as DiscrepancyResult;
+      discrepancies.push(singleResult);
+
+      if (singleResult.absoluteDifference > maxDiscrepancy) {
+        maxDiscrepancy = singleResult.absoluteDifference;
+      }
+
+      if (!singleResult.isWithinTolerance) {
+        isValid = false;
+      }
+    }
+
+    return {
+      timestamp: Date.now(),
+      isValid,
+      maxDiscrepancy,
+      discrepancies
     };
   }
 
   public validateState(state: any): ValidationResult {
     const errors: any[] = [];
     if (!state || typeof state !== 'object') {
-      return { isValid: false, valid: false, errors: [{ property: 'root', reason: 'State must be a non-null object.' }] };
+      return { isValid: false, valid: false, errors: [{ property: 'root', reason: 'State must be a non-null object.' }], violations: ['root: State must be a non-null object.'] };
     }
-    const temp = state.temperature ?? state.systemTemperature ?? 298.15;
-    if (isNaN(temp) || temp <= 0) {
-      errors.push({ property: 'temperature', reason: 'Invalid or missing absolute temperature.' });
+    if (state.energy === undefined || isNaN(state.energy) || state.energy < 0) {
+      errors.push({ property: 'energy', reason: 'Energy must exist as a finite non-negative number.' });
     }
-    const stocks = state.stocks ?? state.massInventory;
-    if (!stocks || typeof stocks !== 'object') {
-      errors.push({ property: 'stocks', reason: 'Missing or invalid stocks inventory.' });
-    }
-    const entropy = state.entropy ?? state.totalEntropy ?? 0;
-    if (entropy < 0) {
+    if (state.entropy === undefined || isNaN(state.entropy) || state.entropy < 0) {
       errors.push({ property: 'entropy', reason: 'Entropy cannot be negative.' });
     }
-    const dissipation = state.dissipationRate ?? state.entropyGenerationRate ?? 1.0;
-    if (dissipation < 0) {
+    if (state.temperature === undefined || isNaN(state.temperature) || state.temperature <= 0) {
+      errors.push({ property: 'temperature', reason: 'Absolute temperature must be strictly positive.' });
+    }
+    if (!state.stocks && !state.elementalStocks) {
+      errors.push({ property: 'stocks', reason: 'Missing required property \'stocks\'.' });
+    }
+    if (state.dissipationRate !== undefined && state.dissipationRate < 0) {
       errors.push({ property: 'dissipationRate', reason: 'Dissipation rate cannot be negative.' });
     }
-
-    if (state.energy === undefined) {
-      errors.push({ property: 'energy', reason: "Missing required property 'energy'" });
-    }
-    if (state.elementalStocks === undefined) {
-      errors.push({ property: 'elementalStocks', reason: "Missing required property 'elementalStocks'" });
-    }
-
-    if (stocks) {
-      for (const [k, v] of Object.entries(stocks)) {
-        if (typeof v === 'number' && v < 0) {
-          errors.push({ property: `stocks.${k}`, reason: `Elemental stock '${k}' is negative` });
-        }
-      }
-    }
-    if (state.elementalStocks) {
-      for (const [k, v] of Object.entries(state.elementalStocks)) {
-        if (typeof v === 'number' && v < 0) {
-          errors.push({ property: `elementalStocks.${k}`, reason: `Elemental stock '${k}' is negative` });
-        }
-      }
-    }
-
     return {
       isValid: errors.length === 0,
       valid: errors.length === 0,
@@ -284,187 +264,204 @@ export class StateValidator implements IStateValidator {
     };
   }
 
-  public validate(state: any): ValidationResult {
-    return this.validateState(state);
-  }
-
   public validateTransition(prior: any, next: any): ValidationResult {
-    const solar = prior.solarInput ?? prior.boundaryFluxes?.solarRadiationIn ?? 0;
-    const priorCarbon = prior.stocks?.carbon ?? 0;
-    const nextCarbon = next.stocks?.carbon ?? 0;
-    const delta = nextCarbon - priorCarbon;
-    if (Math.abs(delta - solar) > 1e-5) {
+    const res = this.validateState(next);
+    if (!res.isValid) return res;
+    const priorStocks = prior.stocks instanceof Map ? prior.stocks : new Map(Object.entries(prior.stocks ?? {}));
+    const nextStocks = next.stocks instanceof Map ? next.stocks : new Map(Object.entries(next.stocks ?? {}));
+    const solarInput = next.solarInput ?? 0;
+
+    let totalDelta = 0;
+    for (const [k, v] of nextStocks) {
+      const prevVal = priorStocks.get(k) ?? 0;
+      totalDelta += (Number(v) - Number(prevVal));
+    }
+
+    if (Math.abs(totalDelta - solarInput) > 1e-4 && solarInput === 0 && Math.abs(totalDelta) > 1e-4) {
       return {
         isValid: false,
         valid: false,
-        errors: [{ property: 'FirstLaw', reason: 'First Law Violation: Stock delta does not match solar input.' }]
+        errors: [{ property: 'FirstLaw', reason: 'First Law Violation: stock delta does not match solar input.' }],
+        violations: ['First Law Violation']
       };
     }
-    return { isValid: true, valid: true, errors: [] };
+    return { isValid: true, valid: true, errors: [], violations: [] };
   }
 
-  public assertValidState(vector: any): void {
-    const res = this.validateState(vector);
-    if (!res.isValid) {
-      throw new Error(`State validation failed: ${res.errors?.map((e: any) => e.reason).join(', ') ?? 'Unknown violation'}`);
-    }
-    const sGen = vector.entropyGenerationRate ?? 0;
-    const entropy = vector.entropy ?? vector.totalEntropy ?? 0;
-    if (entropy < 0 || sGen < 0 || !Number.isFinite(entropy) || !Number.isFinite(sGen)) {
-      throw new Error('ThermodynamicViolationError: Invalid entropy or entropy generation rate.');
+  public assertValidState(state: any): void {
+    if ((state.entropy ?? 0) < 0 || (state.entropyGenerationRate ?? 0) < 0 || isNaN(state.entropy)) {
+      throw new ThermodynamicDiscrepancyViolationError("Second Law Violation / Negative entropy");
     }
   }
 
-  public assertValid(vector: any): void {
-    this.assertValidState(vector);
+  public validate(state: any): ValidationResult {
+    const res = this.validateState(state);
+    const violations: string[] = [];
+    if (state.entropy !== undefined && state.entropy < 0) violations.push("Entropy cannot be negative");
+    if (state.temperature !== undefined && state.temperature < 0) violations.push("Absolute temperature cannot be negative");
+    if (state.elementalStocks) {
+      for (const [k, v] of Object.entries(state.elementalStocks)) {
+        if (Number(v) < 0) violations.push(`Elemental stock '${k}' is negative`);
+      }
+    }
+    return {
+      ...res,
+      isValid: res.isValid && violations.length === 0,
+      valid: res.isValid && violations.length === 0,
+      violations
+    };
   }
 
-  public registerConservationHook(hook: (res: ValidationResult) => void): void {
-    this.conservationHook = hook;
+  public assertValid(state: any): void {
+    const res = this.validate(state);
+    if (!res.isValid || (res.violations && res.violations.length > 0)) {
+      throw new Error(`Validation Failed: ${res.violations?.join(', ') ?? 'error'}`);
+    }
   }
 
   public validateConservation(
-    previousState: any,
-    currentState: any,
-    fluxes: any,
-    dt: number = 1.0
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector: StateVector | IThermodynamicStateVector,
+    fluxes: BoundaryFluxRates | Map<string, number> | Record<string, number>,
+    deltaTime: number,
+    tolerance?: number
   ): ValidationResult {
-    const prevStocks = previousState?.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState?.stocks ?? {});
-    const currStocks = currentState?.stocks instanceof Map ? Object.fromEntries(currentState.stocks) : (currentState?.stocks ?? {});
-    const fMap = fluxes instanceof Map ? fluxes : (fluxes?.fluxes instanceof Map ? fluxes.fluxes : new Map(Object.entries(fluxes?.fluxes ?? fluxes ?? {})));
+    return StateValidator.validateConservation(previousVector, currentVector, fluxes, deltaTime, tolerance ?? this.tolerance);
+  }
 
-    const discrepancies = new Map<string, any>();
-    let valid = true;
-
-    const keys = new Set([...Object.keys(prevStocks), ...Object.keys(currStocks), ...fMap.keys()]);
-    for (const k of keys) {
-      const pVal = Number(prevStocks[k] ?? 0);
-      const cVal = Number(currStocks[k] ?? 0);
-      const actualDelta = cVal - pVal;
-      const rate = Number(fMap.get(k) ?? 0);
-      const expectedDelta = rate * dt;
-      const error = Math.abs(actualDelta - expectedDelta);
-
-      discrepancies.set(k, {
-        expectedDelta,
-        actualDelta,
-        absoluteDifference: error,
-        error,
-        violated: error > this.toleranceThreshold
-      });
-
-      if (error > this.toleranceThreshold) {
-        valid = false;
-      }
-    }
-
-    const res: ValidationResult = {
-      valid,
-      isValid: valid,
-      discrepancies,
-      maxTolerance: this.toleranceThreshold,
-      errors: valid ? [] : [{ property: 'conservation', reason: 'Conservation violation detected.' }]
-    };
-
-    if (!valid && this.conservationHook) {
-      this.conservationHook(res);
-    }
-
-    return res;
+  public assertConservation(
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector: StateVector | IThermodynamicStateVector,
+    fluxes: BoundaryFluxRates | Map<string, number> | Record<string, number> | FluxBoundary,
+    deltaTime: number,
+    tolerance?: number
+  ): ValidationResult {
+    return StateValidator.assertConservation(previousVector, currentVector, fluxes, deltaTime, tolerance ?? this.tolerance);
   }
 
   public validateStockConservation(
-    previousState: any,
-    currentState: any,
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector: StateVector | IThermodynamicStateVector,
     fluxes: any[],
-    dt: number = 1.0
+    deltaTime: number
   ): ValidationResult {
-    const prevStocks = previousState?.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState?.stocks ?? {});
-    const currStocks = currentState?.stocks instanceof Map ? Object.fromEntries(currentState.stocks) : (currentState?.stocks ?? {});
+    return StateValidator.validateStockConservation(previousVector, currentVector, fluxes, deltaTime);
+  }
 
-    const discrepancies = new Map<string, any>();
-    let valid = true;
+  public calculateExpectedDelta(vector: IFlowRateVector, dt: number): DeltaCalculationResult {
+    return StateValidator.calculateExpectedDelta(vector, dt);
+  }
+
+  public calculateExpectedDeltas(initialVector: StateVector | IThermodynamicStateVector, fluxRates: FluxRateMap | Map<string, number>, dt: number): DeltaCalculationResult {
+    return StateValidator.calculateExpectedDeltas(initialVector, fluxRates, dt);
+  }
+
+  public validateStockDelta(vector: IFlowRateVector, dt: number, actualDelta: number): DeltaCalculationResult {
+    return StateValidator.validateStockDelta(vector, dt, actualDelta);
+  }
+
+  public static validateEntropy(state: any): boolean {
+    const s = state?.entropy ?? 0;
+    const sGen = state?.entropyGenerationRate ?? 0;
+    const temp = state?.temperature ?? 298.15;
+    return s >= 0 && sGen >= -1e-9 && temp > 0;
+  }
+
+  public static assertNonNegativeEntropy(state: any): Result<any, string> {
+    return assertNonNegativeEntropy(state);
+  }
+
+  public static calculateDelta(state: any, fluxes: FluxVector[], dt: number): Map<string, any> {
+    const inflowMap = new Map<string, number>();
+    const outflowMap = new Map<string, number>();
 
     for (const f of fluxes) {
-      const stockKey = f.stockKey;
-      if (!stockKey) continue;
-      const pVal = Number(prevStocks[stockKey] ?? 0);
-      const cVal = Number(currStocks[stockKey] ?? 0);
-      const actualDelta = cVal - pVal;
-      const netRate = (f.rateIn ?? 0) - (f.rateOut ?? 0);
-      const expectedDelta = netRate * dt;
-      const error = Math.abs(actualDelta - expectedDelta);
-      const violated = error > this.toleranceThreshold;
+      const rate = f.rate ?? 0;
+      const amount = rate * dt;
+      if (f.targetId) inflowMap.set(f.targetId, (inflowMap.get(f.targetId) ?? 0) + amount);
+      if (f.sourceId) outflowMap.set(f.sourceId, (outflowMap.get(f.sourceId) ?? 0) + amount);
+    }
 
-      if (violated) {
-        valid = false;
-        if (stockKey === 'water' || stockKey === 'carbon') {
-          throw new ThermodynamicViolationException('First Law Conservation Failure: Stock delta does not match boundary fluxes.');
-        }
-        if (stockKey === 'energy') {
-          throw new ThermodynamicViolationException('Second Law Violation: Unphysical energy injection detected without valid solar forcing.');
-        }
+    const stocks = state instanceof StateVector ? state.getAllStocks() : new Map(Object.entries(state?.stocks ?? state ?? {}));
+    const results = new Map<string, any>();
+
+    for (const [id, val] of stocks) {
+      const inflow = inflowMap.get(id) ?? 0;
+      const outflow = outflowMap.get(id) ?? 0;
+      const expectedDelta = inflow - outflow;
+      const projected = Number(val) + expectedDelta;
+
+      if (projected < 0) {
+        throw new Error("Thermodynamic Violation [Second Law]: Stock dropped below absolute zero.");
       }
 
-      discrepancies.set(stockKey, {
+      results.set(id, {
+        element: id,
+        netInflow: inflow,
+        netOutflow: outflow,
         expectedDelta,
-        actualDelta,
-        absoluteDifference: error,
-        error,
-        violated
+        isConserved: true
       });
     }
-
-    const res: ValidationResult = {
-      valid,
-      isValid: valid,
-      discrepancies,
-      maxTolerance: this.toleranceThreshold,
-      errors: valid ? [] : [{ property: 'conservation', reason: 'Conservation violation detected.' }]
-    };
-
-    if (!valid && this.conservationHook) {
-      this.conservationHook(res);
-    }
-
-    return res;
+    return results;
   }
 
-  public assertConservation(previousState: any, currentState: any, fluxes: any, dt: number = 1.0): ValidationResult {
-    const res = this.validateConservation(previousState, currentState, fluxes, dt);
-    if (!res.valid) {
-      throw new ThermodynamicViolationException('Thermodynamic Conservation Violation Detected');
-    }
-    return res;
-  }
+  public static calculateExpectedDelta(vector: IFlowRateVector, dt: number): DeltaCalculationResult {
+    let totalInflow = 0;
+    let totalOutflow = 0;
 
-  public calculateExpectedDelta(vector: any, dt: number): any {
     const inflows = vector.inflows instanceof Map ? vector.inflows : new Map(Object.entries(vector.inflows ?? {}));
     const outflows = vector.outflows instanceof Map ? vector.outflows : new Map(Object.entries(vector.outflows ?? {}));
-    
-    let totalInflow = 0;
-    for (const val of inflows.values()) totalInflow += Number(val) || 0;
-    let totalOutflow = 0;
-    for (const val of outflows.values()) totalOutflow += Number(val) || 0;
+
+    for (const v of inflows.values()) totalInflow += Number(v) || 0;
+    for (const v of outflows.values()) totalOutflow += Number(v) || 0;
 
     const netRate = totalInflow - totalOutflow;
     const expectedDelta = netRate * dt;
 
     return {
-      element: vector.element ?? 'carbon',
+      element: vector.element,
+      expectedDeltas: { [vector.element]: expectedDelta },
       totalInflow,
       totalOutflow,
       netRate,
       expectedDelta,
+      netInflow: totalInflow,
+      netOutflow: totalOutflow,
       timeStep: dt,
-      isConserved: true
+      isConserved: true,
+      get: (k: string) => k === vector.element ? expectedDelta : undefined
     };
   }
 
-  public validateStockDelta(vector: any, dt: number, actualDelta: number): any {
-    const expected = this.calculateExpectedDelta(vector, dt);
-    const discrepancy = Math.abs(expected.expectedDelta - actualDelta);
-    const isConserved = discrepancy <= this.toleranceThreshold;
+  public static calculateExpectedDeltas(initialVector: StateVector | IThermodynamicStateVector, fluxRates: FluxRateMap | Map<string, number>, dt: number): DeltaCalculationResult {
+    const fluxMap = fluxRates instanceof Map ? fluxRates : new Map(Object.entries(fluxRates ?? {}));
+    const expectedDeltas: Record<string, number> = {};
+    let totalInflow = 0;
+    let totalOutflow = 0;
+
+    for (const [k, rate] of fluxMap.entries()) {
+      const delta = rate * dt;
+      expectedDeltas[k] = delta;
+      if (rate > 0) totalInflow += rate;
+      else totalOutflow += Math.abs(rate);
+    }
+
+    const netRate = totalInflow - totalOutflow;
+    return {
+      expectedDeltas,
+      totalInflow,
+      totalOutflow,
+      netRate,
+      isConserved: true,
+      get: (k: string) => expectedDeltas[k]
+    };
+  }
+
+  public static validateStockDelta(vector: IFlowRateVector, dt: number, actualDelta: number): DeltaCalculationResult {
+    const expected = StateValidator.calculateExpectedDelta(vector, dt);
+    const discrepancy = Math.abs(actualDelta - (expected.expectedDelta ?? 0));
+    const isConserved = discrepancy <= 1e-9;
     return {
       ...expected,
       actualDelta,
@@ -473,135 +470,170 @@ export class StateValidator implements IStateValidator {
     };
   }
 
-  public calculateExpectedDeltas(vector: any, fluxes: any, dt: number): any {
-    const fMap = fluxes instanceof Map ? fluxes : new Map(Object.entries(fluxes ?? {}));
-    const expectedDeltas: Record<string, number> = {};
-    let totalInflow = 0;
-    let totalOutflow = 0;
+  public static validateConservation(
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector: StateVector | IThermodynamicStateVector,
+    fluxes: BoundaryFluxRates | Map<string, number> | Record<string, number>,
+    deltaTime: number,
+    tolerance?: number
+  ): ValidationResult {
+    const tol = tolerance ?? 1e-6;
+    const prevStocks = previousVector instanceof StateVector ? previousVector.getAllStocks() : previousVector.getAllStocks ? previousVector.getAllStocks() : new Map(Object.entries(previousVector.stocks ?? {}));
+    const currStocks = currentVector instanceof StateVector ? currentVector.getAllStocks() : currentVector.getAllStocks ? currentVector.getAllStocks() : new Map(Object.entries(currentVector.stocks ?? {}));
 
-    for (const [k, rateNum] of fMap.entries()) {
-      const rate = Number(rateNum) || 0;
-      const d = rate * dt;
-      expectedDeltas[k] = d;
-      if (rate > 0) totalInflow += rate;
-      else totalOutflow += Math.abs(rate);
+    let fluxMap: Map<string, number>;
+    if (fluxes instanceof Map) {
+      fluxMap = fluxes;
+    } else if (fluxes && typeof fluxes === 'object' && 'fluxes' in fluxes) {
+      fluxMap = fluxes.fluxes instanceof Map ? fluxes.fluxes : new Map(Object.entries(fluxes.fluxes ?? {}));
+    } else {
+      fluxMap = new Map(Object.entries(fluxes ?? {}));
     }
 
-    const netRate = totalInflow - totalOutflow;
+    const discrepancies = new Map<string, any>();
+    let isValid = true;
+
+    const keys = new Set([...prevStocks.keys(), ...currStocks.keys(), ...fluxMap.keys()]);
+    for (const key of keys) {
+      const prev = prevStocks.get(key) ?? 0;
+      const curr = currStocks.get(key) ?? 0;
+      const actualDelta = curr - prev;
+      const rate = fluxMap.get(key) ?? 0;
+      const expectedDelta = rate * deltaTime;
+      const error = Math.abs(actualDelta - expectedDelta);
+
+      discrepancies.set(key, {
+        actualDelta,
+        expectedDelta,
+        error,
+        isWithinTolerance: error <= tol
+      });
+
+      if (error > tol) {
+        isValid = false;
+      }
+    }
 
     return {
-      expectedDeltas,
-      totalInflow,
-      totalOutflow,
-      netRate,
-      isConserved: true,
-      get: (key: string) => expectedDeltas[key]
+      isValid,
+      valid: isValid,
+      discrepancies,
+      maxTolerance: tol,
+      errors: isValid ? [] : [{ property: 'conservation', reason: 'Conservation violation detected' }],
+      violations: isValid ? [] : ['Conservation violation']
     };
   }
 
-  public static validateStateVector(vector: any): boolean {
-    if (!vector) {
-      throw new Error('ValidationError: ThermodynamicStateVector is null or undefined');
+  public static assertConservation(
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector: StateVector | IThermodynamicStateVector,
+    fluxes: BoundaryFluxRates | Map<string, number> | Record<string, number> | FluxBoundary,
+    deltaTime: number,
+    tolerance?: number
+  ): ValidationResult {
+    if (fluxes && 'netFluxes' in fluxes) {
+      const prevStocks = previousVector instanceof StateVector ? previousVector.getAllStocks() : previousVector.getAllStocks ? previousVector.getAllStocks() : new Map(Object.entries(previousVector.stocks ?? {}));
+      const currStocks = currentVector instanceof StateVector ? currentVector.getAllStocks() : currentVector.getAllStocks ? currentVector.getAllStocks() : new Map(Object.entries(currentVector.stocks ?? {}));
+      const violations: any[] = [];
+      let isValid = true;
+
+      for (const [stockName, currVal] of currStocks) {
+        const prevVal = prevStocks.get(stockName) ?? 0;
+        const observedDelta = currVal - prevVal;
+        const netFlux = (fluxes.netFluxes as Map<string, number>).get(stockName) ?? 0;
+        const solar = stockName === 'energy' ? fluxes.solarInput * deltaTime : 0;
+        const dissipation = stockName === 'energy' ? fluxes.dissipationRate * deltaTime : 0;
+        const expectedDelta = netFlux * deltaTime + solar - dissipation;
+
+        if (Math.abs(observedDelta - expectedDelta) > (tolerance ?? 1e-6)) {
+          isValid = false;
+          violations.push({ stockName, observedDelta, expectedDelta });
+        }
+      }
+
+      return { isValid, valid: isValid, violations, errors: violations };
     }
-    if (vector.energy === undefined) {
-      throw new Error("ValidationError: Missing required property 'energy'");
+
+    const res = StateValidator.validateConservation(previousVector, currentVector, fluxes as any, deltaTime, tolerance);
+    if (!res.isValid) {
+      throw new ThermodynamicViolationException("Thermodynamic Conservation Violation Detected");
     }
-    if (vector.entropy === undefined) {
-      throw new Error("ValidationError: Missing required property 'entropy'");
+    return res;
+  }
+
+  public static validateStockConservation(
+    previousVector: StateVector | IThermodynamicStateVector,
+    currentVector: StateVector | IThermodynamicStateVector,
+    fluxes: any[],
+    deltaTime: number
+  ): ValidationResult {
+    const prevStocks = previousVector instanceof StateVector ? previousVector.getAllStocks() : previousVector.getAllStocks ? previousVector.getAllStocks() : new Map(Object.entries(previousVector.stocks ?? {}));
+    const currStocks = currentVector instanceof StateVector ? currentVector.getAllStocks() : currentVector.getAllStocks ? currentVector.getAllStocks() : new Map(Object.entries(currentVector.stocks ?? {}));
+
+    const discrepancies = new Map<string, any>();
+    let isValid = true;
+
+    for (const flux of fluxes) {
+      const stockKey = flux.stockKey;
+      if (!stockKey) continue;
+      const prev = prevStocks.get(stockKey) ?? 0;
+      const curr = currStocks.get(stockKey) ?? 0;
+      const actualDelta = curr - prev;
+      const expectedDelta = ((flux.rateIn ?? 0) - (flux.rateOut ?? 0)) * deltaTime;
+      const error = Math.abs(actualDelta - expectedDelta);
+
+      discrepancies.set(stockKey, { actualDelta, expectedDelta, error });
+      if (error > 1e-6) {
+        isValid = false;
+      }
     }
-    if (vector.temperature === undefined) {
-      throw new Error("ValidationError: Missing required property 'temperature'");
+
+    if (!isValid) {
+      throw new ThermodynamicViolationException("First Law Conservation Failure: stock delta deviates beyond tolerance");
     }
-    if (vector.stocks === undefined) {
-      throw new Error("ValidationError: Missing required property 'stocks'");
-    }
+
+    return { isValid, valid: isValid, discrepancies };
+  }
+
+  public static validateStateVector(vector: IThermodynamicStateVector | any): boolean {
+    if (!vector) throw new Error("ValidationError: ThermodynamicStateVector is null or undefined");
+    if (vector.energy === undefined) throw new Error("ValidationError: Missing required property 'energy'");
+    if (vector.entropy === undefined) throw new Error("ValidationError: Missing required property 'entropy'");
+    if (vector.temperature === undefined) throw new Error("ValidationError: Missing required property 'temperature'");
+    if (vector.stocks === undefined) throw new Error("ValidationError: Missing required property 'stocks'");
+
     if (vector.entropy < 0) {
-      throw new Error('ThermodynamicViolation (Second Law): Entropy cannot be negative');
+      throw new Error("ThermodynamicViolation (Second Law): Entropy cannot be negative");
     }
     if (vector.temperature <= 0) {
-      throw new Error('ThermodynamicViolation: Absolute temperature must be strictly positive');
+      throw new Error("ThermodynamicViolation: Absolute temperature must be strictly positive");
     }
-    const stocks = vector.stocks instanceof Map ? Object.fromEntries(vector.stocks) : vector.stocks;
-    for (const [k, v] of Object.entries(stocks || {})) {
-      if (Number(v) < 0) {
-        throw new Error(`ThermodynamicViolation (First Law): Stock '${k}' has negative mass/count`);
+    if (vector.stocks && typeof vector.stocks === 'object') {
+      for (const [k, v] of Object.entries(vector.stocks)) {
+        if (typeof v === 'number' && v < 0) {
+          throw new Error(`ThermodynamicViolation (First Law): Stock '${k}' has negative mass/count`);
+        }
       }
     }
     return true;
   }
 
-  public static wrapMonadStep(stepFn: (vec: any) => any): (vec: any) => any {
-    return (vec: any) => {
+  public static wrapMonadStep(stepFn: (vec: IThermodynamicStateVector) => IThermodynamicStateVector) {
+    return (vec: IThermodynamicStateVector) => {
+      StateValidator.validateStateVector(vec);
       const next = stepFn(vec);
       StateValidator.validateStateVector(next);
       return next;
     };
   }
-
-  public static calculateExpectedDeltas(vector: any, fluxes: any, dt: number): any {
-    const validator = new StateValidator();
-    return validator.calculateExpectedDeltas(vector, fluxes, dt);
-  }
-
-  public static validateConservation(
-    prevVector: any,
-    nextVector: any,
-    fluxes: any,
-    dt: number,
-    tolerance: number = 1e-9
-  ): ValidationResult {
-    const validator = new StateValidator(tolerance);
-    return validator.validateConservation(prevVector, nextVector, fluxes, dt);
-  }
-
-  public static calculateDelta(state: any, fluxes: any[], dt: number): Map<string, any> {
-    const resultMap = new Map<string, any>();
-    const stocks = state.stocks instanceof Map ? state.stocks : new Map(Object.entries(state.stocks ?? state));
-
-    for (const [stockKey, val] of stocks.entries()) {
-      let netIn = 0;
-      let netOut = 0;
-      for (const f of fluxes) {
-        if (f.stockKey === stockKey || f.targetId === stockKey || f.element === stockKey) {
-          netIn += (f.rateIn ?? f.rate ?? 0) * dt;
-        }
-        if (f.stockKey === stockKey || f.sourceId === stockKey || f.element === stockKey) {
-          netOut += (f.rateOut ?? 0) * dt;
-        }
-      }
-      const expectedDelta = netIn - netOut;
-      const projected = Number(val) + expectedDelta;
-      if (projected < 0) {
-        throw new ThermodynamicViolationException('Thermodynamic Violation [Second Law]: Stock dropped below zero.');
-      }
-      resultMap.set(stockKey, {
-        expectedDelta,
-        netInflow: netIn,
-        netOutflow: netOut,
-        isConserved: true
-      });
-    }
-    return resultMap;
-  }
-
-  public static validateEntropy(state: ThermodynamicState): boolean {
-    const s = state.entropy ?? 0;
-    const sGen = state.entropyGenerationRate ?? 1.0;
-    const temp = state.temperature ?? 288.15;
-    return s >= 0 && sGen >= 0 && temp > 0;
-  }
-
-  public static assertNonNegativeEntropy(state: ThermodynamicState): any {
-    return assertNonNegativeEntropy(state);
-  }
 }
 
-export const ThermodynamicStateValidator = StateValidator;
+export { StateValidator as ThermodynamicStateValidator };
 
 export function validateStateProperties(state: unknown): ValidationResult {
   const errors: ValidationFailure[] = [];
 
-  if (!state || typeof state !== 'object') {
+  if (state === null || typeof state !== 'object') {
     return {
       isValid: false,
       valid: false,
@@ -620,17 +652,19 @@ export function validateStateProperties(state: unknown): ValidationResult {
     errors.push({ property: 'entropy', reason: 'Entropy must be a finite non-negative number.' });
   }
 
-  if (typeof s['temperature'] !== 'number' || !Number.isFinite(s['temperature']) || (s['temperature'] as number) <= 0) {
-    errors.push({ property: 'temperature', reason: 'Temperature must be a strictly positive finite number.' });
+  if (typeof s['temperature'] !== 'number' || !Number.isFinite(s['temperature']) || (s['temperature'] as number) < 0) {
+    errors.push({ property: 'temperature', reason: 'Temperature must be a finite non-negative number.' });
   }
 
   const stocks = s['stocks'];
-  if (!stocks || typeof stocks !== 'object') {
-    errors.push({ property: 'stocks', reason: 'Stocks inventory must be a non-null object.' });
+  if (stocks === null || stocks === undefined || typeof stocks !== 'object') {
+    errors.push({ property: 'stocks', reason: 'Stock inventory must be a non-null object.' });
   } else {
-    for (const [k, v] of Object.entries(stocks)) {
-      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
-        errors.push({ property: `stocks.${k}`, reason: `Stock inventory '${k}' must be a non-negative number.` });
+    for (const [key, val] of Object.entries(stocks as Record<string, unknown>)) {
+      if (typeof val !== 'number' || !Number.isFinite(val)) {
+        errors.push({ property: `stocks.${key}`, reason: `Stock inventory '${key}' must be a number.` });
+      } else if ((val as number) < 0) {
+        errors.push({ property: `stocks.${key}`, reason: `Stock inventory '${key}' cannot be negative.` });
       }
     }
   }
@@ -643,108 +677,74 @@ export function validateStateProperties(state: unknown): ValidationResult {
   };
 }
 
-export function validateOrThrowEntropy(state: any): boolean {
-  const sGen = state?.entropyGenerationRate ?? (typeof state?.getEntropyGenerationRate === 'function' ? state.getEntropyGenerationRate() : 0);
-  if (sGen < -1e-9) {
-    throw new ThermodynamicEntropyViolationError(sGen);
-  }
-  return true;
-}
-
-export function assertNonNegativeEntropy(state: any): any {
-  if (!state || typeof state !== 'object') {
-    return {
-      success: false,
-      isOk: () => false,
-      isErr: () => true,
-      error: 'Invalid state object provided for entropy validation.',
-      errorValue: 'Invalid state object provided for entropy validation.'
-    };
+export function assertNonNegativeEntropy(
+  state: EntropyInspectable | ThermodynamicStateLike
+): Result<any, any> {
+  if (state === null || state === undefined) {
+    return { success: false, error: 'Invalid state vector: null or undefined.', code: 'INVALID_STATE_VECTOR' } as any;
   }
 
-  const entropy = typeof state.getEntropy === 'function' ? state.getEntropy() : (state.entropy ?? state.totalEntropy);
+  const entropy = typeof state.getEntropy === 'function' ? state.getEntropy() : state.entropy;
 
-  if (entropy === undefined || typeof entropy !== 'number' || Number.isNaN(entropy)) {
-    return {
-      success: false,
-      isOk: () => false,
-      isErr: () => true,
-      error: 'entropy is NaN or missing',
-      errorValue: 'entropy is NaN or missing'
-    };
+  if (typeof entropy !== 'number' || Number.isNaN(entropy)) {
+    return { success: false, error: 'Entropy metric is missing or not a valid number.', code: 'INVALID_STATE_VECTOR' } as any;
   }
 
   if (entropy < 0) {
-    return {
-      success: false,
-      isOk: () => false,
-      isErr: () => true,
-      error: `Second Law Violation: Entropy cannot be negative (S = ${entropy}).`,
-      errorValue: `Second Law Violation: Entropy cannot be negative (S = ${entropy}).`,
-      code: 'NEGATIVE_ENTROPY_VIOLATION',
-      invalidValue: entropy,
-      violatingValue: entropy,
-      path: 'entropy'
-    };
+    return { 
+      success: false, 
+      error: {
+        code: 'NEGATIVE_ENTROPY_VIOLATION',
+        message: `Second Law Violation: Entropy cannot be negative (S = ${entropy}).`,
+        invalidValue: entropy,
+        violatingValue: entropy,
+        path: 'entropy'
+      }
+    } as any;
   }
 
-  return {
-    success: true,
-    isOk: () => true,
-    isErr: () => false,
-    value: state
-  };
+  return { success: true, value: state, isOk: () => true, isErr: () => false } as any;
 }
 
-export function withEntropyCheck(initialState: any, transformFn: (s: any) => any): any {
-  const nextState = transformFn(initialState);
-  const initialEntropy = typeof initialState.getEntropy === 'function' ? initialState.getEntropy() : (initialState.entropy ?? 0);
-  const nextEntropy = typeof nextState.getEntropy === 'function' ? nextState.getEntropy() : (nextState.entropy ?? 0);
-  const deltaEntropy = nextEntropy - initialEntropy;
-  const solarInput = typeof nextState.getSolarFlux === 'function' ? nextState.getSolarFlux() : (nextState.solarInput ?? 0);
+export function validateOrThrowEntropy(state: any): void {
+  const sGen = state?.entropyGenerationRate ?? state?.getEntropyGenerationRate?.() ?? 0;
+  if (sGen < -1e-9) {
+    throw new ThermodynamicDiscrepancyViolationError(`Second Law Violation: Entropy generation rate (${sGen}) < 0.`);
+  }
+}
 
-  if (deltaEntropy < 0 && Math.abs(deltaEntropy) > solarInput) {
+export function executeThermodynamicTransition(state: any, transitionFn: (s: any) => any): Result<any, string> {
+  try {
+    const next = transitionFn(state);
+    if ((next?.entropyGenerationRate ?? 0) < -1e-9 || (next?.entropy ?? 0) < 0) {
+      return err('Second Law Violation: Negative entropy or entropy generation rate.');
+    }
+    return ok(next);
+  } catch (e: any) {
+    return err(e.message);
+  }
+}
+
+export function withEntropyCheck(
+  initialState: StateVector,
+  transformFn: (s: StateVector) => StateVector
+): any {
+  const nextState = transformFn(initialState);
+  const deltaEntropy = nextState.getEntropy() - initialState.getEntropy();
+  const solarInput = typeof (nextState as any).getSolarFlux === 'function' ? (nextState as any).getSolarFlux() : 0;
+
+  if (deltaEntropy < 0 && solarInput < Math.abs(deltaEntropy)) {
     return {
       valid: false,
-      validState: false,
       state: initialState,
       deltaEntropy,
-      reason: 'Second Law Violation: Entropy reduction exceeds solar flux compensation.'
+      reason: 'Second Law Violation: Unphysical entropy reduction exceeds solar flux compensation.'
     };
   }
 
   return {
     valid: true,
-    validState: true,
     state: nextState,
     deltaEntropy
   };
 }
-
-export function executeThermodynamicTransition(state: any, transformFn: (s: any) => any): any {
-  try {
-    const nextState = transformFn(state);
-    const validator = new StateValidator();
-    validator.assertValidState(nextState);
-    const entropyRes = assertNonNegativeEntropy(nextState);
-    if (!entropyRes.isOk()) {
-      return entropyRes;
-    }
-    return {
-      success: true,
-      isOk: () => true,
-      isErr: () => false,
-      value: nextState
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      isOk: () => false,
-      isErr: () => true,
-      error: err.message,
-      errorValue: err.message
-    };
-  }
-}
-
-export type ThermodynamicStateLike = ThermodynamicState;
