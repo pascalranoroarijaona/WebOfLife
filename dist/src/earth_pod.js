@@ -375,10 +375,10 @@ export class EarthPOD extends ThermodynamicStructure {
             toObject: () => vec.toObject(),
             getEntropyGenerationRate: () => entropyGen,
             getVectorMetrics: () => ({ entropyGenerationRate: entropyGen }),
-            getKeys: () => Object.keys(vec.stocks),
-            getStock: (k) => vec.stocks[k] ?? 0,
+            getKeys: () => vec.stocks instanceof Map ? Array.from(vec.stocks.keys()) : Object.keys(vec.stocks),
+            getStock: (k) => vec.stocks instanceof Map ? (vec.stocks.get(k) ?? 0) : (vec.stocks[k] ?? 0),
             getEntropy: () => vec.entropy,
-            getAllStocks: () => new Map(Object.entries(vec.stocks))
+            getAllStocks: () => vec.stocks instanceof Map ? vec.stocks : new Map(Object.entries(vec.stocks))
         });
         return vec;
     }

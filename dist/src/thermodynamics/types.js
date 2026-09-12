@@ -227,7 +227,7 @@ export class ThermodynamicStateVector {
             solarInputWatts: this.solarInputWatts,
             entropy: this.entropy,
             systemEntropy: this.systemEntropy,
-            stocks: { ...this.stocks },
+            stocks: this.stocks instanceof Map ? Object.fromEntries(this.stocks) : { ...this.stocks },
             massInventory: { ...this.massInventory },
             elementalStocks: { ...this.elementalStocks },
             entropyGenerationRate: this.entropyGenerationRate,
@@ -260,9 +260,12 @@ export class ThermodynamicStateVector {
         };
     }
     getKeys() {
-        return Object.keys(this.stocks);
+        const s = this.stocks instanceof Map ? Object.fromEntries(this.stocks) : (this.stocks ?? {});
+        return Object.keys(s);
     }
     getStock(k) {
+        if (this.stocks instanceof Map)
+            return this.stocks.get(k) ?? 0;
         return this.stocks[k] ?? 0;
     }
     getStocks() {
@@ -272,7 +275,7 @@ export class ThermodynamicStateVector {
         return this.entropy;
     }
     getValues() {
-        return { ...this.stocks };
+        return this.stocks instanceof Map ? Object.fromEntries(this.stocks) : { ...this.stocks };
     }
     getAllStocks() {
         return this.stocks instanceof Map ? this.stocks : new Map(Object.entries(this.stocks));

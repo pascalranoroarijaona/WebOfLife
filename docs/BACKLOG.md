@@ -1,5 +1,5 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 13%
+Roadmap Completion: 11%
 SPRINT_GOAL: Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/thermodynamics/state_validator.ts`): Implement discrepancy comparison logic evaluating absolute differences between actual stock deltas and expected flux-derived deltas.
 
 ## Web of Life Master Backlog
@@ -67,7 +67,6 @@ SPRINT_GOAL: Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/th
 
 ### Phase 3 — Technosphere Industrial Metabolism & Geochemical Extraction (Pending)
 - [ ] Technosphere Interface Contracts & Industrial Flux Vectors (`src/technosphere/types.ts`): Strict typing for industrial flux vectors ($\mathbf{J}_{\text{tech}}$), parasitic load coefficients, and embodied carbon indices.
-- [ ] Ecoinvent-Style Process Dependency Parser (`src/technosphere/ecoinvent_parser.ts`)
 - [ ] Ecoinvent Parser Dataset Ingestion Module (`src/technosphere/ecoinvent/parser.ts`): Ingest JSON-serialized unit process datasets.
 - [ ] Ecoinvent Technology Matrix Builder (`src/technosphere/ecoinvent/matrix_builder.ts`): Construct the technology matrix $A$ and final demand vector $y$.
 - [ ] Leontief Input-Output Technology Matrix Solver (`src/technosphere/leontief_solver.ts`): Implement sparse matrix inversion algorithms $x = (I - A)^{-1} y$ to compute cradle-to-gate embodied carbon and exergy intensity vectors dynamically.

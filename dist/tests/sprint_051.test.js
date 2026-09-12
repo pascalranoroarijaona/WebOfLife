@@ -42,7 +42,7 @@ describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', (
     });
     it('should detect boundary flux violations and return populated violation records', () => {
         const prevMap = new Map([['carbon', 850]]);
-        const currMap = new Map([['carbon', 950]]); // Massive unmodeled jump
+        const currMap = new Map([['carbon', 950]]);
         const prevState = new ThermodynamicStateVector(prevMap);
         const currState = new ThermodynamicStateVector(currMap);
         const boundary = {

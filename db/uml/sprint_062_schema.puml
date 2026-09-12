@@ -1,0 +1,76 @@
+@startuml
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Web of Life - Sprint 062: Thermodynamic State Vector Inventory Discrepancy Evaluator
+
+package "src.thermodynamics" {
+    
+    interface IStateValidator {
+        +evaluateDiscrepancy(previousState: StateVector, currentState: StateVector, netFluxes: Map<string, number>): DiscrepancyReport
+    }
+
+    class StateValidator {
+        -tolerance: number
+        +constructor(tolerance: number)
+        +evaluateDiscrepancy(previousState: StateVector, currentState: StateVector, netFluxes: Map<string, number>): DiscrepancyReport
+        -computeAbsoluteDifference(actual: number, expected: number): number
+    }
+
+    class StateVector {
+        -stocks: Map<string, number>
+        +getStock(key: string): number
+        +getKeys(): Set<string>
+    }
+
+    class DiscrepancyItem {
+        +stockKey: string
+        +actualDelta: number
+        +expectedDelta: number
+        +absoluteDifference: number
+        +exceedsTolerance: boolean
+    }
+
+    class DiscrepancyReport {
+        +timestamp: number
+        +isBalanced: boolean
+        +maxDiscrepancy: number
+        +items: DiscrepancyItem[]
+    }
+
+    IStateValidator <|.. StateValidator
+    StateValidator ..> DiscrepancyReport : produces
+    DiscrepancyReport *-- DiscrepancyItem : contains
+    StateValidator ..> StateVector : evaluates
+}
+
+package "Database Schema" {
+    class thermodynamic_states {
+        +state_id: UUID
+        +entity_id: VARCHAR
+        +timestamp: BIGINT
+        +stocks: JSONB
+    }
+
+    class thermodynamic_fluxes {
+        +flux_id: UUID
+        +transaction_hash: VARCHAR
+        +net_fluxes: JSONB
+    }
+
+    class discrepancy_reports {
+        +report_id: UUID
+        +flux_id: UUID
+        +timestamp: BIGINT
+        +is_balanced: BOOLEAN
+        +max_discrepancy: NUMERIC
+        +tolerance: NUMERIC
+        +items: JSONB
+    }
+
+    thermodynamic_fluxes ||--o{ discrepancy_reports : triggers
+    thermodynamic_states ||--o{ thermodynamic_fluxes : transitions
+}
+
+@enduml

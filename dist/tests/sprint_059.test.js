@@ -20,8 +20,8 @@ describe('Sprint 059: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const report = validator.evaluateDiscrepancy(prevState, currState, integratedFluxes);
         assert.strictEqual(report.withinTolerance, true);
         assert.strictEqual(report.totalDiscrepancy, 0);
-        assert.strictEqual(report.poolDiscrepancies['carbon'].violated, false);
-        assert.strictEqual(report.poolDiscrepancies['water'].violated, false);
+        assert.strictEqual(report.poolDiscrepancies?.['carbon']?.violated, false);
+        assert.strictEqual(report.poolDiscrepancies?.['water']?.violated, false);
     });
     it('should correctly identify anomalous stock injections or leaks exceeding tolerance', () => {
         const validator = new StateValidator(1e-6);
@@ -31,7 +31,7 @@ describe('Sprint 059: Thermodynamic State Vector Inventory Discrepancy Evaluator
         });
         const currState = new StateVector({
             timestamp: 201,
-            stocks: { nitrogen: 3900050, phosphorus: 4000 } // unexpected 50 unit nitrogen leak/injection
+            stocks: { nitrogen: 3900050, phosphorus: 4000 }
         });
         const integratedFluxes = {
             nitrogen: 0,
@@ -39,9 +39,9 @@ describe('Sprint 059: Thermodynamic State Vector Inventory Discrepancy Evaluator
         };
         const report = validator.evaluateDiscrepancy(prevState, currState, integratedFluxes);
         assert.strictEqual(report.withinTolerance, false);
-        assert.strictEqual(report.poolDiscrepancies['nitrogen'].violated, true);
-        assert.strictEqual(report.poolDiscrepancies['nitrogen'].absoluteDifference, 50);
-        assert.strictEqual(report.poolDiscrepancies['phosphorus'].violated, false);
+        assert.strictEqual(report.poolDiscrepancies?.['nitrogen']?.violated, true);
+        assert.strictEqual(report.poolDiscrepancies?.['nitrogen']?.absoluteDifference, 50);
+        assert.strictEqual(report.poolDiscrepancies?.['phosphorus']?.violated, false);
     });
     it('should strictly adhere to custom tolerance thresholds', () => {
         const validator = new StateValidator(1e-2);
@@ -51,15 +51,13 @@ describe('Sprint 059: Thermodynamic State Vector Inventory Discrepancy Evaluator
         });
         const currState = new StateVector({
             timestamp: 301,
-            stocks: { energy_stock: 100.005 } // 0.005 diff
+            stocks: { energy_stock: 100.005 }
         });
         const integratedFluxes = {
             energy_stock: 0.0
         };
-        // Within strict tolerance (1e-6), this should violate
         const strictReport = validator.evaluateDiscrepancy(prevState, currState, integratedFluxes, 1e-6);
         assert.strictEqual(strictReport.withinTolerance, false);
-        // Within loose tolerance (1e-2), this should pass
         const looseReport = validator.evaluateDiscrepancy(prevState, currState, integratedFluxes, 1e-2);
         assert.strictEqual(looseReport.withinTolerance, true);
     });

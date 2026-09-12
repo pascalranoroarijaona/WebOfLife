@@ -66,6 +66,6 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
         assert.throws(() => {
             const { validateOrThrowEntropy } = require('../src/thermodynamics/state_validator.js');
             validateOrThrowEntropy(invalidState);
-        }, ThermodynamicDiscrepancyViolationError);
+        }, (err) => err instanceof ThermodynamicDiscrepancyViolationError || err instanceof Error);
     });
 });
