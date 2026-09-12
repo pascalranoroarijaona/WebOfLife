@@ -1,0 +1,63 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics Subsystem" {
+    class StateVector {
+        +timestamp: number
+        +stocks: Map<string, number>
+        +getSpeciesMass(species: string): number
+    }
+
+    class BoundaryFluxRates {
+        +inflows: Map<string, number>
+        +outflows: Map<string, number>
+        +getNetFlux(species: string): number
+    }
+
+    class ValidationResult {
+        +valid: boolean
+        +discrepancies: Map<string, { expectedDelta: number; actualDelta: number; error: number }>
+        +timestamp: number
+        +maxTolerance: number
+    }
+
+    class StateValidator {
+        -tolerance: number
+        -hooks: Array<(result: ValidationResult) => void>
+        +validateConservation(previous: StateVector, current: StateVector, fluxes: BoundaryFluxRates, dt: number, tolerance?: number): ValidationResult
+        +assertConservation(previous: StateVector, current: StateVector, fluxes: BoundaryFluxRates, dt: number, tolerance?: number): void
+        +registerConservationHook(callback: (result: ValidationResult) => void): void
+    }
+
+    class ThermodynamicMonad {
+        +processId: string
+        +execute(state: StateVector): StateVector
+    }
+
+    class EarthPod {
+        +podId: string
+        +tick(): void
+        +evaluateThermodynamics(): void
+    }
+}
+
+package "Blockchain & Ledger" {
+    class ThermodynamicBlock {
+        +blockIndex: number
+        +previousHash: string
+        +currentHash: string
+        +entropyGenerationRate: number
+        +conservationVerified: boolean
+        +nonce: number
+        +mine(): void
+    }
+}
+
+StateVector --* ThermodynamicMonad : transforms >
+StateVector <-- StateValidator : inspects previous/current >
+BoundaryFluxRates <-- StateValidator : evaluates against >
+StateValidator ..> ValidationResult : produces >
+EarthPod --> StateValidator : invokes assertConservation() >
+EarthPod --> ThermodynamicBlock : anchors state hash >
+
+@enduml

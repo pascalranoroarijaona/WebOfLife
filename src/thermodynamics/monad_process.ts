@@ -1,10 +1,10 @@
 /**
- * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Sprint 46)
+ * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Sprint 46 & Retro-Compatibility)
  */
 import { ThermodynamicStateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator } from './state_validator.js';
 
-export { StateValidator as ThermodynamicStateValidator, StateValidator };
+export { StateValidator as ThermodynamicStateValidator, StateValidator, validateOrThrowEntropy };
 
 export interface IMonadProcess {
   execute(state: ThermodynamicStateVector): ThermodynamicStateVector;

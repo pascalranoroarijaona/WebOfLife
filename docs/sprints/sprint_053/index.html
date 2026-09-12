@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 053: Web of Life - Thermodynamic State Vector Stock Conservation Asserter</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+    <!-- Topbar Navigation -->
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/55 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl animate-pulse">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sprint 053</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Vector Stock Conservation Asserter Active (60 FPS Draw Loop & Canvas Engine)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/30 p-6 flex flex-col gap-6 overflow-y-auto z-20">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-emerald-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-emerald-400">64</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sprint-telemetry" class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Sprint 053 Telemetry</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3 text-xs font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Stock Delta:</span>
+                        <span id="telemetry-stock-delta" class="text-emerald-400">0.0000</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Assert Status:</span>
+                        <span id="telemetry-assert-status" class="text-emerald-400">PASSED</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Conservation Ratio:</span>
+                        <span id="telemetry-conservation-ratio" class="text-slate-200">1.0000</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <canvas id="web-of-life-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+            
+            <div id="overlay-stats" class="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur border border-slate-800/80 rounded-lg px-4 py-2 text-xs font-mono text-slate-400 flex items-center space-x-4 pointer-events-none">
+                <div>STATE VECTOR: <span id="stat-vector-state" class="text-emerald-400">CONSERVED</span></div>
+                <div>ENTROPY: <span id="stat-entropy" class="text-slate-200">0.421</span></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- App Initialization Module -->
+    <script type="module">
+        import { EarthPOD } from '../../../src/earth_pod.ts';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('web-of-life-canvas');
+            if (!canvas) {
+                console.error('Canvas element not found');
+                return;
+            }
+
+            try {
+                const pod = new EarthPOD(canvas);
+                pod.start();
+
+                // Bind UI controls
+                const btnStart = document.getElementById('btn-start');
+                const btnPause = document.getElementById('btn-pause');
+                const btnReset = document.getElementById('btn-reset');
+
+                if (btnStart) btnStart.addEventListener('click', () => pod.start());
+                if (btnPause) btnPause.addEventListener('click', () => pod.pause());
+                if (btnReset) btnReset.addEventListener('click', () => pod.reset());
+
+                // Periodic telemetry update loop
+                setInterval(() => {
+                    const metrics = pod.getMetrics?.() || { entities: 64, fps: 60, generation: 1, stockDelta: 0, conserved: true, ratio: 1.0 };
+                    
+                    const elEntities = document.getElementById('metric-entities');
+                    const elFps = document.getElementById('metric-fps');
+                    const elGen = document.getElementById('metric-gen');
+                    const elStockDelta = document.getElementById('telemetry-stock-delta');
+                    const elAssertStatus = document.getElementById('telemetry-assert-status');
+                    const elConservationRatio = document.getElementById('telemetry-conservation-ratio');
+                    const elVectorState = document.getElementById('stat-vector-state');
+
+                    if (elEntities) elEntities.textContent = metrics.entities;
+                    if (elFps) elFps.textContent = Math.round(metrics.fps);
+                    if (elGen) elGen.textContent = metrics.generation;
+                    if (elStockDelta) elStockDelta.textContent = (metrics.stockDelta || 0).toFixed(4);
+                    if (elAssertStatus) {
+                        elAssertStatus.textContent = metrics.conserved !== false ? 'PASSED' : 'VIOLATION';
+                        elAssertStatus.className = metrics.conserved !== false ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold animate-pulse';
+                    }
+                    if (elConservationRatio) elConservationRatio.textContent = (metrics.ratio || 1.0).toFixed(4);
+                    if (elVectorState) {
+                        elVectorState.textContent = metrics.conserved !== false ? 'CONSERVED' : 'UNBALANCED';
+                        elVectorState.className = metrics.conserved !== false ? 'text-emerald-400' : 'text-rose-400';
+                    }
+                }, 250);
+
+                console.info('Sprint 053 Thermodynamic State Vector Stock Conservation Asserter initialized successfully.');
+            } catch (err) {
+                console.error('Failed to initialize EarthPOD:', err);
+                const statusText = document.getElementById('status-text');
+                if (statusText) {
+                    statusText.textContent = 'Initialization Error: ' + err.message;
+                    statusText.className = 'text-rose-400 font-semibold';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

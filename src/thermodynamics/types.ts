@@ -114,6 +114,10 @@ export interface BoundaryFluxVector extends IBoundaryFluxArray {
   netMassEnthalpyFlux?: number;
 }
 
+export interface BoundaryFluxRates {
+  fluxes: Map<string, number>;
+}
+
 export interface IExergyMetrics {
   T_0: number;
   entropyGenerationRate: number;
@@ -203,6 +207,12 @@ export interface ValidationFailure {
   reason: string;
 }
 
+export interface DiscrepancyRecord {
+  expectedDelta: number;
+  actualDelta: number;
+  error: number;
+}
+
 export interface ValidationResult {
   isValid: boolean;
   valid?: boolean;
@@ -218,6 +228,8 @@ export interface ValidationResult {
   reason?: string;
   universeEntropyChange?: number;
   timestamp?: number;
+  maxTolerance?: number;
+  discrepancies?: Map<string, DiscrepancyRecord>;
   isOk?: () => boolean;
   isErr?: () => boolean;
 }
