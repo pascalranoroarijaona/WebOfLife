@@ -116,10 +116,17 @@ export class ThermodynamicViolationError extends Error {
 }
 export class ThermodynamicEntropyViolationError extends Error {
     state;
+    entropyGenerationRate;
     constructor(state, message = 'Entropy violation') {
         super(`[ThermodynamicEntropyViolationError]: ${message}`);
         this.state = state;
         this.name = 'ThermodynamicEntropyViolationError';
+        if (state && typeof state.entropyGenerationRate === 'number') {
+            this.entropyGenerationRate = state.entropyGenerationRate;
+        }
+        else if (state && typeof state.getEntropyGenerationRate === 'function') {
+            this.entropyGenerationRate = state.getEntropyGenerationRate();
+        }
     }
 }
 export class ThermodynamicConstraintViolationError extends Error {

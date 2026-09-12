@@ -1,0 +1,38 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class StateVector {
+    + internalEnergy: number
+    + kineticEnergy: number
+    + potentialEnergy: number
+    + entropy: number
+    + temperature: number
+    + getTotalEnergy(): number
+}
+
+class ThermodynamicResult<T> {
+    + success: boolean
+    + value?: T
+    + entropyChange: number
+    + error?: string
+}
+
+class StateValidator {
+    + validateEntropy(prev: StateVector, next: StateVector): boolean
+    + withEntropyCheck<T>(state: T, fn: (s: T) => T): ThermodynamicResult<T>
+}
+
+class EntropyMonad<T> {
+    - state: StateVector
+    + bind(fn: (s: StateVector) => EntropyMonad<T>): EntropyMonad<T>
+    + map(fn: (s: StateVector) => StateVector): EntropyMonad<T>
+    + getResult(): ThermodynamicResult<T>
+}
+
+StateValidator --> StateVector : inspects
+StateValidator ..> ThermodynamicResult : produces
+EntropyMonad o-- StateVector : wraps
+EntropyMonad --> StateValidator : delegates validation via withEntropyCheck
+
+@enduml

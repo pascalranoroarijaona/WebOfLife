@@ -169,6 +169,8 @@ export interface IThermodynamicStateVector {
   stock_masses?: Record<string, number>;
   dissipationRate?: number;
   solarInput?: number;
+  dissipatedHeat?: number;
+  mass?: number;
   time?: number;
   elementalStocks?: any;
   boundaryHeatFlux?: any;
@@ -420,9 +422,15 @@ export class ThermodynamicViolationError extends Error {
 export type ThermodynamicValidationError = ThermodynamicViolationError | string | any;
 
 export class ThermodynamicEntropyViolationError extends Error {
+  public entropyGenerationRate?: number;
   constructor(public readonly state?: any, message: string = 'Entropy violation') {
     super(`[ThermodynamicEntropyViolationError]: ${message}`);
     this.name = 'ThermodynamicEntropyViolationError';
+    if (state && typeof state.entropyGenerationRate === 'number') {
+      this.entropyGenerationRate = state.entropyGenerationRate;
+    } else if (state && typeof state.getEntropyGenerationRate === 'function') {
+      this.entropyGenerationRate = state.getEntropyGenerationRate();
+    }
   }
 }
 

@@ -24,6 +24,9 @@ export class ThermodynamicStateVector {
     exergyDestructionRate;
     timestamp;
     tick;
+    mass;
+    solarInput;
+    dissipatedHeat;
     constructor(options) {
         this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
         this.ambientTemperature = this.temperature;
@@ -53,6 +56,9 @@ export class ThermodynamicStateVector {
         this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
         this.timestamp = options?.timestamp ?? options?.tick ?? 0;
         this.tick = this.timestamp;
+        this.mass = options?.mass;
+        this.solarInput = options?.solarInput;
+        this.dissipatedHeat = options?.dissipatedHeat;
     }
     clone(overrides) {
         const rawStocks = overrides?.stocks ?? overrides?.elementalStocks ?? this.stocks;
@@ -69,7 +75,10 @@ export class ThermodynamicStateVector {
             stocks: stocksObj,
             elementalStocks: overrides?.elementalStocks ?? this.elementalStocks,
             entropyGenerationRate: overrides?.entropyGenerationRate ?? this.entropyGenerationRate,
-            exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate
+            exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate,
+            mass: overrides?.mass ?? this.mass,
+            solarInput: overrides?.solarInput ?? this.solarInput,
+            dissipatedHeat: overrides?.dissipatedHeat ?? this.dissipatedHeat
         });
     }
     toObject() {
@@ -90,7 +99,10 @@ export class ThermodynamicStateVector {
             entropyGenerationRate: this.entropyGenerationRate,
             exergyDestructionRate: this.exergyDestructionRate,
             timestamp: this.timestamp,
-            tick: this.tick
+            tick: this.tick,
+            mass: this.mass,
+            solarInput: this.solarInput,
+            dissipatedHeat: this.dissipatedHeat
         };
     }
     validateFirstLaw() {
@@ -115,22 +127,13 @@ export class ThermodynamicStateVector {
             exergyDestructionRate: this.exergyDestructionRate
         };
     }
-    /**
-     * Static step compatibility wrapper expected by sprint tests (e.g. sprint_027.test.ts).
-     */
     static step(state, fluxDelta, dt) {
         return ThermodynamicMonadProcess.staticStep(state, fluxDelta, dt);
     }
 }
-/**
- * Lightweight builder function to instantiate baseline state vectors.
- */
 export function createBaselineStateVector(overrides) {
     return new ThermodynamicStateVector(overrides);
 }
-/**
- * Backward compatibility alias expected by sprint tests (e.g., sprint_026.test.ts).
- */
 export function createThermodynamicStateVector(overrides) {
     return createBaselineStateVector(overrides);
 }

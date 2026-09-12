@@ -31,6 +31,9 @@ export interface ThermodynamicStateVectorOptions {
   elementalStocks?: Record<string, number> | number[];
   entropyGenerationRate?: number;
   exergyDestructionRate?: number;
+  mass?: number;
+  solarInput?: number;
+  dissipatedHeat?: number;
 }
 
 export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector {
@@ -51,6 +54,9 @@ export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector
   exergyDestructionRate: number;
   timestamp: number;
   tick: number;
+  mass?: number;
+  solarInput?: number;
+  dissipatedHeat?: number;
   clone(overrides?: Partial<IThermodynamicStateVector> | ThermodynamicStateVectorOptions | any): IThermodynamicStateVector;
   toObject(): Record<string, any>;
   validateFirstLaw(): boolean;
@@ -58,6 +64,8 @@ export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector
   getEntropyGenerationRate(): number;
   getVectorMetrics(): Record<string, number>;
 }
+
+export type StateVector = IThermodynamicStateVector;
 
 export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly temperature: number;
@@ -77,6 +85,9 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly exergyDestructionRate: number;
   public readonly timestamp: number;
   public readonly tick: number;
+  public readonly mass?: number;
+  public readonly solarInput?: number;
+  public readonly dissipatedHeat?: number;
 
   constructor(options?: ThermodynamicStateVectorOptions & { elementalStocks?: Record<string, number> | number[]; temperature?: number }) {
     this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
@@ -107,6 +118,9 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
     this.timestamp = options?.timestamp ?? options?.tick ?? 0;
     this.tick = this.timestamp;
+    this.mass = options?.mass;
+    this.solarInput = options?.solarInput;
+    this.dissipatedHeat = options?.dissipatedHeat;
   }
 
   public clone(overrides?: Partial<IThermodynamicStateVector> | ThermodynamicStateVectorOptions | any): IThermodynamicStateVector {
@@ -124,7 +138,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
       stocks: stocksObj,
       elementalStocks: overrides?.elementalStocks ?? this.elementalStocks,
       entropyGenerationRate: overrides?.entropyGenerationRate ?? this.entropyGenerationRate,
-      exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate
+      exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate,
+      mass: overrides?.mass ?? this.mass,
+      solarInput: overrides?.solarInput ?? this.solarInput,
+      dissipatedHeat: overrides?.dissipatedHeat ?? this.dissipatedHeat
     });
   }
 
@@ -146,7 +163,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
       entropyGenerationRate: this.entropyGenerationRate,
       exergyDestructionRate: this.exergyDestructionRate,
       timestamp: this.timestamp,
-      tick: this.tick
+      tick: this.tick,
+      mass: this.mass,
+      solarInput: this.solarInput,
+      dissipatedHeat: this.dissipatedHeat
     };
   }
 
@@ -176,9 +196,6 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     };
   }
 
-  /**
-   * Static step compatibility wrapper expected by sprint tests (e.g. sprint_027.test.ts).
-   */
   public static step(
     state: IThermodynamicStateVector | ThermodynamicStateVector,
     fluxDelta: any,
@@ -188,16 +205,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   }
 }
 
-/**
- * Lightweight builder function to instantiate baseline state vectors.
- */
 export function createBaselineStateVector(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
   return new ThermodynamicStateVector(overrides);
 }
 
-/**
- * Backward compatibility alias expected by sprint tests (e.g., sprint_026.test.ts).
- */
 export function createThermodynamicStateVector(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
   return createBaselineStateVector(overrides);
 }
