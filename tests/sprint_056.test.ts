@@ -39,7 +39,7 @@ describe('Sprint 056: Thermodynamic State Vector Stock Conservation Delta Calcul
         // Exact match
         const validResult = validator.validateStockDelta(vector, 0.5, 3.0);
         assert.strictEqual(validResult.isConserved, true);
-        assert.ok(validResult.discrepancy < 1e-9);
+        assert.ok((validResult.discrepancy ?? 0) < 1e-9);
 
         // Within tolerance (1e-10 diff) - 1e-10 is less than 1e-9 tolerance, so it should be conserved
         const closeResult = validator.validateStockDelta(vector, 0.5, 3.0 + 1e-10);
@@ -48,7 +48,7 @@ describe('Sprint 056: Thermodynamic State Vector Stock Conservation Delta Calcul
         // Explicit violation > 1e-9
         const violationResult = validator.validateStockDelta(vector, 1.0, 3.00002);
         assert.strictEqual(violationResult.isConserved, false);
-        assert.ok(violationResult.discrepancy > 1e-9);
+        assert.ok((violationResult.discrepancy ?? 0) > 1e-9);
     });
 
     it('should maintain multi-element independence across carbon, nitrogen, phosphorus, water, and energy', () => {

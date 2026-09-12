@@ -118,8 +118,8 @@ export class ThermodynamicMonadProcess {
       totalEntropy: newEntropy,
       entropyGenerationRate: sGen,
       exergyDestructionRate: T0 * sGen,
-      fluxes: {
-        ...state.fluxes,
+      boundaryFluxes: {
+        ...(state.boundaryFluxes as any ?? {}),
         ...(fluxDelta ?? {})
       }
     });

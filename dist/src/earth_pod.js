@@ -377,7 +377,8 @@ export class EarthPOD extends ThermodynamicStructure {
             getVectorMetrics: () => ({ entropyGenerationRate: entropyGen }),
             getKeys: () => Object.keys(vec.stocks),
             getStock: (k) => vec.stocks[k] ?? 0,
-            getEntropy: () => vec.entropy
+            getEntropy: () => vec.entropy,
+            getAllStocks: () => new Map(Object.entries(vec.stocks))
         });
         return vec;
     }

@@ -1,16 +1,38 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { BaseThermodynamicProcessMonad, ThermodynamicStateVector, ThermodynamicDerivativeResult, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
-class MockViolatingMonad extends BaseThermodynamicProcessMonad {
+import { ThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { ThermodynamicMonadProcess } from '../src/thermodynamics/thermodynamic_monad_process.js';
+class MockViolatingMonad extends ThermodynamicMonadProcess {
     processId = 'mock_violating_process';
-    evaluate(_state, _dt) {
-        return new ThermodynamicDerivativeResult(100, -1.0, -1.5, -1.5, 0, new Map());
+    constructor() {
+        super(new ThermodynamicStateVector());
+    }
+    transit(state, _dt) {
+        const invalid = state.clone({ entropyGenerationRate: -1.0 });
+        this.validateInvariants(invalid);
+        return invalid;
     }
 }
-class MockValidMonad extends BaseThermodynamicProcessMonad {
+class MockValidMonad extends ThermodynamicMonadProcess {
     processId = 'mock_valid_process';
+    constructor() {
+        super(new ThermodynamicStateVector());
+    }
     evaluate(_state, _dt) {
-        return new ThermodynamicDerivativeResult(500, 10.0, 2.5, 2.5, 0, new Map([['carbon', 10.0]]));
+        return {
+            dInternalEnergy: 500,
+            entropyGenRate: 2.5,
+            massStockDeltas: new Map([['carbon', 10.0]])
+        };
+    }
+    transit(state, dt) {
+        const next = state.clone({
+            internalEnergy: state.internalEnergy + 500 * dt,
+            entropyGenerationRate: 2.5,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 2.5
+        });
+        this.validateInvariants(next);
+        return next;
     }
 }
 describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', () => {

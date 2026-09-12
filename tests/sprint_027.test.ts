@@ -31,12 +31,12 @@ describe('Sprint 027: Thermodynamic State Vector Baseline Structurer', () => {
 
     // Base remains untouched
     assert.strictEqual(base.temperature, 288.15);
-    assert.strictEqual(base.fluxes.solarRadiation, 0);
+    assert.strictEqual(base.fluxes?.solarRadiation, 0);
     assert.strictEqual(base.entropy, 0);
 
     // Custom has applied values
     assert.strictEqual(custom.temperature, 295.0);
-    assert.strictEqual(custom.fluxes.solarRadiation, 342.0);
+    assert.strictEqual(custom.fluxes?.solarRadiation, 342.0);
     assert.strictEqual(custom.entropy, 15.5);
     assert.strictEqual(custom.timestamp, 10);
   });
@@ -69,8 +69,8 @@ describe('Sprint 027: Thermodynamic State Vector Baseline Structurer', () => {
     }, 60);
 
     assert.strictEqual(evolved.timestamp, 60);
-    assert.strictEqual(evolved.fluxes.solarRadiation, 500);
-    assert.strictEqual(evolved.fluxes.thermalEmission, 200);
+    assert.strictEqual(evolved.fluxes?.solarRadiation, 500);
+    assert.strictEqual(evolved.fluxes?.thermalEmission, 200);
     assert.ok(evolved.entropy > initialState.entropy, 'Entropy should increase or accumulate during active net flux');
     assert.strictEqual(evolved.validateSecondLaw(), true);
   });

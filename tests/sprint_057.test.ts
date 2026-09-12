@@ -18,8 +18,8 @@ describe('Sprint 057: StateValidator & Thermodynamic Conservation Delta Calculat
     const dt = 1.0;
     const expectedDeltas = validator.calculateExpectedDeltas(initialVector, fluxRates, dt);
 
-    assert.strictEqual(expectedDeltas.get('carbon_pool'), 5.2);
-    assert.strictEqual(expectedDeltas.get('water_pool'), -12.5);
+    assert.strictEqual(expectedDeltas.get?.('carbon_pool'), 5.2);
+    assert.strictEqual(expectedDeltas.get?.('water_pool'), -12.5);
   });
 
   it('should validate exact mass conservation (First Law conformity)', () => {

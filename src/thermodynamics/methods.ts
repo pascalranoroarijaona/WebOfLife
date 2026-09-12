@@ -12,13 +12,14 @@ import {
   ThermodynamicStateSnapshot,
   IThermodynamicMonad,
   IThermodynamicStateVector,
+  ThermodynamicStateVector,
   STANDARD_AMBIENT_TEMPERATURE_K,
   IThermodynamicProcessResult,
   IBoundaryFluxArray,
   ThermodynamicStateMonad,
   ThermodynamicComplianceResult,
   ElementalStocks
-} from './types';
+} from './types.js';
 
 const T_0 = STANDARD_AMBIENT_TEMPERATURE_K;
 
@@ -55,7 +56,7 @@ export function computeEntropyGeneration(
 
 export function computeExergyDestruction(
   entropyMetrics: EntropyGenerationMetrics,
-  systemUsefulWork: number,
+  _systemUsefulWork: number,
   totalExergyInput: number
 ): ExergyDestructionMetrics {
   const exergyDestructionRate = T_0 * entropyMetrics.totalEntropyGenerationRate;
@@ -98,7 +99,7 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 
   public getStateVector(): IThermodynamicStateVector {
-    return this.stateVector ?? ((this.state as any)?.getStateVector ? (this.state as any).getStateVector() : {
+    return this.stateVector ?? new ThermodynamicStateVector({
       internalEnergy: (this.state as any)?.internalEnergy ?? (this.state as any)?.energy ?? 1000,
       totalEntropy: (this.state as any)?.totalEntropy ?? (this.state as any)?.entropy ?? 0,
       temperature: (this.state as any)?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K,
@@ -133,14 +134,14 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 
   public transit(fn: (state: IThermodynamicStateVector, fluxes?: any) => any, fluxes?: any): IThermodynamicMonad<any> {
-    const safeVec: IThermodynamicStateVector = this.stateVector ?? {
+    const safeVec: IThermodynamicStateVector = this.stateVector ?? new ThermodynamicStateVector({
       internalEnergy: 1000,
       totalEntropy: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       stocks: {}
-    };
+    });
     const nextVec = fn(safeVec, fluxes);
     return new ThermodynamicMonadClass(this.state, nextVec);
   }
@@ -249,23 +250,15 @@ export function computeThermodynamicProcess(params: IThermodynamicProcessParamet
   const T0 = params.referenceTemperature ?? T_0;
   let sGen = 12.5;
 
-  let netHeatTransfer = 0;
-  let netMassFlow = 0;
   const fluxes = params.boundaryFluxes;
   if (fluxes) {
     if (Array.isArray(fluxes.heatFluxes)) {
       for (const hf of fluxes.heatFluxes) {
         const rate = hf.rate ?? hf.magnitude ?? hf.heatTransferRate ?? 0;
         const bTemp = hf.boundaryTemperature ?? hf.temperature ?? T0;
-        netHeatTransfer += rate;
         if (bTemp > 0) {
           sGen += Math.abs(rate / bTemp);
         }
-      }
-    }
-    if (Array.isArray(fluxes.massFluxes)) {
-      for (const mf of fluxes.massFluxes) {
-        netMassFlow += mf.massFlowRate ?? 0;
       }
     }
   }
@@ -381,48 +374,4 @@ export class ThermodynamicMonadEngine {
     const sGen = transition.metrics?.internal_entropy_generation_rate ?? transition.entropyGenerationRate ?? 0;
     return sGen >= 0;
   }
-}
-
-export function photosyntheticFixation(stocks: ElementalStocks | IThermodynamicStateVector | any, carbonRate: number, efficiency: number): any {
-  if (stocks instanceof ElementalStocks) {
-    const next = stocks.clone();
-    next.carbon += carbonRate * (1 - efficiency);
-    next.qLoss += carbonRate * efficiency * 10;
-    return next;
-  }
-  const stocksRecord = stocks.stocks instanceof Map ? Object.fromEntries(stocks.stocks) : (stocks.stocks ?? {});
-  const carbonVal = Number(stocksRecord.carbon ?? 500) + carbonRate * (1 - efficiency);
-  return {
-    ...stocks,
-    stocks: {
-      ...stocksRecord,
-      carbon: carbonVal
-    },
-    elementalStocks: {
-      ...(stocks.elementalStocks ?? {}),
-      carbon: carbonVal
-    }
-  };
-}
-
-export function cellularRespiration(stocks: ElementalStocks | IThermodynamicStateVector | any, respirationRate: number): any {
-  if (stocks instanceof ElementalStocks) {
-    const next = stocks.clone();
-    next.carbon += respirationRate * 1.5;
-    next.qLoss += respirationRate * 25.0;
-    return next;
-  }
-  const stocksRecord = stocks.stocks instanceof Map ? Object.fromEntries(stocks.stocks) : (stocks.stocks ?? {});
-  const carbonVal = Number(stocksRecord.carbon ?? 500) + respirationRate * 1.5;
-  return {
-    ...stocks,
-    stocks: {
-      ...stocksRecord,
-      carbon: carbonVal
-    },
-    elementalStocks: {
-      ...(stocks.elementalStocks ?? {}),
-      carbon: carbonVal
-    }
-  };
 }

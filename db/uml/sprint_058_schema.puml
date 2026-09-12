@@ -1,0 +1,73 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics Module" {
+  class StateVector {
+    - stocks: Map<string, number>
+    - metadata: Record<string, any>
+    + getStock(id: string): number
+    + setStock(id: string, value: number): void
+    + toJSON(): string
+  }
+
+  class StateValidator {
+    {static} + calculateExpectedDeltas(currentVector: StateVector, fluxes: FluxRateMap, deltaTime: number): DeltaCalculationResult
+    {static} + validateConservation(previousVector: StateVector, nextVector: StateVector, fluxes: FluxRateMap, deltaTime: number, tolerance: number): boolean
+  }
+
+  class FluxRateMap {
+    -- record mapping --
+  }
+
+  class DeltaCalculationResult {
+    + expectedDeltas: Record<string, number>
+    + totalInflow: number
+    + totalOutflow: number
+    + netRate: number
+    + isConserved: boolean
+  }
+}
+
+package "Database & Blockchain Persistence" {
+  class ThermodynamicStateEntity {
+    + stateId: string
+    + timestamp: Date
+    + vectorData: JSON
+    + totalEnergyStock: number
+    + entropy: number
+  }
+
+  class BoundaryFluxLogEntity {
+    + fluxId: number
+    + stockIdentifier: string
+    + inflowRate: number
+    + outflowRate: number
+    + deltaTime: number
+    + expectedDelta: number
+  }
+
+  class ConservationValidationEntity {
+    + validationId: number
+    + tolerance: number
+    + isConserved: boolean
+    + totalInflow: number
+    + totalOutflow: number
+    + netRate: number
+  }
+
+  class BlockchainTransactionEntity {
+    + txHash: string
+    + blockNumber: number
+    + signature: string
+    + payloadHash: string
+  }
+}
+
+StateValidator ..> StateVector : inspects
+StateValidator ..> DeltaCalculationResult : produces
+StateValidator ..> FluxRateMap : consumes
+ThermodynamicStateEntity "1" *-- "*" BoundaryFluxLogEntity : logs fluxes
+ConservationValidationEntity --> ThermodynamicStateEntity : references prev/next
+BlockchainTransactionEntity --> ConservationValidationEntity : secures
+
+@enduml

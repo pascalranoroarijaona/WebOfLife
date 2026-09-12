@@ -38,7 +38,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
     exergyDestructionRate: 288.15 * 150.0,
     exergy: 1e8,
     stocks: {},
-    boundaryHeatFlux: boundaryFlux,
+    boundaryHeatFlux: 1000 as any,
     boundaryFluxes: boundaryFlux,
     massInventory: {
       carbon: 850,

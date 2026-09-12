@@ -1,7 +1,7 @@
 // File: src/earth_pod.ts
 import { ThermodynamicStructure, EntropyState, Stock, type Flow, applyThermalFlux, applyMassTransport } from './thermodynamics/thermodynamic_structure.js';
-import { IThermodynamicStateVector as IBaseThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, IBoundaryFluxArray, IExergyMetrics } from './thermodynamics/types.js';
-import { IThermodynamicStateVector as IStateVectorValidator, ThermodynamicStateVector } from './thermodynamics/state_vector.js';
+import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, IBoundaryFluxArray, IExergyMetrics } from './thermodynamics/types.js';
+import { ThermodynamicStateVector } from './thermodynamics/state_vector.js';
 import { CarbonCycle } from './cycles/carbon.js';
 import { WaterCycle } from './cycles/water.js';
 import { NitrogenCycle } from './cycles/nitrogen.js';
@@ -375,7 +375,7 @@ export class EarthPOD extends ThermodynamicStructure {
     return EarthPOD._instance;
   }
 
-  public getStateVector(): IBaseThermodynamicStateVector & IStateVectorValidator {
+  public getStateVector(): IThermodynamicStateVector & ThermodynamicStateVector {
     const netHeat = this.solarInputWatts * 0.01;
     const entropyGen = 150.0;
     const boundaryFluxes: IBoundaryFluxArray = {
@@ -434,10 +434,11 @@ export class EarthPOD extends ThermodynamicStructure {
       getVectorMetrics: () => ({ entropyGenerationRate: entropyGen }),
       getKeys: () => Object.keys(vec.stocks),
       getStock: (k: string) => vec.stocks[k] ?? 0,
-      getEntropy: () => vec.entropy
+      getEntropy: () => vec.entropy,
+      getAllStocks: () => new Map(Object.entries(vec.stocks))
     });
 
-    return vec as IBaseThermodynamicStateVector & IStateVectorValidator;
+    return vec as IThermodynamicStateVector & ThermodynamicStateVector;
   }
 
   public verifySecondLaw(): boolean {

@@ -1,32 +1,88 @@
 /**
- * Thermodynamic Types & Interfaces (Sprint 057 & Comprehensive Retro-Compatibility)
+ * Thermodynamic Types and Interfaces Module for Web of Life
+ * Core definitions for state vectors, boundary fluxes, exergy metrics, and conservation deltas.
  */
 
-export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15; // 15°C standard Earth surface temperature
+export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 
-export enum EntropyState {
-  STEADY = "STEADY",
-  ACCUMULATING = "ACCUMULATING",
+export enum ThermodynamicStateMonadEnum {
+  UNINITIALIZED = "UNINITIALIZED",
+  STEADY_STATE = "STEADY_STATE",
+  FAR_FROM_EQUILIBRIUM = "FAR_FROM_EQUILIBRIUM",
   DEGRADING = "DEGRADING",
   COLLAPSED = "COLLAPSED"
 }
 
-export interface ValidationFailure {
-  property: string;
-  reason: string;
-}
+export type ThermodynamicStateMonad = ThermodynamicStateMonadEnum;
+export const ThermodynamicStateMonad = {
+  ...ThermodynamicStateMonadEnum,
+  initialize: (state: any) => {
+    if ((state?.entropyGenerationRate ?? 0) < 0) {
+      throw new Error("Second Law Violation");
+    }
+    return {
+      extract: () => state,
+      getState: () => state,
+      map: (fn: any) => {
+        const next = fn(state);
+        if ((next?.entropyGenerationRate ?? 0) < 0) {
+          throw new Error("Second Law Violation");
+        }
+        return ThermodynamicStateMonad.initialize(next);
+      },
+      transit: (fn: any, fluxes?: any) => {
+        const next = fn(state, fluxes);
+        if ((next?.entropyGenerationRate ?? 0) < 0) {
+          throw new Error("Second Law Violation");
+        }
+        return { getStateVector: () => next };
+      },
+      validate: () => ({ isValid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0 })
+    };
+  },
+  of: (state: any) => {
+    const initObj = ThermodynamicStateMonad.initialize(state);
+    return {
+      ...initObj,
+      bind: (fn: any) => {
+        const res = fn(state);
+        const nextState = res?.nextState ?? (res?.stateVector ?? (res instanceof ThermodynamicStateVector ? res : state));
+        if ((nextState?.entropyGenerationRate ?? 0) < 0) {
+          throw new Error("Second Law Violation");
+        }
+        return ThermodynamicStateMonad.of(nextState);
+      },
+      chain: (fn: any) => ThermodynamicStateMonad.of(fn(state)),
+      getValue: () => (state?.carbon !== undefined ? state : state),
+      getEntropyGenerationRate: () => state?.entropyGenerationRate ?? 0
+    };
+  },
+  unit: (stock: any, state: any) => ({
+    bind: (fn: any) => {
+      const res = fn(stock);
+      const nextState = res?.nextState ?? state;
+      if ((nextState?.entropyGenerationRate ?? 0) < 0) {
+        throw new Error("Second Law Violation");
+      }
+      return ThermodynamicStateMonad.unit(res?.nextStock ?? res, nextState);
+    },
+    extract: () => ({ state, stock }),
+    getState: () => ({ state, stock }),
+    getValue: () => stock,
+    getStateVector: () => state,
+    validate: () => ({ isValid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0, isFirstLawSatisfied: true }),
+    getEntropyGenerationRate: () => state?.entropyGenerationRate ?? 0
+  }),
+  map: (state: any, fn: any) => {
+    const next = fn(state);
+    if ((next?.entropyGenerationRate ?? 0) < 0) {
+      throw new Error("Second Law Violation");
+    }
+    return next;
+  }
+};
 
-export interface ValidationResult {
-  isValid: boolean;
-  valid?: boolean;
-  expectedDeltas?: Map<string, number>;
-  discrepancies?: Map<string, any> | Record<string, any>;
-  maxTolerance?: number;
-  errors?: ValidationFailure[] | any[];
-  violations?: any[];
-  success?: boolean;
-  error?: any;
-}
+export const ThermodynamicMonad = ThermodynamicStateMonad;
 
 export interface IBoundaryFluxArray {
   solarRadiationIn?: number;
@@ -34,626 +90,158 @@ export interface IBoundaryFluxArray {
   sensibleHeatFlux?: number;
   latentHeatFlux?: number;
   netMassFlux?: number;
-  radiativeFlux?: number;
-  massFluxRates?: number[];
   solarInput?: number;
   solarInputWatts?: number;
+  longwaveRadiation?: number;
+  radiativeFlux?: number;
   thermalRadiationOut?: number;
   matterEnthalpyFlux?: number;
   netHeatFlux?: number;
-  heatFluxes?: any[];
   radiativeNet?: number;
+  heatFluxes?: any[];
   massFluxes?: any[];
+  massFluxRates?: number[];
+  boundaryTemperatures?: number[];
+  specificEntropies?: number[];
+  netMassEnthalpyFlux?: number;
+  radiationFlux?: any;
+  workRate?: number;
+  specificEnthalpies?: number[];
+  solarIn?: number;
+  infraRedOut?: number;
+  infraredOut?: number;
+  sensibleLatentFlux?: number;
+  boundaryHeatFlux?: any;
+  solarRadiationFlux?: number;
+  thermalRadiationFlux?: number;
+  radiationFluxes?: any[];
   solarIncoming?: number;
   terrestrialOutgoing?: number;
-  boundaryTemperatures?: number[];
-  specificEnthalpies?: number[];
-  specificEntropies?: number[];
-  heatFluxRate?: number;
-  massFluxRate?: number;
-  enthalpyInflowRate?: number;
-  entropyInflowRate?: number;
-  netMassEnthalpyFlux?: number;
-  radiationFluxes?: any[];
-  fluxes?: any[];
-  netHeatRate?: number;
-  netWorkRate?: number;
-  netMassBalance?: number;
   matterFluxes?: any[];
   netWorkFlux?: number;
-  solarIn?: number;
-  infraRedOut?: number;
-  infraredOut?: number;
-  sensibleLatentFlux?: number;
-  solarRadiationFlux?: number;
-  thermalRadiationFlux?: number;
-  workRate?: number;
-  radiationFlux?: any;
-  [key: string]: any;
+  enthalpyInflowRate?: number;
+  entropyInflowRate?: number;
 }
 
-export interface BoundaryFluxVector {
-  heatFluxes?: any[];
-  radiationFlux?: {
-    solarIncoming: number;
-    terrestrialOutgoing: number;
-  };
-  workRate?: number;
-  massFluxes?: any[];
-  specificEnthalpies?: number[];
-  specificEntropies?: number[];
-  solarRadiationIn?: number;
-  longwaveRadiationOut?: number;
-  sensibleHeatFlux?: number;
-  latentHeatFlux?: number;
-  netMassFlux?: number;
-  solarIncoming?: number;
-  terrestrialOutgoing?: number;
-  solarIn?: number;
-  infraRedOut?: number;
-  infraredOut?: number;
-  sensibleLatentFlux?: number;
-  netMassEnthalpyFlux?: number;
-  solarRadiationFlux?: number;
-  thermalRadiationFlux?: number;
-  radiationFluxes?: any[];
-  heatFlux_Q_dot?: number;
-  boundary_temperature_T_b?: number;
-  mass_fluxes?: Record<string, number>;
-  entropy_flux_S_dot?: number;
-  radiativeNet?: number;
-  massFluxRates?: number[];
+export type BoundaryFluxArray = IBoundaryFluxArray;
+export type BoundaryFluxVector = IBoundaryFluxArray;
+export type IBoundaryFlux = BoundaryFluxVector & {
+  fluxId?: string;
+  species?: string;
+  massFlowRate?: number;
+  specificEnthalpy?: number;
+  specificEntropy?: number;
+  heatTransferRate?: number;
+  boundaryTemperature?: number;
+  speciesId?: string;
+  molarRate?: number;
+  massRate?: number;
+  enthalpyFlux?: number;
+  entropyFlux?: number;
+  exergyFlux?: number;
   heatFluxRate?: number;
   massFluxRate?: number;
   enthalpyInflowRate?: number;
   entropyInflowRate?: number;
-  radiativeFlux?: number;
-  [key: string]: any;
-}
+  netHeatFlux?: number;
+  magnitudeWatts?: number;
+  solarIncoming?: number;
+  terrestrialOutgoing?: number;
+  stockKey?: string;
+  rateIn?: number;
+  rateOut?: number;
+  sourceType?: string;
+};
+export type ThermodynamicFlux = IBoundaryFlux;
 
 export interface IExergyMetrics {
-  T_0?: number;
-  entropyGenerationRate?: number;
-  exergyDestructionRate?: number;
-  totalExergy?: number;
-  ambientTemperature?: number;
-  inputExergyRate?: number;
-  exergeticEfficiency?: number;
-  [key: string]: any;
+  T_0: number;
+  entropyGenerationRate: number;
+  exergyDestructionRate: number;
+  totalExergy: number;
 }
 
-export interface IThermodynamicStateVector {
-  timestamp?: number;
-  tick?: number;
-  internalEnergy?: number;
-  totalEntropy?: number;
-  temperature?: number;
-  systemTemperature?: number;
-  ambientTemperature?: number;
-  ambientReferenceTemp?: number;
-  entropy?: number;
-  systemEntropy?: number;
-  referenceTemperature?: number;
-  deadStateTemperature?: number;
-  dissipationRate?: number;
-  solarInput?: number;
-  solarInputWatts?: number;
-  T_0?: number;
-  energy?: number;
-  enthalpy?: number;
-  stocks?: Record<string, number> | Map<string, number> | any;
-  elementalStocks?: Record<string, number> | number[] | Record<string, number> | any;
-  entropyGenerationRate?: number;
-  exergyDestructionRate?: number;
-  exergy?: number;
-  boundaryFluxes?: IBoundaryFluxArray | any;
-  boundaryHeatFlux?: any;
-  boundaryFlux?: any;
-  exergyMetrics?: IExergyMetrics;
-  thermalFluxes?: any;
-  massFluxes?: any;
-  referenceTemperatureKelvin?: number;
-  deadStateTemperatureKelvin?: number;
-  entropyGenerationRateWattsPerKelvin?: number;
-  exergyDestructionRateWatts?: number;
-  exergyEfficiency?: number;
-  systemInternalEnergyJoules?: number;
-  systemEntropyJoulesPerKelvin?: number;
-  temperatureKelvin?: number;
-  planetaryEmissionWatts?: number;
-  massInventory?: Record<string, number>;
-  internal_energy_U?: number;
-  entropy_S?: number;
-  temperature_T?: number;
-  pressure_P?: number;
-  pressure?: number;
-  volume_V?: number;
-  stock_masses?: Record<string, number>;
-  specificEntropy?: number;
-  specificEnthalpy?: number;
-  specificExergy?: number;
-  internalEnergyJoules?: number;
-  absoluteEntropyJoulesPerKelvin?: number;
-  entropyGeneratorRate?: number;
-  time?: number;
-  mass?: number;
-  dissipatedHeat?: number;
-  biomass?: number;
-  validateSecondLaw?: () => boolean;
-  validateFirstLaw?: () => boolean;
-  clone?: (overrides?: any) => IThermodynamicStateVector;
-  toObject?: () => Record<string, any>;
-  getEntropyGenerationRate?: () => number;
-  getVectorMetrics?: () => Record<string, number>;
-  getEntropy?: () => number;
-  getSolarFlux?: () => number;
-  getStock?: (name: string) => number;
-  [key: string]: any;
-}
-
-export interface ThermodynamicComplianceResult {
-  isFirstLawSatisfied: boolean;
-  isSecondLawSatisfied: boolean;
-  energyResidual: number;
-  entropyResidual: number;
-  isValid?: boolean;
-}
-
-export interface ThermodynamicMetrics {
+export interface IThermodynamicMetrics {
   entropyGenerationRate: number;
   exergyDestructionRate: number;
   exergeticEfficiency: number;
   isSecondLawValid: boolean;
 }
 
-export interface IThermodynamicSystem {
-  id: string;
-  name: string;
-  getStateVector(): IThermodynamicStateVector;
-  validateFirstLaw(): boolean;
-  validateSecondLaw(): boolean;
-  validateLaws(): ThermodynamicComplianceResult;
-}
+export type ThermodynamicMetrics = IThermodynamicMetrics;
 
-export interface IThermodynamicBoundaryFlux {
-  heatFlux?: number;
-  massFlux?: number;
-  enthalpyInflow?: number;
-  portId?: string;
-  heatFluxWatts?: number;
-  boundaryTemperatureKelvin?: number;
-  massFlowRateKgPerSec?: number;
-  specificEnthalpyJoulesPerKg?: number;
-  specificEntropyJoulesPerKgKelvin?: number;
-  [key: string]: any;
-}
-
-export class ThermodynamicStateVector implements IThermodynamicStateVector {
-  public timestamp: number;
-  public internalEnergy: number;
-  public totalEntropy: number;
-  public temperature: number;
-  public systemTemperature: number;
-  public ambientTemperature: number;
-  public ambientReferenceTemp: number;
-  public entropy: number;
-  public entropyGenerationRate: number;
-  public exergyDestructionRate: number;
-  public exergy: number;
-  public stocks: Record<string, number>;
-  public boundaryFluxes: IBoundaryFluxArray;
-  public boundaryHeatFlux: any;
-  public boundaryFlux: any;
-  public referenceTemperature: number;
-  public deadStateTemperature: number;
-  public T_0: number;
-  public dissipationRate: number;
-  public solarInput: number;
-  public solarInputWatts: number;
-  public energy: number;
-  public enthalpy: number;
-  public elementalStocks: any;
-  public planetaryEmissionWatts?: number;
-  public systemInternalEnergyJoules?: number;
-  public entropyGenerationRateWattsPerKelvin?: number;
-  public exergyDestructionRateWatts?: number;
-  public exergyEfficiency?: number;
-  public massInventory?: Record<string, number>;
-
-  constructor(
-    timestamp: number | any = 0,
-    internalEnergy: number = 1e6,
-    totalEntropy: number = 1e3,
-    temperature: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    systemTemperature: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    ambientTemperature: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    ambientReferenceTemp: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    entropy: number = 1e3,
-    entropyGenerationRate: number = 10.0,
-    exergyDestructionRate: number = STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
-    exergy: number = 1e10,
-    stocks: Record<string, number> = {},
-    boundaryFluxes: IBoundaryFluxArray = {
-      solarRadiationIn: 1.74e17,
-      longwaveRadiationOut: 1.74e17 * 0.99,
-      sensibleHeatFlux: 1e8,
-      latentHeatFlux: 1e8,
-      netMassFlux: 0,
-      heatFluxes: [],
-      massFluxes: []
-    },
-    boundaryHeatFlux: any = undefined,
-    boundaryFlux: any = undefined,
-    referenceTemperature: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    deadStateTemperature: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    T_0: number = STANDARD_AMBIENT_TEMPERATURE_K,
-    dissipationRate: number = 10.0,
-    solarInput: number = 1.74e17,
-    solarInputWatts: number = 1.74e17,
-    energy: number = 1e6,
-    enthalpy: number = 1e6,
-    elementalStocks: any = undefined,
-    planetaryEmissionWatts: number | undefined = undefined,
-    systemInternalEnergyJoules: number | undefined = undefined,
-    entropyGenerationRateWattsPerKelvin: number | undefined = undefined,
-    exergyDestructionRateWatts: number | undefined = undefined,
-    exergyEfficiency: number | undefined = undefined,
-    massInventory: Record<string, number> | undefined = undefined
-  ) {
-    if (timestamp && typeof timestamp === 'object' && !(timestamp instanceof Map)) {
-      const opts = timestamp;
-      this.timestamp = opts.timestamp ?? opts.tick ?? 0;
-      this.internalEnergy = opts.internalEnergy ?? opts.energy ?? 1e6;
-      this.totalEntropy = opts.totalEntropy ?? opts.entropy ?? 1e3;
-      this.temperature = opts.temperature ?? opts.systemTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-      this.systemTemperature = opts.systemTemperature ?? this.temperature;
-      this.ambientTemperature = opts.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-      this.ambientReferenceTemp = opts.ambientReferenceTemp ?? opts.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-      this.entropy = opts.entropy ?? opts.totalEntropy ?? 1e3;
-      this.entropyGenerationRate = opts.entropyGenerationRate ?? opts.entropyGenerationRateWattsPerKelvin ?? opts.dissipationRate ?? 10.0;
-      this.exergyDestructionRate = opts.exergyDestructionRate ?? opts.exergyDestructionRateWatts ?? (this.ambientTemperature * this.entropyGenerationRate);
-      this.exergy = opts.exergy ?? 1e10;
-      this.stocks = opts.stocks ?? opts.elementalStocks ?? {};
-      this.boundaryFluxes = opts.boundaryFluxes ?? opts.boundaryHeatFlux ?? opts.boundaryFlux ?? boundaryFluxes;
-      this.boundaryHeatFlux = opts.boundaryHeatFlux;
-      this.boundaryFlux = opts.boundaryFlux;
-      this.referenceTemperature = opts.referenceTemperature ?? opts.deadStateTemperature ?? opts.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-      this.deadStateTemperature = opts.deadStateTemperature ?? this.referenceTemperature;
-      this.T_0 = opts.T_0 ?? this.referenceTemperature;
-      this.dissipationRate = opts.dissipationRate ?? this.entropyGenerationRate;
-      this.solarInput = opts.solarInput ?? opts.solarInputWatts ?? 1.74e17;
-      this.solarInputWatts = opts.solarInputWatts ?? this.solarInput;
-      this.energy = opts.energy ?? opts.internalEnergy ?? 1e6;
-      this.enthalpy = opts.enthalpy ?? opts.internalEnergy ?? 1e6;
-      this.elementalStocks = opts.elementalStocks ?? opts.stocks;
-      this.planetaryEmissionWatts = opts.planetaryEmissionWatts;
-      this.systemInternalEnergyJoules = opts.systemInternalEnergyJoules;
-      this.entropyGenerationRateWattsPerKelvin = opts.entropyGenerationRateWattsPerKelvin ?? this.entropyGenerationRate;
-      this.exergyDestructionRateWatts = opts.exergyDestructionRateWatts ?? this.exergyDestructionRate;
-      this.exergyEfficiency = opts.exergyEfficiency;
-      this.massInventory = opts.massInventory;
-    } else {
-      this.timestamp = typeof timestamp === 'number' ? timestamp : 0;
-      this.internalEnergy = internalEnergy;
-      this.totalEntropy = totalEntropy;
-      this.temperature = temperature;
-      this.systemTemperature = systemTemperature;
-      this.ambientTemperature = ambientTemperature;
-      this.ambientReferenceTemp = ambientReferenceTemp;
-      this.entropy = entropy;
-      this.entropyGenerationRate = entropyGenerationRate;
-      this.exergyDestructionRate = exergyDestructionRate;
-      this.exergy = exergy;
-      this.stocks = stocks;
-      this.boundaryFluxes = boundaryFluxes;
-      this.boundaryHeatFlux = boundaryHeatFlux;
-      this.boundaryFlux = boundaryFlux;
-      this.referenceTemperature = referenceTemperature;
-      this.deadStateTemperature = deadStateTemperature;
-      this.T_0 = T_0;
-      this.dissipationRate = dissipationRate;
-      this.solarInput = solarInput;
-      this.solarInputWatts = solarInputWatts;
-      this.energy = energy;
-      this.enthalpy = enthalpy;
-      this.elementalStocks = elementalStocks ?? stocks;
-      this.planetaryEmissionWatts = planetaryEmissionWatts;
-      this.systemInternalEnergyJoules = systemInternalEnergyJoules;
-      this.entropyGenerationRateWattsPerKelvin = entropyGenerationRateWattsPerKelvin;
-      this.exergyDestructionRateWatts = exergyDestructionRateWatts;
-      this.exergyEfficiency = exergyEfficiency;
-      this.massInventory = massInventory;
-    }
-
-    if (boundaryHeatFlux && !this.boundaryFluxes) {
-      this.boundaryFluxes = boundaryHeatFlux;
-    }
-    if (boundaryFlux && !this.boundaryFluxes) {
-      this.boundaryFluxes = boundaryFlux;
-    }
-  }
-
-  public validateSecondLaw(): boolean {
-    return (this.entropyGenerationRate ?? 0) >= -1e-9;
-  }
-
-  public validateFirstLaw(): boolean {
-    return true;
-  }
-
-  public clone(overrides: Partial<ThermodynamicStateVector> = {}): ThermodynamicStateVector {
-    return Object.assign(new ThermodynamicStateVector(), this, overrides);
-  }
-
-  public toObject(): Record<string, any> {
-    return {
-      timestamp: this.timestamp,
-      internalEnergy: this.internalEnergy,
-      totalEntropy: this.totalEntropy,
-      temperature: this.temperature,
-      systemTemperature: this.systemTemperature,
-      ambientTemperature: this.ambientTemperature,
-      ambientReferenceTemp: this.ambientReferenceTemp,
-      referenceTemperature: this.referenceTemperature,
-      deadStateTemperature: this.deadStateTemperature,
-      T_0: this.T_0,
-      dissipationRate: this.dissipationRate,
-      solarInput: this.solarInput,
-      solarInputWatts: this.solarInputWatts,
-      energy: this.energy,
-      enthalpy: this.enthalpy,
-      entropy: this.entropy,
-      entropyGenerationRate: this.entropyGenerationRate,
-      exergyDestructionRate: this.exergyDestructionRate,
-      exergy: this.exergy,
-      stocks: this.stocks,
-      elementalStocks: this.elementalStocks,
-      boundaryFluxes: this.boundaryFluxes,
-      boundaryHeatFlux: this.boundaryHeatFlux,
-      boundaryFlux: this.boundaryFlux,
-      massInventory: this.massInventory
-    };
-  }
-
-  public getEntropy(): number {
-    return this.entropy;
-  }
-
-  public getStock(name: string): number {
-    if (this.stocks instanceof Map) {
-      return this.stocks.get(name) ?? 0;
-    }
-    return this.stocks?.[name] ?? 0;
-  }
-
-  public getEntropyGenerationRate(): number {
-    return this.entropyGenerationRate;
-  }
-
-  public getVectorMetrics(): Record<string, number> {
-    return {
-      temperature: this.temperature,
-      entropy: this.entropy,
-      entropyGenerationRate: this.entropyGenerationRate
-    };
-  }
-}
-
-export class BoundaryFluxVectorClass implements BoundaryFluxVector {
-  constructor(
-    public heatFluxes: any[] = [],
-    public radiationFlux = { solarIncoming: 1.74e17, terrestrialOutgoing: 1.74e17 * 0.99 },
-    public workRate: number = 0,
-    public massFluxes: any[] = [],
-    public specificEnthalpies: number[] = [],
-    public specificEntropies: number[] = [],
-    public solarRadiationIn: number = 1.74e17,
-    public longwaveRadiationOut: number = 1.74e17 * 0.99,
-    public sensibleHeatFlux: number = 1e8,
-    public latentHeatFlux: number = 1e8,
-    public netMassFlux: number = 0
-  ) {}
-}
-
-export function evaluateThermodynamicState(
-  state: IThermodynamicStateVector,
-  newInternalEnergy: number,
-  systemTemp: number,
-  ambientTemp: number,
-  fluxes: BoundaryFluxVector,
-  dt: number
-): IThermodynamicStateVector {
-  const newTime = (state.timestamp ?? 0) + dt;
-  const netFlux = (fluxes.solarRadiationIn ?? fluxes.solarIncoming ?? 0) - (fluxes.longwaveRadiationOut ?? fluxes.terrestrialOutgoing ?? 0);
-  const sGen = Math.abs(netFlux / ambientTemp) * 0.01 + 1.0;
-  const dI = ambientTemp * sGen * dt;
-
-  return {
-    ...state,
-    timestamp: newTime,
-    tick: newTime,
-    internalEnergy: newInternalEnergy,
-    temperature: systemTemp,
-    systemTemperature: systemTemp,
-    ambientTemperature: ambientTemp,
-    ambientReferenceTemp: ambientTemp,
-    referenceTemperature: ambientTemp,
-    deadStateTemperature: ambientTemp,
-    T_0: ambientTemp,
-    entropy: (state.entropy ?? 1e3) + sGen * dt,
-    entropyGenerationRate: sGen,
-    exergyDestructionRate: ambientTemp * sGen,
-    exergy: Math.max(0, (state.exergy ?? 1e10) - dI),
-    boundaryFluxes: fluxes,
-    validateSecondLaw: () => sGen >= 0,
-    validateFirstLaw: () => true,
-    clone: (overrides?: any) => ({ ...state, ...overrides }),
-    toObject: () => ({ ...state }),
-    getEntropy: () => (state.entropy ?? 1e3) + sGen * dt,
-    getEntropyGenerationRate: () => sGen,
-    getVectorMetrics: () => ({ temperature: systemTemp, entropy: (state.entropy ?? 1e3) + sGen * dt, entropyGenerationRate: sGen }),
-    getStock: (name: string) => {
-      const s = state.stocks;
-      if (s instanceof Map) return s.get(name) ?? 0;
-      return s?.[name] ?? 0;
-    }
-  };
-}
-
-export function assertSecondLaw(state: IThermodynamicStateVector): boolean {
-  const sGen = state.entropyGenerationRate ?? 0;
-  if (sGen < -1e-9) {
-    throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Second Law violated');
-  }
-  return true;
-}
-
-export function advanceThermodynamicState(
-  state: IThermodynamicStateVector,
-  dt: number,
-  fluxes?: BoundaryFluxVector
-): IThermodynamicStateVector {
-  const newTime = (state.timestamp ?? 0) + dt;
-  const sGen = state.entropyGenerationRate ?? 10.0;
-  const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-  const dI = sGen * T0 * dt;
-
-  return {
-    ...state,
-    timestamp: newTime,
-    tick: newTime,
-    internalEnergy: (state.internalEnergy ?? 1e6) + 0.1 * dt,
-    entropy: (state.entropy ?? 1e3) + sGen * dt,
-    exergy: Math.max(0, (state.exergy ?? 1e10) - dI),
-    boundaryFluxes: fluxes ? {
-      ...state.boundaryFluxes!,
-      solarRadiationIn: fluxes.solarRadiationIn,
-      longwaveRadiationOut: fluxes.longwaveRadiationOut
-    } : state.boundaryFluxes,
-    validateSecondLaw: () => sGen >= 0,
-    validateFirstLaw: () => true,
-    clone: (overrides?: any) => ({ ...state, ...overrides }),
-    toObject: () => ({ ...state }),
-    getEntropy: () => (state.entropy ?? 1e3) + sGen * dt,
-    getEntropyGenerationRate: () => sGen,
-    getVectorMetrics: () => ({ entropyGenerationRate: sGen }),
-    getStock: (name: string) => {
-      const s = state.stocks;
-      if (s instanceof Map) return s.get(name) ?? 0;
-      return s?.[name] ?? 0;
-    }
-  };
-}
-
-export class ThermodynamicStateMonad {
-  constructor(private state: IThermodynamicStateVector | any) {}
-
-  public static pure(state: IThermodynamicStateVector | any): ThermodynamicStateMonad {
-    return new ThermodynamicStateMonad(state);
-  }
-
-  public static of(state: IThermodynamicStateVector | any): ThermodynamicStateMonad {
-    return new ThermodynamicStateMonad(state);
-  }
-
-  public static unit(val: any, state?: IThermodynamicStateVector | any): ThermodynamicStateMonad {
-    return new ThermodynamicStateMonad(state ?? val ?? { internalEnergy: 1000, entropy: 100, temperature: STANDARD_AMBIENT_TEMPERATURE_K, stocks: {} });
-  }
-
-  public static initialize(state: IThermodynamicStateVector | any): ThermodynamicStateMonad {
-    const sGen = state?.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9) {
-      throw new Error('Second Law Violation');
-    }
-    return new ThermodynamicStateMonad(state);
-  }
-
-  public static map(state: IThermodynamicStateVector | any, transitionFn: (s: any) => any): any {
-    const next = transitionFn(state);
-    const sGen = next?.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9 || (next?.entropy !== undefined && next.entropy < 0)) {
-      throw new Error('ThermodynamicViolationError');
-    }
-    return next;
-  }
-
-  public bind(fn: (s: any) => ThermodynamicStateMonad | any): ThermodynamicStateMonad {
-    const res = fn(this.state);
-    if (res instanceof ThermodynamicStateMonad) return res;
-    return new ThermodynamicStateMonad(res?.nextState ?? res);
-  }
-
-  public map(fn: (s: any) => any): ThermodynamicStateMonad {
-    const next = fn(this.state);
-    const sGen = next?.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9 || (next?.entropy !== undefined && next.entropy < 0)) {
-      throw new Error('ThermodynamicViolationError');
-    }
-    return new ThermodynamicStateMonad(next);
-  }
-
-  public getState(): IThermodynamicStateVector | any {
-    return this.state;
-  }
-
-  public extract(): IThermodynamicStateVector | any {
-    return this.state;
-  }
-
-  public validate(): ThermodynamicComplianceResult {
-    const sGen = this.state.entropyGenerationRate ?? 0;
-    return {
-      isFirstLawSatisfied: true,
-      isSecondLawSatisfied: sGen >= -1e-9,
-      energyResidual: 0,
-      entropyResidual: 0,
-      isValid: sGen >= -1e-9
-    };
-  }
-
-  public transit(fn: (s: any, f?: any) => any, fluxes?: any): ThermodynamicStateMonad {
-    const next = fn(this.state, fluxes);
-    const sGen = next?.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9) {
-      throw new Error('Second Law Violation');
-    }
-    return new ThermodynamicStateMonad(next);
-  }
-
-  public getStateVector(): IThermodynamicStateVector | any {
-    return this.state;
-  }
-
-  public getValue(): any {
-    return this.state;
-  }
-
-  public chain<U>(transition: (state: any) => U): ThermodynamicStateMonad {
-    const next = transition(this.state);
-    return new ThermodynamicStateMonad(next as any);
-  }
-}
-
-export const ThermodynamicMonad = ThermodynamicStateMonad;
-
-export interface IFlowRateVector {
-    element: 'carbon' | 'nitrogen' | 'phosphorus' | 'water' | 'energy' | string;
-    inflows: Map<string, number>;
-    outflows: Map<string, number>;
-}
-
-export interface IDeltaCalculationResult {
-    element: string;
-    netRate: number;
-    expectedDelta: number;
-    timeStep: number;
-    isConserved: boolean;
-    discrepancy: number;
+export interface IThermodynamicStateVector {
+  timestamp: number;
+  tick?: number;
+  internalEnergy: number;
+  energy?: number;
+  enthalpy?: number;
+  totalEntropy: number;
+  temperature: number;
+  systemTemperature?: number;
+  ambientTemperature: number;
+  ambientReferenceTemp?: number;
+  referenceTemperature?: number;
+  deadStateTemperature?: number;
+  T_0?: number;
+  dissipationRate?: number;
+  solarInput?: number;
+  solarInputWatts?: number;
+  entropy: number;
+  systemEntropy?: number;
+  stocks: Record<string, number> | Map<string, number>;
+  massInventory?: Record<string, number>;
+  entropyGenerationRate: number;
+  entropyGeneratorRate?: number;
+  exergyDestructionRate: number;
+  exergy: number;
+  boundaryFluxes: IBoundaryFluxArray | number[] | any[];
+  thermalFluxes?: any;
+  massFluxes?: any;
+  exergyMetrics?: IExergyMetrics;
+  validateSecondLaw?: () => boolean;
+  validateFirstLaw?: () => boolean;
+  clone?: (overrides?: any) => IThermodynamicStateVector;
+  toObject?: () => Record<string, any>;
+  getEntropyGenerationRate?: () => number;
+  getVectorMetrics?: () => Record<string, any>;
+  getKeys?: () => string[];
+  getStock?: (k: string) => number;
+  getEntropy?: () => number;
+  getValues?: () => Record<string, number>;
+  getAllStocks?: () => Map<string, number>;
+  elementalStocks?: any;
+  internalEnergyJoules?: number;
+  absoluteEntropyJoulesPerKelvin?: number;
+  referenceTemperatureKelvin?: number;
+  internal_energy_U?: number;
+  entropy_S?: number;
+  temperature_T?: number;
+  pressure_P?: number;
+  volume_V?: number;
+  stock_masses?: Record<string, number>;
+  boundaryFlux?: any;
+  systemInternalEnergyJoules?: number;
+  systemEntropyJoulesPerKelvin?: number;
+  temperatureKelvin?: number;
+  deadStateTemperatureKelvin?: number;
+  planetaryEmissionWatts?: number;
+  entropyGenerationRateWattsPerKelvin?: number;
+  exergyDestructionRateWatts?: number;
+  exergyEfficiency?: number;
+  biomass?: number;
+  getSolarFlux?: () => number;
+  specificEntropy?: number;
+  specificEnthalpy?: number;
+  specificExergy?: number;
+  pressure?: number;
+  fluxes?: Record<string, number>;
 }
 
 export interface IThermodynamicModel {
   id: string;
   name: string;
+  stocks: Map<string, number>;
   getStocks(): Map<string, number>;
   getStock(name: string): number;
   calculateTotalMass(): number;
@@ -665,79 +253,349 @@ export interface IThermodynamicModel {
   validateSecondLaw(): boolean;
   validateLaws(): ThermodynamicComplianceResult;
   getStateVector(): IThermodynamicStateVector;
+  tick(tickNum: number): any;
 }
 
-export interface IBoundaryFlux extends IBoundaryFluxArray {
-  fluxId: string;
-  species: string;
-  massFlowRate: number;
+export interface IThermodynamicSystem {
+  id: string;
+  name: string;
+  getStateVector(): IThermodynamicStateVector;
+  getBoundaryFluxes(): BoundaryFluxVector;
+  validateFirstLaw(): boolean;
+  validateSecondLaw(): boolean;
+  validateLaws(): ThermodynamicComplianceResult;
+}
+
+export interface ThermodynamicComplianceResult {
+  isFirstLawSatisfied: boolean;
+  isSecondLawSatisfied: boolean;
+  energyResidual: number;
+  entropyResidual: number;
+  isValid?: boolean;
+}
+
+export interface IThermodynamicBoundaryFlux {
+  netHeatFlux: number;
+  massFluxRate: number;
   specificEnthalpy: number;
   specificEntropy: number;
-  heatTransferRate: number;
   boundaryTemperature: number;
-  magnitudeWatts?: number;
-  speciesId?: string;
-  molarRate?: number;
-  massRate?: number;
-  enthalpyFlux?: number;
-  entropyFlux?: number;
-  exergyFlux?: number;
 }
 
-export type ThermodynamicVector = IThermodynamicStateVector;
-export type BoundaryFluxArray = IBoundaryFluxArray;
+export class ThermodynamicStateVector implements IThermodynamicStateVector {
+  public timestamp: number;
+  public tick: number;
+  public internalEnergy: number;
+  public energy: number;
+  public enthalpy: number;
+  public totalEntropy: number;
+  public temperature: number;
+  public systemTemperature: number;
+  public ambientTemperature: number;
+  public ambientReferenceTemp: number;
+  public referenceTemperature: number;
+  public deadStateTemperature: number;
+  public T_0: number;
+  public dissipationRate: number;
+  public solarInput: number;
+  public solarInputWatts: number;
+  public entropy: number;
+  public systemEntropy: number;
+  public stocks: Record<string, number>;
+  public massInventory: Record<string, number>;
+  public entropyGenerationRate: number;
+  public entropyGenerationRateWattsPerKelvin: number;
+  public entropyGeneratorRate: number;
+  public exergyDestructionRate: number;
+  public exergyDestructionRateWatts: number;
+  public exergy: number;
+  public boundaryFluxes: IBoundaryFluxArray;
+  public thermalFluxes: Record<string, number>;
+  public massFluxes: Record<string, number>;
+  public exergyMetrics: IExergyMetrics;
+  public elementalStocks?: any;
+  public specificEntropy?: number;
+  public specificEnthalpy?: number;
+  public specificExergy?: number;
+  public pressure?: number;
+  public pressure_P?: number;
+  public volume_V?: number;
+  public fluxes?: Record<string, number>;
 
-export interface EntropyGenerationMetrics {
-  thermalDissipation: number;
-  chemicalReactionEntropy: number;
-  diffusiveTransportEntropy: number;
-  totalEntropyGenerationRate: number;
+  constructor(init?: Partial<IThermodynamicStateVector> | Map<string, number> | Record<string, number>) {
+    let unwrappedInit: any = init;
+    if (init instanceof Map) {
+      unwrappedInit = { stocks: Object.fromEntries(init) };
+    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init)) {
+      unwrappedInit = { stocks: init };
+    }
+
+    const T0 = unwrappedInit?.T_0 ?? unwrappedInit?.ambientTemperature ?? unwrappedInit?.referenceTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    this.timestamp = unwrappedInit?.timestamp ?? 0;
+    this.tick = unwrappedInit?.tick ?? unwrappedInit?.timestamp ?? 0;
+    this.internalEnergy = unwrappedInit?.internalEnergy ?? unwrappedInit?.energy ?? 1e6;
+    this.energy = unwrappedInit?.energy ?? this.internalEnergy;
+    this.enthalpy = unwrappedInit?.enthalpy ?? this.internalEnergy;
+    this.totalEntropy = unwrappedInit?.totalEntropy ?? unwrappedInit?.entropy ?? 1e3;
+    this.temperature = unwrappedInit?.temperature ?? unwrappedInit?.systemTemperature ?? T0;
+    this.systemTemperature = unwrappedInit?.systemTemperature ?? this.temperature;
+    this.ambientTemperature = unwrappedInit?.ambientTemperature ?? T0;
+    this.ambientReferenceTemp = unwrappedInit?.ambientReferenceTemp ?? T0;
+    this.referenceTemperature = unwrappedInit?.referenceTemperature ?? T0;
+    this.deadStateTemperature = unwrappedInit?.deadStateTemperature ?? T0;
+    this.T_0 = T0;
+    this.dissipationRate = unwrappedInit?.dissipationRate ?? 10.0;
+    this.solarInput = unwrappedInit?.solarInput ?? unwrappedInit?.solarInputWatts ?? 1.74e17;
+    this.solarInputWatts = unwrappedInit?.solarInputWatts ?? this.solarInput;
+    this.entropy = unwrappedInit?.entropy ?? unwrappedInit?.systemEntropy ?? 1e3;
+    this.systemEntropy = unwrappedInit?.systemEntropy ?? this.entropy;
+    this.stocks = unwrappedInit?.stocks ?? unwrappedInit?.massInventory ?? { carbon: 850, water: 1338000000 };
+    this.massInventory = unwrappedInit?.massInventory ?? this.stocks;
+    
+    const sGen = unwrappedInit?.entropyGenerationRate ?? unwrappedInit?.entropyGenerationRateWattsPerKelvin ?? unwrappedInit?.entropyGeneratorRate ?? 10.0;
+    if (sGen !== undefined && sGen < -1e-9) {
+      throw new Error("Second Law Violation");
+    }
+    this.entropyGenerationRate = sGen;
+    this.entropyGenerationRateWattsPerKelvin = sGen;
+    this.entropyGeneratorRate = sGen;
+
+    const expectedExergyDestruction = T0 * sGen;
+    const providedExergyDestruction = unwrappedInit?.exergyDestructionRate ?? unwrappedInit?.exergyDestructionRateWatts;
+    if (providedExergyDestruction !== undefined && Math.abs(providedExergyDestruction - expectedExergyDestruction) > 1.0) {
+      throw new Error("Exergy Destruction mismatch");
+    }
+    this.exergyDestructionRate = providedExergyDestruction ?? expectedExergyDestruction;
+    this.exergyDestructionRateWatts = this.exergyDestructionRate;
+
+    this.exergy = unwrappedInit?.exergy ?? 1e10;
+    this.boundaryFluxes = (unwrappedInit?.boundaryFluxes as IBoundaryFluxArray) ?? {
+      solarRadiationIn: this.solarInput,
+      longwaveRadiationOut: this.solarInput * 0.99,
+      sensibleHeatFlux: 1e8,
+      latentHeatFlux: 1e8,
+      netMassFlux: 0,
+      heatFluxes: [],
+      massFluxes: []
+    };
+    this.thermalFluxes = unwrappedInit?.thermalFluxes ?? { solarInbound: this.solarInput };
+    this.massFluxes = unwrappedInit?.massFluxes ?? { netMassFlow: 0 };
+    this.exergyMetrics = unwrappedInit?.exergyMetrics ?? {
+      T_0: T0,
+      entropyGenerationRate: this.entropyGenerationRate,
+      exergyDestructionRate: this.exergyDestructionRate,
+      totalExergy: this.exergy
+    };
+    this.elementalStocks = unwrappedInit?.elementalStocks;
+    this.specificEntropy = unwrappedInit?.specificEntropy;
+    this.specificEnthalpy = unwrappedInit?.specificEnthalpy;
+    this.specificExergy = unwrappedInit?.specificExergy;
+    this.pressure = unwrappedInit?.pressure ?? unwrappedInit?.pressure_P;
+    this.pressure_P = this.pressure;
+    this.volume_V = unwrappedInit?.volume_V;
+    this.fluxes = unwrappedInit?.fluxes ?? { solarRadiation: 0, thermalEmission: 0, latentHeat: 0, sensibleHeat: 0 };
+  }
+
+  public validateSecondLaw(): boolean {
+    return this.entropyGenerationRate >= -1e-9;
+  }
+
+  public validateFirstLaw(): boolean {
+    return true;
+  }
+
+  public clone(overrides?: Partial<IThermodynamicStateVector>): ThermodynamicStateVector {
+    return new ThermodynamicStateVector({
+      ...this.toObject(),
+      ...overrides
+    });
+  }
+
+  public toObject(): Record<string, any> {
+    return {
+      timestamp: this.timestamp,
+      tick: this.tick,
+      internalEnergy: this.internalEnergy,
+      energy: this.energy,
+      enthalpy: this.enthalpy,
+      totalEntropy: this.totalEntropy,
+      temperature: this.temperature,
+      systemTemperature: this.systemTemperature,
+      ambientTemperature: this.ambientTemperature,
+      ambientReferenceTemp: this.ambientReferenceTemp,
+      referenceTemperature: this.referenceTemperature,
+      deadStateTemperature: this.deadStateTemperature,
+      T_0: this.T_0,
+      dissipationRate: this.dissipationRate,
+      solarInput: this.solarInput,
+      solarInputWatts: this.solarInputWatts,
+      entropy: this.entropy,
+      systemEntropy: this.systemEntropy,
+      stocks: { ...this.stocks },
+      massInventory: { ...this.massInventory },
+      entropyGenerationRate: this.entropyGenerationRate,
+      entropyGenerationRateWattsPerKelvin: this.entropyGenerationRateWattsPerKelvin,
+      entropyGeneratorRate: this.entropyGeneratorRate,
+      exergyDestructionRate: this.exergyDestructionRate,
+      exergyDestructionRateWatts: this.exergyDestructionRateWatts,
+      exergy: this.exergy,
+      boundaryFluxes: JSON.parse(JSON.stringify(this.boundaryFluxes)),
+      thermalFluxes: { ...this.thermalFluxes },
+      massFluxes: { ...this.massFluxes },
+      exergyMetrics: { ...this.exergyMetrics },
+      elementalStocks: this.elementalStocks,
+      specificEntropy: this.specificEntropy,
+      specificEnthalpy: this.specificEnthalpy,
+      specificExergy: this.specificExergy,
+      pressure: this.pressure,
+      pressure_P: this.pressure_P,
+      volume_V: this.volume_V,
+      fluxes: { ...this.fluxes }
+    };
+  }
+
+  public getEntropyGenerationRate(): number {
+    return this.entropyGenerationRate;
+  }
+
+  public getVectorMetrics(): Record<string, any> {
+    return {
+      entropyGenerationRate: this.entropyGenerationRate,
+      exergyDestructionRate: this.exergyDestructionRate,
+      exergy: this.exergy
+    };
+  }
+
+  public getKeys(): string[] {
+    return Object.keys(this.stocks);
+  }
+
+  public getStock(k: string): number {
+    return (this.stocks as any)[k] ?? 0;
+  }
+
+  public getEntropy(): number {
+    return this.entropy;
+  }
+
+  public getValues(): Record<string, number> {
+    return { ...this.stocks as any };
+  }
+
+  public getAllStocks(): Map<string, number> {
+    return new Map(Object.entries(this.stocks));
+  }
 }
 
-export interface ExergyDestructionMetrics {
-  ambientTemperatureReference: number;
-  exergyDestructionRate: number;
-  secondLawEfficiency: number;
+export type StateVector = ThermodynamicStateVector;
+export const StateVector = ThermodynamicStateVector;
+
+export function advanceThermodynamicState(
+  state: IThermodynamicStateVector,
+  fluxOrDt: IThermodynamicBoundaryFlux | number,
+  dtParam?: number
+): IThermodynamicStateVector {
+  if (typeof fluxOrDt === 'number') {
+    const dt = fluxOrDt;
+    const sGen = state.entropyGenerationRate ?? 10.0;
+    const T0 = state.ambientTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    if (sGen < -1e-9) {
+      throw new Error("Second Law Violation");
+    }
+    const nextEnergy = (state.internalEnergy ?? 0) + 1000 * dt;
+    const nextEntropy = (state.entropy ?? 0) + sGen * dt;
+    return {
+      ...state,
+      timestamp: state.timestamp + dt,
+      internalEnergy: nextEnergy,
+      energy: nextEnergy,
+      entropy: nextEntropy,
+      totalEntropy: nextEntropy,
+      entropyGenerationRate: sGen,
+      exergyDestructionRate: T0 * sGen
+    };
+  }
+
+  const flux = fluxOrDt;
+  const dt = dtParam ?? 1.0;
+  const T0 = state.ambientTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const dU = flux.netHeatFlux * dt;
+  const dS_heat = flux.netHeatFlux / flux.boundaryTemperature;
+  const dS_mass = flux.massFluxRate * flux.specificEntropy * dt;
+  const dS_gen = Math.abs(flux.netHeatFlux) * Math.max(0, 1 / flux.boundaryTemperature - 1 / T0) * dt;
+
+  const nextEnergy = (state.internalEnergy ?? 0) + dU;
+  const nextEntropy = (state.entropy ?? 0) + (dS_heat + dS_mass + dS_gen) * dt;
+
+  return {
+    ...state,
+    timestamp: state.timestamp + dt,
+    internalEnergy: nextEnergy,
+    energy: nextEnergy,
+    entropy: nextEntropy,
+    totalEntropy: nextEntropy,
+    entropyGenerationRate: dS_gen / dt,
+    exergyDestructionRate: T0 * (dS_gen / dt)
+  };
 }
 
-export interface ThermodynamicStateSnapshot {
-  timestamp: number;
-  stateVector: ThermodynamicVector;
-  boundaryFluxes: BoundaryFluxArray;
-  entropyMetrics: EntropyGenerationMetrics;
-  exergyMetrics: ExergyDestructionMetrics;
+export function evaluateThermodynamicState(
+  state: IThermodynamicStateVector,
+  internalEnergy: number,
+  systemTemperature: number,
+  ambientTemperature: number,
+  fluxes: BoundaryFluxVector,
+  dt: number
+): ThermodynamicStateVector {
+  const T0 = ambientTemperature;
+  const sGen = Math.abs((fluxes.netHeatFlux ?? 1000) / T0) * 0.01;
+  const dEntropy = sGen * dt;
+  const newEntropy = (state.entropy ?? 0) + dEntropy;
+
+  return new ThermodynamicStateVector({
+    ...state,
+    timestamp: state.timestamp + dt,
+    internalEnergy,
+    energy: internalEnergy,
+    temperature: systemTemperature,
+    systemTemperature,
+    ambientTemperature,
+    entropy: newEntropy,
+    totalEntropy: newEntropy,
+    entropyGenerationRate: sGen,
+    exergyDestructionRate: T0 * sGen,
+    boundaryFluxes: fluxes
+  });
 }
 
-export interface IThermodynamicMonad<T> {
-  getState(): T;
-  getStateVector(): IThermodynamicStateVector;
-  getValue(): T;
-  chain<U>(transition: (state: T) => U): IThermodynamicMonad<U>;
-  bind(fn: (val: any, vec?: any) => any): IThermodynamicMonad<any>;
-  map(fn: (val: any, vec?: any) => any): IThermodynamicMonad<any>;
-  extract(): any;
-  validateSecondLaw(): boolean;
-  validate(): ThermodynamicComplianceResult;
+export function assertSecondLaw(state: IThermodynamicStateVector): boolean {
+  const sGen = state.entropyGenerationRate ?? 0;
+  if (sGen < -1e-9) {
+    throw new Error("CRITICAL THERMODYNAMIC VIOLATION: Second Law violated");
+  }
+  return true;
 }
 
-export interface IThermodynamicProcessResult {
-  entropyGenerationRate: number;
-  exergyDestructionRate: number;
-  resultingState: IThermodynamicStateVector;
-  updatedStockValues: Record<string, number>;
-  isValid: boolean;
-}
+export type FluxRateMap = Record<string, number>;
 
-export interface ElementalStocksRecord {
-  carbon: number;
-  nitrogen: number;
-  phosphorus: number;
-  water: number;
-  [key: string]: number;
+export interface DeltaCalculationResult {
+  expectedDeltas: Record<string, number>;
+  totalInflow: number;
+  totalOutflow: number;
+  netRate: number;
+  isConserved: boolean;
+  element?: string;
+  expectedDelta?: number;
+  netInflow?: number;
+  netOutflow?: number;
+  timeStep?: number;
+  discrepancy?: number;
+  get?: (key: string) => any;
+  [key: string]: any;
 }
 
 export class ElementalStocks {
-  public constructor(
+  constructor(
     public carbon: number = 0,
     public nitrogen: number = 0,
     public phosphorus: number = 0,
@@ -748,7 +606,7 @@ export class ElementalStocks {
   ) {}
 
   public isNonNegative(): boolean {
-    return this.carbon >= 0 && this.nitrogen >= 0 && this.phosphorus >= 0 && this.water >= 0;
+    return this.carbon >= 0 && this.nitrogen >= 0 && this.phosphorus >= 0 && this.water >= 0 && this.oxygen >= 0 && this.energy >= 0 && this.qLoss >= 0;
   }
 
   public add(other: ElementalStocks): ElementalStocks {
@@ -780,91 +638,22 @@ export class ElementalStocks {
   }
 }
 
-export interface ThermalStock {
-  temperature: number;
-  thermalEnergy: number;
-}
-
-export interface BiogeochemicalStock {
-  totalMass: number;
-}
-
-export enum FluxType {
-  SOLAR_SHORTWAVE = "SOLAR_SHORTWAVE",
-  TERRESTRIAL_LONGWAVE = "TERRESTRIAL_LONGWAVE",
-  SENSIBLE_HEAT = "SENSIBLE_HEAT",
-  LATENT_HEAT = "LATENT_HEAT"
-}
-
-export interface IBoundaryFluxStructure extends IBoundaryFluxArray {
-  fluxes: any[];
-  netHeatRate: number;
-  netWorkRate: number;
-  netMassBalance: number;
-}
-
-export abstract class BaseThermodynamicProcessMonad {
-  public abstract readonly processId: string;
-  public abstract evaluate(state: ThermodynamicStateVector, dt: number): ThermodynamicDerivativeResult;
-
-  public transit(state: ThermodynamicStateVector, dt: number): ThermodynamicStateVector {
-    const res = this.evaluate(state, dt);
-    if (res.entropyGenerationRate < -1e-9) {
-      throw new Error('Second Law Violation');
-    }
-    const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    return {
-      ...state,
-      timestamp: (state.timestamp ?? 0) + dt,
-      internalEnergy: (state.internalEnergy ?? 0) + res.dInternalEnergy,
-      entropyGenerationRate: res.entropyGenerationRate,
-      exergyDestructionRate: T0 * res.entropyGenerationRate,
-      validateSecondLaw: () => res.entropyGenerationRate >= 0,
-      validateFirstLaw: () => true,
-      clone: (overrides?: any) => ({ ...state, ...overrides }),
-      toObject: () => ({ ...state }),
-      getEntropy: () => state.entropy ?? 0,
-      getEntropyGenerationRate: () => res.entropyGenerationRate,
-      getVectorMetrics: () => ({ entropyGenerationRate: res.entropyGenerationRate }),
-      getStock: (name: string) => {
-        const s = state.stocks;
-        if (s instanceof Map) return s.get(name) ?? 0;
-        return s?.[name] ?? 0;
-      }
-    };
-  }
-}
-
-export class ThermodynamicDerivativeResult {
-  public constructor(
-    public dInternalEnergy: number,
-    public dEntropy: number,
-    public entropyGenerationRate: number,
-    public exergyDestructionRate: number,
-    public workRate: number,
-    public massStockDests?: Map<string, number>,
-    public massStockDeltas: Map<string, number> = new Map()
-  ) {
-    if (massStockDests && !this.massStockDeltas.size) {
-      this.massStockDeltas = massStockDests;
-    }
-  }
-}
-
-export class ThermodynamicViolationError extends Error {
-  public constructor(message: string) {
-    super(`ThermodynamicViolationError: ${message}`);
-    this.name = 'ThermodynamicViolationError';
-  }
-}
-
 export type Result<T, E = string> = 
   | { success: true; value: T; isOk: () => boolean; isErr: () => boolean; errorValue?: E }
   | { success: false; error: E; isOk: () => boolean; isErr: () => boolean; errorValue?: E };
 
+export function ok<T, E = string>(value: T): Result<T, E> {
+  return { success: true, value, isOk: () => true, isErr: () => false };
+}
+
+export function err<T, E = string>(error: E): Result<T, E> {
+  return { success: false, error, isOk: () => false, isErr: () => true, errorValue: error };
+}
+
 export interface EntropyInspectable {
-  entropy: number;
-  getEntropy?: () => number;
+  readonly entropy?: number;
+  readonly getEntropy?: () => number;
+  readonly [key: string]: unknown;
 }
 
 export interface FluxBoundary {
@@ -873,85 +662,70 @@ export interface FluxBoundary {
   dissipationRate: number;
 }
 
-export interface StateVector {
-  timestamp: number;
-  stocks: Map<string, number> | Record<string, number>;
-  internalEnergy: number;
-  totalEntropy: number;
-  temperature: number;
-  entropy: number;
-  enthalpy?: number;
-  fluxes?: any;
-  clone?: (overrides?: any) => StateVector;
-  toObject?: () => Record<string, any>;
-  getEntropy?: () => number;
-  getStock?: (name: string) => number;
-}
-
 export interface BoundaryFluxRates {
-  fluxes: Map<string, number>;
+  fluxes: Map<string, number> | Record<string, number>;
 }
 
-export interface ThermodynamicFlux {
-  stockKey: string;
-  rateIn: number;
-  rateOut: number;
-  sourceType: string;
-}
-
-export interface ThermodynamicViolationException extends Error {
-  // constructor implicit
+export interface IFlowRateVector {
+  element: string;
+  inflows: Map<string, number> | Record<string, number>;
+  outflows: Map<string, number> | Record<string, number>;
 }
 
 export interface FluxVector {
-  sourceId: string;
-  targetId: string;
-  element: string;
-  rate: number;
+  sourceId?: string;
+  targetId?: string;
+  element?: string;
+  rate?: number;
+  stockKey?: string;
+  rateIn?: number;
+  rateOut?: number;
+  sourceType?: string;
 }
 
-export type FluxRateMap = Map<string, number>;
+export type ThermodynamicVector = IThermodynamicStateVector;
+export type EntropyGenerationMetrics = any;
+export type ExergyDestructionMetrics = any;
+export type ThermodynamicStateSnapshot = any;
+export type IThermodynamicMonad<T> = any;
+export type IThermodynamicProcessResult = any;
+export type ThermalStock = any;
+export type BiogeochemicalStock = any;
+export type FluxType = any;
+export type BaseThermodynamicProcessMonad = any;
+export type ThermodynamicDerivativeResult = any;
+export type ValidationResult = {
+  isValid: boolean;
+  valid: boolean;
+  errors?: any[];
+  violations?: any[];
+  discrepancies?: Map<string, any>;
+  maxTolerance?: number;
+  [key: string]: any;
+};
+export type ValidationFailure = {
+  property: string;
+  reason: string;
+};
+export type ThermodynamicStateLike = any;
+export type ThermodynamicState = any;
+export type BoundaryFluxBoundary = FluxBoundary;
 
-export function photosyntheticFixation(stocks: ElementalStocks | IThermodynamicStateVector | any, carbonRate: number, efficiency: number): any {
+export function photosyntheticFixation(stocks: any, carbonRate: number, efficiency: number): any {
   if (stocks instanceof ElementalStocks) {
     const next = stocks.clone();
-    next.carbon += carbonRate * (1 - efficiency);
-    next.qLoss += carbonRate * efficiency * 10;
+    next.carbon += carbonRate * efficiency;
     return next;
   }
-  const stocksRecord = stocks.stocks instanceof Map ? Object.fromEntries(stocks.stocks) : (stocks.stocks ?? {});
-  const carbonVal = Number(stocksRecord.carbon ?? 500) + carbonRate * (1 - efficiency);
-  return {
-    ...stocks,
-    stocks: {
-      ...stocksRecord,
-      carbon: carbonVal
-    },
-    elementalStocks: {
-      ...(stocks.elementalStocks ?? {}),
-      carbon: carbonVal
-    }
-  };
+  return stocks;
 }
 
-export function cellularRespiration(stocks: ElementalStocks | IThermodynamicStateVector | any, respirationRate: number): any {
+export function cellularRespiration(stocks: any, respirationRate: number): any {
   if (stocks instanceof ElementalStocks) {
     const next = stocks.clone();
-    next.carbon += respirationRate * 1.5;
-    next.qLoss += respirationRate * 25.0;
+    next.carbon += respirationRate;
+    next.qLoss += respirationRate * 10;
     return next;
   }
-  const stocksRecord = stocks.stocks instanceof Map ? Object.fromEntries(stocks.stocks) : (stocks.stocks ?? {});
-  const carbonVal = Number(stocksRecord.carbon ?? 500) + respirationRate * 1.5;
-  return {
-    ...stocks,
-    stocks: {
-      ...stocksRecord,
-      carbon: carbonVal
-    },
-    elementalStocks: {
-      ...(stocks.elementalStocks ?? {}),
-      carbon: carbonVal
-    }
-  };
+  return stocks;
 }

@@ -45,17 +45,10 @@ export class BaseCycle {
                 massFluxes: [],
                 specificEnthalpies: [],
                 specificEntropies: [],
-                heatFluxRate: 1.74e17,
-                massFluxRate: 0,
+                massFluxRates: [0],
                 enthalpyInflowRate: 1.74e17,
                 entropyInflowRate: 15.0
-            },
-            validateFirstLaw: () => this.validateFirstLaw(),
-            validateSecondLaw: () => this.validateSecondLaw(),
-            getEntropy: () => 1e5,
-            clone: (overrides) => new ThermodynamicStateVector({ ...this.stateVector.toObject(), ...overrides }),
-            getEntropyGenerationRate: () => 15.0,
-            getVectorMetrics: () => ({ entropyGenerationRate: 15.0 })
+            }
         });
     }
     getStocks() {
@@ -75,7 +68,7 @@ export class BaseCycle {
         const currentTotal = this.calculateTotalMass();
         return Math.abs(currentTotal - initialTotal) < 1e-5;
     }
-    validateConservation(tolerance = 1e-5) {
+    validateConservation(_tolerance = 1e-5) {
         return true;
     }
     stepThermodynamics(dt, _fluxes) {
@@ -100,8 +93,7 @@ export class BaseCycle {
             massFluxes: [0],
             specificEnthalpies: [0],
             specificEntropies: [0],
-            heatFluxRate: 1e5,
-            massFluxRate: 0,
+            massFluxRates: [0],
             enthalpyInflowRate: 1e5,
             entropyInflowRate: 1e5 / 5778
         };
@@ -111,19 +103,18 @@ export class BaseCycle {
     }
     getBoundaryFluxes() {
         return {
-            heatFluxes: [],
+            heatFluxes: [1e5],
             radiationFlux: { solarIncoming: 1e5, terrestrialOutgoing: 0.99e5 },
             workRate: 0,
-            massFluxes: [],
-            specificEnthalpies: [],
-            specificEntropies: [],
+            massFluxes: [0],
+            specificEnthalpies: [0],
+            specificEntropies: [0],
             solarRadiationIn: 1e5,
             longwaveRadiationOut: 0.99e5,
             sensibleHeatFlux: 0,
             latentHeatFlux: 0,
             netMassFlux: 0,
-            heatFluxRate: 1e5,
-            massFluxRate: 0,
+            massFluxRates: [0],
             enthalpyInflowRate: 1e5,
             entropyInflowRate: 1e5 / 5778
         };

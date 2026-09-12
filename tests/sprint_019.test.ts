@@ -1,40 +1,49 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { 
-  BaseThermodynamicProcessMonad, 
   ThermodynamicStateVector, 
-  ThermodynamicDerivativeResult, 
-  BoundaryFluxVector,
+  BoundaryFluxVector, 
   STANDARD_AMBIENT_TEMPERATURE_K 
 } from '../src/thermodynamics/types.js';
+import { ThermodynamicMonadProcess } from '../src/thermodynamics/thermodynamic_monad_process.js';
 
-class MockViolatingMonad extends BaseThermodynamicProcessMonad {
+class MockViolatingMonad extends ThermodynamicMonadProcess {
   readonly processId = 'mock_violating_process';
 
-  evaluate(_state: ThermodynamicStateVector, _dt: number): ThermodynamicDerivativeResult {
-    return new ThermodynamicDerivativeResult(
-      100,
-      -1.0,
-      -1.5,
-      -1.5,
-      0,
-      new Map()
-    );
+  constructor() {
+    super(new ThermodynamicStateVector());
+  }
+
+  transit(state: ThermodynamicStateVector, _dt: number): ThermodynamicStateVector {
+    const invalid = state.clone({ entropyGenerationRate: -1.0 });
+    this.validateInvariants(invalid);
+    return invalid;
   }
 }
 
-class MockValidMonad extends BaseThermodynamicProcessMonad {
+class MockValidMonad extends ThermodynamicMonadProcess {
   readonly processId = 'mock_valid_process';
 
-  evaluate(_state: ThermodynamicStateVector, _dt: number): ThermodynamicDerivativeResult {
-    return new ThermodynamicDerivativeResult(
-      500,
-      10.0,
-      2.5,
-      2.5,
-      0,
-      new Map([['carbon', 10.0]])
-    );
+  constructor() {
+    super(new ThermodynamicStateVector());
+  }
+
+  evaluate(_state: ThermodynamicStateVector, _dt: number) {
+    return {
+      dInternalEnergy: 500,
+      entropyGenRate: 2.5,
+      massStockDeltas: new Map([['carbon', 10.0]])
+    };
+  }
+
+  transit(state: ThermodynamicStateVector, dt: number): ThermodynamicStateVector {
+    const next = state.clone({
+      internalEnergy: state.internalEnergy + 500 * dt,
+      entropyGenerationRate: 2.5,
+      exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 2.5
+    });
+    this.validateInvariants(next);
+    return next;
   }
 }
 
