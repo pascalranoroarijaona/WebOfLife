@@ -1,71 +1,45 @@
 -- ============================================================================
--- Web of Life Database & Thermodynamic Blockchain Schema
--- Sprint 029 Update: Thermodynamic State Vector Validation & Monad Ledger
+-- Web of Life: Thermodynamic Blockchain & SQL Schema
+-- Sprint 030 Update: Thermodynamic State Vector Validation & Monad Ledgers
 -- ============================================================================
 
--- Enable UUID extension if not present
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors & Validation Logs
--- ----------------------------------------------------------------------------
+-- 1. Thermodynamic State Vectors Table
 CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_id UUID NOT NULL,
     energy DOUBLE PRECISION NOT NULL CHECK (energy >= 0),
     entropy DOUBLE PRECISION NOT NULL CHECK (entropy >= 0),
-    temperature DOUBLE PRECISION NOT NULL CHECK (temperature > 0),
-    stocks JSONB NOT NULL DEFAULT '{}'::jsonb,
+    temperature DOUBLE PRECISION NOT NULL CHECK (temperature >= 0),
+    elemental_stocks JSONB NOT NULL DEFAULT '{}',
     is_valid BOOLEAN NOT NULL DEFAULT TRUE,
-    validation_error TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    validation_errors TEXT[] DEFAULT ARRAY[]::TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_vectors_pod_time 
-ON thermodynamic_state_vectors(pod_id, timestamp DESC);
-
--- ----------------------------------------------------------------------------
--- 2. Thermodynamic Monad Execution Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS monad_execution_logs (
-    execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vector_id_input UUID REFERENCES thermodynamic_state_vectors(vector_id),
-    vector_id_output UUID REFERENCES thermodynamic_state_vectors(vector_id),
-    step_name VARCHAR(255) NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('SUCCESS', 'VALIDATION_FAILED', 'EXECUTION_ERROR')),
-    error_message TEXT,
-    execution_time_ms DOUBLE PRECISION NOT NULL,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 2. Thermodynamic Validation Audit Log
+CREATE TABLE IF NOT EXISTS validation_audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE,
+    is_valid BOOLEAN NOT NULL,
+    errors TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    warnings TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT²,
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_monad_logs_status 
-ON monad_execution_logs(status, executed_at DESC);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Blockchain Stock Transactions
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT UNIQUE NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
-    universe_entropy_change DOUBLE PRECISION NOT NULL CHECK (universe_entropy_change >= 0),
-    validator_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
-    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
-    source_pod_id UUID NOT NULL,
-    target_pod_id UUID NOT NULL,
-    stock_type VARCHAR(100) NOT NULL, -- e.g., 'CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER'
-    quantity DOUBLE PRECISION NOT NULL CHECK (quantity >= 0),
+-- 3. Monad Process Execution Ledger
+CREATE TABLE IF NOT EXISTS monad_process_ledger (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    process_name VARCHAR(255) NOT NULL,
+    input_state_id UUID REFERENCES thermodynamic_state_vectors(id),
+    output_state_id UUID REFERENCES thermodynamic_state_vectors(id),
     entropy_generated DOUBLE PRECISION NOT NULL CHECK (entropy_generated >= 0),
-    tx_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    signature VARCHAR(512) NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_tx_block 
-ON thermodynamic_transactions(block_id);
+-- 4. Indexes for Time-Series and State Verification Performance
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_state_vectors_entity ON thermodynamic_state_vectors(entity_id);
+CREATE INDEX IF NOT EXISTS idx_validation_audit_logs_state ON validation_audit_logs(state_vector_id);
+CREATE INDEX IF NOT EXISTS idx_monad_process_ledger_executed ON monad_process_ledger(executed_at);

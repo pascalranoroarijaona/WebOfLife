@@ -1,0 +1,44 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics & Monads" {
+
+  interface IStateValidator {
+    + validate(state: ThermodynamicStateVector): ValidationResult
+    + assertValid(state: ThermodynamicStateVector): void
+  }
+
+  class ThermodynamicStateValidator {
+    - requiredProperties: string[]
+    + validate(state: ThermodynamicStateVector): ValidationResult
+    + assertValid(state: ThermodynamicStateVector): void
+  }
+
+  class ThermodynamicStateVector {
+    + energy: number
+    + entropy: number
+    + temperature: number
+    + elementalStocks: Record<string, number>
+  }
+
+  class ValidationResult {
+    + isValid: boolean
+    + errors: string[]
+    + warnings: string[]
+  }
+
+  class ThermodynamicMonadProcess {
+    - validator: IStateValidator
+    + bind(state: ThermodynamicStateVector): ThermodynamicStateVector
+    + executeStep(state: ThermodynamicStateVector): ThermodynamicStateVector
+  }
+
+  IStateValidator <|.. ThermodynamicStateValidator
+  ThermodynamicStateValidator --> ValidationResult : produces
+  ThermodynamicStateValidator --> ThermodynamicStateVector : inspects
+  ThermodynamicMonadProcess --> IStateValidator : uses
+  ThermodynamicMonadProcess --> ThermodynamicStateVector : transforms
+}
+
+@enduml
