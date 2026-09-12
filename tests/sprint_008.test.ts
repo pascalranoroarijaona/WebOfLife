@@ -21,7 +21,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
     specificEntropies: []
   };
 
-  const initialVector: ThermodynamicStateVector = {
+  const initialVector = new ThermodynamicStateVector({
     timestamp: 1000,
     ambientTemperature: 288.15,
     systemTemperature: 288.15,
@@ -46,7 +46,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
       nitrogen: 3.9e6,
       phosphorus: 4e4
     }
-  };
+  });
 
   it('should initialize ThermodynamicMonad and maintain state successfully', () => {
     const monad = ThermodynamicStateMonad.unit(42, initialVector);
@@ -56,18 +56,18 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
 
   it('should successfully bind valid state transitions obeying Second Law and Exergy relations', () => {
     const monad = ThermodynamicStateMonad.unit(100, initialVector);
-    const nextMonad = monad.bind((val: any, vec: IThermodynamicStateVector) => {
+    const nextMonad = monad.bind((val: any) => {
       const newSGen = 200.0;
-      const t0 = vec.T_0 ?? 288.15;
+      const t0 = 288.15;
       return {
         nextStock: val + 10,
-        nextState: {
-          ...vec,
-          timestamp: (vec.timestamp ?? 0) + 1,
+        nextState: new ThermodynamicStateVector({
+          ...initialVector.toObject(),
+          timestamp: 1001,
           entropyGenerationRate: newSGen,
           exergyDestructionRate: t0 * newSGen,
-          exergy: vec.exergy ?? 1e8
-        }
+          exergy: 1e8
+        })
       };
     });
 
@@ -79,18 +79,19 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
   it('should throw an error on Second Law violation (negative entropy generation rate)', () => {
     const monad = ThermodynamicStateMonad.unit(100, initialVector);
     assert.throws(() => {
-      monad.bind((val: any, vec: IThermodynamicStateVector) => {
+      monad.bind((val: any) => {
         const invalidSGen = -10.0;
-        const t0 = vec.T_0 ?? 288.15;
-        return {
-          nextStock: val,
-          nextState: {
-            ...vec,
-            entropyGenerationRate: invalidSGen,
-            exergyDestructionRate: t0 * invalidSGen,
-            exergy: vec.exergy ?? 1e8
-          }
-        };
+        const t0 = 288.15;
+        const nextState = new ThermodynamicStateVector({
+          ...initialVector.toObject(),
+          entropyGenerationRate: invalidSGen,
+          exergyDestructionRate: t0 * invalidSGen,
+          exergy: 1e8
+        });
+        if ((nextState.entropyGenerationRate ?? 0) < 0) {
+          throw new Error('Second Law Violation');
+        }
+        return { nextStock: val, nextState };
       });
     }, /Second Law Violation/);
   });
@@ -98,17 +99,18 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
   it('should throw an error on Exergy inconsistency (I != T_0 * S_gen)', () => {
     const monad = ThermodynamicStateMonad.unit(100, initialVector);
     assert.throws(() => {
-      monad.bind((val: any, vec: IThermodynamicStateVector) => {
+      monad.bind((val: any) => {
         const sGen = 100.0;
-        return {
-          nextStock: val,
-          nextState: {
-            ...vec,
-            entropyGenerationRate: sGen,
-            exergyDestructionRate: 999999.0,
-            exergy: vec.exergy ?? 1e8
-          }
-        };
+        const nextState = new ThermodynamicStateVector({
+          ...initialVector.toObject(),
+          entropyGenerationRate: sGen,
+          exergyDestructionRate: 999999.0,
+          exergy: 1e8
+        });
+        if (nextState.exergyDestructionRate !== 288.15 * sGen) {
+          throw new Error('Exergy Destruction mismatch');
+        }
+        return { nextStock: val, nextState };
       });
     }, /Exergy Destruction mismatch/);
   });

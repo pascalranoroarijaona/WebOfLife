@@ -8,7 +8,7 @@ import { NitrogenCycle } from '../src/cycles/nitrogen.js';
 import { PhosphorusCycle } from '../src/cycles/phosphorus.js';
 import { WaterCycle } from '../src/cycles/water.js';
 import { calculateFirstLawResidual, evaluateSecondLaw, stepThermodynamicMonad } from '../src/thermodynamics/methods.js';
-import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
     it('should enforce S_gen >= 0 across all planetary cycles', () => {
         const carbon = new CarbonCycle();
@@ -27,29 +27,48 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
         }
     });
     it('should verify Gouy-Stodola proportionality: I_dot = T_0 * S_gen_dot', () => {
-        const baseState = {
+        const baseState = new ThermodynamicStateVector({
             timestamp: 0,
             temperature: 300,
+            systemTemperature: 300,
             totalEntropy: 50,
             deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1000,
             entropy: 50,
             entropyGenerationRate: 12.5,
-            exergyDestructionRate: 0, // will be evaluated
+            exergyDestructionRate: 0,
             exergy: 1e10,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             stocks: {},
-            boundaryFluxes: []
-        };
+            boundaryFluxes: {
+                solarRadiationIn: 1e3,
+                longwaveRadiationOut: 1e3,
+                sensibleHeatFlux: 0,
+                latentHeatFlux: 0,
+                netMassFlux: 0,
+                heatFluxes: [],
+                massFluxes: []
+            }
+        });
         const evaluated = evaluateSecondLaw(baseState);
         assert.strictEqual(evaluated.entropyGenerationRate, 12.5);
         assert.strictEqual(evaluated.exergyDestructionRate, STANDARD_AMBIENT_TEMPERATURE_K * 12.5);
     });
     it('should compute First Law residuals and monad updates correctly', () => {
-        const baseState = {
+        const bFluxes = {
+            solarRadiationIn: 1e3,
+            longwaveRadiationOut: 1e3,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [],
+            massFluxes: []
+        };
+        const baseState = new ThermodynamicStateVector({
             timestamp: 0,
             temperature: 298.15,
+            systemTemperature: 298.15,
             totalEntropy: 100,
             deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 5000,
@@ -60,18 +79,8 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             stocks: {},
-            boundaryFluxes: [
-                {
-                    fluxId: 'test_flux',
-                    species: 'energy',
-                    massFlowRate: 1.0,
-                    specificEnthalpy: 100,
-                    specificEntropy: 0.5,
-                    heatTransferRate: 50,
-                    boundaryTemperature: 300
-                }
-            ]
-        };
+            boundaryFluxes: bFluxes
+        });
         const nextResult = stepThermodynamicMonad(baseState, {
             solarIncoming: 100,
             terrestrialOutgoing: 99,

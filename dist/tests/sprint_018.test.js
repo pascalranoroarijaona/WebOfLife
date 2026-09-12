@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
 import { ThermodynamicMonadProcess } from '../src/thermodynamics/thermodynamic_monad_process.js';
 describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Accounting', () => {
     const initialBoundaryFluxes = {
@@ -9,7 +9,6 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
         latentHeatFlux: 50,
         massFluxRates: [1.0, 0.1, 0.01, 5.0],
         heatFluxes: [],
-        radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 0 },
         workRate: 0,
         massFluxes: [],
         specificEnthalpies: [],
@@ -18,14 +17,13 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
         longwaveRadiationOut: 0,
         netMassFlux: 0
     };
-    const initialState = {
+    const initialState = new ThermodynamicStateVector({
         timestamp: 0,
-        time: 0,
         temperature: 295.0,
+        systemTemperature: 295.0,
         ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
         ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
         internalEnergy: 1e8,
-        energy: 1e8,
         entropy: 2e5,
         totalEntropy: 2e5,
         stocks: {},
@@ -34,22 +32,22 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
         boundaryFluxes: initialBoundaryFluxes,
         entropyGenerationRate: 0,
         exergyDestructionRate: 0
-    };
+    });
     it('should initialize and execute thermodynamic monad process successfully', () => {
         const process = new ThermodynamicMonadProcess('monad_01', 'Planetary Biosphere Pod', initialState);
         const dt = 10.0;
         const nextState = process.step(initialState, initialBoundaryFluxes, dt);
-        assert.strictEqual(nextState.time, 10.0);
+        assert.strictEqual(nextState.tick, 10.0);
         assert.ok((nextState.internalEnergy ?? 0) > (initialState.internalEnergy ?? 0), 'Internal energy should increase with net positive heat/enthalpy influx');
         assert.ok((nextState.entropyGenerationRate ?? 0) >= 0, 'Internal entropy generation rate must be non-negative (Second Law)');
         assert.strictEqual(nextState.exergyDestructionRate, (nextState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K) * (nextState.entropyGenerationRate ?? 0), 'Gouy-Stodola theorem invariant check failed');
     });
     it('should strictly enforce non-negative entropy generation invariant', () => {
         const process = new ThermodynamicMonadProcess('monad_02', 'Stressed Control Volume', initialState);
-        const invalidState = {
-            ...initialState,
-            entropyGenerationRate: -0.5 // artificially violating S_gen >= 0
-        };
+        const invalidState = new ThermodynamicStateVector({
+            ...initialState.toObject(),
+            entropyGenerationRate: -0.5
+        });
         assert.throws(() => {
             process.validateInvariants(invalidState);
             if (!process.validateInvariants(invalidState)) {

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 056: Web of Life - Thermodynamic State Vector Stock Conservation Delta Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+    <!-- Topbar Navigation -->
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-xl">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl animate-pulse">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sprint 056</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Validator & Stock Conservation Delta Calculator Active (60 FPS Draw Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/40 p-6 flex flex-col gap-6 overflow-y-auto z-20">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-emerald-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3 shadow-inner">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-emerald-400">64</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sprint-telemetry" class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Sprint 056 Telemetry</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3 shadow-inner text-xs font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Stock Delta (C):</span>
+                        <span id="metric-stock-carbon" class="text-emerald-400">0.000</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Stock Delta (N):</span>
+                        <span id="metric-stock-nitrogen" class="text-cyan-400">0.000</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Stock Delta (P):</span>
+                        <span id="metric-stock-phosphorus" class="text-amber-400">0.000</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">State Vector Valid:</span>
+                        <span id="metric-state-valid" class="text-emerald-400">true</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport Canvas Container -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <canvas id="world-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+            
+            <!-- Floating Overlay Diagnostics -->
+            <div class="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-lg p-3 text-xs font-mono space-y-1 pointer-events-none shadow-2xl">
+                <div class="text-slate-300 font-semibold mb-1">Thermodynamic Conservation Vector</div>
+                <div class="text-slate-400">Total Entropy Flux: <span id="overlay-entropy" class="text-emerald-400">0.00 J/K</span></div>
+                <div class="text-slate-400">Stock Divergence: <span id="overlay-divergence" class="text-cyan-400">0.00%</span></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/60 py-3 px-6 text-xs text-slate-500 flex justify-between items-center z-30">
+        <div>Web of Life Simulation Engine &bull; Sprint 056 Thermodynamic Vector & Stock Conservation Delta Calculator</div>
+        <div class="flex space-x-4">
+            <a href="01_RFC.md" class="hover:text-slate-300 transition">RFC</a>
+            <a href="02_METHODS.md" class="hover:text-slate-300 transition">Methods</a>
+        </div>
+    </footer>
+
+    <!-- Main Module Script -->
+    <script type="module">
+        import { EarthPOD } from '../../../src/earth_pod.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const canvas = document.getElementById('world-canvas');
+            const pod = new EarthPOD(canvas);
+            await pod.initialize();
+            pod.start();
+
+            // Wire UI Controls
+            document.getElementById('btn-start').addEventListener('click', () => pod.start());
+            document.getElementById('btn-pause').addEventListener('click', () => pod.pause());
+            document.getElementById('btn-reset').addEventListener('click', () => pod.reset());
+
+            // Telemetry loop
+            setInterval(() => {
+                const telemetry = pod.getTelemetry ? pod.getTelemetry() : {};
+                if (telemetry.entities !== undefined) {
+                    document.getElementById('metric-entities').innerText = telemetry.entities;
+                }
+                if (telemetry.fps !== undefined) {
+                    document.getElementById('metric-fps').innerText = telemetry.fps;
+                }
+                if (telemetry.generation !== undefined) {
+                    document.getElementById('metric-gen').innerText = telemetry.generation;
+                }
+                if (telemetry.stockCarbon !== undefined) {
+                    document.getElementById('metric-stock-carbon').innerText = telemetry.stockCarbon.toFixed(3);
+                }
+                if (telemetry.stockNitrogen !== undefined) {
+                    document.getElementById('metric-stock-nitrogen').innerText = telemetry.stockNitrogen.toFixed(3);
+                }
+                if (telemetry.stockPhosphorus !== undefined) {
+                    document.getElementById('metric-stock-phosphorus').innerText = telemetry.stockPhosphorus.toFixed(3);
+                }
+                if (telemetry.stateValid !== undefined) {
+                    const el = document.getElementById('metric-state-valid');
+                    el.innerText = telemetry.stateValid.toString();
+                    el.className = telemetry.stateValid ? 'font-mono font-bold text-emerald-400' : 'font-mono font-bold text-rose-400';
+                }
+                if (telemetry.entropyFlux !== undefined) {
+                    document.getElementById('overlay-entropy').innerText = telemetry.entropyFlux.toFixed(2) + ' J/K';
+                }
+                if (telemetry.divergence !== undefined) {
+                    document.getElementById('overlay-divergence').innerText = (telemetry.divergence * 100).toFixed(3) + '%';
+                }
+            }, 250);
+        });
+    </script>
+</body>
+</html>

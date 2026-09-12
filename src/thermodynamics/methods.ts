@@ -16,7 +16,8 @@ import {
   IThermodynamicProcessResult,
   IBoundaryFluxArray,
   ThermodynamicStateMonad,
-  ThermodynamicComplianceResult
+  ThermodynamicComplianceResult,
+  ElementalStocks
 } from './types';
 
 const T_0 = STANDARD_AMBIENT_TEMPERATURE_K;
@@ -325,9 +326,9 @@ export function computePhotosynthesisThermodynamics(
     entropyGeneratorRate: sGen,
     exergyDestructionRate: T0 * sGen,
     boundaryFluxes: [
-      { speciesId: 'carbon', molarRate: carbonFlux, massRate: carbonFlux * 12, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0, heatFluxRate: 0, massFluxRate: carbonFlux * 12, enthalpyInflowRate: 0, entropyInflowRate: 0 },
-      { speciesId: 'oxygen', molarRate: carbonFlux, massRate: carbonFlux * 32, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0, heatFluxRate: 0, massFluxRate: carbonFlux * 32, enthalpyInflowRate: 0, entropyInflowRate: 0 },
-      { speciesId: 'solar', molarRate: 0, massRate: 0, enthalpyFlux: 1000, entropyFlux: 3.3, exergyFlux: 1000, heatFluxRate: 1000, massFluxRate: 0, enthalpyInflowRate: 1000, entropyInflowRate: 3.3 }
+      { fluxId: 'carbon_flux', species: 'carbon', massFlowRate: carbonFlux * 12, specificEnthalpy: 0, specificEntropy: 0, heatTransferRate: 0, boundaryTemperature: T0, speciesId: 'carbon', molarRate: carbonFlux, massRate: carbonFlux * 12, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0, heatFluxRate: 0, enthalpyInflowRate: 0, entropyInflowRate: 0 },
+      { fluxId: 'oxygen_flux', species: 'oxygen', massFlowRate: carbonFlux * 32, specificEnthalpy: 0, specificEntropy: 0, heatTransferRate: 0, boundaryTemperature: T0, speciesId: 'oxygen', molarRate: carbonFlux, massRate: carbonFlux * 32, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0, heatFluxRate: 0, enthalpyInflowRate: 0, entropyInflowRate: 0 },
+      { fluxId: 'solar_flux', species: 'solar', massFlowRate: 0, specificEnthalpy: 0, specificEntropy: 3.3, heatTransferRate: 1000, boundaryTemperature: T0, speciesId: 'solar', molarRate: 0, massRate: 0, enthalpyFlux: 1000, entropyFlux: 3.3, exergyFlux: 1000, heatFluxRate: 1000, enthalpyInflowRate: 1000, entropyInflowRate: 3.3 }
     ],
     validateSecondLaw: () => sGen >= 0
   };
@@ -380,4 +381,48 @@ export class ThermodynamicMonadEngine {
     const sGen = transition.metrics?.internal_entropy_generation_rate ?? transition.entropyGenerationRate ?? 0;
     return sGen >= 0;
   }
+}
+
+export function photosyntheticFixation(stocks: ElementalStocks | IThermodynamicStateVector | any, carbonRate: number, efficiency: number): any {
+  if (stocks instanceof ElementalStocks) {
+    const next = stocks.clone();
+    next.carbon += carbonRate * (1 - efficiency);
+    next.qLoss += carbonRate * efficiency * 10;
+    return next;
+  }
+  const stocksRecord = stocks.stocks instanceof Map ? Object.fromEntries(stocks.stocks) : (stocks.stocks ?? {});
+  const carbonVal = Number(stocksRecord.carbon ?? 500) + carbonRate * (1 - efficiency);
+  return {
+    ...stocks,
+    stocks: {
+      ...stocksRecord,
+      carbon: carbonVal
+    },
+    elementalStocks: {
+      ...(stocks.elementalStocks ?? {}),
+      carbon: carbonVal
+    }
+  };
+}
+
+export function cellularRespiration(stocks: ElementalStocks | IThermodynamicStateVector | any, respirationRate: number): any {
+  if (stocks instanceof ElementalStocks) {
+    const next = stocks.clone();
+    next.carbon += respirationRate * 1.5;
+    next.qLoss += respirationRate * 25.0;
+    return next;
+  }
+  const stocksRecord = stocks.stocks instanceof Map ? Object.fromEntries(stocks.stocks) : (stocks.stocks ?? {});
+  const carbonVal = Number(stocksRecord.carbon ?? 500) + respirationRate * 1.5;
+  return {
+    ...stocks,
+    stocks: {
+      ...stocksRecord,
+      carbon: carbonVal
+    },
+    elementalStocks: {
+      ...(stocks.elementalStocks ?? {}),
+      carbon: carbonVal
+    }
+  };
 }

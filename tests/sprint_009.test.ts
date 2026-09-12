@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicStateMonad, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateMonad, IThermodynamicStateVector, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
-  const baseVector: ThermodynamicStateVector = {
+  const baseVector: ThermodynamicStateVector = new ThermodynamicStateVector({
     timestamp: Date.now(),
     ambientTemperature: 288.15,
     systemTemperature: 288.15,
@@ -13,6 +13,7 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
     temperature: 288.15,
     ambientReferenceTemp: 288.15,
     referenceTemperature: 288.15,
+    deadStateTemperature: 255.0,
     entropyGenerationRate: 1.2e13,
     exergyDestructionRate: 255.0 * 1.2e13,
     exergy: 1e10,
@@ -38,7 +39,7 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
     entropyGenerationRateWattsPerKelvin: 1.2e13,
     exergyDestructionRateWatts: 255.0 * 1.2e13,
     exergyEfficiency: 0.65
-  };
+  });
 
   it('should successfully initialize ThermodynamicStateMonad with valid state', () => {
     const monad = ThermodynamicStateMonad.initialize(baseVector);
@@ -46,11 +47,11 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
   });
 
   it('should reject initialization if entropy generation rate is negative', () => {
-    const invalidVector: ThermodynamicStateVector = {
-      ...baseVector,
+    const invalidVector: ThermodynamicStateVector = new ThermodynamicStateVector({
+      ...baseVector.toObject(),
       entropyGenerationRate: -100,
       entropyGenerationRateWattsPerKelvin: -100
-    };
+    });
     assert.throws(() => {
       ThermodynamicStateMonad.initialize(invalidVector);
     }, /Second Law Violation/);
@@ -59,22 +60,22 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
   it('should enforce Second Law ($\dot{S}_{\text{gen}} \ge 0$) across state transitions', () => {
     const monad = ThermodynamicStateMonad.initialize(baseVector);
     
-    const validNext = monad.map((current: ThermodynamicStateVector) => {
+    const validNext = monad.map((current: IThermodynamicStateVector) => {
       const t0 = current.deadStateTemperatureKelvin ?? 255.0;
-      return {
+      return new ThermodynamicStateVector({
         ...current,
         timestamp: (current.timestamp ?? 0) + 1000,
         entropyGenerationRate: 1.5e13,
         entropyGenerationRateWattsPerKelvin: 1.5e13,
         exergyDestructionRate: t0 * 1.5e13,
         exergyDestructionRateWatts: t0 * 1.5e13
-      };
+      });
     });
 
     assert.strictEqual((validNext.extract() as ThermodynamicStateVector).entropyGenerationRateWattsPerKelvin, 1.5e13);
 
     assert.throws(() => {
-      monad.map((current: ThermodynamicStateVector) => ({
+      monad.map((current: IThermodynamicStateVector) => new ThermodynamicStateVector({
         ...current,
         entropyGenerationRate: -5.0,
         entropyGenerationRateWattsPerKelvin: -5.0,
@@ -88,7 +89,7 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
     const monad = ThermodynamicStateMonad.initialize(baseVector);
 
     assert.throws(() => {
-      monad.map((current: ThermodynamicStateVector) => ({
+      monad.map((current: IThermodynamicStateVector) => new ThermodynamicStateVector({
         ...current,
         entropyGenerationRate: 2.0e13,
         entropyGenerationRateWattsPerKelvin: 2.0e13,

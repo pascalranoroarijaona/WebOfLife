@@ -1,6 +1,7 @@
 // File: src/earth_pod.ts
 import { ThermodynamicStructure, EntropyState, applyThermalFlux, applyMassTransport } from './thermodynamics/thermodynamic_structure.js';
 import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad } from './thermodynamics/types.js';
+import { ThermodynamicStateVector } from './thermodynamics/state_vector.js';
 import { CarbonCycle } from './cycles/carbon.js';
 import { WaterCycle } from './cycles/water.js';
 import { NitrogenCycle } from './cycles/nitrogen.js';
@@ -330,6 +331,7 @@ export class EarthPOD extends ThermodynamicStructure {
             longwaveRadiationOut: this.solarInputWatts * 0.99,
             netMassFlux: 0,
             solarInput: this.solarInputWatts,
+            solarInputWatts: this.solarInputWatts,
             thermalRadiationOut: this.solarInputWatts * 0.99,
             matterEnthalpyFlux: 0,
             netHeatFlux: netHeat,
@@ -342,17 +344,26 @@ export class EarthPOD extends ThermodynamicStructure {
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
             totalExergy: 1e12
         };
-        const vec = {
+        const vec = new ThermodynamicStateVector({
             tick: this.tickCreated,
             timestamp: this.tickCreated,
             internalEnergy: 1e12,
+            energy: 1e12,
+            enthalpy: 1e12,
             totalEntropy: 5e9,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+            referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            T_0: STANDARD_AMBIENT_TEMPERATURE_K,
+            dissipationRate: entropyGen,
+            solarInput: this.solarInputWatts,
+            solarInputWatts: this.solarInputWatts,
             entropy: 5e9,
-            energy: 1e12,
             stocks: { carbon: 850, nitrogen: 3900000, phosphorus: 4e9, water: 1338000000 },
+            massInventory: { carbon: 850, nitrogen: 3900000, phosphorus: 4e9, water: 1338000000 },
             entropyGenerationRate: entropyGen,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
             exergy: 1e12,
@@ -360,8 +371,14 @@ export class EarthPOD extends ThermodynamicStructure {
             exergyMetrics,
             validateSecondLaw: () => entropyGen >= 0,
             validateFirstLaw: () => true,
-            clone: (overrides) => ({ ...vec, ...overrides })
-        };
+            clone: (overrides) => new ThermodynamicStateVector({ ...vec.toObject(), ...overrides }),
+            toObject: () => vec.toObject(),
+            getEntropyGenerationRate: () => entropyGen,
+            getVectorMetrics: () => ({ entropyGenerationRate: entropyGen }),
+            getKeys: () => Object.keys(vec.stocks),
+            getStock: (k) => vec.stocks[k] ?? 0,
+            getEntropy: () => vec.entropy
+        });
         return vec;
     }
     verifySecondLaw() {

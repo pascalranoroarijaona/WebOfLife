@@ -5,7 +5,7 @@ import { ThermodynamicStateMonad, ThermodynamicStateVector } from '../src/thermo
 
 describe('Sprint 003: Thermodynamic Monad Tests', () => {
   it('TC-01: ThermodynamicMonad wraps values and states successfully', () => {
-    const mockVector: ThermodynamicStateVector = {
+    const mockVector = new ThermodynamicStateVector({
       timestamp: 0,
       ambientTemperature: 288.15,
       systemTemperature: 288.15,
@@ -29,7 +29,7 @@ describe('Sprint 003: Thermodynamic Monad Tests', () => {
         radiativeNet: 0,
         massFluxes: []
       }
-    };
+    });
 
     const monad = ThermodynamicStateMonad.of(mockVector);
     assert.ok(monad);

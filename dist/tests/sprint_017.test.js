@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 import { ThermodynamicMonadProcess } from '../src/thermodynamics/thermodynamic_monad_process.js';
 import { EarthPOD, bootstrapMegaPod } from '../src/earth_pod.js';
 class MockMonadProcess extends ThermodynamicMonadProcess {
@@ -13,9 +13,19 @@ class MockMonadProcess extends ThermodynamicMonadProcess {
 }
 describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () => {
     it('1. Negative Entropy Rejection Test', () => {
-        const initialState = {
+        const bFluxes = {
+            solarRadiationIn: 0,
+            longwaveRadiationOut: 0,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [],
+            massFluxes: []
+        };
+        const initialState = new ThermodynamicStateVector({
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1000,
@@ -26,12 +36,13 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
             entropyGenerationRate: 0.1,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 0.1,
             exergy: 1e5,
-            boundaryFluxes: []
-        };
+            boundaryFluxes: bFluxes
+        });
         const monad = new MockMonadProcess('mock_01', 'Mock Pod', initialState);
-        const invalidState = {
+        const invalidState = new ThermodynamicStateVector({
             timestamp: 1,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1000,
@@ -42,8 +53,8 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
             entropyGenerationRate: -1.5,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 1.5,
             exergy: 1e5,
-            boundaryFluxes: []
-        };
+            boundaryFluxes: bFluxes
+        });
         assert.throws(() => {
             monad.testSetState(invalidState);
         }, /Second Law Violation|Thermodynamic State Validation Failed/);
@@ -52,9 +63,19 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
         const T0 = 298.15;
         const sGen = 0.05;
         const expectedI = T0 * sGen; // 14.9075 W
-        const validState = {
+        const bFluxes = {
+            solarRadiationIn: 0,
+            longwaveRadiationOut: 0,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [],
+            massFluxes: []
+        };
+        const validState = new ThermodynamicStateVector({
             timestamp: 0,
             temperature: T0,
+            systemTemperature: T0,
             ambientTemperature: T0,
             ambientReferenceTemp: T0,
             internalEnergy: 5000,
@@ -65,8 +86,8 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
             entropyGenerationRate: sGen,
             exergyDestructionRate: expectedI,
             exergy: 1e5,
-            boundaryFluxes: []
-        };
+            boundaryFluxes: bFluxes
+        });
         const monad = new MockMonadProcess('mock_02', 'Mock Pod 2', validState);
         assert.strictEqual(monad.getStateVector().exergyDestructionRate, 14.9075);
         assert.strictEqual(monad.validateSecondLaw(), true);

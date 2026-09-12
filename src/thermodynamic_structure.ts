@@ -1,24 +1,24 @@
 /**
- * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
+ * Thermodynamic Structure and Base Implementations (Sprint 021 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
 import { 
   IThermodynamicSystem, 
   IThermodynamicStateVector, 
   STANDARD_AMBIENT_TEMPERATURE_K, 
-  advanceThermodynamicState, 
   ThermodynamicStateMonad, 
   IBoundaryFluxArray, 
-  BoundaryFluxArray,
   ThermodynamicStateVector, 
   BoundaryFluxVector, 
   ThermodynamicComplianceResult, 
+  BoundaryFluxArray, 
   ThermodynamicMetrics,
-  IThermodynamicBoundaryFlux
+  IThermodynamicBoundaryFlux,
+  advanceThermodynamicState
 } from './thermodynamics/types.js';
-import { executeThermodynamicStep } from './thermodynamics/thermodynamic_monad_process.js';
+import { executeThermodynamicStep } from './thermodynamic_monad_process.js';
 
-export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, IBoundaryFluxArray, ThermodynamicMetrics, IThermodynamicBoundaryFlux };
+export { ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, ThermodynamicMetrics, IThermodynamicBoundaryFlux, advanceThermodynamicState };
 
 export enum EntropyState {
   STEADY = "STEADY",
@@ -101,6 +101,7 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
       internalEnergy: this.internalEnergyJoules,
       totalEntropy: this.entropyJoulesPerKelvin,
       temperature: T0,
+      systemTemperature: T0,
       ambientTemperature: T0,
       ambientReferenceTemp: T0,
       entropy: this.entropyJoulesPerKelvin,
@@ -225,8 +226,7 @@ export function applyThermalFlux(
 ): [any, IThermodynamicStateVector] {
   const T0 = state.referenceTemperature ?? state.T_0 ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
   const dU = qNet * dt;
-  const currentInternalEnergy = state.internalEnergy ?? 1e6;
-  const newInternalEnergy = currentInternalEnergy + dU;
+  const newInternalEnergy = (state.internalEnergy ?? 1e6) + dU;
 
   const entropyTransfer = qNet / boundaryTemp;
   const sysTemp = T0;
@@ -275,6 +275,7 @@ export function applyThermalFlux(
     entropy: newEntropy,
     totalEntropy: newEntropy,
     temperature: sysTemp,
+    systemTemperature: sysTemp,
     ambientTemperature: T0,
     ambientReferenceTemp: T0,
     stocks: state.stocks ?? {},
@@ -325,8 +326,7 @@ export function applyMassTransport(
   const dotSGen = Math.abs(totalMassRate * specificEntropy * 0.05);
   const dotI = T0 * dotSGen;
 
-  const currentInternalEnergy = state.internalEnergy ?? 1e6;
-  const newInternalEnergy = currentInternalEnergy + dU;
+  const newInternalEnergy = (state.internalEnergy ?? 1e6) + dU;
   const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
   const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
 
@@ -369,6 +369,7 @@ export function applyMassTransport(
     entropy: newEntropy,
     totalEntropy: newEntropy,
     temperature: T0,
+    systemTemperature: T0,
     ambientTemperature: T0,
     ambientReferenceTemp: T0,
     stocks: state.stocks ?? {},

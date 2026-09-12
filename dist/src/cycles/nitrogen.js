@@ -33,7 +33,14 @@ export class NitrogenCycle extends BaseCycle {
             heatFluxRate: solarFlux * 1e-5,
             massFluxRate: 0.5,
             enthalpyInflowRate: solarFlux * 1e-5,
-            entropyInflowRate: (solarFlux * 1e-5) / 295.0
+            entropyInflowRate: (solarFlux * 1e-5) / 295.0,
+            fluxId: 'nitrogen_cycle_flux',
+            species: 'nitrogen',
+            massFlowRate: 0.5,
+            specificEnthalpy: 300,
+            specificEntropy: 1.5,
+            heatTransferRate: solarFlux * 1e-5,
+            boundaryTemperature: 295.0
         };
         const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-5 * dt, (solarFlux * 1e-5 / 295.0) * dt, dt);
         this.stateVector = 'state' in res ? res.state : res;

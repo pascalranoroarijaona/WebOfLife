@@ -7,11 +7,12 @@ import { ThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K } from '../src
 describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', () => {
   it('should validate a correct thermodynamic state vector successfully', () => {
     const validator = new StateValidator();
-    const validState: ThermodynamicStateVector = {
+    const validState = new ThermodynamicStateVector({
       timestamp: 0,
       internalEnergy: 1e6,
       totalEntropy: 5000,
       entropy: 5000,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 10.5,
@@ -22,7 +23,7 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       dissipationRate: 10.5,
       solarInput: 0,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
     const result = validator.validateState(validState);
     assert.strictEqual(result.isValid, true);
@@ -46,11 +47,12 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
 
   it('should enforce Second Law non-negative entropy and dissipation checks', () => {
     const validator = new StateValidator();
-    const badEntropyState: ThermodynamicStateVector = {
+    const badEntropyState = new ThermodynamicStateVector({
       timestamp: 0,
       internalEnergy: 1e6,
       totalEntropy: -10,
       entropy: -10,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -60,7 +62,7 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { carbon: 100 },
       dissipationRate: -5,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
     const result = validator.validateState(badEntropyState);
     assert.strictEqual(result.isValid, false);
@@ -71,11 +73,12 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
 
   it('should enforce First Law conservation across valid stock transitions', () => {
     const validator = new StateValidator();
-    const prior: ThermodynamicStateVector = {
+    const prior = new ThermodynamicStateVector({
       timestamp: 0,
       internalEnergy: 1e6,
       totalEntropy: 1000,
       entropy: 1000,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -85,13 +88,14 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { carbon: 100, nitrogen: 50 },
       solarInput: 10,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
-    const next: ThermodynamicStateVector = {
+    const next = new ThermodynamicStateVector({
       timestamp: 1,
       internalEnergy: 1e6,
       totalEntropy: 1010,
       entropy: 1010,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -101,7 +105,7 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { carbon: 105, nitrogen: 55 },
       solarInput: 10,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
     const result = validator.validateTransition(prior, next);
     assert.strictEqual(result.isValid, true);
@@ -109,11 +113,12 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
 
   it('should reject First Law violations when stock delta does not match solar input', () => {
     const validator = new StateValidator(1e-5);
-    const prior: ThermodynamicStateVector = {
+    const prior = new ThermodynamicStateVector({
       timestamp: 0,
       internalEnergy: 1e6,
       totalEntropy: 1000,
       entropy: 1000,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -123,13 +128,14 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { carbon: 100 },
       solarInput: 5,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
-    const next: ThermodynamicStateVector = {
+    const next = new ThermodynamicStateVector({
       timestamp: 1,
       internalEnergy: 1e6,
       totalEntropy: 1000,
       entropy: 1000,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -139,7 +145,7 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { carbon: 200 }, // delta = 100, solar = 5 -> violation
       solarInput: 5,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
     const result = validator.validateTransition(prior, next);
     assert.strictEqual(result.isValid, false);
@@ -149,11 +155,12 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
 
   it('should successfully execute ThermodynamicMonadProcess steps on compliant states', () => {
     const monadProcess = new ThermodynamicMonadProcess();
-    const initialState: ThermodynamicStateVector = {
+    const initialState = new ThermodynamicStateVector({
       timestamp: 0,
       internalEnergy: 1e6,
       totalEntropy: 500,
       entropy: 500,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -163,17 +170,18 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { biomass: 50 },
       solarInput: 5,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
     const transitionFn = (s: ThermodynamicStateVector): ThermodynamicStateVector => {
       const stocksRecord = s.stocks instanceof Map ? Object.fromEntries(s.stocks) : s.stocks;
       const biomassVal = Number((stocksRecord as any)?.biomass ?? 0);
       const currentEntropy = s.entropy ?? 0;
-      return {
-        ...s,
+      return new ThermodynamicStateVector({
+        ...s.toObject(),
         stocks: { ...stocksRecord, biomass: biomassVal + 5 },
-        entropy: currentEntropy + 2
-      };
+        entropy: currentEntropy + 2,
+        totalEntropy: currentEntropy + 2
+      });
     };
 
     const finalState = monadProcess.step(initialState, transitionFn);
@@ -183,11 +191,12 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
 
   it('should throw an error in ThermodynamicMonadProcess when transition violates thermodynamic laws', () => {
     const monadProcess = new ThermodynamicMonadProcess();
-    const initialState: ThermodynamicStateVector = {
+    const initialState = new ThermodynamicStateVector({
       timestamp: 0,
       internalEnergy: 1e6,
       totalEntropy: 500,
       entropy: 500,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 1.0,
@@ -197,15 +206,15 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
       stocks: { biomass: 50 },
       solarInput: 0,
       boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-    };
+    });
 
     const badTransitionFn = (s: ThermodynamicStateVector): ThermodynamicStateVector => {
       const stocksRecord = s.stocks instanceof Map ? Object.fromEntries(s.stocks) : s.stocks;
       const biomassVal = Number((stocksRecord as any)?.biomass ?? 0);
-      return {
-        ...s,
+      return new ThermodynamicStateVector({
+        ...s.toObject(),
         stocks: { ...stocksRecord, biomass: biomassVal + 1000 } // Violation
-      };
+      });
     };
 
     assert.throws(() => {

@@ -6,7 +6,7 @@ import { EarthPOD, bootstrapMegaPod } from '../src/earth_pod.js';
 
 describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validation', () => {
   it('TC-01: High solar radiation, standard metabolism maintains positive entropy generation and exergy destruction', () => {
-    const prevState: ThermodynamicStateVector = {
+    const prevState = new ThermodynamicStateVector({
       timestamp: 0,
       ambientTemperature: 288.15,
       systemTemperature: 288.15,
@@ -31,7 +31,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
         massFluxes: [],
         netMassEnthalpyFlux: 0
       }
-    };
+    });
 
     const fluxes: BoundaryFluxVector = {
       solarRadiationIn: 1.74e17,
@@ -54,7 +54,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
 
     const newState = evaluateThermodynamicState(
       prevState,
-      1.0001e12, // slightly increased internal energy
+      1.0001e12,
       288.15,
       288.15,
       fluxes,
@@ -62,15 +62,15 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
     );
 
     assert.strictEqual(newState.timestamp, 1.0);
-    assert.ok((newState.entropyGenerationRate ?? 0) >= 0, `S_gen_dot must be >= 0, got ${newState.entropyGenerationRate}`);
-    assert.ok((newState.exergyDestructionRate ?? 0) >= 0, `I_dot must be >= 0, got ${newState.exergyDestructionRate}`);
+    assert.ok((newState.entropyGenerationRate ?? 0) >= 0);
+    assert.ok((newState.exergyDestructionRate ?? 0) >= 0);
     
     const isValid = assertSecondLaw(newState);
     assert.strictEqual(isValid, true);
   });
 
   it('TC-02: Zero-flux equilibrium thermal state yields near-zero entropy generation', () => {
-    const prevState: ThermodynamicStateVector = {
+    const prevState = new ThermodynamicStateVector({
       timestamp: 10,
       ambientTemperature: 288.15,
       systemTemperature: 288.15,
@@ -95,7 +95,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
         massFluxes: [],
         netMassEnthalpyFlux: 0
       }
-    };
+    });
 
     const fluxes: BoundaryFluxVector = {
       solarRadiationIn: 0,
@@ -130,7 +130,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
   });
 
   it('TC-03: Spurious negative entropy generation throws critical thermodynamic violation', () => {
-    const invalidState: ThermodynamicStateVector = {
+    const invalidState = new ThermodynamicStateVector({
       timestamp: 5,
       ambientTemperature: 288.15,
       systemTemperature: 288.15,
@@ -140,7 +140,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
       temperature: 288.15,
       ambientReferenceTemp: 288.15,
       referenceTemperature: 288.15,
-      entropyGenerationRate: -15.0, // Invalid!
+      entropyGenerationRate: -15.0,
       exergyDestructionRate: -4322.25,
       exergy: 1e10,
       stocks: {},
@@ -155,7 +155,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
         massFluxes: [],
         netMassEnthalpyFlux: 0
       }
-    };
+    });
 
     assert.throws(() => {
       assertSecondLaw(invalidState);

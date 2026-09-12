@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { BaseThermodynamicProcessMonad, ThermodynamicDerivativeResult, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { BaseThermodynamicProcessMonad, ThermodynamicStateVector, ThermodynamicDerivativeResult, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
 class MockViolatingMonad extends BaseThermodynamicProcessMonad {
     processId = 'mock_violating_process';
     evaluate(_state, _dt) {
@@ -29,12 +29,13 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
         longwaveRadiationOut: 239.0,
         netMassFlux: 1.2
     };
-    const initialState = {
+    const initialState = new ThermodynamicStateVector({
         timestamp: 0,
         internalEnergy: 1e10,
         entropy: 1e6,
         totalEntropy: 1e6,
         temperature: 290.0,
+        systemTemperature: 290.0,
         ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
         ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
         stocks: {},
@@ -42,7 +43,7 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
         exergyDestructionRate: 0.0,
         exergy: 5e9,
         boundaryFluxes: initialBoundaryFluxes
-    };
+    });
     it('Test 1: Second Law Enforcement (Throws on negative S_gen_dot)', () => {
         const monad = new MockViolatingMonad();
         assert.throws(() => {

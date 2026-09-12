@@ -1,10 +1,10 @@
 // File: tests/sprint_003.test.ts
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicStateMonad } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateMonad, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 describe('Sprint 003: Thermodynamic Monad Tests', () => {
     it('TC-01: ThermodynamicMonad wraps values and states successfully', () => {
-        const mockVector = {
+        const mockVector = new ThermodynamicStateVector({
             timestamp: 0,
             ambientTemperature: 288.15,
             systemTemperature: 288.15,
@@ -28,7 +28,7 @@ describe('Sprint 003: Thermodynamic Monad Tests', () => {
                 radiativeNet: 0,
                 massFluxes: []
             }
-        };
+        });
         const monad = ThermodynamicStateMonad.of(mockVector);
         assert.ok(monad);
         const validation = monad.validate();

@@ -1,10 +1,10 @@
 // File: tests/sprint_002.test.ts
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { evaluateThermodynamicState, assertSecondLaw } from '../src/thermodynamics/types.js';
+import { evaluateThermodynamicState, assertSecondLaw, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () => {
     it('TC-01: Evaluates valid thermodynamic state correctly', () => {
-        const prevState = {
+        const prevState = new ThermodynamicStateVector({
             timestamp: 0,
             ambientTemperature: 288.15,
             systemTemperature: 288.15,
@@ -33,7 +33,7 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
                 specificEntropies: [],
                 radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 900 }
             }
-        };
+        });
         const nextState = evaluateThermodynamicState(prevState, 1000050, 288.15, 288.15, {
             solarRadiationIn: 1000,
             longwaveRadiationOut: 900,

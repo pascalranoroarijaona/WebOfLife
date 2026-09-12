@@ -5,7 +5,7 @@ import { evaluateThermodynamicState, assertSecondLaw, ThermodynamicStateVector }
 
 describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () => {
   it('TC-01: Evaluates valid thermodynamic state correctly', () => {
-    const prevState: ThermodynamicStateVector = {
+    const prevState = new ThermodynamicStateVector({
       timestamp: 0,
       ambientTemperature: 288.15,
       systemTemperature: 288.15,
@@ -34,7 +34,7 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
         specificEntropies: [],
         radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 900 }
       }
-    };
+    });
 
     const nextState = evaluateThermodynamicState(
       prevState,

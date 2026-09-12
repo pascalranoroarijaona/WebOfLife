@@ -18,7 +18,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
     temperature: 288.15,
     entropy: 1500.0,
     entropyGenerationRate: 15.2,
-    massStocks: {
+    stocks: {
       carbon: 850,
       water: 1338000000,
       nitrogen: 3900000,
@@ -31,7 +31,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
     const result = StateValidator.assertNonNegativeEntropy(validState);
     assert.strictEqual(result.isOk(), true);
     if (result.isOk()) {
-      assert.deepStrictEqual(result.value, validState);
+      assert.deepStrictEqual((result as any).value, validState);
     }
   });
 
@@ -77,7 +77,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
   it('should return error monad on unphysical transition violating Second Law', () => {
     const transitionResult = executeThermodynamicTransition(validState, (s: any) => ({
       ...s,
-      entropyGenerationRate: -5.0 // Unphysical backflow
+      entropyGenerationRate: -5.0
     }));
     assert.strictEqual(transitionResult.isErr(), true);
   });

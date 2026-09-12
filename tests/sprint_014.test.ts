@@ -11,7 +11,7 @@ import {
 import { 
   BaseThermodynamicSystem, 
   ThermodynamicStateMonad 
-} from '../src/thermodynamics/thermodynamic_structure.js';
+} from '../src/thermodynamic_structure.js';
 import { EarthPOD, bootstrapMegaPod } from '../src/earth_pod.js';
 
 class TestThermalSystem extends BaseThermodynamicSystem {
@@ -28,7 +28,7 @@ class TestThermalSystem extends BaseThermodynamicSystem {
   }
 }
 
-describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcement', () => {
+describe('Sprint 014: Thermodynamic State Vector & Second Law Enforcement', () => {
   const defaultBoundaryFluxes: IBoundaryFluxArray = {
     solarRadiationIn: 1.74e17,
     longwaveRadiationOut: 1.74e17 * 0.99,
@@ -39,12 +39,13 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
     massFluxes: []
   };
 
-  const initialState: ThermodynamicStateVector = {
+  const initialState = new ThermodynamicStateVector({
     timestamp: 0,
     internalEnergy: 1e15,
     entropy: 5e10,
     totalEntropy: 5e10,
     temperature: 288.15,
+    systemTemperature: 288.15,
     ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
     ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
     entropyGenerationRate: 12.5,
@@ -52,7 +53,7 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
     exergy: 1e10,
     stocks: {},
     boundaryFluxes: defaultBoundaryFluxes
-  };
+  });
 
   it('should enforce Second Law ($\dot{S}_{\text{gen}} \ge 0$) in metrics', () => {
     const sys = new TestThermalSystem(initialState, 12.5);

@@ -1,25 +1,35 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicStateMonad, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateVector, ThermodynamicStateMonad, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
 import { executeThermodynamicStep } from '../src/thermodynamics/thermodynamic_monad_process.js';
 import { bootstrapMegaPod } from '../src/earth_pod.js';
 describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equations', () => {
     it('should enforce non-negative entropy generation rate (\dot{S}_{gen} >= 0)', () => {
-        const initialState = {
+        const bFluxes = {
+            solarRadiationIn: 0,
+            longwaveRadiationOut: 0,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [],
+            massFluxes: []
+        };
+        const initialState = new ThermodynamicStateVector({
             timestamp: 0,
             internalEnergy: 1e6,
             enthalpy: 1e6,
             entropy: 5000,
             totalEntropy: 5000,
             temperature: 288.15,
+            systemTemperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             stocks: {},
             entropyGenerationRate: -1.0, // Invalid negative entropy generation
             exergyDestructionRate: 0,
             exergy: 1e5,
-            boundaryFluxes: []
-        };
+            boundaryFluxes: bFluxes
+        });
         const initialFluxes = {
             heatFluxes: [],
             radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 990 },
@@ -39,21 +49,31 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
         }, /Second Law Violation/);
     });
     it('should validate exact computation of exergy destruction rate (\dot{I} = T_0 \dot{S}_{gen})', () => {
-        const initialState = {
+        const bFluxes = {
+            solarRadiationIn: 0,
+            longwaveRadiationOut: 0,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [],
+            massFluxes: []
+        };
+        const initialState = new ThermodynamicStateVector({
             timestamp: 0,
             internalEnergy: 1e6,
             enthalpy: 1e6,
             entropy: 5000,
             totalEntropy: 5000,
             temperature: 288.15,
+            systemTemperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             stocks: {},
             entropyGenerationRate: 5.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
             exergy: 1e5,
-            boundaryFluxes: []
-        };
+            boundaryFluxes: bFluxes
+        });
         const initialFluxes = {
             heatFluxes: [],
             radiationFlux: { solarIncoming: 174e15, terrestrialOutgoing: 173.5e15 },

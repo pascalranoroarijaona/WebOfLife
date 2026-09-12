@@ -23,7 +23,7 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
             stocks: {},
             boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 298.15,
-            pressure: 101325,
+            pressure_P: 101325,
             specificEntropy: 1200.0,
             specificEnthalpy: 250000.0,
             specificExergy: 50000.0
@@ -62,7 +62,7 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
             stocks: {},
             boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 300.0,
-            pressure: 101325,
+            pressure_P: 101325,
             specificEntropy: 1150.0,
             specificEnthalpy: 240000.0
         };
@@ -101,7 +101,7 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
             stocks: { H2O: 1000.0, CO2: 400.0 },
             boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 290.0,
-            pressure: 101325,
+            pressure_P: 101325,
             specificEntropy: 1100.0,
             specificEnthalpy: 230000.0
         };
@@ -143,11 +143,10 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
             stocks: {},
             boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 300.0,
-            pressure: 101325,
+            pressure_P: 101325,
             specificEntropy: 2000.0,
             specificEnthalpy: 300000.0
         };
-        // Artificial massive heat removal that might theoretically cause negative raw delta
         const boundaryFluxes = {
             solarRadiationIn: 0,
             longwaveRadiationOut: 0,

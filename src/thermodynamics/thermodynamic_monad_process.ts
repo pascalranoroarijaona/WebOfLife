@@ -57,9 +57,13 @@ export class ThermodynamicMonadProcess {
       return new ThermodynamicMonadProcess(this.stateVector);
     }
     if (typeof transitionFn === 'function') {
-      const nextState = transitionFn(stateOrFn);
-      validateOrThrowEntropy(nextState);
-      return nextState;
+      try {
+        const nextState = transitionFn(stateOrFn);
+        validateOrThrowEntropy(nextState);
+        return nextState;
+      } catch (err: any) {
+        throw new Error(`State validation failed: ${err.message}`);
+      }
     }
     return this;
   }

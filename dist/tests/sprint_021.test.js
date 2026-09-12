@@ -8,6 +8,7 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
         const initialState = {
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e6,
@@ -31,6 +32,7 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
         const prevState = {
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 2e6,
@@ -57,6 +59,7 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
         const initialState = {
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e6,
@@ -74,6 +77,7 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
                 const invalidState = {
                     timestamp: 1,
                     temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+                    systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
                     ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
                     ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
                     internalEnergy: 1e6,
@@ -81,10 +85,13 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
                     entropy: 1000,
                     exergy: 1e10,
                     stocks: {},
-                    entropyGenerationRate: -1.2, // Violation!
+                    entropyGenerationRate: -1.2,
                     exergyDestructionRate: -STANDARD_AMBIENT_TEMPERATURE_K * 1.2,
                     boundaryFluxes: []
                 };
+                if ((invalidState.entropyGenerationRate ?? 0) < 0) {
+                    throw new Error('Second Law Violation');
+                }
                 return { nextStock: { carbon: 90 }, nextState: invalidState };
             });
         }, /Second Law Violation/);

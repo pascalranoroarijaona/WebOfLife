@@ -55,12 +55,13 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
     netMassFlux: 1.2
   };
 
-  const initialState: ThermodynamicStateVector = {
+  const initialState = new ThermodynamicStateVector({
     timestamp: 0,
     internalEnergy: 1e10,
     entropy: 1e6,
     totalEntropy: 1e6,
     temperature: 290.0,
+    systemTemperature: 290.0,
     ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
     ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
     stocks: {},
@@ -68,7 +69,7 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
     exergyDestructionRate: 0.0,
     exergy: 5e9,
     boundaryFluxes: initialBoundaryFluxes
-  };
+  });
 
   it('Test 1: Second Law Enforcement (Throws on negative S_gen_dot)', () => {
     const monad = new MockViolatingMonad();

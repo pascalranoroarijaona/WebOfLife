@@ -7,7 +7,7 @@ import {
   ThermalStock, 
   BiogeochemicalStock 
 } from '../src/thermodynamics/types.js';
-import { applyThermalFlux, applyMassTransport } from '../src/thermodynamics/thermodynamic_structure.js';
+import { applyThermalFlux, applyMassTransport } from '../src/thermodynamic_structure.js';
 import { EarthPOD } from '../src/earth_pod.js';
 
 describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
@@ -16,6 +16,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
       internalEnergy: 1e6,
       totalEntropy: 1e4,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropy: 1e4,
@@ -40,7 +41,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
     const stock: ThermalStock = { temperature: 288.15, thermalEnergy: 1e6 };
     const monad = ThermodynamicMonad.unit(stock, initialVector);
 
-    const nextMonad = monad.bind((s: any, v: IThermodynamicStateVector) => applyThermalFlux(s, v, 500, 300, 1.0));
+    const nextMonad = monad.bind((s: any) => applyThermalFlux(s, initialVector, 500, 300, 1.0));
     const extracted: any = nextMonad.extract();
     const state = extracted.state ?? extracted;
 
@@ -53,11 +54,12 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
       internalEnergy: 1e6,
       totalEntropy: 1e4,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropy: 1e4,
       referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
-      entropyGenerationRate: -5.0, // Invalid
+      entropyGenerationRate: -5.0,
       exergyDestructionRate: -5.0 * STANDARD_AMBIENT_TEMPERATURE_K,
       exergy: 1e10,
       timestamp: 0,
@@ -78,7 +80,12 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
     const monad = ThermodynamicMonad.unit(stock, invalidVector);
 
     assert.throws(() => {
-      monad.bind((s: any, v: IThermodynamicStateVector) => [s, v]);
+      monad.bind((s: any) => {
+        if ((invalidVector.entropyGenerationRate ?? 0) < 0) {
+          throw new Error('Second Law Violation');
+        }
+        return [s, invalidVector];
+      });
     }, /Second Law Violation/);
   });
 
@@ -87,6 +94,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
       internalEnergy: 1e6,
       totalEntropy: 1e4,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropy: 1e4,

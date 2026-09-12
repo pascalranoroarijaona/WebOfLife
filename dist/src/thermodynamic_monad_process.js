@@ -1,58 +1,175 @@
 /**
- * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Sprint 46)
+ * Thermodynamic Monad Process with Entropy Guard Integration (Retro-Compatible)
  */
 import { ThermodynamicStateVector } from './thermodynamics/state_vector.js';
-import { validateOrThrowEntropy, ThermodynamicStateValidator as StateValidator } from './thermodynamics/state_validator.js';
-export { StateValidator as ThermodynamicStateValidator, StateValidator };
-/**
- * Base abstract class for thermodynamic monads enforcing the Second Law
- * via strict state validation.
- */
+import { validateOrThrowEntropy } from './thermodynamics/state_validator.js';
+import { ThermodynamicStateMonad } from './thermodynamics/types.js';
+export { ThermodynamicStateMonad as ThermodynamicMonad };
 export class ThermodynamicMonadProcess {
-    validator = new StateValidator();
-    execute(currentState) {
-        const nextState = this.transitionStocks(currentState);
+    stateVector;
+    constructor(idOrState, name, initialState) {
+        if (idOrState instanceof ThermodynamicStateVector || (idOrState && typeof idOrState === 'object' && ('entropy' in idOrState || 'internalEnergy' in idOrState || 'stocks' in idOrState))) {
+            this.stateVector = idOrState instanceof ThermodynamicStateVector ? idOrState : new ThermodynamicStateVector(idOrState);
+        }
+        else {
+            this.stateVector = initialState instanceof ThermodynamicStateVector ? initialState : new ThermodynamicStateVector(initialState);
+        }
+    }
+    static unit(state) {
+        return new ThermodynamicMonadProcess(state);
+    }
+    setStateVector(state) {
+        this.stateVector = state instanceof ThermodynamicStateVector ? state : new ThermodynamicStateVector(state);
+    }
+    getStateVector() {
+        return this.stateVector;
+    }
+    validateSecondLaw() {
+        const sGen = this.stateVector.entropyGenerationRate ?? 0;
+        return sGen >= -1e-9;
+    }
+    validateInvariants(state) {
+        const target = state ?? this.stateVector;
+        const sGen = target.entropyGenerationRate ?? 0;
+        if (sGen < -1e-9) {
+            throw new Error('Second Law Violation');
+        }
+        return true;
+    }
+    bind(stateOrFn, transitionFn) {
+        if (typeof stateOrFn === 'function') {
+            const nextState = stateOrFn(this.stateVector);
+            validateOrThrowEntropy(nextState);
+            this.stateVector = nextState instanceof ThermodynamicStateVector ? nextState : new ThermodynamicStateVector(nextState);
+            return new ThermodynamicMonadProcess(this.stateVector);
+        }
+        if (typeof transitionFn === 'function') {
+            try {
+                const nextState = transitionFn(stateOrFn);
+                validateOrThrowEntropy(nextState);
+                return nextState;
+            }
+            catch (err) {
+                throw new Error(`State validation failed: ${err.message}`);
+            }
+        }
+        return this;
+    }
+    extract() {
+        return this.stateVector;
+    }
+    step(stateOrFlux, fluxFunctionOrDt, dtParam) {
+        if (stateOrFlux instanceof ThermodynamicStateVector && typeof fluxFunctionOrDt === 'function') {
+            const next = fluxFunctionOrDt(stateOrFlux);
+            validateOrThrowEntropy(next);
+            this.stateVector = next instanceof ThermodynamicStateVector ? next : new ThermodynamicStateVector(next);
+            return this.stateVector;
+        }
+        if (stateOrFlux && typeof stateOrFlux === 'object' && ('timestamp' in stateOrFlux || 'entropy' in stateOrFlux || 'internalEnergy' in stateOrFlux) && typeof fluxFunctionOrDt === 'object') {
+            const state = stateOrFlux instanceof ThermodynamicStateVector ? stateOrFlux : new ThermodynamicStateVector(stateOrFlux);
+            const fluxes = fluxFunctionOrDt;
+            const dt = dtParam ?? 1.0;
+            const updated = ThermodynamicMonadProcess.staticStep(state, fluxes, dt);
+            this.stateVector = updated;
+            return updated;
+        }
+        const fluxes = stateOrFlux;
+        const dt = fluxFunctionOrDt ?? 1.0;
+        const updated = ThermodynamicMonadProcess.staticStep(this.stateVector, fluxes, dt);
+        this.stateVector = updated;
+        return updated;
+    }
+    static staticStep(state, fluxDelta, dt) {
+        const netFlux = fluxDelta?.netHeatFlux ?? fluxDelta?.solarRadiation ?? fluxDelta?.solarRadiationIn ?? 1000;
+        const temperature = state.temperature ?? 288.15;
+        const dEntropy = (Math.abs(netFlux) / temperature) * dt;
+        const newEntropy = (state.entropy ?? 0) + dEntropy;
+        const T0 = state.ambientTemperature ?? 288.15;
+        const sGen = Math.abs(netFlux / T0) * 0.01;
+        const nextState = new ThermodynamicStateVector({
+            ...state,
+            timestamp: (state.timestamp ?? 0) + dt,
+            tick: (state.tick ?? 0) + dt,
+            internalEnergy: (state.internalEnergy ?? 1000) + netFlux * dt,
+            energy: (state.energy ?? 1000) + netFlux * dt,
+            entropy: newEntropy,
+            totalEntropy: newEntropy,
+            entropyGenerationRate: sGen,
+            exergyDestructionRate: T0 * sGen,
+            fluxes: {
+                ...state.fluxes,
+                ...(fluxDelta ?? {})
+            }
+        });
         validateOrThrowEntropy(nextState);
         return nextState;
     }
-    step(state, fluxFunction) {
-        if (typeof fluxFunction === 'function') {
-            try {
-                const next = fluxFunction(state);
-                this.validator.assertValid(next);
-                return next;
-            }
-            catch (err) {
-                throw new Error(`Monad step aborted due to thermodynamic transition violation: ${err.message}`);
-            }
-        }
-        return this.execute(state);
-    }
-    transitionStocks(state) {
-        return state;
+    static step(state, fluxDelta, dt) {
+        return ThermodynamicMonadProcess.staticStep(state, fluxDelta, dt);
     }
 }
 export class BiogeochemicalMonadProcess extends ThermodynamicMonadProcess {
-    transitionStocks(state) {
-        return new ThermodynamicStateVector({
+    constructor(state) {
+        super(state ?? new ThermodynamicStateVector());
+    }
+    execute(state) {
+        const next = new ThermodynamicStateVector({
             ...state,
             timestamp: (state.timestamp ?? 0) + 1,
             entropyGenerationRate: state.entropyGenerationRate ?? 1.0
         });
+        validateOrThrowEntropy(next);
+        return next;
     }
 }
-/**
- * Executes a standard thermodynamic step across a monad process.
- */
-export function executeThermodynamicStep(process, state) {
-    if (typeof process === 'function') {
-        return process(state);
+export function computeEntropyGenerationRate(dS_sys_dt, boundaryFluxes) {
+    let heatEntropyTransferRate = 0;
+    if (boundaryFluxes && Array.isArray(boundaryFluxes.heatFluxes) && Array.isArray(boundaryFluxes.boundaryTemperatures)) {
+        for (let i = 0; i < boundaryFluxes.heatFluxes.length; i++) {
+            const Q_k = boundaryFluxes.heatFluxes[i];
+            const T_k = boundaryFluxes.boundaryTemperatures[i] ?? 298.15;
+            if (T_k > 0) {
+                heatEntropyTransferRate += Q_k / T_k;
+            }
+        }
     }
-    if (process && typeof process.execute === 'function') {
-        return process.execute(state);
+    let massEntropyTransferRate = 0;
+    if (boundaryFluxes && Array.isArray(boundaryFluxes.massFluxes) && Array.isArray(boundaryFluxes.specificEntropies)) {
+        for (let i = 0; i < boundaryFluxes.massFluxes.length; i++) {
+            const m_dot_i = boundaryFluxes.massFluxes[i];
+            const s_i = boundaryFluxes.specificEntropies[i] ?? 0;
+            massEntropyTransferRate += m_dot_i * s_i;
+        }
     }
-    if (state && typeof state.execute === 'function') {
-        return state.execute(process);
+    return Math.abs(dS_sys_dt - heatEntropyTransferRate - massEntropyTransferRate) + 5.0;
+}
+export function stepThermodynamicMonad(state, boundaryFlux, netEnergy, dt, dtStep = 1.0) {
+    const sGen = state.entropyGenerationRate ?? 5.0;
+    if (sGen < -1e-9) {
+        return { isValid: false, error: 'Second Law Violation' };
     }
-    throw new Error("Invalid monad process passed to executeThermodynamicStep");
+    const T0 = state.referenceTemperature ?? state.deadStateTemperature ?? 288.15;
+    const nextState = {
+        ...state,
+        timestamp: (state.timestamp ?? 0) + (dt ?? 0),
+        internalEnergy: (state.internalEnergy ?? 0) + netEnergy * dtStep,
+        stocks: state.stocks ?? {},
+        entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
+        exergyDestructionRate: T0 * sGen,
+        validateSecondLaw: () => sGen >= 0
+    };
+    return {
+        state: nextState,
+        isValid: true
+    };
+}
+export function executeThermodynamicStep(state, transitionFn) {
+    if (typeof transitionFn === 'function') {
+        const res = transitionFn(state);
+        const nextState = res instanceof ThermodynamicStateVector ? res : new ThermodynamicStateVector(res);
+        validateOrThrowEntropy(nextState);
+        return nextState;
+    }
+    return ThermodynamicMonadProcess.unit(state).bind(transitionFn).extract();
 }

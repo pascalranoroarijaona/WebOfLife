@@ -13,20 +13,26 @@ export abstract class BaseCycle implements IThermodynamicModel {
 
   constructor(public name: string, initialStocks?: Record<string, number>) {
     this.id = `${name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 9)}`;
-    this.stateVector = {
+    this.stateVector = new ThermodynamicStateVector({
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 1e8,
+      energy: 1e8,
+      enthalpy: 1e8,
       entropy: 1e5,
       totalEntropy: 1e5,
+      dissipationRate: 15.0,
+      solarInput: 1.74e17,
+      solarInputWatts: 1.74e17,
       entropyGenerationRate: 15.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
       exergy: 1e10,
       stocks: {},
-      fluxes: { solarRadiation: 1.74e17, thermalEmission: 1.74e17 * 0.99, latentHeat: 0, sensibleHeat: 0 },
       boundaryFluxes: {
         solarRadiationIn: 1.74e17,
         longwaveRadiationOut: 1.74e17 * 0.99,
@@ -47,9 +53,11 @@ export abstract class BaseCycle implements IThermodynamicModel {
       },
       validateFirstLaw: () => this.validateFirstLaw(),
       validateSecondLaw: () => this.validateSecondLaw(),
+      getEntropy: () => 1e5,
+      clone: (overrides?: any) => new ThermodynamicStateVector({ ...this.stateVector.toObject(), ...overrides }),
       getEntropyGenerationRate: () => 15.0,
       getVectorMetrics: () => ({ entropyGenerationRate: 15.0 })
-    };
+    });
   }
 
   public getStocks(): Map<string, number> {
@@ -105,7 +113,8 @@ export abstract class BaseCycle implements IThermodynamicModel {
       entropyInflowRate: 1e5 / 5778
     };
     const res = stepThermodynamicMonad(this.stateVector, defaultFlux, 1e5 * dt, (1e5 / 5778) * dt, dt);
-    this.stateVector = 'state' in res ? res.state : res;
+    const nextState = 'state' in res ? res.state : res;
+    this.stateVector = nextState instanceof ThermodynamicStateVector ? nextState : new ThermodynamicStateVector(nextState);
   }
 
   public getBoundaryFluxes(): BoundaryFluxVector {

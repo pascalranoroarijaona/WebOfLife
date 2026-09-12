@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
 import { computeEntropyGenerationRate, stepThermodynamicMonad } from '../src/thermodynamics/thermodynamic_monad_process.js';
 import { bootstrapMegaPod } from '../src/earth_pod.js';
 describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', () => {
@@ -21,8 +21,20 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
         assert.ok(sGen > 0, `Entropy generation rate should be positive, got ${sGen}`);
     });
     it('should enforce Second Law: throw error or return invalid result when S_gen < 0', () => {
-        const initialState = {
+        const bFluxes = {
+            solarRadiationIn: 1.74e17,
+            longwaveRadiationOut: 1.74e17 * 0.99,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [],
+            boundaryTemperatures: [],
+            massFluxes: [],
+            specificEntropies: []
+        };
+        const initialState = new ThermodynamicStateVector({
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e6,
             entropy: 5000,
             totalEntropy: 5000,
@@ -33,24 +45,10 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
             stocks: {},
             entropyGenerationRate: 10,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10,
-            boundaryFluxes: {
-                solarIncoming: 1.74e17,
-                terrestrialOutgoing: 1.74e17 * 0.99,
-                heatFluxes: [],
-                boundaryTemperatures: [],
-                massFluxes: [],
-                specificEntropies: []
-            },
-            boundaryFlux: {
-                solarIncoming: 1.74e17,
-                terrestrialOutgoing: 1.74e17 * 0.99,
-                heatFluxes: [],
-                boundaryTemperatures: [],
-                massFluxes: [],
-                specificEntropies: []
-            },
+            boundaryFluxes: bFluxes,
+            boundaryFlux: bFluxes,
             timestamp: 0
-        };
+        });
         const boundaryFlux = {
             solarIncoming: 1.74e17,
             terrestrialOutgoing: 1.74e17 * 0.99,
@@ -64,8 +62,20 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
         assert.ok(result.error?.includes('Second Law Violation'), `Expected Second Law Violation error, got: ${result.error}`);
     });
     it('should maintain Gouy-Stodola consistency (I = T_0 * S_gen)', () => {
-        const initialState = {
+        const bFluxes = {
+            solarRadiationIn: 1.74e17,
+            longwaveRadiationOut: 1.74e17 * 0.99,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            heatFluxes: [100],
+            boundaryTemperatures: [500],
+            massFluxes: [],
+            specificEntropies: []
+        };
+        const initialState = new ThermodynamicStateVector({
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            systemTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e6,
             entropy: 5000,
             totalEntropy: 5000,
@@ -76,24 +86,10 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
             stocks: {},
             entropyGenerationRate: 5.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
-            boundaryFluxes: {
-                solarIncoming: 1.74e17,
-                terrestrialOutgoing: 1.74e17 * 0.99,
-                heatFluxes: [100],
-                boundaryTemperatures: [500],
-                massFluxes: [],
-                specificEntropies: []
-            },
-            boundaryFlux: {
-                solarIncoming: 1.74e17,
-                terrestrialOutgoing: 1.74e17 * 0.99,
-                heatFluxes: [100],
-                boundaryTemperatures: [500],
-                massFluxes: [],
-                specificEntropies: []
-            },
+            boundaryFluxes: bFluxes,
+            boundaryFlux: bFluxes,
             timestamp: 0
-        };
+        });
         const boundaryFlux = {
             solarIncoming: 1.74e17,
             terrestrialOutgoing: 1.74e17 * 0.99,

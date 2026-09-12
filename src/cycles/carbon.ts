@@ -40,7 +40,14 @@ export class CarbonCycle extends BaseCycle {
       heatFluxRate: solarFlux * 1e-4,
       massFluxRate: 1.2,
       enthalpyInflowRate: solarFlux * 1e-4,
-      entropyInflowRate: (solarFlux * 1e-4) / STANDARD_AMBIENT_TEMPERATURE_K
+      entropyInflowRate: (solarFlux * 1e-4) / STANDARD_AMBIENT_TEMPERATURE_K,
+      fluxId: 'carbon_cycle_flux',
+      species: 'carbon',
+      massFlowRate: 1.2,
+      specificEnthalpy: 500,
+      specificEntropy: 2.1,
+      heatTransferRate: solarFlux * 1e-4,
+      boundaryTemperature: STANDARD_AMBIENT_TEMPERATURE_K
     };
     const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-4 * dt, (solarFlux * 1e-4 / STANDARD_AMBIENT_TEMPERATURE_K) * dt, dt);
     this.stateVector = 'state' in res ? res.state : res;

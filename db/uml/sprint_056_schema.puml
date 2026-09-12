@@ -1,0 +1,62 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class EarthPod {
+    + podId: string
+    + podName: string
+    + createdAt: Date
+    + updatedAt: Date
+}
+
+class ThermodynamicStock {
+    + stockId: string
+    + podId: string
+    + element: string
+    + currentMass: number
+    + capacity: number
+    + lastUpdated: Date
+}
+
+class StateValidator {
+    - tolerance: number
+    + constructor(tolerance: number)
+    + calculateExpectedDelta(vector: IFlowRateVector, dt: number): IDeltaCalculationResult
+    + validateStockDelta(vector: IFlowRateVector, dt: number, actualDelta: number): IDeltaCalculationResult
+}
+
+interface IFlowRateVector {
+    + element: string
+    + inflows: Map<string, number>
+    + outflows: Map<string, number>
+}
+
+interface IDeltaCalculationResult {
+    + element: string
+    + netRate: number
+    + expectedDelta: number
+    + timeStep: number
+    + isConserved: boolean
+    + discrepancy: number
+}
+
+class StateValidationLedgerRecord {
+    + ledgerId: string
+    + vectorId: string
+    + timeStep: number
+    + netRate: number
+    + expectedDelta: number
+    + actualDelta: number
+    + discrepancy: number
+    + isConserved: boolean
+    + tolerance: number
+    + validatedAt: Date
+    + blockSignature: string
+}
+
+EarthPod "1" *-- "0..*" ThermodynamicStock : contains
+EarthPod "1" *-- "0..*" IFlowRateVector : bounds
+StateValidator ..> IFlowRateVector : consumes
+StateValidator ..> IDeltaCalculationResult : produces
+StateValidationLedgerRecord --> IFlowRateVector : logs vector state
+
+@enduml
