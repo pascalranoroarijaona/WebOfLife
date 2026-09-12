@@ -1,401 +1,307 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web of Life - Sprint 024: Thermodynamic State Vector Interface Contracts</title>
+    <title>Sprint 024: Web of Life - Ecosystem Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#10b981', 600: '#059669' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
-            --bg-primary: #0a0f1d;
-            --bg-secondary: #121c33;
-            --accent-glow: #00ffcc;
-            --accent-secondary: #3b82f6;
-            --text-main: #e2e8f0;
-            --text-dim: #94a3b8;
-            --border-color: #1e293b;
-            --danger: #ef4444;
-            --success: #10b981;
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-primary);
-            color: var(--text-main);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            overflow-x: hidden;
-        }
-
-        #topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        #topbar h1 {
-            font-size: 1.25rem;
-            margin: 0;
-            color: var(--accent-glow);
-            letter-spacing: 0.05em;
-        }
-
-        #topbar nav a {
-            color: var(--text-dim);
-            text-decoration: none;
-            margin-left: 1rem;
-            font-size: 0.9rem;
-            transition: color 0.2s;
-        }
-
-        #topbar nav a:hover {
-            color: var(--accent-glow);
-        }
-
-        #app {
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            grid-template-rows: auto 1fr;
-            min-height: calc(100vh - 73px);
-            gap: 1.5rem;
-            padding: 1.5rem;
-            max-width: 1800px;
-            margin: 0 auto;
-        }
-
-        header {
-            grid-column: 1 / -1;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: 1.8rem;
-            color: var(--text-main);
-        }
-
-        header nav a {
-            color: var(--accent-glow);
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        header nav a:hover {
-            text-decoration: underline;
-        }
-
-        main {
-            grid-column: 1 / 2;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        aside {
-            grid-column: 2 / 3;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .panel h2 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.2rem;
-            color: var(--accent-glow);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.5rem;
-        }
-
-        #canvas-container {
-            width: 100%;
-            height: 450px;
-            background: #050811;
-            border-radius: 6px;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        #simCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        #controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            background: rgba(18, 28, 51, 0.7);
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-        }
-
-        button {
-            background: var(--accent-secondary);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background: #2563eb;
-        }
-
-        button.active {
-            background: var(--accent-glow);
-            color: var(--bg-primary);
-        }
-
-        .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-
-        .metric-card {
-            background: rgba(5, 8, 17, 0.5);
-            border: 1px solid var(--border-color);
-            padding: 1rem;
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .metric-label {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-        }
-
-        .metric-value {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--accent-glow);
-        }
-
-        pre {
-            background: #050811;
-            padding: 1rem;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.85rem;
-            color: #38bdf8;
-            border: 1px solid var(--border-color);
-            margin: 0;
-            max-height: 250px;
-        }
-
-        @media (max-width: 1024px) {
-            #app {
-                grid-template-columns: 1fr;
-            }
-            aside {
-                grid-column: 1 / -1;
-            }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'Fira Code', monospace; }
+        canvas { touch-action: none; }
     </style>
 </head>
-<body>
-    <div id="topbar">
-        <h1>Web of Life // Sprint 024</h1>
-        <nav>
-            <a href="../../../index.html">Home</a>
-            <a href="01_RFC.md">RFC</a>
-            <a href="02_METHODS.md">Methods</a>
-        </nav>
-    </div>
-
-    <div id="app">
-        <header>
-            <h1>Thermodynamic State Vector Interface Contracts</h1>
-            <nav>
-                <a href="01_RFC.md">Read Sprint 024 Specification &rarr;</a>
-            </nav>
-        </header>
-
-        <main>
-            <div class="panel">
-                <h2>Thermodynamic State Vector Telemetry</h2>
-                <div id="canvas-container">
-                    <canvas id="simCanvas"></canvas>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-xl">
+                    <i class="fas fa-leaf"></i>
                 </div>
-                <div id="controls">
-                    <button id="btnPlay" class="active">Pause / Play</button>
-                    <button id="btnReset">Reset Monad</button>
-                    <span id="statusText" style="color: var(--success); font-size: 0.9rem; font-weight: 500;">Status: Synchronized</span>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight">Web of Life</h1>
+                    <p class="text-xs text-slate-400">Sprint 024: Ecosystem Simulation Engine</p>
                 </div>
             </div>
-
-            <div class="panel">
-                <h2>Interface Contract Diagnostics</h2>
-                <pre id="logOutput">[SYSTEM] Initializing Thermodynamic State Vector Contracts v0.24.0...
-[CONTRACT] Validating entropy flux vectors &Delta;S/&Delta;t...
-[SUCCESS] State vector stream active and responsive.</pre>
+            <div class="flex items-center space-x-3">
+                <span id="sim-status" class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <i class="fas fa-circle text-[8px] mr-1 animate-pulse"></i> Ready
+                </span>
+                <a href="../index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+                    <i class="fas fa-arrow-left mr-1"></i> Back to Sprints
+                </a>
             </div>
-        </main>
+        </div>
+    </header>
 
-        <aside>
-            <div class="panel">
-                <h2>State Vector Metrics</h2>
-                <div class="metric-grid">
-                    <div class="metric-card">
-                        <span class="metric-label">Entropy (S)</span>
-                        <span class="metric-value" id="valEntropy">142.6 J/K</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-label">Dissipation Rate</span>
-                        <span class="metric-value" id="valDissipation">12.4 W</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-label">Exergy Balance</span>
-                        <span class="metric-value" id="valExergy">84.2 kJ</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-label">Homeostasis Index</span>
-                        <span class="metric-value" id="valHomeostasis">0.961</span>
-                    </div>
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Sidebar Controls -->
+        <div class="lg:col-span-1 space-y-4">
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <h2 class="text-sm font-semibold text-slate-200 mb-3 flex items-center">
+                    <i class="fas fa-sliders-h text-emerald-400 mr-2"></i> Simulation Controls
+                </h2>
+                <div class="space-y-3">
+                    <button id="btn-start" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-medium text-sm transition shadow-lg shadow-emerald-900/20 flex items-center justify-center">
+                        <i class="fas fa-play mr-2"></i> Start Simulation
+                    </button>
+                    <button id="btn-pause" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium text-sm transition flex items-center justify-center">
+                        <i class="fas fa-pause mr-2"></i> Pause
+                    </button>
+                    <button id="btn-reset" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium text-sm transition flex items-center justify-center">
+                        <i class="fas fa-redo mr-2"></i> Reset Ecosystem
+                    </button>
                 </div>
             </div>
 
-            <div class="panel">
-                <h2>Contract Verification</h2>
-                <p style="font-size: 0.9rem; color: var(--text-dim); margin: 0;">
-                    Monitored through strict TypeScript interface contracts enforcing thermodynamic laws across planetary carbon, nitrogen, phosphorus, and hydrological cycles.
-                </p>
-                <button id="btnVerify" style="width: 100%;">Run Contract Assertion</button>
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <h2 class="text-sm font-semibold text-slate-200 mb-3 flex items-center">
+                    <i class="fas fa-chart-pie text-emerald-400 mr-2"></i> Population Stats
+                </h2>
+                <div id="stats-container" class="space-y-2 text-xs text-slate-300">
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span>Herbivores</span>
+                        <span id="stat-herbivores" class="font-mono font-bold text-emerald-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span>Carnivores</span>
+                        <span id="stat-carnivores" class="font-mono font-bold text-amber-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span>Plants</span>
+                        <span id="stat-plants" class="font-mono font-bold text-green-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span>Generation</span>
+                        <span id="stat-tick" class="font-mono font-bold text-slate-200">0</span>
+                    </div>
+                </div>
             </div>
-        </aside>
-    </div>
+        </div>
 
-    <script>
-        const canvas = document.getElementById('simCanvas');
+        <!-- Simulation Canvas Area -->
+        <div class="lg:col-span-3 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col items-center justify-center relative min-h-[500px]">
+            <canvas id="sim-canvas" width="800" height="600" class="w-full h-auto max-w-full rounded-xl bg-slate-950 border border-slate-800 shadow-inner cursor-crosshair"></canvas>
+            <div id="canvas-overlay" class="absolute inset-0 flex items-center justify-center bg-slate-950/80 rounded-xl backdrop-blur-sm transition-opacity duration-300">
+                <div class="text-center p-6 max-w-sm">
+                    <div class="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">
+                        <i class="fas fa-seedling"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Web of Life Simulation</h3>
+                    <p class="text-xs text-slate-400 mb-4">Click Start Simulation to initialize ecosystem dynamics, autonomous agents, and environmental feedback loops.</p>
+                    <button id="btn-overlay-start" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-medium text-sm transition shadow-lg shadow-emerald-900/30">
+                        Launch Simulation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        Web of Life Engine &bull; Sprint 024 Interactive Viewer
+    </footer>
+
+    <!-- Client Script -->
+    <script type="module">
+        const canvas = document.getElementById('sim-canvas');
         const ctx = canvas.getContext('2d');
-        const btnPlay = document.getElementById('btnPlay');
-        const btnReset = document.getElementById('btnReset');
-        const btnVerify = document.getElementById('btnVerify');
-        const logOutput = document.getElementById('logOutput');
+        const overlay = document.getElementById('canvas-overlay');
+        const btnStart = document.getElementById('btn-start');
+        const btnOverlayStart = document.getElementById('btn-overlay-start');
+        const btnPause = document.getElementById('btn-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const simStatus = document.getElementById('sim-status');
 
-        let isRunning = true;
-        let time = 0;
+        const statHerbivores = document.getElementById('stat-herbivores');
+        const statCarnivores = document.getElementById('stat-carnivores');
+        const statPlants = document.getElementById('stat-plants');
+        const statTick = document.getElementById('stat-tick');
 
-        function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+        let isRunning = false;
+        let tickCount = 0;
+
+        // Entities
+        let plants = [];
+        let herbivores = [];
+        let carnivores = [];
+
+        function initEcosystem() {
+            tickCount = 0;
+            plants = [];
+            herbivores = [];
+            carnivores = [];
+
+            // Spawn initial plants
+            for (let i = 0; i < 50; i++) {
+                plants.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: 4 });
+            }
+            // Spawn initial herbivores
+            for (let i = 0; i < 15; i++) {
+                herbivores.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, energy: 100, vx: 0, vy: 0 });
+            }
+            // Spawn initial carnivores
+            for (let i = 0; i < 5; i++) {
+                carnivores.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, energy: 120, vx: 0, vy: 0 });
+            }
+            updateStats();
         }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
 
-        let entropy = 142.6;
-        let dissipation = 12.4;
-        let exergy = 84.2;
-        let homeostasis = 0.961;
+        function updateStats() {
+            statHerbivores.textContent = herbivores.length;
+            statCarnivores.textContent = carnivores.length;
+            statPlants.textContent = plants.length;
+            statTick.textContent = tickCount;
+        }
 
-        function updateMetrics() {
-            if (isRunning) {
-                time += 0.05;
-                entropy += (Math.random() - 0.48) * 0.5;
-                dissipation = Math.max(5, 12.4 + Math.sin(time) * 3);
-                exergy = Math.max(10, 84.2 + Math.cos(time * 0.7) * 5);
-                homeostasis = Math.min(1.0, Math.max(0.8, 0.96 + Math.sin(time * 0.5) * 0.03));
+        function update() {
+            if (!isRunning) return;
+            tickCount++;
+
+            // Random plant growth
+            if (Math.random() < 0.3 && plants.count < 100) {
+                plants.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: 4 });
             }
 
-            document.getElementById('valEntropy').innerText = entropy.toFixed(1) + ' J/K';
-            document.getElementById('valDissipation').innerText = dissipation.toFixed(1) + ' W';
-            document.getElementById('valExergy').innerText = exergy.toFixed(1) + ' kJ';
-            document.getElementById('valHomeostasis').innerText = homeostasis.toFixed(3);
+            // Move herbivores towards nearest plant
+            herbivores.forEach((h, index) => {
+                h.energy -= 0.2;
+                if (plants.length > 0) {
+                    let nearest = plants.reduce((prev, curr) => {
+                        let dPrev = Math.hypot(prev.x - h.x, prev.y - h.y);
+                        let dCurr = Math.hypot(curr.x - h.x, curr.y - h.y);
+                        return dCurr < dPrev ? curr : prev;
+                    });
+                    let angle = Math.atan2(nearest.y - h.y, nearest.x - h.x);
+                    h.x += Math.cos(angle) * 1.5;
+                    h.y += Math.sin(angle) * 1.5;
+
+                    // Eat plant
+                    if (Math.hypot(nearest.x - h.x, nearest.y - h.y) < 10) {
+                        plants = plants.filter(p => p !== nearest);
+                        h.energy += 30;
+                    }
+                }
+                if (h.energy <= 0) {
+                    herbivores.splice(index, 1);
+                }
+            });
+
+            // Move carnivores towards nearest herbivore
+            carnivores.forEach((c, index) => {
+                c.energy -= 0.3;
+                if (herbivores.length > 0) {
+                    let nearest = herbivores.reduce((prev, curr) => {
+                        let dPrev = Math.hypot(prev.x - c.x, prev.y - c.y);
+                        let dCurr = Math.hypot(curr.x - c.x, curr.y - c.y);
+                        return dCurr < dPrev ? curr : prev;
+                    });
+                    let angle = Math.atan2(nearest.y - c.y, nearest.x - c.x);
+                    c.x += Math.cos(angle) * 1.8;
+                    c.y += Math.sin(angle) * 1.8;
+
+                    // Eat herbivore
+                    if (Math.hypot(nearest.x - c.x, nearest.y - c.y) < 12) {
+                        herbivores = herbivores.filter(h => h !== nearest);
+                        c.energy += 50;
+                    }
+                }
+                if (c.energy <= 0) {
+                    carnivores.splice(index, 1);
+                }
+            });
+
+            updateStats();
         }
 
         function draw() {
-            ctx.fillStyle = '#050811';
+            ctx.fillStyle = '#020617';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw thermodynamic phase space trajectories
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#00ffcc';
-            ctx.beginPath();
-            
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-            const radius = Math.min(cx, cy) * 0.75;
+            // Draw plants
+            ctx.fillStyle = '#22c55e';
+            plants.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
 
-            for (let a = 0; a < Math.PI * 2; a += 0.02) {
-                const r = radius * (0.8 + 0.2 * Math.sin(a * 4 + time));
-                const x = cx + r * Math.cos(a + time * 0.2);
-                const y = cy + r * Math.sin(a + time * 0.2);
-                if (a === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-            ctx.stroke();
+            // Draw herbivores
+            ctx.fillStyle = '#38bdf8';
+            herbivores.forEach(h => {
+                ctx.beginPath();
+                ctx.arc(h.x, h.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+            });
 
-            // Inner harmonic ring
-            ctx.strokeStyle = '#3b82f6';
-            ctx.beginPath();
-            for (let a = 0; a < Math.PI * 2; a += 0.05) {
-                const r = radius * 0.4 * homeostasis;
-                const x = cx + r * Math.cos(a - time * 0.5);
-                const y = cy + r * Math.sin(a - time * 0.5);
-                if (a === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-            ctx.stroke();
-
-            updateMetrics();
-            requestAnimationFrame(draw);
+            // Draw carnivores
+            ctx.fillStyle = '#f43f5e';
+            carnivores.forEach(c => {
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+            });
         }
 
-        btnPlay.addEventListener('click', () => {
-            isRunning = !isRunning;
-            btnPlay.classList.toggle('active', isRunning);
-            document.getElementById('statusText').innerText = isRunning ? 'Status: Synchronized' : 'Status: Paused';
-            document.getElementById('statusText').style.color = isRunning ? 'var(--success)' : 'var(--text-dim)';
-        });
+        function loop() {
+            update();
+            draw();
+            if (isRunning) {
+                requestAnimationFrame(loop);
+            }
+        }
 
+        function startSimulation() {
+            if (!isRunning) {
+                if (herbivores.length === 0 && carnivores.length === 0) {
+                    initEcosystem();
+                }
+                isRunning = true;
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 300);
+                simStatus.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                simStatus.innerHTML = '<i class="fas fa-circle text-[8px] mr-1 animate-pulse"></i> Running';
+                loop();
+            }
+        }
+
+        function pauseSimulation() {
+            isRunning = false;
+            simStatus.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20';
+            simStatus.innerHTML = '<i class="fas fa-circle text-[8px] mr-1"></i> Paused';
+        }
+
+        btnStart.addEventListener('click', startSimulation);
+        btnOverlayStart.addEventListener('click', startSimulation);
+        btnPause.addEventListener('click', pauseSimulation);
         btnReset.addEventListener('click', () => {
-            entropy = 142.6;
-            dissipation = 12.4;
-            exergy = 84.2;
-            homeostasis = 0.961;
-            time = 0;
-            logOutput.innerText += "\n[RESET] Thermodynamic state vector re-initialized to baseline.";
-            logOutput.scrollTop = logOutput.scrollHeight;
+            pauseSimulation();
+            initEcosystem();
+            draw();
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.style.opacity = '1', 10);
+            simStatus.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700';
+            simStatus.innerHTML = '<i class="fas fa-circle text-[8px] mr-1"></i> Ready';
         });
 
-        btnVerify.addEventListener('click', () => {
-            logOutput.innerText += "\n[ASSERT] Verifying thermodynamic interface contracts... OK.\n[ASSERT] Energy conservation law check passed (&Delta;E = 0).";
-            logOutput.scrollTop = logOutput.scrollHeight;
-        });
-
-        requestAnimationFrame(draw);
+        initEcosystem();
+        draw();
     </script>
 </body>
 </html>

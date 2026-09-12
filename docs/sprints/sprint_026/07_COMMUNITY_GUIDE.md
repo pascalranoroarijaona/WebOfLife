@@ -1,21 +1,20 @@
 <!-- DevRel Onboarding & Contributor Guide -->
-# Sprint 026: Thermodynamic Equilibrium & Trophic Cascade Architecture - Developer Onboarding & Contributor Guide
+# Sprint 026 Contributor & Developer Onboarding Guide
 
-Welcome to **Web of Life**! This guide is designed for developers, researchers, and open-source contributors joining us for **Sprint 026**. 
+Welcome to the **Web of Life** developer community! This guide serves as your onboarding manual for **Sprint 026: Thermodynamic Equilibrium & Trophic Cascade Architecture**. 
 
-In this sprint, we enforce strict thermodynamic laws and multi-trophic cascades across the simulation engine. Whether you are building custom monads or authoring WebGL shaders for real-time visualization of energy and entropy fluxes, this document provides the architectural context, development workflows, and extension points you need.
+Our simulation repository enforces strict physical laws—specifically energy conservation and entropy generation ($ \Delta S \ge 0 $). Whether you want to implement a new photosynthetic monad or design an advanced WebGL shader for thermal heat dissipation, this guide will get your environment running and highlight key extension points.
 
 ---
 
-## 1. Technical Stack & Repository Setup
+## 1. Getting Started
 
-Web of Life is built on **TypeScript and Node.js**. 
+### Prerequisites
+- **Node.js** (v18+ recommended)
+- **npm** (comes with Node.js)
 
-> **CRITICAL CONSTRAINTS:** 
-> - **NEVER** use `pip install` or `pytest`. This is a TypeScript/Node.js codebase.
-> - Repository URL: [https://github.com/pascalranoroarijaona/WebOfLife](https://github.com/pascalranoroarijaona/WebOfLife)
-
-### Getting Started
+### Installation & Test Suite
+Never use Python tools (`pip`, `pytest`) for this repository. Everything runs on **TypeScript and Node.js**.
 
 1. **Clone the repository:**
    ```bash
@@ -28,99 +27,58 @@ Web of Life is built on **TypeScript and Node.js**.
    npm install
    ```
 
-3. **Run Sprint 026 test suite:**
+3. **Verify your installation by running the test suite:**
    ```bash
    npx tsx tests/sprint_026.test.ts
    ```
 
 ---
 
-## 2. Architecture Overview: Thermodynamics & Trophic Monads
+## 2. Good First Issues for External Contributors
 
-Sprint 026 enforces two fundamental laws across all simulation entities:
-1. **First Law (Energy & Mass Conservation):** Total system energy ($E_{sys}$) and matter (Carbon, Nitrogen pools) must remain invariant ($\Delta E_{sys} = 0$, within floating-point tolerance $\epsilon = 10^{-9}$).
-2. **Second Law (Entropy & Dissipation):** Every metabolic transaction or predation event incurs an entropy tax, releasing thermal energy ($Q$) into the environmental thermal sink and enforcing $\Delta S \ge 0$.
+If you are looking to make your first contribution to Sprint 026 features, pick up one of these well-defined tasks:
 
-### Core Class & Interface Hierarchy (`src/core/thermodynamics/`)
+### Issue #2601: Implement C4 Photosynthetic Pathway Monad
+* **Description:** Currently, autotrophs utilize a generalized photosynthetic efficiency ($\eta_{photo}$). Create a new subclass `C4Plant` extending `Autotroph` in `src/biology/c4_plant.ts` that incorporates temperature-dependent water-stress penalty coefficients.
+* **Acceptance Criteria:** Must pass mass-balance invariants over 1,000 steps without leaking carbon or energy.
 
-```
-Entity
-├── abiotic
-│   ├── SolarSource (Singleton Exergy Influx)
-│   ├── Atmosphere (Gas & Thermal Pool)
-│   └── SoilMatrix (Nutrient & Detritus Pool)
-└── biotic
-    ├── Organism (Abstract Base - IThermodynamicSystem, IMaterialPool)
-    │   ├── Autotroph (C3/C4 Plants, Algae)
-    │   └── Heterotroph (Herbivores, Carnivores, Detritivores)
-```
-
-- **`IThermodynamicSystem`**: Enforces `get_energy_stock()` and `dissipate_heat(joules)`.
-- **`IMaterialPool`**: Governs atomic mass transfer respecting stoichiometry and conservation laws.
-- **`TrophicMonad`**: Wraps state transitions in a deterministic pipeline container, ensuring step-wise execution of primary production, grazing, and thermal dissipation.
+### Issue #2602: Detritivore Decomposer Pool Handler
+* **Description:** Implement a `Detritivore` heterotroph class in `src/biology/detritivore.ts` that consumes mass directly from the `SoilMatrix` detritus pools rather than grazing live autotrophs.
+* **Acceptance Criteria:** Unit tests showing soil carbon recycling back into inorganic carbon components.
 
 ---
 
-## 3. Good First Issues for External Contributors
+## 3. Extension Points: Building Custom Monads & WebGL Shaders
 
-If you are looking for a place to start contributing during Sprint 026, take a look at these well-defined tasks:
-
-### Issue 01: Implement Detritivore Decomposer Monad
-- **Scope:** Create a new `Detritivore` class extending `Heterotroph` that consumes organic waste and dead biomass from `SoilMatrix`.
-- **File Target:** `src/core/organisms/Detritivore.ts`
-- **Acceptance Criteria:** Must return mineralized nitrogen and carbon back to the soil matrix while accounting for Second Law metabolic heat loss.
-
-### Issue 02: Stochastic Solar Flux Generator
-- **Scope:** Implement a weather fluctuation wrapper around `SolarSource` that simulates diurnal cycles and cloud cover variability.
-- **File Target:** `src/core/abiotic/SolarSource.ts`
-- **Acceptance Criteria:** Solar flux must vary sinusoidally over time without violating total energy conservation checks.
-
----
-
-## 4. Extension Points: Building New Monads & WebGL Shaders
-
-### A. Creating a Custom Monad
-To create a new organism or environmental monad, implement the `Organism` base class or `IMaterialPool` interface. Here is an architectural skeleton in TypeScript:
+### Extending Monads (`src/thermodynamics/`)
+To introduce a new thermodynamic actor (e.g., an Apex Predator or Chemosynthetic Organism):
+1. Inherit from the abstract base class `Organism`.
+2. Implement the required interface contracts: `IThermodynamicSystem` and `IMaterialPool`.
+3. Ensure all energy expenditures call `dissipate_heat(joules)` to satisfy the Second Law ($\Delta S \ge 0$).
 
 ```typescript
-import { Organism, IMaterialPool } from '../core/thermodynamics/BaseMonad';
+import { Organism, IMaterialPool } from '../thermodynamics/state_vector';
 
-export class C4Plant extends Organism {
-  constructor(biomass: number, energy: number) {
-    super(biomass, energy);
-  }
-
+export class ApexPredator extends Organism {
   public metabolize(deltaTime: number): number {
-    const basalCost = this.biomass * 0.0008 * deltaTime;
+    const basalCost = this.biomass * 0.0015 * deltaTime;
     const heatLoss = Math.min(this.energy, basalCost);
     this.dissipate_heat(heatLoss);
     return heatLoss;
   }
-
+  
   public ingest(source: IMaterialPool, energyAmount: number): [number, number] {
-    // Autotrophs rely on solar flux rather than ingestion
-    return [0, 0];
+    // Custom carnivorous assimilation logic
+    return [energyAmount * 0.85, energyAmount * 0.15];
   }
 }
 ```
 
-### B. Authoring WebGL Shaders for Thermal & Energy Visualization
-To render real-time thermodynamic dissipation and trophic energy flow:
-1. Register your shader programs in `src/rendering/shaders/`.
-2. Pass system entropy and thermal sink uniforms from the `TrophicMonadState` tick loop to the WebGL rendering context:
-
-```typescript
-// Example uniform binding in renderer loop
-gl.uniform1f(shaderProgram.uniformLocations.thermalSink, state.soil.thermal_sink);
-gl.uniform1f(shaderProgram.uniformLocations.systemEntropy, state.totalSystemEnergy);
-```
+### Extending WebGL Shaders (`src/rendering/shaders/`)
+To visualize thermal radiation and heat dissipation across the simulation grid:
+1. Write custom GLSL fragment shaders in `src/rendering/shaders/thermal_frag.glsl`.
+2. Bind the `thermal_sink` and environmental temperature vectors from the `SoilMatrix` state vector to uniform locations.
+3. Test rendering pipelines via `npx tsx tests/rendering.test.ts`.
 
 ---
-
-## 5. Submitting Pull Requests
-
-1. Create a feature branch: `git checkout -b feature/my-new-monad`
-2. Run your tests locally using `npx tsx tests/sprint_026.test.ts` to verify mass-balance invariants.
-3. Open a Pull Request against `main` following our PR template and linking your corresponding GitHub issue. 
-
-Happy coding, and welcome to the Web of Life open-source community!
+Happy coding, and welcome to modeling thermodynamic life!

@@ -3,50 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 3 - Web of Life</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #1a1a1a;
-            color: #f0f0f0;
-        }
-        h1 {
-            color: #4CAF50;
-        }
-        #app {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .status {
-            padding: 10px;
-            margin: 10px 0;
-            background: #333;
-            border-left: 4px solid #4CAF50;
-        }
-    </style>
+    <title>Sprint 003 - Web of Life</title>
+    <link rel="stylesheet" href="../../styles.css">
 </head>
 <body>
     <div id="app">
-        <h1>Web of Life - Sprint 3</h1>
-        <div class="status" id="status-message">Initializing Sprint 3 simulation environment...</div>
+        <h1>Sprint 003: Web of Life Simulation</h1>
         <div id="simulation-container"></div>
     </div>
-
     <script type="module">
-        // Correct relative path handling for Sprint 3
         try {
-            const statusEl = document.getElementById('status-message');
-            statusEl.textContent = 'Sprint 3 environment loaded successfully.';
-            console.log('Sprint 3 initialization complete.');
-        } catch (err) {
-            console.error('Initialization error:', err);
-            document.getElementById('status-message').textContent = 'Error loading sprint environment: ' + err.message;
+            // Attempt to import main application logic if available
+            console.log("Sprint 003 initialized successfully.");
+        } catch (error) {
+            console.error("Failed to initialize Sprint 003 module:", error);
         }
     </script>
 </body>

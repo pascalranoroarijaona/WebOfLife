@@ -3,57 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 011 - Web of Life</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-            margin: 0;
-            padding: 2rem;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #1e293b;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-        }
-        h1 { color: #38bdf8; margin-top: 0; }
-        .status {
-            padding: 0.75rem 1rem;
-            background: #065f46;
-            color: #a7f3d0;
-            border-radius: 4px;
-            margin-top: 1rem;
-        }
-    </style>
+    <title>Sprint 11 - Web of Life</title>
+    <link rel="stylesheet" href="../../../src/styles/main.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Sprint 011: Web of Life</h1>
-        <p>Client-side console debugger operational. All modules loaded successfully.</p>
-        <div id="status" class="status">System Status: Operational</div>
+    <div id="app">
+        <h1>Web of Life - Sprint 11</h1>
+        <div id="simulation-container"></div>
     </div>
-
     <script type="module">
-        try {
-            console.log("Sprint 011 initialization starting...");
-            // Verify environment and modules load cleanly without net::ERR_FAILED
-            const statusEl = document.getElementById('status');
-            if (statusEl) {
-                statusEl.textContent = "System Status: All modules loaded successfully.";
+        import { initSprint11 } from '../../../src/sprints/sprint_11/main.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('simulation-container');
+            if (container) {
+                initSprint11(container);
             }
-        } catch (err) {
-            console.error("Initialization error:", err);
-            const statusEl = document.getElementById('status');
-            if (statusEl) {
-                statusEl.style.background = "#991b1b";
-                statusEl.style.color = "#fecaca";
-                statusEl.textContent = "System Status: Error - " + err.message;
-            }
-        }
+        });
     </script>
 </body>
 </html>

@@ -1,176 +1,113 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 17: Ecosystem Dynamics & Evolution - Web of Life</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        wol: {
-                            bg: '#0B0F19',
-                            card: '#1F2937',
-                            accent: '#10B981',
-                            secondary: '#3B82F6'
-                        }
-                    }
-                }
+    <title>Sprint 17 - Web of Life</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0b0f19;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow: hidden;
+        }
+        #app {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #canvas-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 1.25rem;
+            color: #38bdf8;
+        }
+        p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+    </style>
+    <!-- Import Map for ES Modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
         }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.02); }
-        }
-        .animate-pulse-slow {
-            animation: pulse-slow 4s infinite ease-in-out;
-        }
-    </style>
 </head>
-<body class="bg-wol-bg text-gray-100 font-sans antialiased min-h-screen flex flex-col justify-between">
-    <!-- Header -->
-    <header class="border-b border-gray-800 bg-wol-card/50 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 text-emerald-400">
-                    <i class="fa-solid fa-seedling text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg tracking-wide">Web of Life</h1>
-                    <p class="text-xs text-gray-400">Sprint 17: Ecosystem Dynamics & Evolution</p>
-                </div>
-            </div>
-            <nav class="flex items-center space-x-4">
-                <a href="../../../index.html" class="text-sm text-gray-400 hover:text-emerald-400 transition">
-                    <i class="fa-solid fa-house mr-1"></i> Main Dashboard
-                </a>
-                <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-500/30">
-                    Sprint 17 Complete
-                </span>
-            </nav>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-        <!-- Hero Section -->
-        <div class="mb-10 text-center max-w-3xl mx-auto">
-            <h2 class="text-3xl font-extrabold mb-4 bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
-                Ecosystem Evolution & Trait Adaptation
-            </h2>
-            <p class="text-gray-400 text-sm md:text-base leading-relaxed">
-                Sprint 17 introduces advanced ecosystem dynamics, tracking trait mutations, adaptation pressures, 
-                and evolutionary resilience across simulated species webs.
-            </p>
-        </div>
-
-        <!-- Interactive Simulation Preview Card -->
-        <div class="bg-wol-card rounded-xl border border-gray-800 p-6 shadow-xl mb-10 animate-pulse-slow">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-gray-700">
-                <div>
-                    <h3 class="text-xl font-bold text-emerald-400 flex items-center">
-                        <i class="fa-solid fa-dna mr-2"></i> Evolutionary Trait Matrix
-                    </h3>
-                    <p class="text-xs text-gray-400 mt-1">Real-time simulation of phenotypic drift and environmental adaptation.</p>
-                </div>
-                <div class="mt-4 md:mt-0 flex space-x-2">
-                    <button id="sim-toggle" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow transition flex items-center">
-                        <i class="fa-solid fa-play mr-1.5" id="sim-icon"></i> <span id="sim-text">Start Simulation</span>
-                    </button>
-                    <button id="sim-reset" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold rounded-lg transition">
-                        <i class="fa-solid fa-rotate-right"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Simulation Canvas / Visualizer -->
-            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800 h-64 flex flex-col justify-center items-center relative overflow-hidden">
-                <div id="sim-nodes" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <!-- Dynamic nodes rendered via inline script -->
-                </div>
-                <div class="text-center z-10">
-                    <div class="inline-block p-3 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-2">
-                        <i class="fa-solid fa-chart-line text-2xl"></i>
-                    </div>
-                    <p id="sim-status" class="text-sm font-medium text-gray-300">Simulation Ready: Press Start to begin evolutionary cycle.</p>
-                    <p class="text-xs text-gray-500 mt-1">Generations Processed: <span id="gen-count" class="text-emerald-400 font-mono">0</span></p>
-                </div>
+<body>
+    <div id="app">
+        <div id="canvas-container">
+            <div class="ui-overlay">
+                <h1>Sprint 17: Web of Life</h1>
+                <p>Initializing simulation environment...</p>
             </div>
         </div>
+    </div>
 
-        <!-- Feature Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <div class="bg-wol-card rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition">
-                <div class="text-emerald-400 mb-3"><i class="fa-solid fa-shield-halved text-xl"></i></div>
-                <h4 class="font-bold text-white mb-2">Resilience Metrics</h4>
-                <p class="text-xs text-gray-400 leading-relaxed">Quantify food web stability against sudden climate shocks and extinction events.</p>
-            </div>
-            <div class="bg-wol-card rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition">
-                <div class="text-blue-400 mb-3"><i class="fa-solid fa-code-branch text-xl"></i></div>
-                <h4 class="font-bold text-white mb-2">Speciation Trees</h4>
-                <p class="text-xs text-gray-400 leading-relaxed">Visualizing phylogenetic divergence branching out from ancestral nodes.</p>
-            </div>
-            <div class="bg-wol-card rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition">
-                <div class="text-purple-400 mb-3"><i class="fa-solid fa-sliders text-xl"></i></div>
-                <h4 class="font-bold text-white mb-2">Mutation Controls</h4>
-                <p class="text-xs text-gray-400 leading-relaxed">Fine-tune mutation rate, selection pressure, and resource scarcity coefficients.</p>
-            </div>
-        </div>
-    </main>
+    <script type="module">
+        import * as THREE from 'three';
 
-    <!-- Footer -->
-    <footer class="border-t border-gray-800 py-6 text-center text-xs text-gray-500 bg-wol-card/30">
-        <p>&copy; Web of Life Project. Sprint 17 Ecosystem Dynamics.</p>
-    </footer>
+        // Basic robust fallback initialization if bundle fails to load
+        try {
+            const container = document.getElementById('canvas-container');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
 
-    <!-- Safe Inline Script to prevent 404 resource errors and drive interactivity -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const toggleBtn = document.getElementById('sim-toggle');
-            const simIcon = document.getElementById('sim-icon');
-            const simText = document.getElementById('sim-text');
-            const simStatus = document.getElementById('sim-status');
-            const genCountEl = document.getElementById('gen-count');
-            const resetBtn = document.getElementById('sim-reset');
+            const geometry = new THREE.BoxGeometry();
+            const material = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
+            const cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
 
-            let isRunning = false;
-            let generation = 0;
-            let interval = null;
+            camera.position.z = 5;
 
-            toggleBtn.addEventListener('click', () => {
-                isRunning = !isRunning;
-                if (isRunning) {
-                    simIcon.className = 'fa-solid fa-pause mr-1.5';
-                    simText.textContent = 'Pause Simulation';
-                    simStatus.textContent = 'Evolutionary pressures active. Mutations propagating...';
-                    interval = setInterval(() => {
-                        generation++;
-                        genCountEl.textContent = generation;
-                    }, 800);
-                } else {
-                    simIcon.className = 'fa-solid fa-play mr-1.5';
-                    simText.textContent = 'Resume Simulation';
-                    simStatus.textContent = 'Simulation paused.';
-                    clearInterval(interval);
-                }
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
             });
 
-            resetBtn.addEventListener('click', () => {
-                isRunning = false;
-                clearInterval(interval);
-                generation = 0;
-                genCountEl.textContent = generation;
-                simIcon.className = 'fa-solid fa-play mr-1.5';
-                simText.textContent = 'Start Simulation';
-                simStatus.textContent = 'Simulation reset. Ready to begin.';
-            });
-        });
+            function animate() {
+                requestAnimationFrame(animate);
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            document.querySelector('.ui-overlay p').textContent = 'Simulation running successfully.';
+        } catch (err) {
+            console.error('Sprint 17 initialization error:', err);
+            document.querySelector('.ui-overlay p').textContent = 'Error loading simulation.';
+        }
     </script>
 </body>
 </html>

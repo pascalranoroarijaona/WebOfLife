@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 6%
-SPRINT_GOAL: Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
+Roadmap Completion: 7%
+SPRINT_GOAL: Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
 
 ## Web of Life Master Backlog
 
@@ -214,7 +214,7 @@ SPRINT_GOAL: Thermodynamic State Vector Interface Contracts (`src/thermodynamics
 - [x] Abstract `ThermodynamicStructure` class hierarchy. (`src/thermodynamics/thermodynamic_structure.ts`, `src/earth_pod.ts`)
 - [x] Executable monad methods and stock-and-flow ledger. (`src/earth_pod.ts`, `src/cycles/base_cycle.ts`)
 - [x] Biogeochemical `CyclePOD` instances (Carbon, Water, Nitrogen, Phosphorus). (`src/cycles/carbon.ts`, `src/cycles/water.ts`, `src/cycles/nitrogen.ts`, `src/cycles/phosphorus.ts`)
-- [ ] Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
+- [x] Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
 - [ ] Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
 - [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper functions that assert required property existence and non-negative entropy fields prior to monad step executions.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.

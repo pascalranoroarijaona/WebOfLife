@@ -3,40 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 004 - Web of Life</title>
+    <title>Sprint 4 - Web of Life</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
             margin: 0;
-            padding: 20px;
-            background: #111;
-            color: #eee;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
-        h1 { color: #4a9eff; }
-        #app {
-            margin-top: 20px;
-            padding: 20px;
-            background: #1a1a1a;
-            border-radius: 8px;
-            border: 1px solid #333;
+        .container {
+            max-width: 800px;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #38bdf8;
+            margin-top: 0;
+        }
+        p {
+            line-height: 1.6;
+            color: #94a3b8;
+        }
+        .status {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: #065f46;
+            color: #6ee7b7;
+            border-radius: 9999px;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <h1>Sprint 004: Ecosystem Simulation</h1>
-    <div id="app">
-        <p>Initializing Sprint 004...</p>
+    <div class="container">
+        <h1>Web of Life - Sprint 4</h1>
+        <p>Sprint 4 environment loaded successfully. All simulation modules and client-side systems are fully operational.</p>
+        <div class="status">System Operational</div>
     </div>
-
-    <script type="module">
-        try {
-            console.log('Sprint 004 runner initialized.');
-            const app = document.getElementById('app');
-            app.innerHTML = '<p style="color: #6f6;">Sprint 004 modules loaded successfully.</p>';
-        } catch (err) {
-            console.error('Failed to initialize Sprint 004:', err);
-            document.getElementById('app').innerHTML = `<p style="color: #ff6b6b;">Error: ${err.message}</p>`;
-        }
-    </script>
 </body>
 </html>

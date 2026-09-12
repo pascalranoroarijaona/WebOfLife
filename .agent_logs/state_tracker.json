@@ -1,5 +1,5 @@
 {
-  "current_sprint": 26,
+  "current_sprint": 27,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -125,6 +125,11 @@
       "sprint": 25,
       "goal": "Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux array structures.",
       "timestamp": "2026-09-12T10:50:26.984840+00:00"
+    },
+    {
+      "sprint": 26,
+      "goal": "Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\\text{ K}$) and zeroed flux records.",
+      "timestamp": "2026-09-12T11:20:28.842649+00:00"
     }
   ]
 }

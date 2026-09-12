@@ -1,58 +1,287 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 2: Web of Life</title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
+    <title>Sprint 002 - Web of Life Simulation</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            900: '#14532d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #0f172a;
-            color: #f8fafc;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        header {
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 1rem;
-        }
-        h1 { margin: 0 0 0.5rem 0; color: #38bdf8; }
-        p { color: #94a3b8; }
-        #app {
-            background: #1e293b;
-            border-radius: 8px;
-            padding: 20px;
-            min-height: 400px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Web of Life - Sprint 2</h1>
-            <p>Ecosystem Simulation & Network Visualization</p>
-        </header>
-        <main id="app">
-            <div id="simulation-container">Loading Sprint 2 simulation...</div>
-        </main>
-    </div>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
+    <!-- Header / Navigation -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="bg-green-600 text-white p-2 rounded-lg shadow-lg">
+                <i class="fa-solid fa-seedling text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Web of Life</h1>
+                <p class="text-xs text-slate-400">Sprint 002: Ecosystem Simulation Dashboard</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="sim-clock" class="px-3 py-1 bg-slate-800 text-green-400 font-mono text-sm rounded-full border border-slate-700">
+                Day 0 | 00:00
+            </span>
+            <button id="theme-toggle" class="p-2 text-slate-400 hover:text-white transition-colors">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 max-w-[1600px] w-full mx-auto">
+        
+        <!-- Left Panel: Simulation Controls & Stats -->
+        <div class="space-y-6 lg:col-span-1">
+            <!-- Controls Card -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">
+                    <i class="fa-solid fa-sliders mr-2 text-green-500"></i>Simulation Controls
+                </h2>
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                    <button id="btn-play" class="bg-green-600 hover:bg-green-500 text-white font-medium py-2 px-3 rounded-lg transition-all flex items-center justify-center space-x-1 shadow-md shadow-green-900/30">
+                        <i class="fa-solid fa-play text-xs"></i>
+                        <span>Start</span>
+                    </button>
+                    <button id="btn-pause" class="bg-amber-600 hover:bg-amber-500 text-white font-medium py-2 px-3 rounded-lg transition-all flex items-center justify-center space-x-1 shadow-md">
+                        <i class="fa-solid fa-pause text-xs"></i>
+                        <span>Pause</span>
+                    </button>
+                    <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white font-medium py-2 px-3 rounded-lg transition-all flex items-center justify-center space-x-1 shadow-md">
+                        <i class="fa-solid fa-rotate-right text-xs"></i>
+                        <span>Reset</span>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs text-slate-400 mb-1">
+                            <span>Simulation Speed</span>
+                            <span id="speed-val">1x</span>
+                        </div>
+                        <input id="speed-range" type="range" min="1" max="5" value="1" class="w-full accent-green-500 bg-slate-800 rounded-lg appearance-none h-2 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Population Statistics -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">
+                    <i class="fa-solid fa-chart-pie mr-2 text-green-500"></i>Population Metrics
+                </h2>
+                <div id="metrics-container" class="space-y-3">
+                    <div class="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-800">
+                        <span class="text-sm text-slate-300 flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-500 mr-2"></span>Producers
+                        </span>
+                        <span id="count-producers" class="font-mono font-bold text-green-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-800">
+                        <span class="text-sm text-slate-300 flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2"></span>Herbivores
+                        </span>
+                        <span id="count-herbivores" class="font-mono font-bold text-blue-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-800">
+                        <span class="text-sm text-slate-300 flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span>Carnivores
+                        </span>
+                        <span id="count-carnivores" class="font-mono font-bold text-rose-400">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center/Right Panel: Canvas Viewport & Console Log -->
+        <div class="lg:col-span-3 flex flex-col space-y-6">
+            <!-- Canvas Viewport -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex-1 flex flex-col items-center justify-center relative min-h-[500px]">
+                <div class="absolute top-4 left-4 flex items-center space-x-2 text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-lg backdrop-blur border border-slate-700/50">
+                    <i class="fa-solid fa-eye text-green-400"></i>
+                    <span>Ecosystem Viewport (2D Grid)</span>
+                </div>
+                <canvas id="simulation-canvas" class="bg-slate-950 rounded-lg border border-slate-800 shadow-inner w-full max-w-[800px] h-[500px] cursor-crosshair"></canvas>
+            </div>
+
+            <!-- Event Console Log -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        <i class="fa-solid fa-terminal mr-2 text-green-500"></i>Simulation Event Log
+                    </h3>
+                    <button id="btn-clear-log" class="text-xs text-slate-400 hover:text-white transition-colors">Clear</button>
+                </div>
+                <div id="console-log" class="bg-slate-950 rounded-lg p-3 h-32 overflow-y-auto font-mono text-xs text-slate-300 space-y-1 border border-slate-800">
+                    <div class="text-slate-500">[System] Initializing Sprint 002 Ecosystem environment...</div>
+                    <div class="text-green-400">[System] Ready. Click 'Start' to begin simulation.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        Web of Life Ecosystem Simulator &bull; Sprint 002 Release
+    </footer>
+
+    <!-- Application Bootstrap Script -->
     <script type="module">
-        // Fallback or robust module loading to prevent net::ERR_FAILED
-        try {
-            // Attempt to load main application module if present
-            const container = document.getElementById('simulation-container');
-            container.innerHTML = '<p style="color: #4ade80;">Sprint 2 module loaded successfully.</p>';
-        } catch (err) {
-            console.error('Failed to initialize sprint 2 app:', err);
+        // Fallback robust simulation controller if main bundle encounters network failures
+        const canvas = document.getElementById('simulation-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Handle responsive canvas sizing
+        canvas.width = 800;
+        canvas.height = 500;
+
+        let isRunning = false;
+        let day = 0;
+        let time = 0;
+        let speed = 1;
+
+        const entities = [
+            { type: 'producer', x: 200, y: 150, color: '#22c55e', radius: 6 },
+            { type: 'producer', x: 400, y: 300, color: '#22c55e', radius: 6 },
+            { type: 'herbivore', x: 250, y: 200, color: '#3b82f6', radius: 8, energy: 100 },
+            { type: 'carnivore', x: 500, y: 250, color: '#f43f5e', radius: 10, energy: 100 }
+        ];
+
+        function logMessage(msg, colorClass = 'text-slate-300') {
+            const consoleLog = document.getElementById('console-log');
+            const div = document.createElement('div');
+            div.className = colorClass;
+            div.textContent = `[Day ${day}] ${msg}`;
+            consoleLog.appendChild(div);
+            consoleLog.scrollTop = consoleLog.scrollHeight;
         }
+
+        function updateCounts() {
+            document.getElementById('count-producers').textContent = entities.filter(e => e.type === 'producer').length;
+            document.getElementById('count-herbivores').textContent = entities.filter(e => e.type === 'herbivore').length;
+            document.getElementById('count-carnivores').textContent = entities.filter(e => e.type === 'carnivore').length;
+        }
+
+        function render() {
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid lines for visual depth
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Render entities
+            entities.forEach(entity => {
+                ctx.beginPath();
+                ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+                ctx.fillStyle = entity.color;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff22';
+                ctx.stroke();
+                ctx.closePath();
+            });
+        }
+
+        function step() {
+            if (!isRunning) return;
+
+            time += speed;
+            if (time >= 100) {
+                time = 0;
+                day++;
+                logMessage('A new day begins in the ecosystem.', 'text-green-400');
+            }
+
+            // Simple wandering motion
+            entities.forEach(entity => {
+                if (entity.type !== 'producer') {
+                    entity.x += (Math.random() - 0.5) * 2 * speed;
+                    entity.y += (Math.random() - 0.5) * 2 * speed;
+
+                    // Bounds checking
+                    entity.x = Math.max(10, Math.min(canvas.width - 10, entity.x));
+                    entity.y = Math.max(10, Math.min(canvas.height - 10, entity.y));
+                }
+            });
+
+            document.getElementById('sim-clock').textContent = `Day ${day} | ${String(Math.floor(time)).padStart(2, '0')}:00`;
+            updateCounts();
+            render();
+            requestAnimationFrame(step);
+        }
+
+        // Event Listeners
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                logMessage('Simulation started.', 'text-green-400');
+                step();
+            }
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            isRunning = false;
+            logMessage('Simulation paused.', 'text-amber-400');
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            isRunning = false;
+            day = 0;
+            time = 0;
+            document.getElementById('sim-clock').textContent = `Day 0 | 00:00`;
+            logMessage('Simulation reset to initial state.', 'text-rose-400');
+            updateCounts();
+            render();
+        });
+
+        document.getElementById('speed-range').addEventListener('input', (e) => {
+            speed = parseInt(e.target.value, 10);
+            document.getElementById('speed-val').textContent = `${speed}x`;
+        });
+
+        document.getElementById('btn-clear-log').addEventListener('click', () => {
+            document.getElementById('console-log').innerHTML = '<div class="text-slate-500">[System] Log cleared.</div>';
+        });
+
+        // Initial setup
+        updateCounts();
+        render();
     </script>
 </body>
 </html>

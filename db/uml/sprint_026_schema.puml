@@ -1,0 +1,137 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+
+package "Web of Life - Thermodynamics & Trophic Architecture (Sprint 026)" {
+
+    interface IThermodynamicSystem {
+        +get_energy_stock(): float
+        +dissipate_heat(joules: float): void
+    }
+
+    interface IMaterialPool {
+        +transfer_mass(target: IMaterialPool, stoichiometry: Map<string, float>): boolean
+    }
+
+    abstract class Entity {
+        +entity_id: UUID
+        +domain: string
+        +classification: string
+        +name: string
+        +is_active: boolean
+    }
+
+    package "Abiotic Entities" {
+        class SolarSource {
+            +flux_rate: float
+            +emit_exergy(): float
+        }
+
+        class Atmosphere {
+            +gas_composition: Map<string, float>
+            +temperature: float
+        }
+
+        class SoilMatrix {
+            +detritus_pool: float
+            +nutrient_stocks: Map<string, float>
+        }
+    }
+
+    abstract class Organism {
+        +biomass: float
+        +energy: float
+        +entropy_generated: float
+        +assimilation_efficiency: float
+        +{abstract} metabolize(delta_time: float): void
+        +{abstract} ingest(source: IMaterialPool, energy_amount: float): void
+    }
+
+    package "Autotrophs (Primary Producers)" {
+        abstract class Autotroph {
+            +photosynthetic_efficiency: float
+            +fix_carbon(solar_flux: float): void
+        }
+        class C3Plant {
+            +photorespiration_rate: float
+        }
+        class C4Plant {
+            +carbon_concentration_efficiency: float
+        }
+    }
+
+    package "Heterotrophs (Consumers)" {
+        abstract class Heterotroph {
+            +egestion_rate: float
+        }
+        class Herbivore {
+            +graze(producer: Autotroph): void
+        }
+        class Carnivore {
+            +predate(prey: Heterotroph): void
+        }
+        class Detritivore {
+            +decompose(soil: SoilMatrix): void
+        }
+    }
+
+    package "Monad State Containers" {
+        class TrophicMonad {
+            +state_vector_id: UUID
+            +transform_state(transition_func: Lambda): TrophicMonad
+            +verify_conservation_laws(): boolean
+        }
+
+        class ThermodynamicStateVector {
+            +ambient_temperature: float
+            +internal_energy: float
+            +entropy_generated: float
+            +solar_flux_in: float
+            +heat_dissipated: float
+        }
+    }
+
+    package "Blockchain Ledger" {
+        class ThermodynamicBlock {
+            +block_id: UUID
+            +block_height: long
+            +previous_hash: string
+            +current_hash: string
+            +total_system_energy: float
+            +total_system_entropy: float
+        }
+
+        class TrophicMonadTransaction {
+            +transaction_id: UUID
+            +transaction_type: string
+            +energy_transferred: float
+            +entropy_delta: float
+        }
+    }
+
+    Entity <|-- SolarSource
+    Entity <|-- Atmosphere
+    Entity <|-- SoilMatrix
+    Entity <|-- Organism
+
+    IThermodynamicSystem <|.. Organism
+    IMaterialPool <|.. Organism
+    IMaterialPool <|.. SoilMatrix
+    IMaterialPool <|.. Atmosphere
+
+    Organism <|-- Autotroph
+    Organism <|-- Heterotroph
+
+    Autotroph <|-- C3Plant
+    Autotroph <|-- C4Plant
+
+    Heterotroph <|-- Herbivore
+    Heterotroph <|-- Carnivore
+    Heterotroph <|-- Detritivore
+
+    TrophicMonad --> ThermodynamicStateVector : encapsulates
+    ThermodynamicBlock *-- TrophicMonadTransaction : records
+    TrophicMonadTransaction --> TrophicMonad : originates from
+}
+@enduml

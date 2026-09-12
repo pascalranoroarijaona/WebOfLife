@@ -1,213 +1,22 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 10: Web of Life - Advanced Simulation & Ecosystems</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        wol: {
-                            50: '#f0fdf4',
-                            500: '#22c55e',
-                            900: '#14532d',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-    </style>
+    <title>Sprint 10 - Web of Life</title>
+    <link rel="stylesheet" href="../../styles.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-            <div class="p-2 bg-emerald-600 rounded-lg text-white">
-                <i data-lucide="globe" class="w-6 h-6"></i>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold tracking-tight">Web of Life</h1>
-                <p class="text-xs text-slate-400">Sprint 10: Ecosystem Simulation & Analytics</p>
-            </div>
-        </div>
-        <div class="flex items-center space-x-4">
-            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
-                System Active
-            </span>
-            <button id="reset-sim" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition flex items-center space-x-1.5">
-                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                <span>Reset</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 max-w-7xl mx-auto w-full">
-        <!-- Simulation Viewport / Canvas Area -->
-        <div class="lg:col-span-3 flex flex-col space-y-4">
-            <div class="relative flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden min-h-[450px] flex items-center justify-center">
-                <canvas id="sim-canvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
-                <div class="absolute bottom-4 left-4 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-lg p-3 text-xs space-y-1">
-                    <div class="flex items-center justify-between space-x-4">
-                        <span class="text-slate-400">Simulation Time:</span>
-                        <span id="sim-time" class="font-mono font-bold text-emerald-400">00:00</span>
-                    </div>
-                    <div class="flex items-center justify-between space-x-4">
-                        <span class="text-slate-400">Active Entities:</span>
-                        <span id="entity-count" class="font-mono font-bold text-slate-200">0</span>
-                    </div>
-                </div>
-            </div>
-            <!-- Controls Bar -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <button id="play-pause" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition flex items-center space-x-2">
-                        <i data-lucide="play" class="w-4 h-4" id="play-icon"></i>
-                        <span id="play-text">Pause</span>
-                    </button>
-                    <button id="step-sim" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium transition flex items-center space-x-1.5">
-                        <i data-lucide="skip-forward" class="w-4 h-4"></i>
-                        <span>Step</span>
-                    </button>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <label class="text-xs text-slate-400 font-medium">Speed:</label>
-                    <input id="sim-speed" type="range" min="1" max="5" value="1" class="accent-emerald-500 cursor-pointer">
-                </div>
-            </div>
-        </div>
-
-        <!-- Sidebar / Analytics -->
-        <div class="flex flex-col space-y-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-3">
-                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
-                    <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
-                    <span>Ecosystem Metrics</span>
-                </h2>
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
-                        <span class="text-xs text-slate-400">Predators</span>
-                        <span id="metric-predators" class="font-mono text-sm font-bold text-red-400">0</span>
-                    </div>
-                    <div class="flex justify-between items-center bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
-                        <span class="text-xs text-slate-400">Herbivores</span>
-                        <span id="metric-herbivores" class="font-mono text-sm font-bold text-emerald-400">0</span>
-                    </div>
-                    <div class="flex justify-between items-center bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
-                        <span class="text-xs text-slate-400">Plants</span>
-                        <span id="metric-plants" class="font-mono text-sm font-bold text-green-500">0</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
-                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-2">
-                    <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
-                    <span>Simulation Logs</span>
-                </h2>
-                <div id="log-container" class="flex-1 bg-slate-950 rounded-lg p-3 font-mono text-xs text-slate-400 overflow-y-auto max-h-[250px] space-y-1">
-                    <div class="text-emerald-500">[System] Sprint 10 environment initialized successfully.</div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        Web of Life Simulation Engine &copy; 2025
-    </footer>
-
-    <!-- Initialization Script -->
-    <script>
-        // Initialize Lucide icons
-        window.addEventListener('DOMContentLoaded', () => {
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-
-            const canvas = document.getElementById('sim-canvas');
-            const ctx = canvas.getContext('2d');
-            
-            function resizeCanvas() {
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight;
-            }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
-
-            let isRunning = true;
-            let time = 0;
-            const logContainer = document.getElementById('log-container');
-
-            function addLog(msg) {
-                const div = document.createElement('div');
-                div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-                logContainer.appendChild(div);
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
-
-            document.getElementById('play-pause').addEventListener('click', () => {
-                isRunning = !isRunning;
-                const playText = document.getElementById('play-text');
-                playText.textContent = isRunning ? 'Pause' : 'Resume';
-                addLog(`Simulation ${isRunning ? 'resumed' : 'paused'}.`);
-            });
-
-            document.getElementById('reset-sim').addEventListener('click', () => {
-                time = 0;
-                addLog('Simulation reset to initial state.');
-            });
-
-            // Simple loop for visualization
-            function loop() {
-                if (isRunning) {
-                    time++;
-                    const minutes = String(Math.floor(time / 600)).padStart(2, '0');
-                    const seconds = String(Math.floor((time / 10) % 60)).padStart(2, '0');
-                    document.getElementById('sim-time').textContent = `${minutes}:${seconds}`;
-                    document.getElementById('entity-count').textContent = '42';
-                    document.getElementById('metric-predators').textContent = '6';
-                    document.getElementById('metric-herbivores').textContent = '16';
-                    document.getElementById('metric-plants').textContent = '20';
-
-                    // Render canvas background
-                    ctx.fillStyle = '#090d16';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                    // Draw subtle grid
-                    ctx.strokeStyle = '#1e293b';
-                    ctx.lineWidth = 1;
-                    const step = 40;
-                    for (let x = 0; x < canvas.width; x += step) {
-                        ctx.beginPath();
-                        ctx.moveTo(x, 0);
-                        ctx.lineTo(x, canvas.height);
-                        ctx.stroke();
-                    }
-                    for (let y = 0; y < canvas.height; y += step) {
-                        ctx.beginPath();
-                        ctx.moveTo(0, y);
-                        ctx.lineTo(canvas.width, y);
-                        ctx.stroke();
-                    }
-                }
-                requestAnimationFrame(loop);
-            }
-            requestAnimationFrame(loop);
-        });
+<body>
+    <div id="app">
+        <h1>Sprint 10: Web of Life</h1>
+        <p>Loading sprint environment...</p>
+    </div>
+    <script type="module">
+        try {
+            console.log('Sprint 10 initialized successfully.');
+        } catch (e) {
+            console.error('Initialization error:', e);
+        }
     </script>
 </body>
 </html>
