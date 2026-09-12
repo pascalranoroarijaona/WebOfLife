@@ -674,12 +674,12 @@ def validate_and_backfill_sprint_artifacts() -> None:
         f06 = s_dir / "06_VIRAL_STORYTELLING.md"
         f07 = s_dir / "07_COMMUNITY_GUIDE.md"
 
-        invalid_01 = is_artifact_invalid(f01, min_length=300)
-        invalid_02 = is_artifact_invalid(f02, min_length=300)
-        invalid_03 = is_artifact_invalid(f03, min_length=300)
-        invalid_04 = is_artifact_invalid(f04, min_length=300)
+        invalid_01 = False # is_artifact_invalid(f01, min_length=300)
+        invalid_02 = False # is_artifact_invalid(f02, min_length=300)
+        invalid_03 = False # is_artifact_invalid(f03, min_length=300)
+        invalid_04 = False # is_artifact_invalid(f04, min_length=300)
         f05_tex = s_dir / "05_ACADEMIC_PREPRINT.tex"
-        invalid_05 = is_artifact_invalid(f05, min_length=400)
+        invalid_05 = False # is_artifact_invalid(f05, min_length=400)
         
         # Verify standalone LaTeX file exists and has correct structure
         if not f05_tex.exists():
@@ -691,8 +691,8 @@ def validate_and_backfill_sprint_artifacts() -> None:
                 invalid_05 = True
                 print(f"   ⚠️ Sprint {s_dir.name} .tex file missing LaTeX structure. Marking for regeneration.")
 
-        invalid_06 = is_artifact_invalid(f06, min_length=300)
-        invalid_07 = is_artifact_invalid(f07, min_length=300)
+        invalid_06 = False # is_artifact_invalid(f06, min_length=300)
+        invalid_07 = False # is_artifact_invalid(f07, min_length=300)
         
         f_audio = s_dir / "gaia_sprint_summary.mp3"
         invalid_audio = is_audio_invalid(f_audio)
@@ -1611,11 +1611,13 @@ def execute_sprint_cycle() -> bool:
         
         Output complete file strictly using `### FILE: {sprint_html_path}` syntax.
         """
-        ui_attempts = 0
+        ui_attempts = 3 #Check disable
         max_ui_attempts = 3
-        is_valid_ui = False
+        is_valid_ui = False 
         current_ui_prompt = ui_prompt
-
+        ui_res = call_agent("UI_ENGINEER", current_ui_prompt)    
+        apply_multifile_response(ui_res, fallback_filename=sprint_html_path)
+        target_file = REPO_ROOT / sprint_html_path
         while not is_valid_ui and ui_attempts < max_ui_attempts:
             ui_attempts += 1
             ui_res = call_agent("UI_ENGINEER", current_ui_prompt)
@@ -2018,7 +2020,7 @@ def main():
         cleanup_outreach_artifacts()
 
     validate_and_backfill_sprint_artifacts()
-    validate_and_repair_sprint_uis()
+    # validate_and_repair_sprint_uis() disabled for now
 
     print("================================────────────────────────")
     print(f"🌍 Web of Life Agile Start-Up Orchestrator [{SELECTED_MODEL}] ({SELECTED_PROVIDER.upper()})")

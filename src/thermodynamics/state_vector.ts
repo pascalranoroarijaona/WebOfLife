@@ -63,9 +63,12 @@ export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector
   validateSecondLaw(): boolean;
   getEntropyGenerationRate(): number;
   getVectorMetrics(): Record<string, number>;
+  getKeys(): string[];
+  getStock(key: string): number;
+  getEntropy(): number;
 }
 
-export type StateVector = IThermodynamicStateVector;
+export type StateVector = ThermodynamicStateVector;
 
 export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly temperature: number;
@@ -89,7 +92,28 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly solarInput?: number;
   public readonly dissipatedHeat?: number;
 
-  constructor(options?: ThermodynamicStateVectorOptions & { elementalStocks?: Record<string, number> | number[]; temperature?: number }) {
+  constructor(options?: ThermodynamicStateVectorOptions | Map<string, number>) {
+    if (options instanceof Map) {
+      const mapObj = Object.fromEntries(options);
+      this.stocks = mapObj;
+      this.temperature = STANDARD_AMBIENT_TEMPERATURE_K;
+      this.ambientTemperature = this.temperature;
+      this.ambientReferenceTemp = this.temperature;
+      this.fluxes = { solarRadiation: 0, thermalEmission: 0, latentHeat: 0, sensibleHeat: 0 };
+      this.boundaryFluxes = this.fluxes;
+      this.entropy = 0;
+      this.energy = 1000;
+      this.internalEnergy = 1000;
+      this.totalEntropy = 0;
+      this.systemEntropy = 0;
+      this.exergy = 1e5;
+      this.entropyGenerationRate = 0;
+      this.exergyDestructionRate = 0;
+      this.timestamp = 0;
+      this.tick = 0;
+      return;
+    }
+
     this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     this.ambientTemperature = this.temperature;
     this.ambientReferenceTemp = this.temperature;
@@ -194,6 +218,18 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
       entropyGenerationRate: this.entropyGenerationRate,
       exergyDestructionRate: this.exergyDestructionRate
     };
+  }
+
+  public getKeys(): string[] {
+    return Object.keys(this.stocks);
+  }
+
+  public getStock(name: string): number {
+    return this.stocks[name] ?? 0;
+  }
+
+  public getEntropy(): number {
+    return this.entropy;
   }
 
   public static step(

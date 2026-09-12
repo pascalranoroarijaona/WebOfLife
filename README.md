@@ -206,7 +206,7 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 13%
-SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
+SPRINT_GOAL: Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement inventory mass conservation checks verifying stock deltas against boundary flux rates within tolerance bounds.
 
 ## Web of Life Master Backlog
 
@@ -219,13 +219,14 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/th
 - [x] Thermodynamic State Vector Property Validator Helper (`src/thermodynamics/state_validator.ts`): Implement a pure validation function `validateStateProperties(state)` that checks for the presence and validity of required thermodynamic properties (`energy`, `entropy`, `temperature`, `stocks`) without throwing errors.
 - [x] Thermodynamic State Vector Non-Negative Entropy Assertion Utility (`src/thermodynamics/state_validator.ts`): Implement a pure helper function `assertNonNegativeEntropy(state)` that inspects state objects and returns a Result object instead of throwing.
 - [x] Thermodynamic State Vector Non-Negative Entropy Exception Guard (`src/thermodynamics/state_validator.ts`): Implement a strict assertion wrapper `validateOrThrowEntropy(state)` that triggers a `ThermodynamicEntropyViolationError` if $\dot{S}_{\text{gen}} < 0$.
-- [ ] Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
+- [x] Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
 - [ ] Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement inventory mass conservation checks verifying stock deltas against boundary flux rates within tolerance bounds.
 - [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper wrapper function that integrates property checks, entropy assertions, and stock conservation validators for monad step executions.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
 - [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
 - [ ] Prigogine Minimum Entropy Production Monad (`src/thermodynamics/dissipative_stability.ts`): Create an analytic monad method that tracks temporal changes in internal entropy generation ($\frac{d\dot{S}_{\text{gen}}}{dt}$), evaluating whether regional subsystems are relaxing toward Prigogine’s minimum entropy production state or sliding toward bifurcation/collapse.
+- [ ] H3 Spatial Index Types (`src/spatial/h3_types.ts`): Define strict TypeScript interfaces for H3 cell addresses, resolution tiers (res 3–4 for global macro-cells), and lat/lon coordinate mappings.
 - [ ] Uber H3 Spatial Index Layer (`src/spatial/h3_grid.ts`): Implement a binding module that initializes base resolution global cell indices, handles parent/child cell indexing lookups, and translates lat/lon coordinates into valid H3 cell addresses for monad spatial anchoring.
 - [ ] Explicit H3 K-Ring Adjacency Matrix Builder (`src/spatial/h3_topology.ts`): Implement a sparse adjacency matrix generator that computes $k$-ring neighborhoods (where $k \in \{1, 2\}$) for any active set of H3 indices, mapping them to matrix row/column coordinates for gradient calculations across hexagonal boundaries.
 - [ ] Vectorized H3 Tensor Flux Router (`src/spatial/h3_tensor_routing.ts`): Build a tensor routing engine that executes sparse matrix multiplications ($\mathbf{J}_{\text{spatial}} = \mathbf{D} \cdot \nabla \mathbf{C}$) to simulate advection, diffusion, and runoff between adjacent hexagonal cells based on elevation and pressure gradients.
@@ -241,19 +242,24 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/th
 - [ ] Cryospheric Local Melting Flux Methods (`src/thermodynamics/cryosphere_coupling.ts`): Build local melting flux methods that translate net incoming shortwave radiation spikes into volumetric ice-melt stocks within high-latitude H3 cells.
 
 ### Phase 2 — Biosphere Stoichiometry, Mycorrhizae & Trophic Networks (Pending)
+- [ ] Unified Biological State Interface (`src/biosphere/biosphere_types.ts`): Formalize base TypeScript types extending `ThermodynamicStructure` to enforce mandatory fields for dry-weight biomass ($M_{\text{bio}}$), elemental pools ($C:N:P$), metabolic heat dissipation ($\dot{Q}$), and internal entropy generation ($\dot{S}_{\text{gen}}$).
+- [ ] Stoichiometric Conservation Guard (`src/biosphere/stoichiometry_validator.ts`): Validation pipeline middleware intercepting trophic consumption and nutrient uptake transactions to ensure atomic mass conservation ($\sum \Delta \text{Elements} = 0$).
+- [ ] Spatial H3 Biosphere Indexer (`src/spatial/biosphere_spatial_bridge.ts`): Spatial mapping utilities binding `GeoBiomePOD` instances and `SpeciesPOD` populations to Uber H3 hexagonal grid cells.
 - [ ] Stoichiometric Ratio Configuration Interface (`src/biosphere/stoichiometric_types.ts`): Define strict TypeScript interfaces for fixed Redfield ratio parameters ($C:N:P = 106:16:1$), homeostatic regulation coefficients ($h$), and maximum elemental storage capacities.
 - [ ] Liebig Multi-Factor Limiting Function (`src/biosphere/liebig_constraints.ts`): Code a multiplicative multiplier function: $\mu = \min\left(\frac{N}{K_N + N}, \frac{P}{K_P + P}, \frac{I}{K_I + I}, \frac{W}{K_W + W}\right)$ governing NPP across H3 cells.
 - [ ] Carbon Overflow Respiration & Exudation Routing (`src/biosphere/carbon_overflow.ts`): Code carbon overflow respiration and DOC exudation routines for autotroph monads when nitrogen or phosphorus drops below strict stoichiometric thresholds.
 - [ ] Elemental Stoichiometric Fixed-Ratio Bounds (`src/biosphere/stoichiometric_cycling.ts`): Implement nutrient limitation bottlenecks on net primary productivity (NPP) based on available inorganic stocks.
+- [ ] Stoichiometric Homeostasis Matrix (`src/biosphere/stoichiometric_homeostasis.ts`): Implement strict elemental ratio balancing ($C:N:P$) with homeostatic regulation coefficients ($h$) that dictate excess nutrient excretion or carbon overflow respiration.
 - [ ] Mycorrhizal Mycelial Network Contracts (`src/biosphere/mycorrhizal/mycorrhizal_types.ts`): Define fungal mycelial network contracts, including hyphal carbon storage stocks, phosphorus/nitrogen mineral transport capacity, and osmotic exchange rates.
+- [ ] Hyphal Carbon Allocation Matrix (`src/biosphere/mycorrhizal/hyphal_allocation.ts`): Implement source-sink dynamics allocating photosynthetic carbon stocks from autotroph root zones to fungal networks proportional to transfer efficiency.
 - [ ] Subterranean Mycorrhizal Token Broker Monad (`src/biosphere/mycorrhizal/mycorrhizal_network_monad.ts`): Create a `MycorrhizalNetworkMonad` class extending `ThermodynamicStructure` acting as a localized token broker between `GeoBiomePOD` root zones and fungal mycelial pools.
-- [ ] Osmotic Concentration Gradient Diffusion (`src/biosphere/mycorrhizal/mycorrhizal_diffusion.ts`): Add spatial diffusion methods allowing mycorrhizal networks to shuttle nutrients across adjacent H3 hexagonal nodes based on osmotic and concentration gradients.
-- [ ] Holling Type II Functional Response Calculator (`src/biosphere/food_web/holling_response.ts`): Map predator-prey consumption rates to handling times and resource densities.
-- [ ] Multi-Trophic Jacobian Stability & Food Web Matrix (`src/biosphere/food_web/jacobian_stability.ts`): Construct an $N \times N$ consumer-resource interaction matrix assembling autotrophs, herbivores, and carnivores, evaluating Jacobian eigenvalues ($\text{Re}(\lambda_{\max}) < 0$) to trigger state-shift warnings.
+- [ ] Osmotic Concentration Gradient Diffusion (`src/biosphere/mycorrhizal/mycorrhizal_diffusion.ts`, `src/biosphere/mycorrhizal/osmotic_shuttle.ts`): Add spatial diffusion methods allowing mycorrhizal networks to shuttle nutrients across adjacent H3 hexagonal nodes based on osmotic and concentration gradients.
+- [ ] Holling Type II Functional Response Calculator (`src/biosphere/food_web/holling_response.ts`, `src/biosphere/food_web/holling_type2.ts`): Map predator-prey consumption rates to handling times and resource densities.
+- [ ] Multi-Trophic Jacobian Stability & Food Web Matrix (`src/biosphere/food_web/jacobian_stability.ts`, `src/biosphere/food_web/jacobian_eigen.ts`): Construct an $N \times N$ consumer-resource interaction matrix assembling autotrophs, herbivores, and carnivores, evaluating Jacobian eigenvalues ($\text{Re}(\lambda_{\max}) < 0$) to trigger state-shift warnings.
 - [ ] Continuous Multi-Trait Vector Definitions (`src/biosphere/traits/trait_types.ts`): Define continuous trait vector types including Specific Leaf Area (SLA), root depth, seed mass, and thermal tolerance limits.
 - [ ] Environmental Trait Filtering Filter (`src/biosphere/traits/environmental_filter.ts`): Implement multi-variate distance filters matching local H3 cell stress arrays against species trait envelopes to compute survival probabilities.
-- [ ] Vapor Pressure Deficit (VPD) Threshold Calculator (`src/biosphere/succession/vapor_pressure_deficit.ts`): Calculate VPD thresholds and drought stress indices from temperature and relative humidity stocks across H3 cells.
-- [ ] Stochastic Markovian Succession Matrices (`src/biosphere/succession/transition_matrix.ts`): Implement stochastic Markovian state-transition matrices governing post-wildfire and drought recovery paths (grassland $\rightarrow$ shrubland $\rightarrow$ climax forest).
+- [ ] Vapor Pressure Deficit (VPD) Threshold Calculator (`src/biosphere/succession/vapor_pressure_deficit.ts`, `src/biosphere/succession/vpd_stress.ts`): Calculate VPD thresholds and drought stress indices from temperature and relative humidity stocks across H3 cells.
+- [ ] Stochastic Markovian Succession Matrices (`src/biosphere/succession/transition_matrix.ts`, `src/biosphere/succession/markov_transitions.ts`): Implement stochastic Markovian state-transition matrices governing post-wildfire and drought recovery paths (grassland $\rightarrow$ shrubland $\rightarrow$ climax forest).
 - [ ] Automated Taxonomic Ingestion Parser (`src/biosphere/taxonomic_harvester.ts`): Lightweight JSON parser mapping GBIF/NCBI hierarchical taxa directly to typed `SpeciesPOD` base attributes.
 - [ ] Age/Stage-Structured Leslie Population Matrices (`src/biosphere/iucn/leslie_matrix.ts`): Build age and stage-structured Leslie matrix population models for `SpeciesPOD` instances tracking vital rates.
 - [ ] IUCN Red List Population Viability Thresholds (`src/biosphere/iucn_thresholds.ts`): Integrate IUCN Red List extinction risk thresholds and population decline velocities as dynamic extinction-risk flags within monad state vectors.
@@ -265,7 +271,7 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/th
 
 ### Phase 3 — Technosphere Industrial Metabolism & Geochemical Extraction (Pending)
 - [ ] Technosphere Interface Contracts & Industrial Flux Vectors (`src/technosphere/types.ts`): Strict typing for industrial flux vectors ($\mathbf{J}_{\text{tech}}$), parasitic load coefficients, and embodied carbon indices.
-- [ ] Ecoinvent-Style Process Dependency Parser (`src/technosphere/ecoinvent_parser.ts`): Build a JSON/CSV matrix parser to ingest ecoinvent-style process interdependency coefficients.
+- [ ] Ecoinvent-Style Process Dependency Parser (`src/technosphere/ecoinvent_parser.ts`)
 - [ ] Ecoinvent Parser Dataset Ingestion Module (`src/technosphere/ecoinvent/parser.ts`): Ingest JSON-serialized unit process datasets.
 - [ ] Ecoinvent Technology Matrix Builder (`src/technosphere/ecoinvent/matrix_builder.ts`): Construct the technology matrix $A$ and final demand vector $y$.
 - [ ] Leontief Input-Output Technology Matrix Solver (`src/technosphere/leontief_solver.ts`): Implement sparse matrix inversion algorithms $x = (I - A)^{-1} y$ to compute cradle-to-gate embodied carbon and exergy intensity vectors dynamically.
@@ -326,6 +332,14 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/th
 - [ ] Deterministic State Consensus Function (`src/ledger/poew_validator.ts`): Write a deterministic consensus function that ingests transactional state deltas and validates both First Law mass conservation ($\sum \Delta \text{Stock} = 0 \pm 10^{-6}$) and Second Law non-negative entropy generation ($\dot{S}_{\text{gen}} \ge 0$).
 - [ ] Vortex Block Generator & Hasher (`src/ledger/block_generator.ts`): Group validated transactions into a `ThermodynamicBlock`, hashing the entire Earth state vector combined with the previous block's hash to ensure temporal immutability.
 - [ ] SQLite Append-Only Immutable Ledger (`db/schema.sql`, `src/ledger/sqlite_ledger.ts`): Persist the validated blocks into a local SQLite database, creating a permanent, auditable cryptographic history of the planetary simulation.
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
 
 <!-- BACKLOG_END -->
 

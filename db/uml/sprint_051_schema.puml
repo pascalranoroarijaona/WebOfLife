@@ -1,0 +1,61 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics Core" {
+  class ThermodynamicStructure {
+    +structureId: string
+    +metadata: Map<string, any>
+  }
+
+  class StateVector {
+    -stocks: Map<string, number>
+    +getKeys(): Set<string>
+    +getStock(key: string): number | undefined
+    +setStock(key: string, value: number): void
+  }
+
+  class ThermodynamicMonad {
+    +monadId: string
+    +executeCycle(dt: number): void
+  }
+
+  class ThermodynamicStateValidator {
+    -defaultTolerance: number
+    +assertConservation(previousState: StateVector, currentState: StateVector, boundary: FluxBoundary, deltaTime: number, tolerances?: Map<string, number>): ValidationResult
+  }
+}
+
+package "Types & Interfaces" {
+  interface FluxBoundary {
+    +netFluxes: Map<string, number>
+    +solarInput: number
+    +dissipationRate: number
+  }
+
+  interface ValidationViolation {
+    +stockName: string
+    +observedDelta: number
+    +predictedDelta: number
+    +discrepancy: number
+    +tolerance: number
+  }
+
+  interface ValidationResult {
+    +isValid: boolean
+    +violations: Array<ValidationViolation>
+    +timestamp: number
+  }
+
+  interface IStateValidator {
+    +assertConservation(previousState: StateVector, currentState: StateVector, boundary: FluxBoundary, deltaTime: number, tolerances?: Map<string, number>): ValidationResult
+  }
+}
+
+ThermodynamicStructure *-- StateVector : composition
+ThermodynamicMonad --> StateVector : manipulates
+ThermodynamicMonad --> FluxBoundary : evaluates
+ThermodynamicStateValidator ..|> IStateValidator : implements
+ThermodynamicStateValidator --> ValidationResult : produces
+ValidationResult *-- ValidationViolation : contains
+
+@enduml

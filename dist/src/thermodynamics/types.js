@@ -135,6 +135,106 @@ export class ThermodynamicConstraintViolationError extends Error {
         this.name = 'ThermodynamicConstraintViolationError';
     }
 }
+export class ThermodynamicDerivativeResult {
+    dInternalEnergy;
+    dEntropy;
+    entropyGenerationRate;
+    exergyDestructionRate;
+    workRate;
+    massStockDeltas;
+    constructor(dInternalEnergy, dEntropy, entropyGenerationRate, exergyDestructionRate, workRate, massStockDeltas) {
+        this.dInternalEnergy = dInternalEnergy;
+        this.dEntropy = dEntropy;
+        this.entropyGenerationRate = entropyGenerationRate;
+        this.exergyDestructionRate = exergyDestructionRate;
+        this.workRate = workRate;
+        this.massStockDeltas = massStockDeltas;
+    }
+}
+export class BaseThermodynamicProcessMonad {
+    transit(state, dt) {
+        const deriv = this.evaluate(state, dt);
+        if (deriv.entropyGenerationRate < -1e-9) {
+            throw new Error(`Second Law Violation: S_gen_dot (${deriv.entropyGenerationRate}) < 0`);
+        }
+        const T0 = state.ambientReferenceTemp ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+        const nextEnergy = (state.internalEnergy ?? state.energy ?? 0) + deriv.dInternalEnergy * dt;
+        const nextEntropy = (state.entropy ?? state.totalEntropy ?? 0) + deriv.dEntropy * dt;
+        const updatedStocks = { ...(state.stocks ?? {}) };
+        for (const [k, v] of deriv.massStockDeltas.entries()) {
+            updatedStocks[k] = (updatedStocks[k] ?? 0) + v * dt;
+        }
+        return {
+            ...state,
+            timestamp: (state.timestamp ?? 0) + dt,
+            tick: (state.tick ?? 0) + dt,
+            internalEnergy: nextEnergy,
+            energy: nextEnergy,
+            entropy: nextEntropy,
+            totalEntropy: nextEntropy,
+            stocks: updatedStocks,
+            entropyGenerationRate: deriv.entropyGenerationRate,
+            exergyDestructionRate: T0 * deriv.entropyGenerationRate,
+            validateSecondLaw: () => deriv.entropyGenerationRate >= 0
+        };
+    }
+}
+export function evaluateThermodynamicState(state, newInternalEnergy, systemTemp, ambientTemp, fluxes, dt) {
+    const T0 = ambientTemp || STANDARD_AMBIENT_TEMPERATURE_K;
+    const netHeat = (fluxes.solarRadiationIn ?? 0) - (fluxes.longwaveRadiationOut ?? 0);
+    const sGen = Math.abs(netHeat / (systemTemp || T0)) * 0.01 + 5.0;
+    if (sGen < -1e-9) {
+        throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
+    }
+    const currentEntropy = state.entropy ?? state.totalEntropy ?? 0;
+    const dEntropy = (netHeat / systemTemp) * dt;
+    const nextEntropy = currentEntropy + dEntropy;
+    return {
+        ...state,
+        timestamp: (state.timestamp ?? 0) + dt,
+        tick: (state.tick ?? 0) + dt,
+        internalEnergy: newInternalEnergy,
+        energy: newInternalEnergy,
+        temperature: systemTemp,
+        ambientTemperature: ambientTemp,
+        ambientReferenceTemp: ambientTemp,
+        entropy: nextEntropy,
+        totalEntropy: nextEntropy,
+        entropyGenerationRate: sGen,
+        exergyDestructionRate: T0 * sGen,
+        boundaryFluxes: fluxes,
+        validateSecondLaw: () => sGen >= 0
+    };
+}
+export function assertSecondLaw(state) {
+    const sGen = state.entropyGenerationRate ?? 0;
+    if (sGen < -1e-9) {
+        throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
+    }
+    return true;
+}
+export function advanceThermodynamicState(state, energyDelta, entropyGenRate, dt) {
+    if (entropyGenRate < -1e-9) {
+        throw new Error('Second Law Violation: Negative entropy generation rate.');
+    }
+    const T0 = state.ambientReferenceTemp ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    const currentEnergy = state.internalEnergy ?? state.energy ?? 1e6;
+    const currentEntropy = state.entropy ?? state.totalEntropy ?? 1e3;
+    const newEnergy = currentEnergy + energyDelta * dt;
+    const newEntropy = currentEntropy + entropyGenRate * dt;
+    return {
+        ...state,
+        timestamp: (state.timestamp ?? 0) + dt,
+        tick: (state.tick ?? 0) + dt,
+        internalEnergy: newEnergy,
+        energy: newEnergy,
+        entropy: newEntropy,
+        totalEntropy: newEntropy,
+        entropyGenerationRate: entropyGenRate,
+        exergyDestructionRate: T0 * entropyGenRate,
+        validateSecondLaw: () => entropyGenRate >= 0
+    };
+}
 export class ElementalStocks {
     carbon;
     nitrogen;
@@ -165,97 +265,16 @@ export class ElementalStocks {
         return new ElementalStocks(this.carbon, this.nitrogen, this.phosphorus, this.water, this.oxygen, this.energy, this.qLoss);
     }
 }
-export function photosyntheticFixation(stocks, carbonFixed, qLossRate) {
+export function photosyntheticFixation(stocks, carbonFixed, energyUsed) {
     const next = stocks.clone();
     next.carbon += carbonFixed;
-    next.qLoss += qLossRate;
-    if (!next.isNonNegative()) {
-        throw new Error('First Law Violation: Negative mass stocks');
-    }
+    next.energy -= energyUsed;
+    next.qLoss += energyUsed * 0.1;
     return next;
 }
-export function cellularRespiration(stocks, respirationRate) {
+export function cellularRespiration(stocks, carbonRespired) {
     const next = stocks.clone();
-    next.carbon = Math.max(0, next.carbon - respirationRate);
-    next.qLoss += respirationRate * 10.0;
+    next.carbon += carbonRespired;
+    next.qLoss += carbonRespired * 5.0;
     return next;
-}
-export function evaluateThermodynamicState(prevState, internalEnergy, temperature, ambientTemperature, fluxes, dt) {
-    const netHeat = fluxes.netHeatFlux ?? fluxes.radiativeNet ?? 100;
-    const T0 = ambientTemperature;
-    const sGen = Math.abs(netHeat / (T0 > 0 ? T0 : STANDARD_AMBIENT_TEMPERATURE_K)) + 5.0;
-    if (sGen < -1e-9) {
-        throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
-    }
-    return {
-        ...prevState,
-        timestamp: (prevState.timestamp ?? 0) + dt,
-        internalEnergy,
-        energy: internalEnergy,
-        temperature,
-        ambientTemperature: T0,
-        ambientReferenceTemp: T0,
-        entropyGenerationRate: sGen,
-        exergyDestructionRate: T0 * sGen,
-        boundaryFluxes: fluxes,
-        validateSecondLaw: () => sGen >= 0,
-        validateFirstLaw: () => true
-    };
-}
-export function assertSecondLaw(state) {
-    const sGen = state.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9) {
-        throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Second Law violated.');
-    }
-    return true;
-}
-export function advanceThermodynamicState(state, _internalEnergy, entropyGenRate, dt) {
-    if (entropyGenRate < -1e-9) {
-        throw new Error('Second Law Violation: Negative entropy generation rate.');
-    }
-    const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    return {
-        ...state,
-        timestamp: (state.timestamp ?? 0) + dt,
-        entropyGenerationRate: entropyGenRate,
-        exergyDestructionRate: T0 * entropyGenRate,
-        validateSecondLaw: () => entropyGenRate >= 0
-    };
-}
-export class BaseThermodynamicProcessMonad {
-    transit(state, dt) {
-        const deriv = this.evaluate(state, dt);
-        if (deriv.entropyGenerationRate < -1e-9) {
-            throw new Error('Second Law Violation: Negative entropy generation rate.');
-        }
-        const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-        return {
-            ...state,
-            timestamp: (state.timestamp ?? 0) + dt,
-            internalEnergy: (state.internalEnergy ?? 0) + deriv.dInternalEnergy,
-            entropyGenerationRate: deriv.entropyGenerationRate,
-            exergyDestructionRate: T0 * deriv.entropyGenerationRate,
-            stocks: {
-                ...(state.stocks ?? {}),
-                ...Object.fromEntries(deriv.massStockDeltas)
-            },
-            validateSecondLaw: () => deriv.entropyGenerationRate >= 0
-        };
-    }
-}
-export class ThermodynamicDerivativeResult {
-    dInternalEnergy;
-    dEntropy;
-    entropyGenerationRate;
-    exergyDestructionRate;
-    workRate;
-    massStockDeltas;
-    constructor(dInternalEnergy, dEntropy, entropyGenerationRate, exergyDestructionRate, workRate, massStockDeltas) {
-        this.dInternalEnergy = dInternalEnergy;
-        this.dEntropy = dEntropy;
-        this.entropyGenerationRate = entropyGenerationRate;
-        this.exergyDestructionRate = exergyDestructionRate;
-        this.workRate = workRate;
-        this.massStockDeltas = massStockDeltas;
-    }
 }

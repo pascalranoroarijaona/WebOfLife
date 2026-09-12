@@ -1,63 +1,66 @@
 -- ============================================================================
--- Web of Life: Sprint 050 Database Schema
--- Thermodynamic State Vector Non-Negative Entropy Monad Pipe & Ledger
+-- Web of Life: Thermodynamic State Vector & Conservation Ledger Schema
+-- Sprint 051: Thermodynamic State Vector Stock Conservation Asserter
 -- ============================================================================
 
--- Enable UUID extension if not present
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- 1. Thermodynamic State Vectors Table
--- Stores snapshots of the thermodynamic state of ecological and biochemical pods.
-CREATE TABLE IF NOT EXISTS thermodynamic_states (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL,
-    internal_energy NUMERIC(18, 6) NOT NULL,
-    entropy NUMERIC(18, 6) NOT NULL,
-    temperature NUMERIC(18, 6) NOT NULL,
-    solar_flux NUMERIC(18, 6) DEFAULT 0.000000,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
+    stock_id VARCHAR(64) PRIMARY KEY,
+    stock_name VARCHAR(128) NOT NULL UNIQUE,
+    category VARCHAR(64) NOT NULL, -- e.g., 'ELEMENTAL', 'ENERGETIC', 'ENTROPIC'
+    base_unit VARCHAR(32) NOT NULL,
+    default_tolerance NUMERIC(20, 10) DEFAULT 1e-6,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Index for fast time-series retrieval by pod
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_pod_time 
-ON thermodynamic_states(pod_id, timestamp DESC);
+CREATE TABLE IF NOT EXISTS state_vectors (
+    vector_id VARCHAR(64) PRIMARY KEY,
+    pod_id VARCHAR(64) NOT NULL,
+    timestamp BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
--- 2. Thermodynamic State Transformations & Monad Validations Ledger
--- Records every monadic pipeline execution, including entropy checks, 
--- delta S calculations, validation status, and potential rollbacks.
-CREATE TABLE IF NOT EXISTS thermodynamic_transformations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    initial_state_id UUID NOT NULL REFERENCES thermodynamic_states(id) ON DELETE CASCADE,
-    candidate_state_id UUID NOT NULL REFERENCES thermodynamic_states(id) ON DELETE CASCADE,
-    result_state_id UUID NOT NULL REFERENCES thermodynamic_states(id) ON DELETE CASCADE,
-    delta_entropy NUMERIC(18, 6) NOT NULL,
-    solar_input NUMERIC(18, 6) NOT NULL,
+CREATE TABLE IF NOT EXISTS state_vector_components (
+    vector_id VARCHAR(64) REFERENCES state_vectors(vector_id) ON DELETE CASCADE,
+    stock_id VARCHAR(64) REFERENCES thermodynamic_stocks(stock_id),
+    stock_value NUMERIC(30, 12) NOT NULL,
+    PRIMARY KEY (vector_id, stock_id)
+);
+
+CREATE TABLE IF NOT EXISTS flux_boundaries (
+    boundary_id VARCHAR(64) PRIMARY KEY,
+    pod_id VARCHAR(64) NOT NULL,
+    solar_input NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    dissipation_rate NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    recorded_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS boundary_net_fluxes (
+    boundary_id VARCHAR(64) REFERENCES flux_boundaries(boundary_id) ON DELETE CASCADE,
+    stock_id VARCHAR(64) REFERENCES thermodynamic_stocks(stock_id),
+    flux_rate NUMERIC(30, 12) NOT NULL,
+    PRIMARY KEY (boundary_id, stock_id)
+);
+
+CREATE TABLE IF NOT EXISTS conservation_validation_runs (
+    validation_id VARCHAR(64) PRIMARY KEY,
+    previous_vector_id VARCHAR(64) REFERENCES state_vectors(vector_id),
+    current_vector_id VARCHAR(64) REFERENCES state_vectors(vector_id),
+    boundary_id VARCHAR(64) REFERENCES flux_boundaries(boundary_id),
+    delta_time NUMERIC(16, 6) NOT NULL,
     is_valid BOOLEAN NOT NULL,
-    rejection_reason TEXT,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    validated_at BIGINT NOT NULL,
+    block_signature VARCHAR(128)
 );
 
--- Index for auditing validation failures and second law violations
-CREATE INDEX IF NOT EXISTS idx_thermo_trans_validity 
-ON thermodynamic_transformations(is_valid, executed_at DESC);
-
--- 3. Thermodynamic Blockchain Block Signatures
--- Immutably anchors validated thermodynamic monad pipelines into cryptographic blocks.
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_index SERIAL PRIMARY KEY,
-    block_hash VARCHAR(64) UNIQUE NOT NULL,
-    previous_block_hash VARCHAR(64) NOT NULL,
-    transformation_id UUID NOT NULL REFERENCES thermodynamic_transformations(id) ON DELETE CASCADE,
-    merkle_root VARCHAR(64) NOT NULL,
-    validator_signature VARCHAR(128) NOT NULL,
-    minted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS conservation_violations (
+    violation_id VARCHAR(64) PRIMARY KEY,
+    validation_id VARCHAR(64) REFERENCES conservation_validation_runs(validation_id) ON DELETE CASCADE,
+    stock_id VARCHAR(64) REFERENCES thermodynamic_stocks(stock_id),
+    observed_delta NUMERIC(30, 12) NOT NULL,
+    predicted_delta NUMERIC(30, 12) NOT NULL,
+    discrepancy NUMERIC(30, 12) NOT NULL,
+    tolerance NUMERIC(20, 10) NOT NULL
 );
 
--- Index for blockchain traversal
-CREATE INDEX IF NOT EXISTS idx_thermo_blocks_hash 
-ON thermodynamic_blocks(block_hash);
-
--- ============================================================================
--- End of Sprint 050 Schema Definition
--- ============================================================================
+CREATE INDEX idx_state_vectors_pod_timestamp ON state_vectors(pod_id, timestamp);
+CREATE INDEX idx_validation_runs_validity ON conservation_validation_runs(is_valid);

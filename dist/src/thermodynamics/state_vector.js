@@ -28,6 +28,26 @@ export class ThermodynamicStateVector {
     solarInput;
     dissipatedHeat;
     constructor(options) {
+        if (options instanceof Map) {
+            const mapObj = Object.fromEntries(options);
+            this.stocks = mapObj;
+            this.temperature = STANDARD_AMBIENT_TEMPERATURE_K;
+            this.ambientTemperature = this.temperature;
+            this.ambientReferenceTemp = this.temperature;
+            this.fluxes = { solarRadiation: 0, thermalEmission: 0, latentHeat: 0, sensibleHeat: 0 };
+            this.boundaryFluxes = this.fluxes;
+            this.entropy = 0;
+            this.energy = 1000;
+            this.internalEnergy = 1000;
+            this.totalEntropy = 0;
+            this.systemEntropy = 0;
+            this.exergy = 1e5;
+            this.entropyGenerationRate = 0;
+            this.exergyDestructionRate = 0;
+            this.timestamp = 0;
+            this.tick = 0;
+            return;
+        }
         this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
         this.ambientTemperature = this.temperature;
         this.ambientReferenceTemp = this.temperature;
@@ -126,6 +146,15 @@ export class ThermodynamicStateVector {
             entropyGenerationRate: this.entropyGenerationRate,
             exergyDestructionRate: this.exergyDestructionRate
         };
+    }
+    getKeys() {
+        return Object.keys(this.stocks);
+    }
+    getStock(name) {
+        return this.stocks[name] ?? 0;
+    }
+    getEntropy() {
+        return this.entropy;
     }
     static step(state, fluxDelta, dt) {
         return ThermodynamicMonadProcess.staticStep(state, fluxDelta, dt);
