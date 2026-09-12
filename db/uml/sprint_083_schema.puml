@@ -1,0 +1,46 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics & Blockchain" {
+  
+  interface IStateValidator {
+    + evaluateDiscrepancy(actual: ThermodynamicStateVector, expected: ThermodynamicMap): DiscrepancyResult
+  }
+
+  class ThermodynamicStateValidator {
+    + evaluateDiscrepancy(actual: ThermodynamicStateVector, expected: ThermodynamicMap): DiscrepancyResult
+  }
+
+  class ThermodynamicStateVector {
+    - vectorId: string
+    - solarBoundaryInput: number
+    - stocks: Map<string, number>
+    + getStock(key: string): number
+    + getTotalEnthalpy(): number
+    + getTotalEntropy(): number
+  }
+
+  class DiscrepancyResult {
+    + isValid: boolean
+    + discrepancies: Record<string, number>
+    + totalMassVariance: number
+    + timestamp: number
+  }
+
+  class ThermodynamicStockTransaction {
+    - txHash: string
+    - evaluationId: string
+    - previousHash: string
+    - massConservationVerified: boolean
+    - entropyGenerationRate: number
+    + commitTransaction(): void
+  }
+
+  IStateValidator <|.. ThermodynamicStateValidator
+  ThermodynamicStateValidator --> DiscrepancyResult : produces
+  ThermodynamicStateValidator ..> ThermodynamicStateVector : inspects
+  DiscrepancyResult --> ThermodynamicStockTransaction : anchors to ledger
+}
+
+@enduml

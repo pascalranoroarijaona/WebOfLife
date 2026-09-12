@@ -4,7 +4,7 @@
 import { ThermodynamicStateVector, StateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator, ThermodynamicStateValidator } from './state_validator.js';
 
-export { StateValidator as ThermodynamicStateValidator, StateValidator, validateOrThrowEntropy, ThermodynamicStateVector, StateVector };
+export { StateValidator, ThermodynamicStateValidator, validateOrThrowEntropy, ThermodynamicStateVector, StateVector };
 
 export interface IMonadProcess {
   execute(state: ThermodynamicStateVector): ThermodynamicStateVector;
