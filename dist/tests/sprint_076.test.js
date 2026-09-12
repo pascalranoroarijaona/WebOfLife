@@ -38,7 +38,7 @@ describe('Sprint 076: Thermodynamic State Vector Discrepancy Mapping Iterator', 
         const summary = validator.mapDiscrepancies(stocks, baseline);
         assert.strictEqual(summary.conserved, false);
         assert.strictEqual(summary.maxDiscrepancy, 0.5);
-        const carbonRecord = summary.records.find(r => r.element === 'C');
+        const carbonRecord = summary.records.find((r) => r.element === 'C');
         assert.ok(carbonRecord);
         assert.strictEqual(carbonRecord.isWithinTolerance, false);
         assert.strictEqual(carbonRecord.discrepancy, 0.5);

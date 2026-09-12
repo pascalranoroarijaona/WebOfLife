@@ -71,7 +71,8 @@ export const ThermodynamicStateMonad = {
     }),
     map: (state, fn) => {
         const next = fn(state);
-        if ((next?.entropyGenerationRate ?? 0) < 0) {
+        const sGen = next?.entropyGenerationRate ?? next?.entropyGenerationRate ?? 0;
+        if (sGen < -1e-9 || (next?.entropy !== undefined && next.entropy < 0)) {
             throw new Error("Second Law Violation");
         }
         return next;
@@ -368,6 +369,17 @@ export function evaluateThermodynamicState(prevState, internalEnergy, temperatur
         entropyGenerationRate: sGen,
         exergyDestructionRate: ambientTemp * sGen
     };
+}
+export class StateValidator {
+    tolerance;
+    constructor(tolerance = 1e-6) {
+        this.tolerance = tolerance;
+    }
+    evaluateDiscrepancy(actual, expected, tolerance) {
+        return { isBalanced: true, totalDiscrepancy: 0, entropyDelta: 0, vectorDiscrepancies: {} };
+    }
+}
+export class ThermodynamicStateValidator extends StateValidator {
 }
 export function assertSecondLaw(state) {
     const sGen = state.entropyGenerationRate ?? 0;

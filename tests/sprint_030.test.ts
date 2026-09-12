@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicStateValidator } from '../src/thermodynamics/state_validator.js';
+import { ThermodynamicStateValidator, ValidationResult } from '../src/thermodynamics/state_validator.js';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
 
 describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
@@ -23,7 +23,7 @@ describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
       }
     };
 
-    const result = ThermodynamicStateValidator.validate(validState);
+    const result = ThermodynamicStateValidator.validate(validState) as ValidationResult;
     assert.strictEqual(result.isValid, true);
     assert.strictEqual(result.errors?.length ?? 0, 0);
     assert.doesNotThrow(() => ThermodynamicStateValidator.assertValid(validState));
@@ -36,7 +36,7 @@ describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
       // missing entropy and elementalStocks
     };
 
-    const result = ThermodynamicStateValidator.validate(incompleteState);
+    const result = ThermodynamicStateValidator.validate(incompleteState) as ValidationResult;
     assert.strictEqual(result.isValid, false);
     assert.ok(result.errors?.some((e: any) => e.reason?.includes('entropy') || JSON.stringify(e).includes('entropy')));
     assert.ok(result.errors?.some((e: any) => e.reason?.includes('elementalStocks') || JSON.stringify(e).includes('elementalStocks')));
@@ -52,7 +52,7 @@ describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
       elementalStocks: { carbon: 100 }
     };
 
-    const result = ThermodynamicStateValidator.validate(invalidEntropyState);
+    const result = ThermodynamicStateValidator.validate(invalidEntropyState) as ValidationResult;
     assert.strictEqual(result.isValid, false);
     assert.ok(result.errors?.some((e: any) => e.reason?.includes('Entropy cannot be negative') || JSON.stringify(e).includes('Entropy cannot be negative')));
     assert.throws(() => ThermodynamicStateValidator.assertValid(invalidEntropyState));
@@ -67,7 +67,7 @@ describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
       elementalStocks: { carbon: 100 }
     };
 
-    const result = ThermodynamicStateValidator.validate(invalidTempState);
+    const result = ThermodynamicStateValidator.validate(invalidTempState) as ValidationResult;
     assert.strictEqual(result.isValid, false);
     assert.ok(result.errors?.some((e: any) => e.reason?.includes('Absolute temperature') || JSON.stringify(e).includes('Absolute temperature')));
     assert.throws(() => ThermodynamicStateValidator.assertValid(invalidTempState));
@@ -88,7 +88,7 @@ describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
       }
     };
 
-    const result = ThermodynamicStateValidator.validate(invalidStockState);
+    const result = ThermodynamicStateValidator.validate(invalidStockState) as ValidationResult;
     assert.strictEqual(result.isValid, false);
     assert.ok(result.errors?.some((e: any) => e.reason?.includes("Elemental stock 'nitrogen' is negative") || JSON.stringify(e).includes("Elemental stock 'nitrogen' is negative")));
     assert.throws(() => ThermodynamicStateValidator.assertValid(invalidStockState));

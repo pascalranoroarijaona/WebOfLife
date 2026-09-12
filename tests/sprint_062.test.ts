@@ -16,10 +16,10 @@ describe('Sprint 062: Thermodynamic State Vector Inventory Discrepancy Evaluator
       stocks: { carbon: 852, water: 1337999998 }
     });
 
-    const netFluxes = new Map<string, number>([
-      ['carbon', 2.0],
-      ['water', -2.0]
-    ]);
+    const netFluxes = {
+      carbon: 2.0,
+      water: -2.0
+    };
 
     const report = validator.evaluateDiscrepancy(prevState, currState, netFluxes);
 
@@ -39,9 +39,9 @@ describe('Sprint 062: Thermodynamic State Vector Inventory Discrepancy Evaluator
       stocks: { carbon: 900 } // Delta = +50
     });
 
-    const netFluxes = new Map<string, number>([
-      ['carbon', 10.0] // Expected Delta = 10 -> Discrepancy = 40
-    ]);
+    const netFluxes = {
+      carbon: 10.0 // Expected Delta = 10 -> Discrepancy = 40
+    };
 
     const report = validator.evaluateDiscrepancy(prevState, currState, netFluxes);
 
@@ -60,12 +60,12 @@ describe('Sprint 062: Thermodynamic State Vector Inventory Discrepancy Evaluator
       stocks: { carbon: 855, nitrogen: 3900001, phosphorus: 4e9, water: 1338000005 }
     });
 
-    const netFluxes = new Map<string, number>([
-      ['carbon', 5.0],
-      ['nitrogen', 1.0],
-      ['phosphorus', 0.0],
-      ['water', 5.0]
-    ]);
+    const netFluxes = {
+      carbon: 5.0,
+      nitrogen: 1.0,
+      phosphorus: 0.0,
+      water: 5.0
+    };
 
     const validator = new StateValidator(1e-6);
     const report = validator.evaluateDiscrepancy(vecPrev, vecCurr, netFluxes);

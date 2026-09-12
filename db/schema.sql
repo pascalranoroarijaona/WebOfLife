@@ -1,49 +1,53 @@
--- Updated Schema & Ledger Definitions for Sprint 077
--- Thermodynamic State Vector Discrepancy Aggregator & Monad Stock Transactions
+-- ============================================================================
+-- Web of Life - Thermodynamic Blockchain & SQL Schema
+-- Sprint 078 Addition: State Validator Discrepancy Reports & Ledger States
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id VARCHAR(64) PRIMARY KEY,
-    pod_id VARCHAR(64) NOT NULL,
+CREATE TABLE IF NOT EXISTS thermodynamic_states (
+    state_id VARCHAR(64) PRIMARY KEY,
     timestamp BIGINT NOT NULL,
-    carbon_stock DECIMAL(18, 8) NOT NULL,
-    nitrogen_stock DECIMAL(18, 8) NOT NULL,
-    phosphorus_stock DECIMAL(18, 8) NOT NULL,
-    water_stock DECIMAL(18, 8) NOT NULL,
-    enthalpy_stock DECIMAL(18, 8) NOT NULL,
+    total_energy NUMERIC(24, 8) NOT NULL,
+    total_entropy NUMERIC(24, 8) NOT NULL,
+    is_balanced BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS state_evaluation_results (
-    evaluation_id SERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS state_vector_stocks (
+    stock_id SERIAL PRIMARY KEY,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
+    stock_key VARCHAR(128) NOT NULL,
+    stock_value NUMERIC(24, 8) NOT NULL,
+    UNIQUE(state_id, stock_key)
+);
+
+CREATE TABLE IF NOT EXISTS discrepancy_reports (
+    report_id SERIAL PRIMARY KEY,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
     timestamp BIGINT NOT NULL,
-    expected_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
-    actual_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
-    discrepancy DECIMAL(18, 8) NOT NULL,
+    total_discrepancy NUMERIC(24, 8) NOT NULL,
+    is_balanced BOOLEAN NOT NULL,
+    entropy_delta NUMERIC(24, 8) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS discrepancy_aggregations (
-    aggregation_id SERIAL PRIMARY KEY,
-    batch_timestamp BIGINT NOT NULL,
-    max_discrepancy DECIMAL(18, 8) NOT NULL,
-    total_evaluations INT NOT NULL,
-    breach_flag BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS vector_discrepancies (
+    discrepancy_id SERIAL PRIMARY KEY,
+    report_id INTEGER REFERENCES discrepancy_reports(report_id) ON DELETE CASCADE,
+    vector_key VARCHAR(128) NOT NULL,
+    discrepancy_value NUMERIC(24, 8) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS blockchain_transactions (
-    tx_hash VARCHAR(64) PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    sender_pod VARCHAR(64) NOT NULL,
-    receiver_pod VARCHAR(64) NOT NULL,
-    stock_type VARCHAR(32) NOT NULL,
-    delta_amount DECIMAL(18, 8) NOT NULL,
-    dissipation_amount DECIMAL(18, 8) NOT NULL,
-    entropy_generation DECIMAL(18, 8) NOT NULL,
-    signature TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
+    block_hash VARCHAR(64) PRIMARY KEY,
+    previous_block_hash VARCHAR(64),
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    merkle_root VARCHAR(64) NOT NULL,
+    nonce BIGINT NOT NULL,
+    timestamp BIGINT NOT NULL,
+    signature TEXT NOT NULL
 );
 
-CREATE INDEX idx_eval_results_timestamp ON state_evaluation_results(timestamp);
-CREATE INDEX idx_discrepancy_aggregations_batch ON discrepancy_aggregations(batch_timestamp);
-CREATE INDEX idx_blockchain_tx_block ON blockchain_transactions(block_number);
+-- Indexing for high-throughput time-series queries on thermodynamic stocks and validations
+CREATE INDEX IF NOT EXISTS idx_thermo_states_timestamp ON thermodynamic_states(timestamp);
+CREATE INDEX IF NOT EXISTS idx_discrepancy_reports_timestamp ON discrepancy_reports(timestamp);
+CREATE INDEX IF NOT EXISTS idx_vector_discrepancies_report ON vector_discrepancies(report_id);

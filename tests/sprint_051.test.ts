@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
 import { ThermodynamicStateValidator } from '../src/thermodynamics/state_validator.js';
-import { FluxBoundary, ValidationFailure } from '../src/thermodynamics/types.js';
+import { FluxBoundary, ValidationFailure, ValidationResult } from '../src/thermodynamics/types.js';
 
 describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', () => {
   it('should verify closed-system mass balance within tolerance bounds', () => {
@@ -27,7 +27,7 @@ describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', (
     };
 
     const validator = new ThermodynamicStateValidator(1e-7);
-    const result = validator.assertConservation(prevState, currState, boundary, 1.0);
+    const result: ValidationResult = validator.assertConservation(prevState, currState, boundary, 1.0);
 
     assert.strictEqual(result.isValid, true);
     assert.strictEqual(Object.keys(result.violations ?? {}).length, 0);
@@ -47,7 +47,7 @@ describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', (
     };
 
     const validator = new ThermodynamicStateValidator(1e-5);
-    const result = validator.assertConservation(prevState, currState, boundary, 1.0);
+    const result: ValidationResult = validator.assertConservation(prevState, currState, boundary, 1.0);
 
     assert.strictEqual(result.isValid, true);
   });
@@ -66,7 +66,7 @@ describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', (
     };
 
     const validator = new ThermodynamicStateValidator(1e-6);
-    const result = validator.assertConservation(prevState, currState, boundary, 1.0);
+    const result: ValidationResult = validator.assertConservation(prevState, currState, boundary, 1.0);
 
     assert.strictEqual(result.isValid, false);
     const violations = (result.errors ?? []) as ValidationFailure[];

@@ -1,0 +1,62 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 078 Architecture: State Validator & Thermodynamic Ledger
+
+package "Thermodynamics Core" {
+  class StateVector {
+    +stocks: Record<string, number>
+    +totalEnergy: number
+    +totalEntropy: number
+    +clone(): StateVector
+  }
+
+  interface IStateValidator {
+    +evaluateDiscrepancy(currentState: StateVector, expectedState: StateVector): DiscrepancyReport
+  }
+
+  class StateValidator {
+    -tolerance: number
+    +constructor(tolerance: number)
+    +evaluateDiscrepancy(currentState: StateVector, expectedState: StateVector): DiscrepancyReport
+    -aggregateDifferences(current: StateVector, expected: StateVector): Record<string, number>
+    -computeEntropyDelta(current: StateVector, expected: StateVector): number
+  }
+
+  class DiscrepancyReport {
+    +timestamp: number
+    +totalDiscrepancy: number
+    +vectorDiscrepancies: Record<string, number>
+    +isBalanced: boolean
+    +entropyDelta: number
+  }
+}
+
+package "Blockchain & Persistence Layer" {
+  class ThermodynamicBlock {
+    +blockHash: string
+    +previousBlockHash: string
+    +stateId: string
+    +merkleRoot: string
+    +nonce: number
+    +timestamp: number
+    +signature: string
+  }
+
+  class ThermodynamicStateEntity {
+    +stateId: string
+    +timestamp: number
+    +totalEnergy: number
+    +totalEntropy: number
+    +isBalanced: boolean
+  }
+}
+
+IStateValidator <|.. StateValidator
+StateValidator ..> DiscrepancyReport : creates
+StateValidator ..> StateVector : inspects
+ThermodynamicBlock --> ThermodynamicStateEntity : references
+ThermodynamicStateEntity --> DiscrepancyReport : records
+
+@enduml
