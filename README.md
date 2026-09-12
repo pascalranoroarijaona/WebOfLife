@@ -206,7 +206,7 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 13%
-SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Assertion (`src/thermodynamics/state_validator.ts`): Implement validation utility checking that entropy and entropy generation rates are $\ge 0$ to satisfy the Second Law.
+SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Assertion Utility (`src/thermodynamics/state_validator.ts`): Implement a pure helper function `assertNonNegativeEntropy(state)` that inspects state objects and returns a Result object instead of throwing.
 
 ## Web of Life Master Backlog
 
@@ -217,7 +217,9 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Assertion (`src/the
 - [x] Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
 - [x] Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
 - [x] Thermodynamic State Vector Property Validator Helper (`src/thermodynamics/state_validator.ts`): Implement a pure validation function `validateStateProperties(state)` that checks for the presence and validity of required thermodynamic properties (`energy`, `entropy`, `temperature`, `stocks`) without throwing errors.
-- [ ] Thermodynamic State Vector Non-Negative Entropy Assertion (`src/thermodynamics/state_validator.ts`): Implement validation utility checking that entropy and entropy generation rates are $\ge 0$ to satisfy the Second Law.
+- [ ] Thermodynamic State Vector Non-Negative Entropy Assertion Utility (`src/thermodynamics/state_validator.ts`): Implement a pure helper function `assertNonNegativeEntropy(state)` that inspects state objects and returns a Result object instead of throwing.
+- [ ] Thermodynamic State Vector Non-Negative Entropy Exception Guard (`src/thermodynamics/state_validator.ts`): Implement a strict assertion wrapper `validateOrThrowEntropy(state)` that triggers a `ThermodynamicEntropyViolationError` if $\dot{S}_{\text{gen}} < 0$.
+- [ ] Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
 - [ ] Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement inventory mass conservation checks verifying stock deltas against boundary flux rates within tolerance bounds.
 - [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper wrapper function that integrates property checks, entropy assertions, and stock conservation validators for monad step executions.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
@@ -284,9 +286,18 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Assertion (`src/the
 - [ ] Precision Agriculture Nitrogen Actuator (`src/technosphere/precision_ag_actuator.ts`): Implement nitrogen-fertilizer runoff restriction algorithms triggered when local soil-water infiltration exceeds saturation limits.
 
 ### Phase 4 — Atmosphere-Ocean Dynamics, Cryosphere & Raster Assimilation (Pending)
-- [ ] Raster-to-H3 Spatial Data Assimilation Engine (`src/spatial/raster_assimilation.ts`): NetCDF/GeoTIFF raster ingestion pipeline with EnKF / Kalman Filtering.
-- [ ] 3D Baroclinic Atmosphere-Ocean Coupled Boundary Layer (`src/transport/coupled_boundary_layer.ts`): Momentum, sensible heat, latent heat, and gas transfer across air-sea interfaces.
-- [ ] Dynamic Ice Sheet & Glacier Mass Balance (`src/cryosphere/cryosphere_dynamics.ts`): Surface mass balance tracking basal melting and elevation-feedback melt rates.
+- [ ] NetCDF/GeoTIFF Binary Parser (`src/spatial/raster/netcdf_parser.ts`)
+- [ ] Bilinear & Area-Weighted Raster Resampling (`src/spatial/raster/resampling.ts`)
+- [ ] Ensemble Kalman Filter (EnKF) State Assimilation (`src/spatial/raster/enkf_filter.ts`)
+- [ ] Raster Assimilation Pipeline Orchestrator (`src/spatial/raster_assimilation.ts`)
+- [ ] Air-Sea Momentum Transfer & Stress Equations (`src/transport/wind_stress.ts`)
+- [ ] Sensible & Latent Heat Flux Bulk Formulae (`src/transport/turbulent_fluxes.ts`)
+- [ ] Gas Transfer Velocity ($K_w$) & $\mathrm{CO}_2$ Solubility Pumps (`src/transport/gas_transfer.ts`)
+- [ ] Coupled Boundary Layer Integration Wrapper (`src/transport/coupled_boundary_layer.ts`)
+- [ ] Degree-Day Melt Factor Calculator (`src/cryosphere/degree_day_melt.ts`)
+- [ ] Elevation-Feedback Melt Rate Adjuster (`src/cryosphere/elevation_feedback.ts`)
+- [ ] Calving & Basal Sliding Flux Equations (`src/cryosphere/dynamic_discharge.ts`)
+- [ ] Cryosphere Surface Mass Balance Ledger (`src/cryosphere/cryosphere_dynamics.ts`)
 
 ### Phase 5 — AI Symbiotic Policy Optimization & Actuation (Pending)
 - [ ] AI Policy State Vector Tensor Normalizer (`src/ai/policy_state_vector.ts`): Construct a state vector formatter that flattens regional H3 stocks, boundary fluxes, and entropy states into bounded tensors $[0, 1]$ suitable for actor-critic multi-agent networks.

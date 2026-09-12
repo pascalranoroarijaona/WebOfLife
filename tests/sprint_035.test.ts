@@ -27,7 +27,7 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
   };
 
   it('should validate a normal thermodynamic state with non-negative entropy and rates', () => {
-    assert.strictEqual(StateValidator.isValidEntropy(validState), true);
+    assert.strictEqual(StateValidator.validateEntropy(validState), true);
     const result = StateValidator.assertNonNegativeEntropy(validState);
     assert.strictEqual(result.isOk(), true);
     if (result.isOk()) {
@@ -40,7 +40,7 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
       ...validState,
       entropy: -0.001
     };
-    assert.strictEqual(StateValidator.isValidEntropy(invalidState), false);
+    assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
     if (result.isErr()) {
@@ -54,7 +54,7 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
       ...validState,
       entropyGenerationRate: -0.5
     };
-    assert.strictEqual(StateValidator.isValidEntropy(invalidState), false);
+    assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
@@ -64,7 +64,7 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
       ...validState,
       temperature: 0
     };
-    assert.strictEqual(StateValidator.isValidEntropy(invalidState), false);
+    assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });

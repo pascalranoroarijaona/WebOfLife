@@ -1,64 +1,45 @@
 -- ============================================================================
--- Web of Life Database Schema: Sprint 037
--- Thermodynamic State Vector & Non-Negative Entropy Assertion Ledger
+-- Web of Life Database Schema & Thermodynamic Ledger Definitions
+-- Sprint 038: Thermodynamic State Vector Non-Negative Entropy Assertion Utility
 -- ============================================================================
 
--- Enable TimescaleDB extension for time-series ledger data
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+BEGIN;
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors (Time-Series Ledger)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    earth_pod_id UUID NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    temperature DOUBLE PRECISION NOT NULL CHECK (temperature >= 0),
-    internal_energy DOUBLE PRECISION NOT NULL,
-    entropy DOUBLE PRECISION NOT NULL CHECK (entropy >= 0),
-    entropy_generation_rate DOUBLE PRECISION NOT NULL CHECK (entropy_generation_rate >= 0),
-    exergy DOUBLE PRECISION NOT NULL,
-    is_valid BOOLEAN NOT NULL DEFAULT TRUE,
-    violation_notes TEXT[] DEFAULT ARRAY[]::TEXT[],
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Core Thermodynamic States (Time-Series Ledger)
+CREATE TABLE IF NOT EXISTS thermodynamic_states (
+    state_id VARCHAR(64) PRIMARY KEY,
+    entity_id VARCHAR(64) NOT NULL,
+    energy NUMERIC(20, 10) NOT NULL CHECK (energy >= 0),
+    entropy NUMERIC(20, 10) NOT NULL CHECK (entropy >= 0),
+    temperature NUMERIC(10, 4),
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Convert to hypertable for optimized time-series queries
-SELECT create_hypertable('thermodynamic_state_vectors', 'timestamp', if_not_exists => TRUE);
+-- Validation Result Monad Log Table
+CREATE TABLE IF NOT EXISTS entropy_validation_logs (
+    validation_id SERIAL PRIMARY KEY,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
+    is_success BOOLEAN NOT NULL,
+    observed_entropy NUMERIC(20, 10),
+    error_message TEXT,
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
-CREATE INDEX IF NOT EXISTS idx_thermo_states_pod_time 
-ON thermodynamic_state_vectors (earth_pod_id, timestamp DESC);
-
--- ----------------------------------------------------------------------------
--- 2. Thermodynamic Monad Stock Transactions & Flux Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_monad_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id),
-    pod_id UUID NOT NULL,
+-- Thermodynamic Blockchain Block Transactions
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_index SERIAL PRIMARY KEY,
     previous_hash VARCHAR(64) NOT NULL,
-    block_hash VARCHAR(64) NOT NULL,
-    carbon_flux DOUBLE PRECISION NOT NULL,
-    nitrogen_flux DOUBLE PRECISION NOT NULL,
-    phosphorus_flux DOUBLE PRECISION NOT NULL,
-    water_flux DOUBLE PRECISION NOT NULL,
-    validation_status VARCHAR(32) NOT NULL CHECK (validation_status IN ('PASSED', 'FAILED_ENTROPY', 'FAILED_TEMPERATURE', 'FAILED_EXERGY')),
-    committed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    current_hash VARCHAR(64) UNIQUE NOT NULL,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    validation_id INT REFERENCES entropy_validation_logs(validation_id),
+    nonce BIGINT NOT NULL,
+    miner_signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_monad_tx_block_hash 
-ON thermodynamic_monad_transactions (block_hash);
+-- Indexes for performance & time-series traversal
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity ON thermodynamic_states(entity_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_entropy_validation_success ON entropy_validation_logs(is_success);
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_blocks_hash ON thermodynamic_blocks(current_hash);
 
--- ----------------------------------------------------------------------------
--- 3. Second Law Compliance Audit Log
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS second_law_audit_log (
-    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id),
-    violation_type VARCHAR(64) NOT NULL,
-    error_message TEXT NOT NULL,
-    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_log_detected 
-ON second_law_audit_log (detected_at DESC);
+COMMIT;

@@ -37,7 +37,7 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         const result = validator.validate(validState);
         assert.strictEqual(result.isValid, true);
-        assert.strictEqual(result.violations.length, 0);
+        assert.strictEqual((result.violations ?? []).length, 0);
         assert.doesNotThrow(() => validator.assertValid(validState));
     });
 
@@ -67,7 +67,7 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         const result = validator.validate(invalidEntropyState);
         assert.strictEqual(result.isValid, false);
-        assert.ok(result.violations.some(v => v.includes('Entropy') && v.includes('negative')));
+        assert.ok((result.violations ?? []).some(v => v.includes('Entropy') && v.includes('negative')));
         assert.throws(() => validator.assertValid(invalidEntropyState), /Thermodynamic State Validation Failed/);
     });
 
@@ -97,7 +97,7 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         const result = validator.validate(invalidGenState);
         assert.strictEqual(result.isValid, false);
-        assert.ok(result.violations.some(v => v.includes('Entropy generation rate')));
+        assert.ok((result.violations ?? []).some(v => v.includes('Entropy generation rate')));
         assert.throws(() => validator.assertValid(invalidGenState), /Thermodynamic State Validation Failed/);
     });
 

@@ -1,0 +1,46 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics Subsystem" {
+    class ThermodynamicStateVector {
+        +energy: number
+        +entropy: number
+        +temperature?: number
+    }
+
+    interface "Result<T, E>" as Result {
+        +success: boolean
+        +value?: T
+        +error?: E
+    }
+
+    class StateValidator {
+        +{static} assertNonNegativeEntropy(state: ThermodynamicStateVector): Result<boolean, string>
+    }
+}
+
+package "Blockchain & Ledger Subsystem" {
+    class ThermodynamicBlock {
+        +blockIndex: number
+        +previousHash: string
+        +currentHash: string
+        +nonce: number
+        +signature: string
+        +createdAt: Date
+    }
+
+    class EntropyValidationLog {
+        +validationId: number
+        +isSuccess: boolean
+        +observedEntropy: number
+        +errorMessage?: string
+        +validatedAt: Date
+    }
+}
+
+ThermodynamicStateVector --> StateValidator : evaluated by
+StateValidator ..> Result : returns
+ThermodynamicBlock --> ThermodynamicStateVector : references state
+ThermodynamicBlock --> EntropyValidationLog : records validation
+
+@enduml

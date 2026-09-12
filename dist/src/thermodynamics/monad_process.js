@@ -12,7 +12,9 @@ export class ThermodynamicMonadProcess {
         const nextState = transitionFn(state);
         const transitionResult = this.validator.validateTransition(state, nextState);
         if (!transitionResult.isValid) {
-            throw new Error(`Monad step aborted due to thermodynamic transition violation:\n- ${transitionResult.errors.join('\n- ')}`);
+            const errs = transitionResult.errors ?? [];
+            const errMsgs = errs.map(e => typeof e === 'string' ? e : e.reason).join('\n- ');
+            throw new Error(`Monad step aborted due to thermodynamic transition violation:\n- ${errMsgs}`);
         }
         return nextState;
     }
