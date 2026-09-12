@@ -34,7 +34,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
         };
         const monad = ThermodynamicStateMonad.initialize(initialState);
         assert.throws(() => {
-            monad.transit((state, fluxes) => executeThermodynamicStep(state, fluxes));
+            monad.transit((state, fluxes) => executeThermodynamicStep(state, fluxes), initialFluxes);
         }, /Second Law Violation/);
     });
     it('should validate exact computation of exergy destruction rate (\dot{I} = T_0 \dot{S}_{gen})', () => {
@@ -66,7 +66,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             netMassFlux: 0
         };
         const monad = ThermodynamicStateMonad.initialize(initialState);
-        const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f)).getState();
+        const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f), initialFluxes).getStateVector();
         const T0 = extractedState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
         const sGen = extractedState.entropyGenerationRate ?? 0;
         const iDest = extractedState.exergyDestructionRate ?? 0;

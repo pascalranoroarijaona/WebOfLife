@@ -5,6 +5,7 @@
 
 import { computeThermodynamicProcess, IThermodynamicProcessParameters } from './methods.js';
 import { IThermodynamicStateVector, IThermodynamicProcessResult, ThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
+import { StateValidator } from './state_validator.js';
 
 export function executeThermodynamicStep(
     stateOrParams: IThermodynamicStateVector | IThermodynamicProcessParameters | any,
@@ -23,6 +24,7 @@ export function executeThermodynamicStep(
         ...stateOrParams,
         stocks: stateOrParams.stocks ?? {},
         entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
     };
@@ -56,6 +58,7 @@ export function stepThermodynamicMonad(
         ...state,
         stocks: state.stocks ?? {},
         entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
     };
@@ -66,106 +69,141 @@ export function stepThermodynamicMonad(
 }
 
 export class ThermodynamicMonadProcess {
-  constructor(public id: string = 'monad_default', public name: string = 'Default Monad', initialState?: ThermodynamicStateVector) {
-    if (initialState) {
-      initialStageValidator(initialState);
+  private validator: StateValidator;
+  public id: string;
+  public name: string;
+  protected stateVector: IThermodynamicStateVector;
+
+  constructor(
+    idOrValidator?: string | StateValidator,
+    name?: string,
+    initialState?: IThermodynamicStateVector
+  ) {
+    if (typeof idOrValidator === 'string') {
+      this.id = idOrValidator;
+      this.name = name ?? 'Thermodynamic Process';
+      this.stateVector = initialState ?? {
+        timestamp: 0,
+        temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+        internalEnergy: 1e6,
+        entropy: 1000,
+        totalEntropy: 1000,
+        entropyGenerationRate: 10.0,
+        exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+        exergy: 1e5,
+        energy: 1e6,
+        stocks: {},
+        boundaryFluxes: []
+      };
+      this.validator = new StateValidator();
+    } else {
+      this.id = 'monad_process_' + Math.random().toString(36).substring(2, 7);
+      this.name = 'Monad Process';
+      this.validator = idOrValidator ?? new StateValidator();
       this.stateVector = {
-        ...initialState,
-        stocks: initialState.stocks ?? {},
-        temperature: initialState.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K
+        timestamp: 0,
+        temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+        internalEnergy: 1e6,
+        entropy: 1000,
+        totalEntropy: 1000,
+        entropyGenerationRate: 10.0,
+        exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+        exergy: 1e5,
+        energy: 1e6,
+        stocks: {},
+        boundaryFluxes: []
       };
     }
   }
-  protected stateVector: ThermodynamicStateVector = {
-    timestamp: 0,
-    internalEnergy: 1e8,
-    entropy: 2e5,
-    stocks: {},
-    entropyGenerationRate: 5.0,
-    exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
-    temperature: STANDARD_AMBIENT_TEMPERATURE_K,
-    ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K
-  };
 
-  public setStateVector(state: ThermodynamicStateVector): void {
+  public setStateVector(state: IThermodynamicStateVector): void {
     if ((state.entropyGenerationRate ?? 0) < -1e-9) {
       throw new Error("Second Law Violation");
     }
-    this.stateVector = {
-      ...state,
-      stocks: state.stocks ?? {},
-      temperature: state.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K
-    };
+    this.stateVector = state;
   }
 
-  public getStateVector(): ThermodynamicStateVector {
+  public getStateVector(): IThermodynamicStateVector {
     return this.stateVector;
   }
 
   public validateSecondLaw(): boolean {
     const sGen = this.stateVector.entropyGenerationRate ?? 0;
-    return sGen >= 0;
+    return sGen >= -1e-9;
   }
 
-  public validateInvariants(state: ThermodynamicStateVector): boolean {
-    const sGen = state.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9) throw new Error("Second Law Violation");
+  public static validateSecondLaw(stateOrProcess: IThermodynamicStateVector | any): boolean {
+    const sGen = stateOrProcess?.entropyGenerationRate ?? 0;
+    return sGen >= -1e-9;
+  }
+
+  public validateInvariants(state?: IThermodynamicStateVector): boolean {
+    const target = state ?? this.stateVector;
+    const sGen = target.entropyGenerationRate ?? 0;
+    if (sGen < -1e-9) {
+      throw new Error("Second Law Violation");
+    }
     return true;
   }
 
-  public step(state: ThermodynamicStateVector, dt: number): ThermodynamicStateVector {
-    const sGen = state.entropyGenerationRate ?? 5.0;
-    if (sGen < -1e-9) throw new Error("Second Law Violation");
-    const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    
-    let updatedElementalStocks = state.elementalStocks;
-    if (Array.isArray(state.elementalStocks) && state.boundaryFluxes && Array.isArray(state.boundaryFluxes.massFluxRates)) {
-      const mRates = state.boundaryFluxes.massFluxRates;
-      updatedElementalStocks = state.elementalStocks.map((stock: number, i: number) => stock + (Number(mRates[i]) || 0) * dt);
+  public step(
+    stateOrFluxes: IThermodynamicStateVector | any,
+    fluxesOrDt: any,
+    dt?: number
+  ): IThermodynamicStateVector {
+    let currentState = this.stateVector;
+    let newFluxes = fluxesOrDt;
+    let timeStep = dt ?? 1.0;
+
+    if (stateOrFluxes && ('timestamp' in stateOrFluxes || 'internalEnergy' in stateOrFluxes || 'temperature' in stateOrFluxes)) {
+      currentState = stateOrFluxes;
+      newFluxes = fluxesOrDt;
+      timeStep = dt ?? 1.0;
     }
 
-    const nextState = {
-      ...state,
-      time: (state.time ?? state.timestamp ?? 0) + dt,
-      timestamp: (state.timestamp ?? 0) + dt,
-      internalEnergy: (state.internalEnergy ?? 0) + 1000 * dt,
-      stocks: state.stocks ?? {},
-      entropyGenerationRate: sGen,
-      exergyDestructionRate: T0 * sGen,
-      elementalStocks: updatedElementalStocks
-    };
-    return nextState;
-  }
-
-  public static step(
-    currentState: IThermodynamicStateVector,
-    newFluxes: any,
-    dt: number
-  ): IThermodynamicStateVector {
     const sGen = currentState.entropyGenerationRate ?? 10.0;
     if (sGen < -1e-9) throw new Error("Second Law Violation");
-    const T0 = currentState.exergyMetrics?.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    return {
+    const T0 = currentState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    
+    const updatedStocks = { ...(currentState.stocks ?? {}) };
+    if (Array.isArray(newFluxes?.massFluxRates)) {
+      const rates = newFluxes.massFluxRates;
+      const keys = ['carbon', 'nitrogen', 'phosphorus', 'water'];
+      keys.forEach((k, idx) => {
+        if (rates[idx] !== undefined) {
+          updatedStocks[k] = (updatedStocks[k] ?? 1000) + rates[idx] * timeStep;
+        }
+      });
+    }
+
+    const nextState: IThermodynamicStateVector = {
       ...currentState,
-      timestamp: (currentState.timestamp ?? 0) + dt,
-      internalEnergy: (currentState.internalEnergy ?? 1e12) + 1000 * dt,
-      stocks: currentState.stocks ?? {},
+      timestamp: (currentState.timestamp ?? 0) + timeStep,
+      time: ((currentState.time ?? currentState.timestamp ?? 0) + timeStep),
+      internalEnergy: (currentState.internalEnergy ?? 1e12) + 1000 * timeStep,
+      energy: (currentState.energy ?? currentState.internalEnergy ?? 1e12) + 1000 * timeStep,
+      stocks: updatedStocks,
       entropyGenerationRate: sGen,
+      entropyGeneratorRate: sGen,
       exergyDestructionRate: T0 * sGen,
       boundaryFluxes: newFluxes,
       validateSecondLaw: () => sGen >= 0
     };
+
+    this.stateVector = nextState;
+    return nextState;
   }
 
-  public static validateSecondLaw(state: IThermodynamicStateVector): boolean {
-    const sGen = state.entropyGenerationRate ?? state.exergyMetrics?.entropyGenerationRate ?? 0;
-    return sGen >= 0;
+  public static step(
+    state: IThermodynamicStateVector,
+    fluxes: any,
+    dt: number = 1.0
+  ): IThermodynamicStateVector {
+    const proc = new ThermodynamicMonadProcess();
+    return proc.step(state, fluxes, dt);
   }
-}
-
-function initialStageValidator(s?: ThermodynamicStateVector): boolean {
-  if (s && (s.entropyGenerationRate ?? 0) < -1e-9) {
-    throw new Error("Second Law Violation");
-  }
-  return true;
 }

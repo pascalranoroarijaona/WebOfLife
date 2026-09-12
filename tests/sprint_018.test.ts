@@ -25,9 +25,12 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
     time: 0,
     temperature: 295.0,
     ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+    ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
     internalEnergy: 1e8,
+    energy: 1e8,
     entropy: 2e5,
     totalEntropy: 2e5,
+    stocks: {},
     exergy: 5e6,
     elementalStocks: [1000, 200, 50, 10000],
     boundaryFluxes: initialBoundaryFluxes,
@@ -38,7 +41,7 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
   it('should initialize and execute thermodynamic monad process successfully', () => {
     const process = new ThermodynamicMonadProcess('monad_01', 'Planetary Biosphere Pod', initialState);
     const dt = 10.0;
-    const nextState = process.step(initialState, dt);
+    const nextState = process.step(initialState, initialBoundaryFluxes, dt);
 
     assert.strictEqual(nextState.time, 10.0);
     assert.ok((nextState.internalEnergy ?? 0) > (initialState.internalEnergy ?? 0), 'Internal energy should increase with net positive heat/enthalpy influx');
@@ -64,7 +67,7 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
   it('should accurately compute Gouy-Stodola exergy destruction rate', () => {
     const process = new ThermodynamicMonadProcess('monad_03', 'Exergy Accounting Pod', initialState);
     const dt = 1.0;
-    const nextState = process.step(initialState, dt);
+    const nextState = process.step(initialState, initialBoundaryFluxes, dt);
 
     const ambientT = nextState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     const expectedDestruction = ambientT * (nextState.entropyGenerationRate ?? 0);
@@ -75,7 +78,7 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
   it('should validate elemental mass conservation stocks update correctly', () => {
     const process = new ThermodynamicMonadProcess('monad_04', 'Mass Conservation Pod', initialState);
     const dt = 5.0;
-    const nextState = process.step(initialState, dt);
+    const nextState = process.step(initialState, initialBoundaryFluxes, dt);
 
     const initialStocks = initialState.elementalStocks as number[] ?? [0, 0, 0, 0];
     const nextStocks = nextState.elementalStocks as number[] ?? [0, 0, 0, 0];

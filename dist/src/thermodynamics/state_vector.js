@@ -31,9 +31,9 @@ export class ThermodynamicStateVector {
         this.boundaryFluxes = this.fluxes;
         this.entropy = options?.entropy ?? 0;
         this.energy = options?.energy ?? 1000;
-        this.stocks = options?.stocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
-        this.entropyGenerationRate = 0;
-        this.exergyDestructionRate = 0;
+        this.stocks = options?.stocks ?? options?.elementalStocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
+        this.entropyGenerationRate = options?.entropyGenerationRate ?? 0;
+        this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
         this.timestamp = options?.timestamp ?? 0;
     }
     clone(overrides) {
@@ -43,7 +43,9 @@ export class ThermodynamicStateVector {
             entropy: overrides?.entropy ?? this.entropy,
             timestamp: overrides?.timestamp ?? this.timestamp,
             energy: overrides?.energy ?? this.energy,
-            stocks: overrides?.stocks ?? { ...this.stocks },
+            stocks: overrides?.stocks ?? overrides?.elementalStocks ?? { ...this.stocks },
+            entropyGenerationRate: overrides?.entropyGenerationRate ?? this.entropyGenerationRate,
+            exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate
         });
     }
     validateFirstLaw() {

@@ -12,13 +12,14 @@ class MockViolatingMonad extends BaseThermodynamicProcessMonad {
   readonly processId = 'mock_violating_process';
 
   evaluate(_state: ThermodynamicStateVector, _dt: number): ThermodynamicDerivativeResult {
-    return {
-      dInternalEnergy: 100,
-      dEntropy: -1.0,
-      entropyGenerationRate: -1.5, // Negative entropy generation - violates Second Law
-      exergyDestructionRate: 0,
-      massStockDeltas: new Map()
-    };
+    return new ThermodynamicDerivativeResult(
+      100,
+      -1.0,
+      -1.5,
+      -1.5,
+      0,
+      new Map()
+    );
   }
 }
 
@@ -26,13 +27,14 @@ class MockValidMonad extends BaseThermodynamicProcessMonad {
   readonly processId = 'mock_valid_process';
 
   evaluate(_state: ThermodynamicStateVector, _dt: number): ThermodynamicDerivativeResult {
-    return {
-      dInternalEnergy: 500,
-      dEntropy: 10.0,
-      entropyGenerationRate: 2.5, // Valid positive entropy generation rate
-      exergyDestructionRate: 0,
-      massStockDeltas: new Map([['carbon', 10.0]])
-    };
+    return new ThermodynamicDerivativeResult(
+      500,
+      10.0,
+      2.5,
+      2.5,
+      0,
+      new Map([['carbon', 10.0]])
+    );
   }
 }
 

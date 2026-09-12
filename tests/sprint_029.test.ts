@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { ThermodynamicStateValidator } from '../src/thermodynamics/state_validator.js';
-import { ThermodynamicStateVector, IThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
+import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
+import { IThermodynamicStateVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 029: Thermodynamic State Vector Validation Wrapper', () => {
   const validVector: ThermodynamicStateVector = new ThermodynamicStateVector({
@@ -88,9 +89,10 @@ describe('Sprint 029: Thermodynamic State Vector Validation Wrapper', () => {
   });
 
   it('should successfully wrap and guard monad step execution', () => {
-    const mockStep = (vec: IThermodynamicStateVector): IThermodynamicStateVector => vec.clone({
-      energy: vec.energy + 10,
-      entropy: vec.entropy + 1
+    const mockStep = (vec: IThermodynamicStateVector): IThermodynamicStateVector => ({
+      ...vec,
+      energy: (vec.energy ?? 0) + 10,
+      entropy: (vec.entropy ?? 0) + 1
     });
 
     const guardedStep = ThermodynamicStateValidator.wrapMonadStep(mockStep);
@@ -100,7 +102,8 @@ describe('Sprint 029: Thermodynamic State Vector Validation Wrapper', () => {
     assert.strictEqual(result.entropy, 51);
 
     // If step produces unphysical result (e.g. negative entropy), post-validation catches it
-    const corruptStep = (vec: IThermodynamicStateVector): IThermodynamicStateVector => vec.clone({
+    const corruptStep = (vec: IThermodynamicStateVector): IThermodynamicStateVector => ({
+      ...vec,
       entropy: -5
     });
 

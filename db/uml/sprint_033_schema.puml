@@ -1,0 +1,46 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life Thermodynamics" {
+  
+  interface ValidationResult {
+    +valid: boolean
+    +errors: string[]
+  }
+
+  class ThermodynamicStateVector {
+    +energy: number
+    +entropy: number
+    +temperature: number
+    +stocks: Map<string, number>
+    +constructor(energy: number, entropy: number, temperature: number, stocks: Record<string, number>)
+  }
+
+  class StateValidator {
+    +{static} validateStateProperties(state: any): ValidationResult
+    -{static} checkPresence(state: any): string[]
+    -{static} checkValueValidity(state: any): string[]
+  }
+
+  class ThermodynamicMonadProcess {
+    -state: ThermodynamicStateVector
+    +bind(f: Function): ThermodynamicMonadProcess
+    +inspect(): ValidationResult
+  }
+
+  class BlockchainLedgerTransaction {
+    +transactionId: string
+    +stateId: string
+    +signature: string
+    +timestamp: Date
+    +recordValidation(result: ValidationResult): void
+  }
+}
+
+ThermodynamicStateVector "1" *-- "0..*" ThermodynamicMonadProcess : wraps
+StateValidator ..> ValidationResult : produces
+StateValidator ..> ThermodynamicStateVector : inspects
+ThermodynamicMonadProcess --> StateValidator : verifies via
+BlockchainLedgerTransaction --> ValidationResult : logs audit
+
+@enduml

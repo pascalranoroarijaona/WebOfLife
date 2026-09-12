@@ -76,16 +76,18 @@ describe('Sprint 029: Thermodynamic State Vector Validation Wrapper', () => {
         }, /ThermodynamicViolation \(First Law\): Stock 'nitrogen' has negative mass\/count/);
     });
     it('should successfully wrap and guard monad step execution', () => {
-        const mockStep = (vec) => vec.clone({
-            energy: vec.energy + 10,
-            entropy: vec.entropy + 1
+        const mockStep = (vec) => ({
+            ...vec,
+            energy: (vec.energy ?? 0) + 10,
+            entropy: (vec.entropy ?? 0) + 1
         });
         const guardedStep = ThermodynamicStateValidator.wrapMonadStep(mockStep);
         const result = guardedStep(validVector);
         assert.strictEqual(result.energy, 1010);
         assert.strictEqual(result.entropy, 51);
         // If step produces unphysical result (e.g. negative entropy), post-validation catches it
-        const corruptStep = (vec) => vec.clone({
+        const corruptStep = (vec) => ({
+            ...vec,
             entropy: -5
         });
         const guardedCorruptStep = ThermodynamicStateValidator.wrapMonadStep(corruptStep);

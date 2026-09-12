@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicStateVector, BoundaryFluxVector, ThermodynamicStateMonad, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateVector, BoundaryFluxVector, ThermodynamicStateMonad, STANDARD_AMBIENT_TEMPERATURE_K, IThermodynamicStateVector } from '../src/thermodynamics/types.js';
 import { executeThermodynamicStep } from '../src/thermodynamics/thermodynamic_monad_process.js';
 import { bootstrapMegaPod } from '../src/earth_pod.js';
 
@@ -38,7 +38,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
     const monad = ThermodynamicStateMonad.initialize(initialState);
 
     assert.throws(() => {
-      monad.transit((state, fluxes) => executeThermodynamicStep(state, fluxes));
+      monad.transit((state: IThermodynamicStateVector, fluxes: any) => executeThermodynamicStep(state, fluxes), initialFluxes);
     }, /Second Law Violation/);
   });
 
@@ -73,7 +73,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
     };
 
     const monad = ThermodynamicStateMonad.initialize(initialState);
-    const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f)).getState();
+    const extractedState = monad.transit((s: IThermodynamicStateVector, f: any) => executeThermodynamicStep(s, f), initialFluxes).getStateVector();
 
     const T0 = extractedState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     const sGen = extractedState.entropyGenerationRate ?? 0;

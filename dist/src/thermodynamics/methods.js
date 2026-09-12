@@ -88,6 +88,7 @@ export function evaluateSecondLaw(state) {
         ...state,
         stocks: state.stocks ?? {},
         entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
     };
@@ -104,6 +105,7 @@ export function stepThermodynamicMonad(state, boundaryFlux, netEnergy, dt, dtSte
         internalEnergy: (state.internalEnergy ?? 0) + netEnergy * dtStep,
         stocks: state.stocks ?? {},
         entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
     };
@@ -140,9 +142,14 @@ export function computeThermodynamicProcess(params) {
         ...currentState,
         timestamp: (currentState.timestamp ?? 0) + params.timeStep,
         temperature: currentState.temperature ?? T0,
+        ambientTemperature: currentState.ambientTemperature ?? T0,
+        ambientReferenceTemp: currentState.ambientReferenceTemp ?? T0,
+        entropy: currentState.entropy ?? 1000,
+        energy: currentState.energy ?? currentState.internalEnergy ?? 1e6,
         specificEnthalpy: currentState.specificEnthalpy ?? 250000.0,
         stocks: currentState.stocks ?? params.stockInputs ?? {},
         entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
     };
@@ -175,6 +182,7 @@ export function computePhotosynthesisThermodynamics(prevState, carbonFlux, tempe
         timestamp: (prevState.timestamp ?? 0) + dt,
         stocks: prevState.stocks ?? {},
         entropyGenerationRate: sGen,
+        entropyGeneratorRate: sGen,
         exergyDestructionRate: T0 * sGen,
         boundaryFluxes: [
             { speciesId: 'carbon', molarRate: carbonFlux, massRate: carbonFlux * 12, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0 },
@@ -199,6 +207,7 @@ export class ThermodynamicMonadEngine {
             internal_energy_U: (initialState.internal_energy_U ?? initialState.internalEnergy ?? 0) + deltaInternalEnergy_U,
             stocks: initialState.stocks ?? {},
             entropyGenerationRate: sGen,
+            entropyGeneratorRate: sGen,
             exergyDestructionRate: T0 * sGen
         };
         return {
