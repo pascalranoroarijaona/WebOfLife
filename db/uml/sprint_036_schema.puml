@@ -1,0 +1,68 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "src.thermodynamics" {
+  interface ThermodynamicState {
+    + getEntropy(): number
+    + getEntropyGenerationRate(): number
+    + getEnergy(): number
+  }
+
+  class ThermodynamicStateVector {
+    - energy: number
+    - entropy: number
+    - entropyGenerationRate: number
+    + getEntropy(): number
+    + getEntropyGenerationRate(): number
+    + getEnergy(): number
+  }
+
+  class StateValidator {
+    {static} + validateEntropy(state: ThermodynamicState): boolean
+    {static} + assertNonNegativeEntropy(state: ThermodynamicState): void
+  }
+
+  class ThermodynamicConstraintViolationError {
+    - message: string
+    + constructor(message: string)
+  }
+
+  class ThermodynamicMonadProcess {
+    - inputVector: ThermodynamicStateVector
+    - solarInputFlux: number
+    + execute(): ThermodynamicStateVector
+  }
+}
+
+package "Database & Ledger" {
+  class ThermodynamicStateTable {
+    + state_id: VARCHAR(64)
+    + entity_id: VARCHAR(64)
+    + energy_stock: NUMERICAL
+    + entropy_stock: NUMERICAL
+    + entropy_generation_rate: NUMERICAL
+    + timestamp: TIMESTAMPTZ
+  }
+
+  class ThermodynamicMonadTransactionTable {
+    + transaction_id: VARCHAR(64)
+    + state_id: VARCHAR(64)
+    + previous_state_id: VARCHAR(64)
+    + solar_input_flux: NUMERICAL
+    + is_valid: BOOLEAN
+    + violation_reason: TEXT
+    + block_signature: VARCHAR(128)
+    + created_at: TIMESTAMPTZ
+  }
+}
+
+ThermodynamicState <|.. ThermodynamicStateVector
+StateValidator ..> ThermodynamicState : inspects
+StateValidator ..> ThermodynamicConstraintViolationError : throws
+ThermodynamicMonadProcess --> ThermodynamicStateVector : transforms
+ThermodynamicMonadProcess --> StateValidator : validates
+ThermodynamicStateVector --> ThermodynamicStateTable : persists
+ThermodynamicMonadProcess --> ThermodynamicMonadTransactionTable : records
+
+@enduml
