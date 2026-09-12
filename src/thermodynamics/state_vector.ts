@@ -5,12 +5,24 @@
 import { 
   IThermodynamicStateVector, 
   STANDARD_AMBIENT_TEMPERATURE_K, 
-  IBoundaryFluxArray, 
-  IExergyMetrics,
-  ThermodynamicStateVector as BaseThermodynamicStateVector
+  ThermodynamicStateVector as BaseThermodynamicStateVector,
+  IBoundaryFluxArray,
+  IExergyMetrics
 } from './types.js';
 
-export class ThermodynamicStateVector extends BaseThermodynamicStateVector {}
+export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
+  public computeDelta(previousState: ThermodynamicStateVector | BaseThermodynamicStateVector): Record<string, number> {
+    const deltas: Record<string, number> = {};
+    const prevStocks = previousState.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState.stocks ?? {});
+    const currStocks = this.stocks instanceof Map ? Object.fromEntries(this.stocks) : (this.stocks ?? {});
+    const keys = new Set([...Object.keys(prevStocks), ...Object.keys(currStocks)]);
+    for (const k of keys) {
+      deltas[k] = Number(currStocks[k] ?? 0) - Number(prevStocks[k] ?? 0);
+    }
+    return deltas;
+  }
+}
+
 export type StateVector = ThermodynamicStateVector;
 export const StateVector = ThermodynamicStateVector;
 export { ThermodynamicStateVector as StateVectorClass };

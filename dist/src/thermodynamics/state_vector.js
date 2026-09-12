@@ -4,6 +4,16 @@
  */
 import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateVector as BaseThermodynamicStateVector } from './types.js';
 export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
+    computeDelta(previousState) {
+        const deltas = {};
+        const prevStocks = previousState.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState.stocks ?? {});
+        const currStocks = this.stocks instanceof Map ? Object.fromEntries(this.stocks) : (this.stocks ?? {});
+        const keys = new Set([...Object.keys(prevStocks), ...Object.keys(currStocks)]);
+        for (const k of keys) {
+            deltas[k] = Number(currStocks[k] ?? 0) - Number(prevStocks[k] ?? 0);
+        }
+        return deltas;
+    }
 }
 export const StateVector = ThermodynamicStateVector;
 export { ThermodynamicStateVector as StateVectorClass };

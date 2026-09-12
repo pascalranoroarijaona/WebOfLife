@@ -1,0 +1,54 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class StateVector {
+  - vectorId: string
+  - timestamp: number
+  - stocks: Map<string, number>
+  + computeDelta(previous: StateVector): Map<string, number>
+}
+
+class ThermodynamicStructure {
+  - structureId: string
+  - cycleType: string
+  + calculateFluxDerivedDeltas(previous: StateVector, deltaTime: number): Map<string, number>
+}
+
+class DiscrepancyRecord {
+  + stockKey: string
+  + actualDelta: number
+  + expectedFluxDelta: number
+  + absoluteDiscrepancy: number
+  + isWithinTolerance: boolean
+}
+
+class ValidationReport {
+  + timestamp: number
+  + totalAbsoluteDiscrepancy: number
+  + records: DiscrepancyRecord[]
+  + isMassConserved: boolean
+}
+
+class StateValidator {
+  - tolerance: number
+  + constructor(tolerance: number)
+  + evaluate(previousState: StateVector, currentState: StateVector, structure: ThermodynamicStructure, deltaTime: number): ValidationReport
+}
+
+class ThermodynamicLedgerBlock {
+  + blockIndex: number
+  + blockHash: string
+  + previousHash: string
+  + timestamp: number
+  + report: ValidationReport
+  + entropyDelta: number
+  + solarFluxInput: number
+  + signature: string
+}
+
+StateValidator --> StateVector : consumes (previous/current)
+StateValidator --> ThermodynamicStructure : consumes (flux rates)
+StateValidator ..> ValidationReport : produces
+ValidationReport *-- DiscrepancyRecord : contains
+ThermodynamicLedgerBlock o-- ValidationReport : secures
+@enduml

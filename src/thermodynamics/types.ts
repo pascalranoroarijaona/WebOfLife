@@ -236,6 +236,7 @@ export interface IThermodynamicStateVector {
   specificExergy?: number;
   pressure?: number;
   fluxes?: Record<string, number>;
+  computeDelta?: (previousState: ThermodynamicStateVector | any) => Record<string, number>;
 }
 
 export interface IThermodynamicModel {
@@ -399,6 +400,17 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
 
   public validateFirstLaw(): boolean {
     return true;
+  }
+
+  public computeDelta(previousState: ThermodynamicStateVector | any): Record<string, number> {
+    const deltas: Record<string, number> = {};
+    const prevStocks = previousState.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState.stocks ?? {});
+    const currStocks = this.stocks instanceof Map ? Object.fromEntries(this.stocks) : (this.stocks ?? {});
+    const keys = new Set([...Object.keys(prevStocks), ...Object.keys(currStocks)]);
+    for (const k of keys) {
+      deltas[k] = Number(currStocks[k] ?? 0) - Number(prevStocks[k] ?? 0);
+    }
+    return deltas;
   }
 
   public clone(overrides?: Partial<IThermodynamicStateVector>): ThermodynamicStateVector {
