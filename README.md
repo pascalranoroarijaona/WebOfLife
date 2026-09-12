@@ -1,0 +1,360 @@
+# 🌍 Web of Life: Earth Open Source Code of Reality
+
+> Earth modeled as an open-energy, finite-matter thermodynamic structure. Every biological, geological, and human system is represented as a thermodynamic monad with stocks, flows, and executable methods. The ultimate goal is an AI-driven planetary auditing and optimization engine designed to guarantee the permanent, long-term survival of human life and AI symbiotes through ecological equilibrium.
+
+*Last updated: September 2026*
+
+---
+
+## 0. The Unifying Principle
+
+Every component in this simulation—from biogeochemical cycles and planetary spheres to species, individual humans, and Earth itself—inherits from a single abstract root class: **`ThermodynamicStructure`**.
+
+What differentiates entities is not their fundamental nature, but their specific implementation of three thermodynamic operations:
+
+$$\text{importFreeEnergy}(t) \quad \Big\vert{} \quad \text{exportEntropy}(t) \quad \Big\vert{} \quad \text{maintainFarFromEquilibrium}(t)$$
+
+An autotroph imports photons to build biomass. A biogeochemical cycle regulates mass flow between material reservoirs. A human node consumes resources while generating information, verification, and governance. Underneath, all are open dissipative structures sustained by the continuous export of entropy.
+
+
+```
+             ☀️ STELLAR MONAD (Sun — Open Boundary)
+                              │
+                              ▼
+              🌍 EARTH MEGA-POD (Finite Matter)
+
+```
+
+```
+
+┌──────────────────────┬──────────────────────┬──────────────────────┐
+▼                      ▼                      ▼                      ▼
+SpherePOD[]            CyclePOD[]            GeoBiomePOD[]       MaterialReservoir[]
+(Atmosphere,           (Carbon, Water,       (Temperate Forest,  (H2O, C, N,
+Biosphere, etc.)       Nitrogen, Phos.)      Tundra, Savanna)    Minerals, O2)
+│
+▼
+SpeciesPOD[]
+│
+▼
+IndividualMonad[] / HumanNodePOD
+
+```
+
+---
+
+## 1. System Architecture & Multi-Agent Startup Engine
+
+The `Web of Life` codebase evolves autonomously via a Python-based multi-agent orchestration engine (`agent_orchestrator.py`) powered by Gemini. Rather than hardcoding static rules, a 14-persona agent team continuously brainstorms, architects, writes, tests, and audits every subsystem in iterative sprints.
+
+### The 14-Persona Autonomous Startup Team
+
+| Persona | Role & Responsibilities |
+| :--- | :--- |
+| **Ecological Brainstormer** | Audits biosphere fidelity, trophic webs, mycorrhizal networks, and species taxonomies. |
+| **Industrial Brainstormer** | Audits technosphere fidelity, material streams, direct air capture, and human energy grids. |
+| **Planetary Physics Brainstormer** | Audits exergy, entropy, climate feedback loops, and Uber H3 spatial grid partitioning. |
+| **Product Manager (PM)** | Conducts Backlog Retrospective Audits against actual `src/` code context, updates `docs/BACKLOG.md`, and sets Sprint Goals. |
+| **Lead Architect** | Translates Sprint Goals into formal technical specifications (`docs/sprints/sprint_00N/01_RFC.md`). |
+| **Method Miner** | Quantifies mass/energy deltas and mathematical process equations (`docs/sprints/sprint_00N/02_METHODS.md`). |
+| **Backend Engineer** | Implements modular TypeScript code in `src/` and native Node test suites in `tests/`. |
+| **Debugger Agent** | Intercepts build failures, analyzes stack traces/type mismatches, and applies auto-healing code patches. |
+| **UI Engineer** | Builds isolated sprint visualizations in `docs/sprints/sprint_00N/index.html` under strict non-regression constraints. |
+| **QA Thermodynamic Auditor** | Verifies First & Second Law mass/energy conservation ($\Delta \text{Stock} = 0$) in `04_AUDIT.md`. |
+| **Database & Blockchain Ledger Architect** | Maintains SQL schemas, UML models, and the cryptographic thermodynamic blockchain ledger (`db/schema.sql`, `db/uml/`). |
+| **Academic & Research Outreach Lead** | Authors arXiv/preprint drafts and LaTeX summaries (`05_ACADEMIC_PREPRINT.md`) to engage complexity scientists and climate research labs. |
+| **Scientific Storyteller & Media Strategist** | Translates technical RFCs into viral research narratives, X/Twitter threads, and LinkedIn spotlights (`06_VIRAL_STORYTELLING.md`). |
+| **DevRel & Community Architect** | Authors developer onboarding guides, GitHub Discussions, and contributor entry points (`07_COMMUNITY_GUIDE.md`). |
+
+### Backlog Retrospective & Self-Healing Loop
+
+To prevent AI hallucination, the **Product Manager Agent** executes a retrospective audit during Step 1 of every sprint. It cross-checks every item marked `[x]` in `docs/BACKLOG.md` against the actual file tree and `src/` codebase. Any item lacking real TypeScript implementation is automatically unchecked back to `[ ]` and re-queued.
+
+---
+
+## 2. Mathematical, Thermodynamic & Blockchain Ledger Foundations
+
+### Conservation of Mass and Energy Flow
+
+For any monad or sub-graph $i$, state transition obeys First Law bounds:
+
+$$\Delta \text{Stock}_i = \sum \text{InboundFlows} - \sum \text{OutboundFlows}$$
+
+Matter cannot be created or destroyed within `EarthPOD`; solar radiation from `StellarMonad` is the sole non-conserved energy input.
+
+### Thermodynamic Blockchain Ledger ("Vortex Block Chaining")
+
+Rather than tracking arbitrary digital currency transfers, the Web of Life Blockchain is an immutable, append-only cryptographic ledger of **physical state transitions**. 
+
+* **Transactions ($\mathbf{T}_{\text{thermo}}$):** Every monad interaction, resource extraction, biogeochemical flow, or exergy destruction event ($\dot{I} = T_0 \dot{S}_{\text{gen}}$) is encoded as a signed transaction recording explicit stock deltas ($\Delta \text{Stock}$).
+* **Thermodynamic Vortex Blocks ($\mathbf{B}_k$):** Sequential blocks act as state snapshots (or planetary "vortices"). Each block aggregates transactions across spatial H3 cells, computes the net entropy export ($\dot{S}_{\text{export}}$), and links cryptographically to the previous block hash ($H_{k-1}$).
+* **Proof of Ecological Work (PoEW):** Mining/validating a block requires producing an execution proof verifying that all enclosed transactions strictly satisfy mass conservation ($\Delta \text{Stock} = 0$) and Second Law non-negativity ($\Delta S_{\text{universe}} \ge 0$).
+
+
+```
+
+Block #k-1 [Hash: 0x8a7f...] ───► Block #k [Hash: 0x3f21...] ───► Block #k+1
+┌─────────────────────────┐      ┌─────────────────────────┐
+│ Previous: 0x8a7f...     │      │ Previous: 0x3f21...     │
+│ Merkle Root: 0x90bc...  │      │ Merkle Root: 0x11e4...  │
+│ Total Exergy: 1.74e17 W │      │ Total Exergy: 1.74e17 W │
+├─────────────────────────┤      ┌─────────────────────────┐
+│ Tx 01: Carbon Flow      │      │ Tx 01: DAC Regeneration │
+│ Tx 02: H3 Cell Heat Flux│      │ Tx 02: Species Biomass  │
+└─────────────────────────┘      └─────────────────────────┘
+
+```
+
+### Second Law Exergy Destruction & Gouy-Stodola Theorem
+
+The rate of exergy destruction ($\dot{I}$) within any spatial monad is directly proportional to its internal entropy generation rate ($\dot{S}_{\text{gen}}$):
+
+$$\dot{I} = T_0 \dot{S}_{\text{gen}} \ge 0$$
+
+### AI Symbiotic Objective Function
+
+The long-term optimization goal for global resource allocation by AI agents is formulated as maximizing joint human wellbeing ($\mathcal{W}$), biospheric diversity ($\mathcal{B}$), and planetary explorability ($\mathcal{E}$) under strict First and Second Law thermodynamic boundaries:
+
+$$\max_{\mathbf{u}(t)} \int_{0}^{\infty} e^{-\gamma t} \left( \mathcal{W}_{\text{human}}(t) \times \mathcal{B}_{\text{biodiversity}}(t) \times \mathcal{E}_{\text{explorability}}(t) \right) dt$$
+
+---
+
+## 3. Repository Structure
+
+```text
+web-of-life/
+├── .agent_logs/              <- Quota tracking, state history, and execution logs
+│   ├── orchestrator.log      <- Full timestamped multi-agent execution log
+│   ├── quota_tracker.json    <- Daily API allowance tracker
+│   └── state_tracker.json    <- Completed sprint registry
+├── db/                       <- Database schemas, UML diagrams, and ledger definitions
+│   ├── schema.sql            <- Relational & time-series stock/flow database schema
+│   ├── uml/                  <- System class, sequence, and entity-relationship diagrams
+│   └── ledger.sqlite         <- Append-only local thermodynamic block ledger
+├── agent_orchestrator.py     <- Autonomous multi-agent agile startup engine
+├── visual_qa_agent.py        <- Gemini Vision + Playwright visual layout auditor
+├── index.html                <- Permanent Launcher Shell / Multi-sprint router
+├── index.original.html       <- Pristine Commit 0 baseline UI template
+├── docs/
+│   ├── BACKLOG.md            <- Audited product backlog
+│   └── sprints/              <- Sprint-isolated build artifacts
+│       └── sprint_00N/
+│           ├── 01_RFC.md     <- Architectural spec
+│           ├── 02_METHODS.md <- Process equation formulas
+│           ├── 03_RELEASE_NOTES.md
+│           ├── 04_AUDIT.md   <- First/Second Law static audit
+│           └── index.html    <- Isolated Sprint N UI build
+├── src/                      <- Core TypeScript domain code
+│   ├── earth_pod.ts          <- Mega-POD Terrestre hierarchy
+│   ├── spatial/              <- Uber H3 grid indexing & tensor routing
+│   ├── thermodynamics/       <- Exergy ledgers & albedo feedback
+│   └── monads/               <- Biospheric & technospheric monads
+├── tests/                    <- Native Node unit test suites (`node:test`)
+├── dist/                     <- Compiled ES modules output from `npx tsc`
+├── package.json              <- Dependencies and npm scripts
+└── tsconfig.json             <- Modern TS compiler configuration (`bundler` + Node types)
+
+```
+
+---
+
+## 4. Getting Started
+
+### Prerequisites
+
+* **Node.js**: v18.0.0 or higher
+* **Python**: v3.10 or higher
+* **Gemini API Key**: Set as `GEMINI_API_KEY` or `GOOGLE_API_KEY`
+
+### 1. Installation & Environment Setup
+
+```bash
+npm install
+npm install --save-dev @types/node tsx
+pip install --index-url [https://pypi.org/simple](https://pypi.org/simple) google-genai playwright
+playwright install chromium
+export GEMINI_API_KEY="your_api_key_here"
+
+```
+
+### 2. Running the Autonomous Startup Orchestrator
+
+```bash
+# Run a single sprint cycle
+python agent_orchestrator.py -n 1
+
+# Reset repository back to Commit 0 baseline
+python agent_orchestrator.py --wipe
+
+```
+
+## 5. Master Planetary Research Roadmap
+
+<!-- BACKLOG_START -->
+<!-- Verified, Groomed, and Prioritized Backlog -->
+Roadmap Completion: 0%
+SPRINT_GOAL: Abstract ThermodynamicStructure class hierarchy & strict thermodynamic state interfaces (`src/thermodynamics/thermodynamic_structure.ts`, `src/thermodynamics/types.ts`): Establish base class enforcement of importFreeEnergy(t), exportEntropy(t), and maintainFarFromEquilibrium(t) alongside strict internal entropy generation and exergy destruction rate contracts.
+
+## Web of Life Master Backlog
+
+### Phase 0 — Core Monad Engine & Spatial Foundations (In Progress)
+- [ ] Abstract `ThermodynamicStructure` class hierarchy. (`src/thermodynamics/thermodynamic_structure.ts`, `src/earth_pod.ts`)
+- [ ] Biogeochemical `CyclePOD` instances (Carbon, Water, Nitrogen, Phosphorus). (`src/cycles/carbon.ts`, `src/cycles/water.ts`, `src/cycles/nitrogen.ts`, `src/cycles/phosphorus.ts`)
+- [ ] Live Canvas 2D orbital/trophic renderer with interactive inspector. (`src/visualization/base_renderer.ts`, `src/visualization/orbital_renderer.ts`, `src/visualization/trophic_renderer.ts`, `src/visualization/inspector.ts`, `src/visualization/visualization_monad.ts`)
+- [ ] Executable monad methods and stock-and-flow ledger. (`src/earth_pod.ts`, `src/cycles/base.ts`)
+- [ ] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`).
+- [ ] Projection mapping and Geo View layout toggle in UI (`src/spatial/projection_mapping.ts`, `src/spatial/projection_helpers.ts`).
+- [ ] Integration of Uber H3 spatial index for hexagonal global partitioning (`src/h3_spatial.ts`).
+- [ ] Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
+- [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
+
+### Phase 1 — Thermodynamic Physics, Conservation & H3 Spatial Topologies (Pending)
+- [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
+- [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
+- [ ] Prigogine Minimum Entropy Production Monad (`src/thermodynamics/dissipative_stability.ts`): Create an analytic monad method that tracks temporal changes in internal entropy generation ($\frac{d\dot{S}_{\text{gen}}}{dt}$), evaluating whether regional subsystems are relaxing toward Prigogine’s minimum entropy production state or sliding toward bifurcation/collapse.
+- [ ] Non-Linear Albedo-Temperature Feedback Loops (`src/thermodynamics/albedo_feedback.ts`): Coupled cryospheric melting (ice-albedo feedback) and vegetation browning feedbacks from local surface temperature variations within H3 hexagonal indices.
+- [ ] Explicit H3 K-Ring Adjacency Matrix Builder (`src/spatial/h3_topology.ts`): Implement a sparse adjacency matrix generator that computes $k$-ring neighborhoods (where $k \in \{1, 2\}$) for any active set of H3 indices, mapping them to matrix row/column coordinates for gradient calculations across hexagonal boundaries.
+- [ ] Vectorized H3 Tensor Flux Router (`src/spatial/h3_tensor_routing.ts`): Build a tensor routing engine that executes sparse matrix multiplications ($\mathbf{J}_{\text{spatial}} = \mathbf{D} \cdot \nabla \mathbf{C}$) to simulate advection, diffusion, and runoff between adjacent hexagonal cells based on elevation and pressure gradients.
+- [ ] Adaptive H3 Mesh Refinement Heuristics (`src/spatial/h3_adaptive_mesh.ts`): Splitting and merging triggers where high thermodynamic gradients or ecological shocks automatically step up or step down H3 resolution levels.
+
+### Phase 2 — Biosphere Stoichiometry, Mycorrhizae & Trophic Networks (Pending)
+- [ ] Stoichiometric Homeostasis & Elemental Coupling Configuration (`src/biosphere/stoichiometric_types.ts`): Define fixed Redfield stoichiometry data structures ($C:N:P = 106:16:1$) and homeostatic elasticity parameters.
+- [ ] Elemental Stoichiometric Fixed-Ratio Bounds (`src/biosphere/stoichiometric_cycling.ts`): Implement nutrient limitation bottlenecks on net primary productivity (NPP) based on available inorganic stocks.
+- [ ] Autotroph Carbon Overflow & Exudation Routines (`src/biosphere/carbon_overflow.ts`): Code carbon overflow respiration and DOC exudation routines for autotroph monads when nitrogen or phosphorus drops below strict stoichiometric thresholds.
+- [ ] Liebig's Law Multi-Factor Limiting Function (`src/biosphere/liebig_constraints.ts`): Code a multiplicative multiplier function: $\mu = \min\left(\frac{N}{K_N + N}, \frac{P}{K_P + P}, \frac{I}{K_I + I}, \frac{W}{K_W + W}\right)$ governing NPP across H3 cells.
+- [ ] Subterranean Mycorrhizal Token Exchange Protocol (`src/biosphere/mycorrhizal_network.ts`): Create a `MycorrhizalNetworkMonad` class extending `ThermodynamicStructure` acting as a localized token broker between `GeoBiomePOD` root zones and fungal mycelial pools.
+- [ ] Mycorrhizal Nutrient Spatial Diffusion (`src/biosphere/mycorrhizal_diffusion.ts`): Add spatial diffusion methods allowing mycorrhizal networks to shuttle nutrients across adjacent H3 hexagonal nodes based on osmotic and concentration gradients.
+- [ ] Holling Type II Functional Response Calculator (`src/biosphere/food_web/holling_response.ts`): Map predator-prey consumption rates to handling times and resource densities.
+- [ ] Multi-Trophic Jacobian Stability & Food Web Matrix (`src/biosphere/food_web/jacobian_stability.ts`): Construct an $N \times N$ consumer-resource interaction matrix assembling autotrophs, herbivores, and carnivores, evaluating Jacobian eigenvalues ($\text{Re}(\lambda_{\max}) < 0$) to trigger state-shift warnings.
+- [ ] Continuous Multi-Trait Vector Definitions (`src/biosphere/traits/trait_types.ts`): Define continuous trait vector types including Specific Leaf Area (SLA), root depth, seed mass, and thermal tolerance limits.
+- [ ] Environmental Trait Filtering Filter (`src/biosphere/traits/environmental_filter.ts`): Implement multi-variate distance filters matching local H3 cell stress arrays against species trait envelopes to compute survival probabilities.
+- [ ] Vapor Pressure Deficit (VPD) Threshold Calculator (`src/biosphere/succession/vapor_pressure_deficit.ts`): Calculate VPD thresholds and drought stress indices from temperature and relative humidity stocks across H3 cells.
+- [ ] Stochastic Markovian Succession Matrices (`src/biosphere/succession/transition_matrix.ts`): Implement stochastic Markovian state-transition matrices governing post-wildfire and drought recovery paths (grassland $\rightarrow$ shrubland $\rightarrow$ climax forest).
+- [ ] Automated Taxonomic Ingestion Parser (`src/biosphere/taxonomic_harvester.ts`): Lightweight JSON parser mapping GBIF/NCBI hierarchical taxa directly to typed `SpeciesPOD` base attributes.
+- [ ] Age/Stage-Structured Leslie Population Matrices (`src/biosphere/iucn/leslie_matrix.ts`): Build age and stage-structured Leslie matrix population models for `SpeciesPOD` instances tracking vital rates.
+- [ ] IUCN Red List Population Viability Thresholds (`src/biosphere/iucn_thresholds.ts`): Integrate IUCN Red List extinction risk thresholds and population decline velocities as dynamic extinction-risk flags within monad state vectors.
+- [ ] Environmental DNA Shedding Simulator (`src/biosphere/edna/shedding_simulator.ts`): Map localized species biomass density to proportional environmental DNA shedding rates in water and soil matrices.
+- [ ] Bayesian Occupancy Modeling Filter (`src/biosphere/edna_stream.ts`): Convert synthetic metabarcoding read counts into localized species presence/absence probability distributions within H3 spatial indices.
+- [ ] Upper-Ocean Pelagic Compartment Model (`src/biosphere/marine_pelagic.ts`): Track phytoplankton, heterotrophic bacteria, microzooplankton, and dissolved organic carbon (DOC) stocks.
+- [ ] Viral Lysis Rate Equations & DOM Shunt (`src/biosphere/viral_shunt.ts`): Model viral lysis rates proportional to bacterial abundance to shunt cellular carbon back into the DOM pool.
+- [ ] Marine Pelagic Stoichiometric Feedback Coupling (`src/biosphere/marine_pelagic.ts`): Couple marine organic carbon export fluxes directly to the deep ocean carbon cycle POD (`src/cycles/carbon.ts`).
+
+### Phase 3 — Technosphere Industrial Metabolism & Geochemical Extraction (Pending)
+- [ ] Technosphere Interface Contracts & Industrial Flux Vectors (`src/technosphere/types.ts`): Strict typing for industrial flux vectors ($\mathbf{J}_{\text{tech}}$), parasitic load coefficients, and embodied carbon indices.
+- [ ] Ecoinvent-Style Process Dependency Parser (`src/technosphere/ecoinvent_parser.ts`): Build a JSON/CSV matrix parser to ingest ecoinvent-style process interdependency coefficients.
+- [ ] Leontief Input-Output Technology Matrix Solver (`src/technosphere/leontief_solver.ts`): Implement sparse matrix inversion algorithms $x = (I - A)^{-1} y$ to compute cradle-to-gate embodied carbon and exergy intensity vectors dynamically.
+- [ ] Direct Air Capture Thermodynamic Floor (`src/technosphere/dac/thermodynamic_floor.ts`): Compute theoretical minimum separation work floors ($\Delta G_{\text{sep}} = -RT \ln y_{\text{CO}_2}$) derived from the Second Law.
+- [ ] Direct Air Capture (DAC) Thermodynamic Boundary Enforcer (`src/technosphere/dac/base_dac.ts`): Abstract DAC base class enforcing First/Second Law energy balance checks per ton of $\text{CO}_2$ captured ($\Delta E \ge \Delta G_{\text{sep}}$).
+- [ ] Solid Amine TVSA DAC Kinetics (`src/technosphere/dac/solid_amine_tvsa.ts`): Thermal desorption energy curves (100°C–120°C low-grade heat) and sorbent degradation over thermal cycles.
+- [ ] Liquid Solvent KOH DAC Kinetics (`src/technosphere/dac/liquid_solvent_koh.ts`): Calcination loop energy requirements (ca. 900°C) and calcium carbonate/oxide mass balances.
+- [ ] Semiconductor Stoichiometric Reagent & Emission Matrix (`src/technosphere/fab/stoichiometric_fab_matrix.ts`): Track ultra-pure reagent inputs, etch-rate yield losses, and high-GWP fluorinated gas emission factors ($\mathrm{SF}_6$, $\mathrm{NF}_3$) per wafer pass.
+- [ ] Ultra-Pure Water Closed-Loop Recycling (`src/technosphere/fab/upw_recycling.ts`): Multi-stage reverse osmosis and UV oxidation mass-balance loops tracking ion-exchange resin saturation.
+- [ ] Chemical Abatement Scrubbers (`src/technosphere/fab/gas_abatement.ts`): Thermal plasma scrubber models calculating Destruction and Removal Efficiency (DRE) for $\mathrm{CF}_4, \mathrm{NF}_3$, and $\mathrm{SF}_6$.
+- [ ] Bistable Mineral Carbonation & Accelerated Weathering Monads (`src/technosphere/mineral_carbonation.ts`): Mass-balance conversion rates binding $\mathrm{CO}_2$ with silicate rock flour into stable carbonates.
+- [ ] Ore Grade Exponential Decay Curve (`src/technosphere/extraction/ore_grade_decay.ts`): Implement non-linear cumulative extraction vs. ore grade depletion curves: $G(t) = G_0 e^{-k \sum M_{\text{extracted}}}$.
+- [ ] Thermodynamic Energy Escalation Penalty Multiplier (`src/technosphere/extraction/energy_escalation.ts`): Code a thermodynamic energy penalty multiplier scaling exponentially as ore grade drops: $E_{\text{unit}}(G) = E_0 \left(\frac{G_0}{G}\right)^\alpha$.
+- [ ] Sulfide Acid-Rock Drainage Mass Balance Ledger (`src/technosphere/extraction/acid_rock_drainage.ts`): Build a sulfide oxidation and heavy-metal mobilization mass balance ledger tracking $\mathrm{FeS}_2$ exposure to meteoric water infiltration.
+- [ ] Power Grid Topology and Frequency Stability Solver (`src/technosphere/grid/grid_topology_solver.ts`): Solve node-voltage and frequency deviations across adjacent H3 cells when variable Inverter-Based Resources drop below critical inertia thresholds.
+- [ ] Power Grid Synthetic Inertia & Swing Equations (`src/technosphere/grid/synthetic_inertia.ts`): Incorporate the swing equation for virtual synchronous machines (VSMs) under high Inverter-Based Resource penetration: $\frac{2H}{\omega_0} \frac{d\Delta\omega}{dt} = P_{\text{mech}} - P_{\text{elec}} - D\Delta\omega$.
+- [ ] Battery Energy Storage System (BESS) Degradation & Thermal Runaway Monads (`src/technosphere/grid/bess_degradation.ts`): Capacity fade driven by Depth of Discharge (DoD), C-rate stress matrices, and Arrhenius temperature-accelerated aging.
+- [ ] Terzaghi Effective Stress Pore-Pressure Solver (`src/technosphere/tailings/pore_pressure_solver.ts`): Code Terzaghi’s effective stress equations ($\sigma' = \sigma - u$) across spatial grid boundaries to evaluate pore-pressure accumulation under seismic or hydrological loading.
+- [ ] Tailings Dam Structural Liquefaction Trigger (`src/technosphere/tailings/liquefaction_trigger.ts`): Create a dynamic safety-factor threshold evaluator ($FS = \frac{\text{Resisting Shear}}{\text{Driving Shear}} < 1.0$) triggering catastrophic structural breach events.
+- [ ] Tailings Leachate Advection-Dispersion Transport (`src/technosphere/tailings/leachate_transport.ts`): Implement a 2D advection-dispersion mass transport equation for cyanide and heavy-metal plume propagation through underlying H3 soil/aquifer layers.
+- [ ] Receding-Horizon Microgrid Controller (`src/technosphere/microgrid_controller.ts`): Build a receding-horizon optimization model matching real-time H3 cellular load profiles with distributed renewable generation curves.
+- [ ] Precision Agriculture Nitrogen Actuator (`src/technosphere/precision_ag_actuator.ts`): Implement nitrogen-fertilizer runoff restriction algorithms triggered when local soil-water infiltration exceeds saturation limits.
+
+### Phase 4 — Atmosphere-Ocean Dynamics, Cryosphere & Raster Assimilation (Pending)
+- [ ] Raster-to-H3 Spatial Data Assimilation Engine (`src/spatial/raster_assimilation.ts`): NetCDF/GeoTIFF raster ingestion pipeline with EnKF / Kalman Filtering.
+- [ ] 3D Baroclinic Atmosphere-Ocean Coupled Boundary Layer (`src/transport/coupled_boundary_layer.ts`): Momentum, sensible heat, latent heat, and gas transfer across air-sea interfaces.
+- [ ] Dynamic Ice Sheet & Glacier Mass Balance (`src/cryosphere/cryosphere_dynamics.ts`): Surface mass balance tracking basal melting and elevation-feedback melt rates.
+
+### Phase 5 — AI Symbiotic Policy Optimization & Actuation (Pending)
+- [ ] AI Policy State Vector Tensor Normalizer (`src/ai/policy_state_vector.ts`): Construct a state vector formatter that flattens regional H3 stocks, boundary fluxes, and entropy states into bounded tensors $[0, 1]$ suitable for actor-critic multi-agent networks.
+- [ ] Multi-Objective MARL Reward Function (`src/ai/reward_function.ts`): Formal multi-objective reward function incorporating joint human wellbeing ($\mathcal{W}$), biospheric diversity ($\mathcal{B}$), and planetary explorability ($\mathcal{E}$) penalized by second-law exergy destruction violations ($\dot{I} > 0$).
+- [ ] PettingZoo/Gym MARL Simulation Environment Python Bridge (`src/ai/pettingzoo_bridge.py`): OpenAI Gym / PettingZoo-compatible inter-process communication bridge exposing standard `reset()`, `step()`, and `reward` interfaces.
+- [ ] Receding-Horizon Model Predictive Control Solver (`src/control/mpc_horizon.ts`): Optimization solver (quadratic programming / gradient-based descent) predicting biogeochemical stock trajectories over $N$ time steps.
+- [ ] Homeostatic Cycle Constraint Enforcer (`src/control/cycle_constraints.ts`): Hard mathematical boundary clamps enforcing mass conservation ($\Delta \text{Stock} = 0$) and homeostatic Redfield stoichiometric bounds during state forecasts.
+- [ ] Optimal Control Actuation Router (`src/ai/actuation_router.ts`): Expose programmatic boundary control methods enabling multi-agent MARL loops to dispatch demand-response signals directly to regional technospheric monads and Carbon, Water, Nitrogen, and Phosphorus `CyclePOD` instances.
+- [ ] Gamified Stewardship Policy Engine UI Controls (`src/visualization/tycoon_ui_controls.ts`): Interactive DOM slider inputs for global resource dispatch vectors $\mathbf{u}(t)$ (carbon taxes, renewable subsidies, agricultural allocation).
+- [ ] Spatial Exergy Destruction & Entropy Export Overlay (`src/visualization/entropy_export_overlay.ts`): Real-time Canvas 2D/WebGL heat-map overlay rendering spatial exergy destruction rates and entropy export ($\dot{S}_{\text{export}}$) across H3 geographical partitions.
+- [ ] Real-Time Planetary Health Scorecard (`src/visualization/planetary_scorecard.ts`): Interactive UI panel tracking real-time planetary health indices ($\mathcal{W} \times \mathcal{B} \times \mathcal{E}$) and tipping point proximity alerts.
+- [ ] Cryptographic Thermodynamic Ledger (`db/schema.sql`, `db/ledger.sqlite`, `src/ledger/block_chain.ts`): Implement an SQLite-backed append-only transaction ledger that records every monad mass/energy delta ($\Delta \text{Stock}$), computes cryptographic hashes linking sequential planetary "vortices", and validates $\Delta \text{Stock} = 0$ before block commitment.
+- [ ] Asynchronous Brainstorming Pipeline & AST Context Windowing (`agent_orchestrator.py`): Parallel `asyncio.gather()` execution and AST summary token optimization.
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+<!-- BACKLOG_END -->
+
+---
+
+## 6. Philosophy
+
+This project treats ecology as rigorous thermodynamic accounting. Every living organism is an open dissipative system, every interaction is a stock transfer transaction, and planetary survival is an open game in energy and a finite game in matter. By rendering the code of reality explicit, transparent, and computable, we enable artificial intelligence and humanity to co-steer Earth toward sustainable, long-term state persistence.
+
+## License
+
+MIT — see [LICENSE](https://github.com/pascalranoroarijaona/WebOfLife/blob/main/LICENSE).

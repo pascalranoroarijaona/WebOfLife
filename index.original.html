@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(700px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(880px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#inspector {
+  position: fixed;
+  z-index: 20;
+  top: 18px;
+  right: 18px;
+  width: min(390px, calc(100vw - 36px));
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  display: none;
+  background: var(--panel);
+  border: 1px solid #315064;
+  border-radius: 10px;
+  box-shadow: 0 0 40px #000;
+  backdrop-filter: blur(12px);
+}
+
+#inspector.open {
+  display: block;
+}
+
+.inspector-header {
+  position: relative;
+  padding: 16px;
+  border-bottom: 1px solid #315064;
+  background: rgba(255,255,255,0.04);
+}
+
+.close-x-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+
+.close-x-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: transparent;
+}
+
+#node-title {
+  color: white;
+  font-size: 1.08rem;
+  font-weight: bold;
+  padding-right: 28px;
+}
+
+#node-class {
+  margin-top: 5px;
+  color: var(--human);
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+}
+
+#node-description {
+  margin-top: 10px;
+  color: #9fc7d8;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.inspector-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid #203846;
+}
+
+.inspector-section h3 {
+  color: var(--sun);
+  font-size: 0.72rem;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.attribute {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 0.7rem;
+  border-bottom: 1px dotted #24404e;
+}
+
+.attribute-key {
+  color: var(--human);
+}
+
+.attribute-value {
+  color: var(--flora);
+  text-align: right;
+}
+
+.method,
+.relationship {
+  padding: 5px 0;
+  color: #d7e9ec;
+  font-size: 0.7rem;
+}
+
+.method::before {
+  content: "ƒ ";
+  color: var(--sun);
+}
+
+.relationship::before {
+  content: "→ ";
+  color: var(--fauna);
+}
+
+#legend {
+  position: fixed;
+  z-index: 9;
+  right: 18px;
+  bottom: 18px;
+  width: 240px;
+  padding: 13px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  font-size: 0.67rem;
+  backdrop-filter: blur(12px);
+}
+
+.legend-title {
+  color: white;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  color: #9fc7d8;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+#status {
+  position: fixed;
+  z-index: 9;
+  top: 18px;
+  right: 18px;
+  transform: translateY(calc(100% + 20px));
+  color: #7998a8;
+  font-size: 0.65rem;
+}
+</style>
+</head>
+
+<body>
+
+<div id="topbar">
+  <h1>The Earth Web of Life : Source Code of Reality - a Planetary Monad Engine</h1>
+  <h2>Finite Matter · Open Solar Energy · Interdependent Living Systems</h2>
+
+  <p>
+    Earth is modelled as a breathing <span class="highlight">Planetary Mega-POD</span>.
+    Every species is a population of thermodynamic monads participating in the
+    planetary exchange of energy, matter, information and life.
+  </p>
+
+  <p style="margin-top:9px;color:#ff6680;">
+    Click a node to pin/unpin it. Drag to reposition. Tick Debug to display positional offsets.
+  </p>
+
+  <div class="social-links">
+    <a href="https://github.com/pascalranoroarijaona/WebOfLife" target="_blank" rel="noopener noreferrer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub Repository
+    </a>
+    <a href="https://www.linkedin.com/in/pascalranoroarijaona/" target="_blank" rel="noopener noreferrer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.239-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+      LinkedIn Profile
+    </a>
+  </div>
+</div>
+
+<div id="controls">
+  <input id="search" type="text" placeholder="Search species..." />
+
+  <select id="layerFilter">
+    <option value="ALL">All Layers</option>
+    <option value="SUN">Solar Layer</option>
+    <option value="EARTH">Earth Layer</option>
+    <option value="FLORA">Flora</option>
+    <option value="FAUNA">Fauna</option>
+    <option value="FUNGI">Fungi</option>
+    <option value="MICROBE">Microbes</option>
+    <option value="HUMAN">Human Nodes</option>
+    <option value="MATERIAL">Materials</option>
+  </select>
+
+  <div class="zoom-container">
+    <span>Zoom</span>
+    <input id="zoomSlider" type="range" min="0.1" max="2.0" step="0.02" value="0.5" />
+    <span id="zoomVal" style="min-width: 32px; text-align: right;">50%</span>
+  </div>
+
+  <label class="debug-container">
+    <input id="debugToggle" type="checkbox" />
+    <span>Debug</span>
+  </label>
+
+  <button id="geoViewButton">Geo View: OFF</button>
+  <button id="pauseButton">Pause</button>
+  <button id="resetButton">Reset View</button>
+  <button id="closeInspector">Close Inspector</button>
+  <button id="docsButton" onclick="window.open('docs/index.html', '_blank')" style="border-color: #ffaa00; color: #ffaa00;">📄 Sprints Explorer</button>
+</div>
+
+<div id="status">
+  ACTIVE GRAPH · 0 NODES · 0 RELATIONSHIPS
+</div>
+
+<div id="inspector">
+  <div class="inspector-header">
+    <button id="closeInspectorX" class="close-x-btn" title="Close Inspector">✕</button>
+    <div id="node-title">Node</div>
+    <div id="node-class">Class</div>
+    <div id="node-description">Description</div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Attributes</h3>
+    <div id="attributes"></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Executable Methods</h3>
+    <div id="methods"></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Dependencies</h3>
+    <div id="dependencies"></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Outgoing Relations</h3>
+    <div id="relations"></div>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="legend-title">THERMODYNAMIC LAYERS</div>
+  <div class="legend-item"><span class="dot" style="background:var(--sun)"></span> Stellar energy</div>
+  <div class="legend-item"><span class="dot" style="background:var(--earth)"></span> Planetary POD</div>
+  <div class="legend-item"><span class="dot" style="background:var(--flora)"></span> Flora / autotrophs</div>
+  <div class="legend-item"><span class="dot" style="background:var(--fauna)"></span> Fauna / consumers</div>
+  <div class="legend-item"><span class="dot" style="background:var(--fungi)"></span> Fungi / decomposers</div>
+  <div class="legend-item"><span class="dot" style="background:var(--microbe)"></span> Microbial systems</div>
+  <div class="legend-item"><span class="dot" style="background:var(--human)"></span> Human monads</div>
+  <div class="legend-item"><span class="dot" style="background:var(--material)"></span> Matter reservoirs</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script type="module">
+import { bootstrapMegaPod } from 'https://pascalranoroarijaona.github.io/WebOfLife/dist/src/earth_pod.js';
+
+const { sun: megaSun, earth: megaEarth } = bootstrapMegaPod();
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let width;
+let height;
+let centerX;
+let centerY;
+let paused = false;
+let tickCount = 0;
+let selectedNode = null;
+let hoveredNode = null;
+
+let draggedNode = null;
+let isDragging = false;
+let dragStartPos = { x: 0, y: 0 };
+let draggedNodeWasPinned = false;
+let hasMoved = false;
+
+let isGeoMode = false;
+let isDebugMode = false;
+let zoom = 0.5;
+
+const mouse = { x: 0, y: 0 };
+
+const COLORS = {
+  SUN: "#ffaa00",
+  EARTH: "#0088ff",
+  FLORA: "#00ff66",
+  FAUNA: "#ff3366",
+  FUNGI: "#c084fc",
+  MICROBE: "#64d8ff",
+  HUMAN: "#00e1ff",
+  MATERIAL: "#d8c28f"
+};
+
+const nodes = [];
+const relations = [];
+const packets = [];
+
+const TYPES = {
+  SUN: { className: "StellarMonad", color: COLORS.SUN },
+  EARTH: { className: "PlanetaryMegaPOD", color: COLORS.EARTH },
+  FLORA: { className: "AutotrophMonad", color: COLORS.FLORA },
+  FAUNA: { className: "HeterotrophMonad", color: COLORS.FAUNA },
+  FUNGI: { className: "DecomposerMonad", color: COLORS.FUNGI },
+  MICROBE: { className: "MicrobialMonad", color: COLORS.MICROBE },
+  HUMAN: { className: "SatoshiHumanMonad", color: COLORS.HUMAN },
+  MATERIAL: { className: "MaterialReservoir", color: COLORS.MATERIAL }
+};
+
+const GEO_POSITIONS = {
+  "SOLAR_CORE_0": { lat: 80, lon: -170 },
+  "EARTH_MEGA_POD": { lat: 0, lon: 0 },
+  "WATER_RESERVOIR": { lat: -20, lon: -140 },
+  "CARBON_RESERVOIR": { lat: -10, lon: -60 },
+  "NITROGEN_RESERVOIR": { lat: 50, lon: 15 },
+  "MINERAL_RESERVOIR": { lat: -25, lon: 135 },
+  "OXYGEN_RESERVOIR": { lat: 60, lon: 100 },
+  "FLORA_0": { lat: 45.0, lon: -93.0 },
+  "FLORA_1": { lat: -15.0, lon: -170.0 },
+  "FLORA_2": { lat: -25.0, lon: 28.0 },
+  "FLORA_3": { lat: -3.0, lon: -60.0 },
+  "FLORA_4": { lat: 55.0, lon: -140.0 },
+  "FAUNA_0": { lat: -2.33, lon: 34.83 },
+  "FAUNA_1": { lat: -45.0, lon: 90.0 },
+  "FAUNA_2": { lat: 65.0, lon: -150.0 },
+  "FAUNA_3": { lat: 5.0, lon: 20.0 },
+  "FAUNA_4": { lat: 35.0, lon: 138.0 },
+  "FAUNA_5": { lat: -15.0, lon: -55.0 },
+  "FUNGI_0": { lat: 48.0, lon: 2.0 },
+  "FUNGI_1": { lat: 45.0, lon: -120.0 },
+  "FUNGI_2": { lat: -10.0, lon: -50.0 },
+  "MICROBE_0": { lat: 52.0, lon: 13.0 },
+  "MICROBE_1": { lat: 10.0, lon: 60.0 },
+  "MICROBE_2": { lat: 40.71, lon: -74.0 },
+  "MICROBE_3": { lat: 15.0, lon: 101.0 }
+};
+
+for (let i = 0; i < 12; i++) {
+  const lats = [40.71, 51.5, 35.67, -23.55, 28.61, -1.29, -33.86, 48.85, 31.23, 19.43, 55.75, 1.35];
+  const lons = [-74.0, -0.12, 139.65, -46.63, 77.2, 36.82, 151.2, 2.35, 121.47, -99.13, 37.61, 103.81];
+  GEO_POSITIONS[`SATOSHI_HUMAN_${String(i).padStart(3, "0")}`] = {
+    lat: lats[i % lats.length],
+    lon: lons[i % lons.length]
+  };
+}
+
+function geoToCanvas(lat, lon) {
+  const x = ((lon + 180) / 360) * width;
+  const y = ((90 - lat) / 180) * height;
+  return { x, y };
+}
+
+function getMouseWorldPos() {
+  return {
+    x: (mouse.x - centerX) / zoom + centerX,
+    y: (mouse.y - centerY) / zoom + centerY
+  };
+}
+
+class Monad {
+  constructor(config) {
+    Object.assign(this, config);
+    this.angle = Math.random() * Math.PI * 2;
+    this.x = 0;
+    this.y = 0;
+    this.isPinned = false;
+    this.isDragged = false;
+    this.dependencies = [];
+    this.relations = [];
+    this.pulse = Math.random() * Math.PI * 2;
+  }
+
+  update() {
+    if (this.isDragged) {
+      const wMouse = getMouseWorldPos();
+      this.x = wMouse.x;
+      this.y = wMouse.y;
+    } else if (this.isPinned) {
+      // Retain manually pinned position
+    } else if (isGeoMode && GEO_POSITIONS[this.id]) {
+      const target = geoToCanvas(GEO_POSITIONS[this.id].lat, GEO_POSITIONS[this.id].lon);
+      this.x += (target.x - this.x) * 0.08;
+      this.y += (target.y - this.y) * 0.08;
+    } else if (this.dx !== undefined && this.dy !== undefined) {
+      this.x = centerX + this.dx;
+      this.y = centerY + this.dy;
+    } else if (this.type === TYPES.SUN) {
+      this.x = centerX - width * 0.45;
+      this.y = centerY - height * 0.35;
+    } else if (this.type === TYPES.EARTH) {
+      this.x = centerX;
+      this.y = centerY;
+    } else if (this.parent) {
+      this.angle += this.speed;
+      this.x = this.parent.x + Math.cos(this.angle) * this.orbitRadius;
+      this.y = this.parent.y + Math.sin(this.angle) * this.orbitRadius * 0.62;
+    } else {
+      this.x = centerX;
+      this.y = centerY;
+    }
+
+    this.pulse += 0.035;
+  }
+
+  draw() {
+    const active = matchesFilter(this);
+    const dimmed = !active;
+
+    ctx.save();
+    ctx.globalAlpha = dimmed ? 0.08 : 1;
+
+    if (this === hoveredNode || this === selectedNode || this.isPinned) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius + 10 + Math.sin(this.pulse) * 2, 0, Math.PI * 2);
+      ctx.strokeStyle = this.isPinned ? "#00ff66" : "#ffffff";
+      ctx.lineWidth = this === selectedNode ? 3 : 1;
+      ctx.shadowColor = this.type.color;
+      ctx.shadowBlur = 18;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.type.color;
+    ctx.shadowColor = this.type.color;
+    ctx.shadowBlur = this.type === TYPES.EARTH ? 28 : this.type === TYPES.SUN ? 40 : 14;
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#ffffff";
+    ctx.globalAlpha = dimmed ? 0.08 : 0.7;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+
+    if (active && (this === hoveredNode || this === selectedNode || this.radius > 15 || this.labelSize)) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#dff";
+      const fontSize = this.labelSize || 10;
+      ctx.font = `bold ${fontSize}px Courier New`;
+      ctx.textAlign = "center";
+      ctx.fillText(this.label, this.x, this.y - this.radius - 8);
+    }
+
+    ctx.restore();
+  }
+}
+
+class DataPacket {
+  constructor(from, to, type) {
+    this.from = from;
+    this.to = to;
+    this.type = type;
+    this.progress = Math.random();
+    this.speed = 0.002 + Math.random() * 0.006;
+  }
+
+  update() {
+    this.progress += this.speed;
+    if (this.progress >= 1) this.progress = 0;
+  }
+
+  draw() {
+    if (!matchesFilter(this.from) || !matchesFilter(this.to)) return;
+
+    const x = this.from.x + (this.to.x - this.from.x) * this.progress;
+    const y = this.from.y + (this.to.y - this.from.y) * this.progress;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+    ctx.fillStyle = this.type === "energy"
+      ? COLORS.SUN
+      : this.type === "food"
+        ? COLORS.FAUNA
+        : COLORS.FLORA;
+
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+  centerX = width / 2;
+  centerY = height / 2;
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+function addNode(config) {
+  const node = new Monad(config);
+  nodes.push(node);
+  return node;
+}
+
+function connect(from, to, type, label) {
+  const relation = { from, to, type, label };
+  relations.push(relation);
+  from.relations.push(relation);
+  to.dependencies.push(relation);
+  packets.push(new DataPacket(from, to, type));
+}
+
+function randomFrom(array) {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+/* Core Objects */
+const sun = addNode({
+  id: "SOLAR_CORE_0",
+  label: "SUN",
+  labelSize: 28,
+  type: TYPES.SUN,
+  radius: 200,
+  parent: null,
+  dx: -1296,
+  dy: -45,
+  orbitRadius: 0,
+  speed: 0,
+  description: "Open stellar energy engine powering planetary complexity.",
+  attributes: {
+    mass: "1.989 × 10³⁰ kg",
+    state: "Plasma",
+    process: "Hydrogen → Helium fusion",
+    energyMode: "Open system",
+    planetaryRole: "Primary energy source"
+  },
+  methods: [
+    "radiatePhotonFlux()",
+    "emitSolarWind()",
+    "generateEntropyGradient()",
+    "sustainPlanetaryEnergyBudget()"
+  ]
+});
+
+const earth = addNode({
+  id: "EARTH_MEGA_POD",
+  label: "EARTH",
+  labelSize: 18,
+  type: TYPES.EARTH,
+  radius: 34,
+  parent: sun,
+  dx: 249,
+  dy: -37,
+  orbitRadius: 650,
+  speed: 0.0003,
+  description: "Finite planetary matter system containing the biosphere.",
+  attributes: {
+    totalMatter: "Finite",
+    atmosphere: "Dynamic gas membrane",
+    biosphere: "Interdependent living network",
+    waterCycle: "Active",
+    carbonCycle: "Active",
+    thermodynamicMode: "Open energy / finite matter"
+  },
+  methods: [
+    "absorbSolarRadiation()",
+    "cycleAtmosphericGases()",
+    "recycleFiniteMatter()",
+    "maintainEcologicalGradients()",
+    "hostLivingMonads()"
+  ]
+});
+
+connect(sun, earth, "energy", "solar radiation");
+
+/* Materials */
+const materials = [];
+[
+  ["WATER_RESERVOIR", "Water", "H₂O cycle", "Hydrospheric matter"],
+  ["CARBON_RESERVOIR", "Carbon", "Carbon cycle", "Atmospheric and biological carbon"],
+  ["NITROGEN_RESERVOIR", "Nitrogen", "Nitrogen cycle", "Nutrient substrate"],
+  ["MINERAL_RESERVOIR", "Minerals", "Geological cycle", "Finite mineral substrate"],
+  ["OXYGEN_RESERVOIR", "Oxygen", "Atmospheric gas", "Respiration and oxidation"]
+].forEach((entry, index) => {
+  const material = addNode({
+    id: entry[0],
+    label: entry[1],
+    type: TYPES.MATERIAL,
+    radius: 9,
+    parent: earth,
+    orbitRadius: 85 + index * 24,
+    speed: 0.001 + index * 0.0003,
+    description: entry[3],
+    attributes: {
+      chemicalIdentity: entry[2],
+      availability: "Finite planetary stock",
+      regeneration: "Cyclic",
+      accountingMode: "Material ledger"
+    },
+    methods: [
+      "cycleThroughBiosphere()",
+      "bindIntoBiomass()",
+      "returnThroughDecomposition()"
+    ]
+  });
+
+  materials.push(material);
+  connect(earth, material, "matter", "contains");
+});
+
+/* Species Groups */
+const flora = [];
+const fauna = [];
+const fungi = [];
+const microbes = [];
+const humans = [];
+
+function createSpecies({ id, label, type, orbit, radius, description, attributes, methods }) {
+  return addNode({
+    id,
+    label,
+    type: TYPES[type],
+    radius,
+    parent: earth,
+    orbitRadius: orbit,
+    speed: 0.0015 + Math.random() * 0.004,
+    description,
+    attributes,
+    methods
+  });
+}
+
+[
+  ["OAK_FOREST", "Oak Forest", 205],
+  ["KELP_FOREST", "Kelp Forest", 225],
+  ["GRASSLAND", "Grassland", 245],
+  ["RAINFOREST", "Rainforest", 265],
+  ["PHYTOPLANKTON", "Phytoplankton", 285]
+].forEach((entry, index) => {
+  const node = createSpecies({
+    id: `FLORA_${index}`,
+    label: entry[1],
+    type: "FLORA",
+    orbit: entry[2],
+    radius: 10,
+    description: "Autotrophic biomass converting solar energy into living structure.",
+    attributes: {
+      trophicRole: "Primary producer",
+      process: "Photosynthesis",
+      carbonStatus: "Carbon storage active",
+      oxygenStatus: "Oxygen production active",
+      biomass: "Regenerative"
+    },
+    methods: [
+      "photosynthesize(Solar.photons)",
+      "absorbWater(WaterReservoir)",
+      "extractMinerals(MineralReservoir)",
+      "storeCarbon()",
+      "releaseOxygen()",
+      "supportHabitat()"
+    ]
+  });
+
+  flora.push(node);
+  connect(sun, node, "energy", "photon energy");
+  connect(materials[0], node, "matter", "water");
+  connect(materials[3], node, "matter", "minerals");
+  connect(materials[1], node, "matter", "carbon exchange");
+});
+
+[
+  ["BEES", "Bees", 320],
+  ["WHALES", "Whales", 340],
+  ["WOLVES", "Wolves", 360],
+  ["INSECTS", "Insects", 380],
+  ["BIRDS", "Birds", 400],
+  ["HERBIVORES", "Herbivores", 420]
+].forEach((entry, index) => {
+  const node = createSpecies({
+    id: `FAUNA_${index}`,
+    label: entry[1],
+    type: "FAUNA",
+    orbit: entry[2],
+    radius: 8,
+    description: "Heterotrophic organism receiving energy through consumption.",
+    attributes: {
+      trophicRole: index < 2 ? "Primary consumer" : "Secondary consumer",
+      metabolism: "Respiratory",
+      mobility: "Active",
+      populationState: "Dynamic",
+      ecologicalFunction: index === 0 ? "Pollination" : "Consumption"
+    },
+    methods: [
+      "consumeBiomass(Flora)",
+      "respire(Oxygen)",
+      "moveAcrossHabitat()",
+      "reproduce()",
+      "excreteNutrients()",
+      "participateInFoodWeb()"
+    ]
+  });
+
+  fauna.push(node);
+  const foodSource = randomFrom(flora);
+  connect(foodSource, node, "food", "biomass consumption");
+  connect(materials[4], node, "matter", "oxygen");
+  connect(node, materials[1], "matter", "carbon respiration");
+});
+
+[
+  ["MYCELIAL_NETWORK", "Mycelial Network", 450],
+  ["MUSHROOMS", "Mushrooms", 470],
+  ["SOIL_FUNGI", "Soil Fungi", 490]
+].forEach((entry, index) => {
+  const node = createSpecies({
+    id: `FUNGI_${index}`,
+    label: entry[1],
+    type: "FUNGI",
+    orbit: entry[2],
+    radius: 7,
+    description: "Decomposer system returning biological matter to planetary cycles.",
+    attributes: {
+      trophicRole: "Decomposer",
+      ecologicalFunction: "Nutrient recycling",
+      substrate: "Dead organic matter",
+      networkStructure: "Distributed mycelium"
+    },
+    methods: [
+      "decompose(OrganicMatter)",
+      "releaseMinerals()",
+      "connectSoilNetworks()",
+      "exchangeNutrients(Flora)",
+      "returnCarbonToCycle()"
+    ]
+  });
+
+  fungi.push(node);
+  connect(randomFrom(flora), node, "matter", "dead biomass");
+  connect(node, materials[3], "matter", "mineral release");
+  connect(node, earth, "decomposition", "return nutrients");
+});
+
+[
+  ["SOIL_BACTERIA", "Soil Bacteria", 510],
+  ["OCEAN_MICROBES", "Ocean Microbes", 530],
+  ["GUT_MICROBIOME", "Gut Microbiome", 550],
+  ["NITROGEN_FIXERS", "Nitrogen Fixers", 570]
+].forEach((entry, index) => {
+  const node = createSpecies({
+    id: `MICROBE_${index}`,
+    label: entry[1],
+    type: "MICROBE",
+    orbit: entry[2],
+    radius: 5,
+    description: "Microscopic thermodynamic agents transforming matter and chemistry.",
+    attributes: {
+      scale: "Microscopic",
+      ecologicalFunction: "Biogeochemical transformation",
+      replication: "Rapid",
+      planetaryImportance: "Foundational"
+    },
+    methods: [
+      "transformChemicalSubstrate()",
+      "fixNitrogen()",
+      "exchangeMetabolites()",
+      "multiply()",
+      "supportSoilFertility()"
+    ]
+  });
+
+  microbes.push(node);
+  connect(materials[2], node, "matter", "nitrogen substrate");
+  connect(node, earth, "matter", "biogeochemical transformation");
+});
+
+for (let i = 0; i < 12; i++) {
+  const human = createSpecies({
+    id: `SATOSHI_HUMAN_${String(i).padStart(3, "0")}`,
+    label: `Human ${i}`,
+    type: "HUMAN",
+    orbit: 600 + Math.random() * 100,
+    radius: 5,
+    description: "Self-aware node capable of extracting, transforming and coordinating planetary matter.",
+    attributes: {
+      consciousness: "Self-aware",
+      technologicalLevel: "Industrial / computational",
+      energyUse: `${Math.floor(20 + Math.random() * 80)} MWh/year`,
+      materialFootprint: `${(Math.random() * 100).toFixed(2)} tonnes`,
+      informationLayer: "Language, culture, code",
+      governanceMode: "Experimental"
+    },
+    methods: [
+      "extractResources(Earth)",
+      "cultivate(Flora)",
+      "domesticate(Fauna)",
+      "consumeEnergy()",
+      "constructTechnology()",
+      "storeKnowledgeInPOD()",
+      "coordinateWithOtherHumans()",
+      "restoreEcosystem()"
+    ]
+  });
+
+  humans.push(human);
+  connect(earth, human, "matter", "resource extraction");
+  connect(randomFrom(flora), human, "food", "agricultural biomass");
+  connect(randomFrom(fauna), human, "food", "animal biomass");
+  connect(human, earth, "matter", "waste and transformation");
+}
+
+fauna.forEach(animal => connect(randomFrom(flora), animal, "habitat", "habitat dependency"));
+fauna.slice(0, 2).forEach(pollinator => connect(pollinator, randomFrom(flora), "pollination", "pollination service"));
+fungi.forEach(decomposer => connect(decomposer, randomFrom(flora), "symbiosis", "mycorrhizal exchange"));
+
+/* -----------------------------------------------------
+   UI, ZOOM & GRAPH LOGIC
+----------------------------------------------------- */
+
+function matchesFilter(node) {
+  const filter = document.getElementById("layerFilter").value;
+  const query = document.getElementById("search").value.toLowerCase();
+
+  const typeMatches =
+    filter === "ALL" ||
+    Object.keys(TYPES).find(key => TYPES[key] === node.type) === filter;
+
+  const queryMatches =
+    !query ||
+    node.id.toLowerCase().includes(query) ||
+    node.label.toLowerCase().includes(query) ||
+    node.type.className.toLowerCase().includes(query);
+
+  return typeMatches && queryMatches;
+}
+
+function drawOrbit(node) {
+  if (!node.parent || node.type === TYPES.EARTH || isGeoMode || node.isPinned) return;
+
+  ctx.save();
+  ctx.globalAlpha = matchesFilter(node) ? 0.18 : 0.04;
+  ctx.beginPath();
+  ctx.ellipse(
+    node.parent.x,
+    node.parent.y,
+    node.orbitRadius,
+    node.orbitRadius * 0.62,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.strokeStyle = node.type.color;
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRelation(relation) {
+  const active = matchesFilter(relation.from) && matchesFilter(relation.to);
+
+  ctx.save();
+  ctx.globalAlpha = active ? 0.2 : 0.025;
+  ctx.beginPath();
+  ctx.moveTo(relation.from.x, relation.from.y);
+  ctx.lineTo(relation.to.x, relation.to.y);
+
+  const relationColor = {
+    energy: COLORS.SUN,
+    food: COLORS.FAUNA,
+    matter: COLORS.MATERIAL,
+    decomposition: COLORS.FUNGI,
+    habitat: COLORS.FLORA,
+    pollination: COLORS.FLORA,
+    symbiosis: COLORS.MICROBE
+  };
+
+  ctx.strokeStyle = relationColor[relation.type] || "#567";
+  ctx.lineWidth = relation.type === "energy" ? 1.4 : 0.7;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function detectHover() {
+  hoveredNode = null;
+  const wMouse = getMouseWorldPos();
+
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const node = nodes[i];
+    const distance = Math.hypot(wMouse.x - node.x, wMouse.y - node.y);
+
+    if (distance <= node.radius + 10 && matchesFilter(node)) {
+      hoveredNode = node;
+      break;
+    }
+  }
+
+  canvas.style.cursor = isDragging ? "grabbing" : hoveredNode ? "grab" : "crosshair";
+}
+
+function updateInspectorAttributes(node) {
+  const attributes = document.getElementById("attributes");
+  if (!attributes) return;
+
+  let liveAttrs = {};
+
+  if (isDebugMode) {
+    const dx = Math.round(node.x - centerX);
+    const dy = Math.round(node.y - centerY);
+    liveAttrs["World X, Y"] = `${Math.round(node.x)}, ${Math.round(node.y)}`;
+    liveAttrs["Center Offset"] = `dx: ${dx}, dy: ${dy}`;
+    liveAttrs["Pos Formula"] = `centerX ${dx >= 0 ? '+' : '-'} ${Math.abs(dx)}`;
+  }
+
+  liveAttrs = { ...liveAttrs, ...node.attributes };
+
+  attributes.innerHTML = "";
+  Object.entries(liveAttrs).forEach(([key, value]) => {
+    attributes.innerHTML += `
+      <div class="attribute">
+        <span class="attribute-key">${key}</span>
+        <span class="attribute-value">${value}</span>
+      </div>
+    `;
+  });
+}
+
+function showInspector(node) {
+  selectedNode = node;
+  const inspector = document.getElementById("inspector");
+  inspector.classList.add("open");
+
+  document.getElementById("node-title").textContent = node.id;
+  document.getElementById("node-title").style.color = node.type.color;
+  document.getElementById("node-class").textContent = `CLASS: ${node.type.className}`;
+  document.getElementById("node-description").textContent = node.description;
+
+  updateInspectorAttributes(node);
+
+  const methods = document.getElementById("methods");
+  methods.innerHTML = node.methods
+    .map(method => `<div class="method">${method}</div>`)
+    .join("");
+
+  const dependencies = document.getElementById("dependencies");
+  dependencies.innerHTML = node.dependencies.length
+    ? node.dependencies.map(relation => `
+        <div class="relationship">
+          ${relation.from.id} · ${relation.type} · ${relation.label}
+        </div>
+      `).join("")
+    : `<div class="relationship">No incoming dependencies</div>`;
+
+  const outgoing = document.getElementById("relations");
+  outgoing.innerHTML = node.relations.length
+    ? node.relations.map(relation => `
+        <div class="relationship">
+          ${relation.to.id} · ${relation.type} · ${relation.label}
+        </div>
+      `).join("")
+    : `<div class="relationship">No outgoing relations</div>`;
+}
+
+/* Mouse Wheel Zoom Logic */
+const zoomSlider = document.getElementById("zoomSlider");
+const zoomVal = document.getElementById("zoomVal");
+
+function updateZoomUI() {
+  zoomSlider.value = zoom;
+  zoomVal.textContent = `${Math.round(zoom * 100)}%`;
+}
+
+zoomSlider.addEventListener("input", e => {
+  zoom = parseFloat(e.target.value);
+  zoomVal.textContent = `${Math.round(zoom * 100)}%`;
+});
+
+canvas.addEventListener("wheel", event => {
+  event.preventDefault();
+  const zoomFactor = event.deltaY > 0 ? 0.93 : 1.07;
+  zoom = Math.min(Math.max(0.1, zoom * zoomFactor), 2.0);
+  updateZoomUI();
+  detectHover();
+}, { passive: false });
+
+/* Debug Mode Toggle */
+const debugToggle = document.getElementById("debugToggle");
+debugToggle.addEventListener("change", e => {
+  isDebugMode = e.target.checked;
+  if (selectedNode) {
+    updateInspectorAttributes(selectedNode);
+  }
+});
+
+/* Interactive Drag & Toggle Pin Handlers */
+canvas.addEventListener("mousedown", () => {
+  if (hoveredNode) {
+    isDragging = true;
+    draggedNode = hoveredNode;
+    draggedNodeWasPinned = draggedNode.isPinned;
+    dragStartPos = { x: mouse.x, y: mouse.y };
+    hasMoved = false;
+    draggedNode.isDragged = true;
+    showInspector(draggedNode);
+  }
+});
+
+canvas.addEventListener("mousemove", event => {
+  mouse.x = event.clientX;
+  mouse.y = event.clientY;
+
+  if (isDragging && draggedNode) {
+    const dist = Math.hypot(mouse.x - dragStartPos.x, mouse.y - dragStartPos.y);
+    if (dist > 5) {
+      hasMoved = true;
+      draggedNode.isPinned = true;
+    }
+    updateInspectorAttributes(draggedNode);
+  }
+
+  detectHover();
+});
+
+canvas.addEventListener("mouseup", () => {
+  if (draggedNode) {
+    draggedNode.isDragged = false;
+    if (!hasMoved) {
+      draggedNode.isPinned = !draggedNodeWasPinned;
+    }
+    draggedNode = null;
+  }
+  isDragging = false;
+  detectHover();
+});
+
+const closeInspectorFn = () => {
+  selectedNode = null;
+  document.getElementById("inspector").classList.remove("open");
+};
+
+document.getElementById("closeInspector").addEventListener("click", closeInspectorFn);
+document.getElementById("closeInspectorX").addEventListener("click", closeInspectorFn);
+
+document.getElementById("pauseButton").addEventListener("click", event => {
+  paused = !paused;
+  event.target.textContent = paused ? "Resume" : "Pause";
+});
+
+document.getElementById("resetButton").addEventListener("click", () => {
+  document.getElementById("search").value = "";
+  document.getElementById("layerFilter").value = "ALL";
+  selectedNode = null;
+  zoom = 0.5;
+  updateZoomUI();
+  nodes.forEach(node => { node.isPinned = false; });
+  closeInspectorFn();
+});
+
+const geoBtn = document.getElementById("geoViewButton");
+geoBtn.addEventListener("click", () => {
+  isGeoMode = !isGeoMode;
+  geoBtn.textContent = `Geo View: ${isGeoMode ? "ON" : "OFF"}`;
+  geoBtn.style.borderColor = isGeoMode ? "#00ff66" : "#315064";
+});
+
+document.getElementById("search").addEventListener("input", detectHover);
+document.getElementById("layerFilter").addEventListener("change", detectHover);
+
+function updateStatus() {
+  const visibleNodes = nodes.filter(matchesFilter).length;
+  document.getElementById("status").textContent =
+    `ACTIVE GRAPH · ${visibleNodes} VISIBLE NODES · ${relations.length} RELATIONSHIPS · ${packets.length} DATA FLOWS`;
+}
+
+function drawNodeCoordinateOverlay(node) {
+  const dx = Math.round(node.x - centerX);
+  const dy = Math.round(node.y - centerY);
+  const line1 = `WORLD POS : [X: ${Math.round(node.x)}, Y: ${Math.round(node.y)}]`;
+  const line2 = `CENTER DEF : dx: ${dx}, dy: ${dy} (centerX ${dx >= 0 ? '+' : '-'} ${Math.abs(dx)})`;
+
+  ctx.save();
+  ctx.font = "bold 11px Courier New";
+  
+  const textWidth = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width);
+  const boxWidth = textWidth + 18;
+  const boxHeight = 36;
+  const boxX = node.x - boxWidth / 2;
+  const boxY = node.y + node.radius + 14;
+
+  ctx.fillStyle = "rgba(2, 10, 20, 0.92)";
+  ctx.strokeStyle = "#00e1ff";
+  ctx.lineWidth = 1;
+  ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+  ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+  ctx.fillStyle = "#00ffe1";
+  ctx.textAlign = "center";
+  ctx.fillText(line1, node.x, boxY + 14);
+  ctx.fillStyle = "#ffaa00";
+  ctx.fillText(line2, node.x, boxY + 28);
+
+  ctx.restore();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  ctx.fillStyle = "rgba(2, 5, 10, 0.34)";
+  ctx.fillRect(0, 0, width, height);
+
+  if (!paused) {
+    tickCount++;
+    
+    // Defensive check to use the correct method from earth_pod.ts
+    if (megaEarth && typeof megaEarth.simulateTick === 'function') {
+        megaEarth.simulateTick(tickCount);
+    }
+    
+    nodes.forEach(node => node.update());
+    packets.forEach(packet => packet.update());
+  }
+  updateStatus();
+
+  // World space transformation (Zoomed context)
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-centerX, -centerY);
+
+  nodes.forEach(drawOrbit);
+  relations.forEach(drawRelation);
+  packets.forEach(packet => packet.draw());
+  nodes.forEach(node => node.draw());
+
+  // Render position overlay badge ONLY in Debug Mode
+  const activeMonad = draggedNode || selectedNode || hoveredNode;
+  if (isDebugMode && activeMonad && matchesFilter(activeMonad)) {
+    drawNodeCoordinateOverlay(activeMonad);
+  }
+
+  ctx.restore();
+
+  if (hoveredNode && !draggedNode) {
+    ctx.save();
+    ctx.fillStyle = "#dff";
+    ctx.font = "11px Courier New";
+    ctx.textAlign = "left";
+    ctx.fillText(
+      `${hoveredNode.id} · ${hoveredNode.type.className}`,
+      mouse.x + 14,
+      mouse.y - 12
+    );
+    ctx.restore();
+  }
+}
+
+animate();
+</script>
+
+</body>
+</html>
