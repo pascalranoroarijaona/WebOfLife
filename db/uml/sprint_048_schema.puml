@@ -1,0 +1,57 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "Web of Life Thermodynamics & Monad Architecture (Sprint 048)" {
+
+    class Error {
+        +name: string
+        +message: string
+    }
+
+    class ThermodynamicViolationError {
+        +timestamp: Date
+    }
+
+    class ThermodynamicEntropyViolationError {
+        +readonly entropyGenerationRate: number
+        +constructor(message: string, entropyGenerationRate: number)
+    }
+
+    class ThermodynamicStateVector {
+        -internalEnergy: number
+        -temperature: number
+        -entropyGenerationRate: number
+        -cycleType: string
+        +getEntropyGenerationRate(): number
+        +getInternalEnergy(): number
+    }
+
+    class StateValidator {
+        +{static} validateOrThrowEntropy(state: ThermodynamicStateVector): void
+    }
+
+    class ThermodynamicMonadProcess {
+        -stateVector: ThermodynamicStateVector
+        +stepTransition(): void
+        +commitState(): void
+    }
+
+    class BlockchainLedgerNode {
+        -blockIndex: number
+        -previousHash: string
+        +recordTransaction(state: ThermodynamicStateVector, status: string): void
+    }
+
+    Error <|-- ThermodynamicViolationError
+    ThermodynamicViolationError <|-- ThermodynamicEntropyViolationError
+    
+    StateValidator ..> ThermodynamicStateVector : inspects >
+    StateValidator ..> ThermodynamicEntropyViolationError : throws >
+    ThermodynamicMonadProcess --> ThermodynamicStateVector : manages
+    ThermodynamicMonadProcess ..> StateValidator : invokes validateOrThrowEntropy()
+    ThermodynamicMonadProcess --> BlockchainLedgerNode : commits transaction
+}
+
+@enduml

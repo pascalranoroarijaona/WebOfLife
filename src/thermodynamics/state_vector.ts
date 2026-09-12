@@ -4,6 +4,9 @@
  * enforcing First Law (matter/energy conservation) and Second Law (non-negative entropy generation) compliance.
  */
 import { STANDARD_AMBIENT_TEMPERATURE_K, IThermodynamicStateVector as IBaseThermodynamicStateVector } from './types.js';
+import { ThermodynamicMonadProcess } from './thermodynamic_monad_process.js';
+
+export { ThermodynamicMonadProcess };
 
 export interface FluxRecord {
   solarRadiation: number;    // Incoming shortwave flux (W/m^2)
@@ -21,10 +24,11 @@ export interface ThermodynamicStateVectorOptions {
   totalEntropy?: number;     // Alias for entropy
   systemEntropy?: number;    // Alias for system entropy
   timestamp?: number;        // Simulation time step / epoch
+  tick?: number;             // Alias for timestamp/tick
   energy?: number;
   internalEnergy?: number;
   stocks?: Record<string, number> | Map<any, any>;
-  elementalStocks?: Record<string, number>;
+  elementalStocks?: Record<string, number> | number[];
   entropyGenerationRate?: number;
   exergyDestructionRate?: number;
 }
@@ -39,14 +43,16 @@ export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector
   energy: number;
   internalEnergy: number;
   totalEntropy: number;
-  systemEntropy?: number;
+  systemEntropy: number;
   exergy: number;
   stocks: Record<string, number>;
-  elementalStocks?: Record<string, number>;
+  elementalStocks?: Record<string, number> | number[];
   entropyGenerationRate: number;
   exergyDestructionRate: number;
   timestamp: number;
+  tick: number;
   clone(overrides?: Partial<IThermodynamicStateVector> | ThermodynamicStateVectorOptions | any): IThermodynamicStateVector;
+  toObject(): Record<string, any>;
   validateFirstLaw(): boolean;
   validateSecondLaw(): boolean;
   getEntropyGenerationRate(): number;
@@ -66,12 +72,13 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly systemEntropy: number;
   public readonly exergy: number;
   public readonly stocks: Record<string, number>;
-  public readonly elementalStocks?: Record<string, number>;
+  public readonly elementalStocks?: Record<string, number> | number[];
   public readonly entropyGenerationRate: number;
   public readonly exergyDestructionRate: number;
   public readonly timestamp: number;
+  public readonly tick: number;
 
-  constructor(options?: ThermodynamicStateVectorOptions & { elementalStocks?: Record<string, number> }) {
+  constructor(options?: ThermodynamicStateVectorOptions & { elementalStocks?: Record<string, number> | number[]; temperature?: number }) {
     this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     this.ambientTemperature = this.temperature;
     this.ambientReferenceTemp = this.temperature;
@@ -92,13 +99,14 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     this.systemEntropy = initialEntropy;
     this.exergy = 1e5;
     const rawStocks = options?.stocks ?? options?.elementalStocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
-    this.stocks = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks;
+    this.stocks = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : (Array.isArray(rawStocks) ? { carbon: rawStocks[0] ?? 0, nitrogen: rawStocks[1] ?? 0, phosphorus: rawStocks[2] ?? 0, water: rawStocks[3] ?? 0 } : rawStocks);
     if (options?.elementalStocks) {
       this.elementalStocks = options.elementalStocks;
     }
     this.entropyGenerationRate = options?.entropyGenerationRate ?? 0;
     this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
-    this.timestamp = options?.timestamp ?? 0;
+    this.timestamp = options?.timestamp ?? options?.tick ?? 0;
+    this.tick = this.timestamp;
   }
 
   public clone(overrides?: Partial<IThermodynamicStateVector> | ThermodynamicStateVectorOptions | any): IThermodynamicStateVector {
@@ -110,13 +118,36 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
       entropy: overrides?.entropy ?? overrides?.totalEntropy ?? overrides?.systemEntropy ?? this.entropy,
       totalEntropy: overrides?.totalEntropy ?? overrides?.entropy ?? overrides?.systemEntropy ?? this.entropy,
       systemEntropy: overrides?.systemEntropy ?? overrides?.entropy ?? overrides?.totalEntropy ?? this.systemEntropy,
-      timestamp: overrides?.timestamp ?? this.timestamp,
+      timestamp: overrides?.timestamp ?? overrides?.tick ?? this.timestamp,
+      tick: overrides?.tick ?? overrides?.timestamp ?? this.tick,
       energy: overrides?.energy ?? overrides?.internalEnergy ?? this.energy,
       stocks: stocksObj,
       elementalStocks: overrides?.elementalStocks ?? this.elementalStocks,
       entropyGenerationRate: overrides?.entropyGenerationRate ?? this.entropyGenerationRate,
       exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate
     });
+  }
+
+  public toObject(): Record<string, any> {
+    return {
+      temperature: this.temperature,
+      ambientTemperature: this.ambientTemperature,
+      ambientReferenceTemp: this.ambientReferenceTemp,
+      fluxes: this.fluxes,
+      boundaryFluxes: this.boundaryFluxes,
+      entropy: this.entropy,
+      energy: this.energy,
+      internalEnergy: this.internalEnergy,
+      totalEntropy: this.totalEntropy,
+      systemEntropy: this.systemEntropy,
+      exergy: this.exergy,
+      stocks: this.stocks,
+      elementalStocks: this.elementalStocks,
+      entropyGenerationRate: this.entropyGenerationRate,
+      exergyDestructionRate: this.exergyDestructionRate,
+      timestamp: this.timestamp,
+      tick: this.tick
+    };
   }
 
   public validateFirstLaw(): boolean {
@@ -144,6 +175,17 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
       exergyDestructionRate: this.exergyDestructionRate
     };
   }
+
+  /**
+   * Static step compatibility wrapper expected by sprint tests (e.g. sprint_027.test.ts).
+   */
+  public static step(
+    state: IThermodynamicStateVector | ThermodynamicStateVector,
+    fluxDelta: any,
+    dt: number
+  ): ThermodynamicStateVector {
+    return ThermodynamicMonadProcess.staticStep(state, fluxDelta, dt);
+  }
 }
 
 /**
@@ -158,66 +200,4 @@ export function createBaselineStateVector(overrides?: ThermodynamicStateVectorOp
  */
 export function createThermodynamicStateVector(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
   return createBaselineStateVector(overrides);
-}
-
-/**
- * Thermodynamic Monad Process Method for State Evolution and Validation.
- * Encapsulates exact mass/energy/entropy state transformations as a pure monad operation.
- */
-export class ThermodynamicMonadProcess {
-  public static step(
-    state: IThermodynamicStateVector,
-    fluxDelta: Partial<FluxRecord>,
-    dt: number
-  ): IThermodynamicStateVector {
-    const updatedFluxes: FluxRecord = {
-      solarRadiation: fluxDelta.solarRadiation ?? state.fluxes?.solarRadiation ?? 0,
-      thermalEmission: fluxDelta.thermalEmission ?? state.fluxes?.thermalEmission ?? 0,
-      latentHeat: fluxDelta.latentHeat ?? state.fluxes?.latentHeat ?? 0,
-      sensibleHeat: fluxDelta.sensibleHeat ?? state.fluxes?.sensibleHeat ?? 0,
-    };
-
-    const netFlux = updatedFluxes.solarRadiation - (
-      updatedFluxes.thermalEmission + 
-      updatedFluxes.latentHeat + 
-      updatedFluxes.sensibleHeat
-    );
-
-    const temperature = state.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    const dEntropy = (Math.abs(netFlux) / temperature) * dt;
-    const entropy = state.entropy ?? 0;
-    const newEntropy = entropy + dEntropy;
-
-    const heatCapacityParam = 2.0e5;
-    const dT = (netFlux * dt) / heatCapacityParam;
-    const newTemperature = Math.max(0.1, temperature + dT);
-
-    const energy = state.energy ?? state.internalEnergy ?? 1000;
-    const timestamp = state.timestamp ?? 0;
-    const stocks = state.stocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
-
-    if (typeof state.clone === 'function') {
-      return state.clone({
-        temperature: newTemperature,
-        fluxes: updatedFluxes,
-        entropy: newEntropy,
-        totalEntropy: newEntropy,
-        systemEntropy: newEntropy,
-        timestamp: timestamp + dt,
-        energy: energy + netFlux * dt,
-        stocks: stocks
-      });
-    }
-
-    return new ThermodynamicStateVector({
-      temperature: newTemperature,
-      fluxes: updatedFluxes,
-      entropy: newEntropy,
-      totalEntropy: newEntropy,
-      systemEntropy: newEntropy,
-      timestamp: timestamp + dt,
-      energy: energy + netFlux * dt,
-      stocks: stocks
-    });
-  }
 }

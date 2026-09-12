@@ -151,6 +151,10 @@ export interface IThermodynamicStateVector {
   validateSecondLaw?: () => boolean;
   validateFirstLaw?: () => boolean;
   clone?: (overrides?: Partial<IThermodynamicStateVector> | any) => IThermodynamicStateVector;
+  toObject?: () => Record<string, any>;
+  getEntropyGenerationRate?: () => number;
+  getVectorMetrics?: () => Record<string, number>;
+  fluxes?: any;
   deadStateTemperature?: number;
   entropyGeneratorRate?: number;
   systemTemperature?: number;
@@ -568,9 +572,9 @@ export interface BiogeochemicalStock {
 
 export abstract class BaseThermodynamicProcessMonad {
   abstract readonly processId: string;
-  abstract evaluate(state: ThermodynamicStateVector, dt: number): ThermodynamicDerivativeResult;
+  abstract evaluate(state: any, dt: number): ThermodynamicDerivativeResult;
 
-  public transit(state: ThermodynamicStateVector, dt: number): ThermodynamicStateVector {
+  public transit(state: any, dt: number): any {
     const deriv = this.evaluate(state, dt);
     if (deriv.entropyGenerationRate < -1e-9) {
       throw new Error('Second Law Violation: Negative entropy generation rate.');

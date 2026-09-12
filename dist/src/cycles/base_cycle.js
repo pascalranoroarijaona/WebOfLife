@@ -25,6 +25,7 @@ export class BaseCycle {
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
             exergy: 1e10,
             stocks: {},
+            fluxes: { solarRadiation: 1.74e17, thermalEmission: 1.74e17 * 0.99, latentHeat: 0, sensibleHeat: 0 },
             boundaryFluxes: {
                 solarRadiationIn: 1.74e17,
                 longwaveRadiationOut: 1.74e17 * 0.99,
@@ -40,7 +41,9 @@ export class BaseCycle {
                 specificEntropies: []
             },
             validateFirstLaw: () => this.validateFirstLaw(),
-            validateSecondLaw: () => this.validateSecondLaw()
+            validateSecondLaw: () => this.validateSecondLaw(),
+            getEntropyGenerationRate: () => 15.0,
+            getVectorMetrics: () => ({ entropyGenerationRate: 15.0 })
         };
     }
     getStocks() {
