@@ -1,0 +1,106 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 019: Thermodynamic State Vector & Exergy Architecture
+
+package "src/thermodynamics" {
+  
+  interface BoundaryFluxVector {
+    + solarRadiationFlux: number
+    + thermalRadiationFlux: number
+    + sensibleHeatFlux: number
+    + latentHeatFlux: number
+    + massFluxes: Map<string, number>
+  }
+
+  interface ThermodynamicStateVector {
+    + internalEnergy: number
+    + entropy: number
+    + temperature: number
+    + ambientTemperature: number
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+    + exergy: number
+    + boundaryFluxes: BoundaryFluxVector
+  }
+
+  interface ThermodynamicDerivativeResult {
+    + dInternalEnergy: number
+    + dEntropy: number
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+    + massStockDeltas: Map<string, number>
+  }
+
+  interface IThermodynamicProcessMonad {
+    + {readonly} processId: string
+    + evaluate(state: ThermodynamicStateVector, dt: number): ThermodynamicDerivativeResult
+    + transit(state: ThermodynamicStateVector, dt: number): ThermodynamicStateVector
+  }
+
+  abstract class BaseThermodynamicProcessMonad {
+    + {abstract} {readonly} processId: string
+    + {abstract} evaluate(state: ThermodynamicStateVector, dt: number): ThermodynamicDerivativeResult
+    + transit(state: ThermodynamicStateVector, dt: number): ThermodynamicStateVector
+  }
+
+  IThermodynamicProcessMonad <|.. BaseThermodynamicProcessMonad
+  ThermodynamicStateVector *-- BoundaryFluxVector : contains
+  BaseThermodynamicProcessMonad ..> ThermodynamicStateVector : consumes/transforms
+  BaseThermodynamicProcessMonad ..> ThermodynamicDerivativeResult : produces
+}
+
+package "Database Schema (SQL)" {
+  class boundary_flux_vectors {
+    + flux_id: UUID
+    + simulation_id: UUID
+    + solar_radiation_flux: double
+    + thermal_radiation_flux: double
+    + sensible_heat_flux: double
+    + latent_heat_flux: double
+    + mass_flux_map: JSONB
+  }
+
+  class thermodynamic_state_vectors {
+    + state_id: UUID
+    + simulation_id: UUID
+    + flux_id: UUID
+    + internal_energy: double
+    + entropy: double
+    + temperature: double
+    + ambient_temperature: double
+    + entropy_generation_rate: double
+    + exergy_destruction_rate: double
+    + exergy: double
+  }
+
+  class thermodynamic_process_monads {
+    + monad_execution_id: UUID
+    + state_id: UUID
+    + process_id: string
+    + dt: double
+    + d_internal_energy: double
+    + d_entropy: double
+    + entropy_generation_rate: double
+    + exergy_destruction_rate: double
+    + mass_stock_deltas: JSONB
+  }
+
+  class thermodynamic_ledger_blocks {
+    + block_id: UUID
+    + block_index: bigint
+    + previous_hash: string
+    + block_hash: string
+    + merkle_root: string
+    + solar_forcing_total: double
+    + system_exergy_efficiency: double
+    + validator_signature: string
+  }
+
+  boundary_flux_vectors "1" -- "0..*" thermodynamic_state_vectors : bounds
+  thermodynamic_state_vectors "1" -- "0..*" thermodynamic_process_monads : evaluated_by
+}
+
+@enduml

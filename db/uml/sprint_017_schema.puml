@@ -1,0 +1,92 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 17: Thermodynamic State Vector Architecture
+
+package "src/thermodynamics" {
+    interface IThermodynamicBoundaryFlux {
+        +portId: string
+        +heatFluxWatts: PowerWatts
+        +boundaryTemperatureKelvin: TemperatureKelvin
+        +massFlowRateKgPerSec: MassFluxRate
+        +specificEnthalpyJoulesPerKg: number
+        +specificEntropyJoulesPerKgKelvin: number
+    }
+
+    interface IThermodynamicStateVector {
+        +timestamp: number
+        +internalEnergy: EnergyJoules
+        +totalEntropy: EntropyJoulesPerKelvin
+        +systemTemperature: TemperatureKelvin
+        +ambientReferenceTemperature: TemperatureKelvin
+        +boundaryFluxes: readonly IThermodynamicBoundaryFlux[]
+        +entropyGenerationRate: EntropyJoulesPerKelvin
+        +exergyDestructionRate: PowerWatts
+    }
+
+    interface IThermodynamicSystem {
+        +getStateVector(): IThermodynamicStateVector
+        +validateFirstLaw(tolerance?: number): boolean
+        +validateSecondLaw(): boolean
+    }
+
+    class ThermodynamicMonadProcess {
+        -stateVector: IThermodynamicStateVector
+        +getStateVector(): IThermodynamicStateVector
+        +validateFirstLaw(tolerance?: number): boolean
+        +validateSecondLaw(): boolean
+        +executeMonadTransition(): void
+    }
+}
+
+package "src/earth_pod.ts" {
+    class EarthPod {
+        -podId: string
+        -stateVector: IThermodynamicStateVector
+        +getStateVector(): IThermodynamicStateVector
+        +validateFirstLaw(tolerance?: number): boolean
+        +validateSecondLaw(): boolean
+    }
+}
+
+package "src/cycles" {
+    class CycleProcessor {
+        -cycleType: string
+        +evaluateCycleThermodynamics(): IThermodynamicStateVector
+        +validateFirstLaw(tolerance?: number): boolean
+        +validateSecondLaw(): boolean
+    }
+}
+
+package "Database & Ledger Models" {
+    class ThermodynamicStateVectorRecord {
+        +stateVectorId: UUID
+        +systemId: UUID
+        +timestamp: TIMESTAMPTZ
+        +internalEnergyJoules: number
+        +totalEntropyJoulesPerKelvin: number
+        +entropyGenerationRate: number
+        +exergyDestructionRateWatts: number
+    }
+
+    class ThermodynamicBlockTransaction {
+        +transactionId: UUID
+        +blockIndex: int64
+        +previousHash: string
+        +currentHash: string
+        +validatorSignature: string
+    }
+}
+
+IThermodynamicSystem <|.. ThermodynamicMonadProcess
+IThermodynamicSystem <|.. EarthPod
+IThermodynamicSystem <|.. CycleProcessor
+IThermodynamicStateVector *-- IThermodynamicBoundaryFlux
+ThermodynamicMonadProcess --> IThermodynamicStateVector : manages
+EarthPod --> IThermodynamicStateVector : encapsulates
+CycleProcessor --> IThermodynamicStateVector : computes
+ThermodynamicBlockTransaction --> ThermodynamicStateVectorRecord : secures
+
+@enduml

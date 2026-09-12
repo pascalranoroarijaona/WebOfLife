@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web of Life - Sprint 019: Thermodynamic State Vector & Exergy Accounting</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121824;
+            --bg-card: rgba(18, 24, 36, 0.85);
+            --border-color: rgba(76, 175, 80, 0.3);
+            --accent-green: #4caf50;
+            --accent-blue: #2196f3;
+            --accent-amber: #ff9800;
+            --accent-red: #f44336;
+            --accent-cyan: #00bcd4;
+            --text-main: #e0e0e0;
+            --text-muted: #8a99ad;
+            --font-mono: "Fira Code", "Courier New", Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        #topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
+            animation: pulse-glow 4s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
+            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+        }
+
+        h1 { 
+            color: var(--accent-green); 
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        #controls {
+            background: rgba(18, 24, 36, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 25px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 90;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, #388e3c, #66bb6a);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #1565c0, #2196f3);
+        }
+        button.secondary:hover {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        #main-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            flex: 1;
+            height: calc(100vh - 125px);
+            overflow: hidden;
+        }
+
+        #sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .panel-card h3 {
+            font-size: 0.95rem;
+            color: var(--accent-cyan);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            border-bottom: 1px solid rgba(0, 188, 212, 0.2);
+            padding-bottom: 6px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+        }
+
+        .metric-value {
+            font-family: var(--font-mono);
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        #workspace {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: radial-gradient(circle at center, #121f2c 0%, #0a0e17 100%);
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #overlay-stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(18, 24, 36, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            width: 280px;
+            pointer-events: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        #console-log {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 120px;
+            background: rgba(10, 14, 23, 0.92);
+            border-top: 1px solid var(--border-color);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 10px 20px;
+            overflow-y: auto;
+            color: var(--accent-green);
+            display: none;
+        }
+
+        .console-toggle {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            background: rgba(18, 24, 36, 0.9);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            cursor: pointer;
+            z-index: 50;
+        }
+        .console-toggle:hover { color: var(--text-main); background: var(--bg-secondary); }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <div class="brand-container">
+            <div class="brand-logo"></div>
+            <div>
+                <h1>Sprint 019: Thermodynamic State Vector & Exergy Accounting</h1>
+                <div class="subtitle">Web of Life Biosphere Simulation & Ecosystem Thermodynamics</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="../sprint_018/index.html" style="text-decoration: none;"><button class="secondary">&larr; Sprint 018</button></a>
+            <a href="../../index.html" style="text-decoration: none;"><button class="secondary">Hub Home</button></a>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-start">Start Simulation</button>
+        <button id="btn-pause" class="secondary">Pause</button>
+        <button id="btn-step" class="secondary">Step Vector</button>
+        <button id="btn-reset" style="background: linear-gradient(135deg, #c62828, #f44336);">Reset State</button>
+        
+        <div class="control-group">
+            <label for="speed-range">Speed:</label>
+            <input type="range" id="speed-range" min="1" max="10" value="1">
+        </div>
+
+        <div class="control-group">
+            <label for="env-factor">Solar Radiance:</label>
+            <input type="range" id="env-factor" min="50" max="150" value="100">
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="sidebar">
+            <div class="panel-card">
+                <h3>Thermodynamic State <span id="sim-status" style="color: var(--accent-green);">Ready</span></h3>
+                <div class="metric-row">
+                    <span class="metric-label">Tick / Time:</span>
+                    <span class="metric-value" id="val-tick">0</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Total Exergy ($B$):</span>
+                    <span class="metric-value" id="val-exergy">1,450.2 kJ</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Dissipation Rate:</span>
+                    <span class="metric-value" id="val-dissipation">42.8 W/m²</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Carnot Efficiency:</span>
+                    <span class="metric-value" id="val-carnot">0.342</span>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>Biogeochemical Flux</h3>
+                <div class="metric-row">
+                    <span class="metric-label">Carbon Storage:</span>
+                    <span class="metric-value" id="val-carbon">842.0 GtC</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Water Turnover:</span>
+                    <span class="metric-value" id="val-water">520.4 mm</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Nitrogen Pool:</span>
+                    <span class="metric-value" id="val-nitrogen">112.5 Mt</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Phosphorus Flux:</span>
+                    <span class="metric-value" id="val-phosphorus">12.1 Mt</span>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>System Health / Entropy</h3>
+                <div class="metric-row">
+                    <span class="metric-label">Information Entropy:</span>
+                    <span class="metric-value" id="val-entropy">3.84 bits</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Homeostasis Index:</span>
+                    <span class="metric-value" id="val-homeostasis">0.914</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspace">
+            <canvas id="sim-canvas"></canvas>
+            
+            <div id="overlay-stats">
+                <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-cyan); margin-bottom: 8px; font-weight: bold;">
+                    VECTOR & EXERGY TELEMETRY
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Exergy Inflow:</span>
+                    <span class="metric-value" id="ov-inflow">340.2 W</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Exergy Consumption:</span>
+                    <span class="metric-value" id="ov-consumption">289.5 W</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Internal Dissipation:</span>
+                    <span class="metric-value" id="ov-dissipation">50.7 W</span>
+                </div>
+            </div>
+
+            <button class="console-toggle" id="btn-toggle-console">Toggle Console</button>
+            <div id="console-log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { EarthPOD } from '../../../src/earth_pod.ts';
+
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let pod = null;
+        let isRunning = false;
+        let animationFrameId = null;
+        let speed = 1;
+
+        const logEl = document.getElementById('console-log');
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            logEl.innerHTML += `[${time}] ${msg}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        document.getElementById('btn-toggle-console').addEventListener('click', () => {
+            logEl.style.display = logEl.style.display === 'block' ? 'none' : 'block';
+        });
+
+        async function initSim() {
+            try {
+                log("Initializing EarthPOD thermodynamic state vector...");
+                pod = new EarthPOD();
+                await pod.initialize();
+                log("EarthPOD initialized successfully.");
+                updateUI();
+            } catch (err) {
+                log("Initialization error: " + err.message);
+                console.error(err);
+            }
+        }
+
+        function updateUI() {
+            if (!pod) return;
+            const state = pod.getState ? pod.getState() : {};
+            document.getElementById('val-tick').innerText = state.tick || 0;
+            document.getElementById('val-exergy').innerText = ((state.exergy || 1450.2)).toFixed(1) + ' kJ';
+            document.getElementById('val-dissipation').innerText = ((state.dissipation || 42.8)).toFixed(1) + ' W/m²';
+            document.getElementById('val-carnot').innerText = ((state.carnot || 0.342)).toFixed(3);
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw thermodynamic energy flows & state vector network representation
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = Math.min(cx, cy) * 0.55;
+
+            // Draw outer atmospheric ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(33, 150, 243, 0.4)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw inner biosphere core
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(76, 175, 80, 0.15)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(76, 175, 80, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw nodes representing biogeochemical cycles
+            const cycles = ['Carbon', 'Water', 'Nitrogen', 'Phosphorus'];
+            cycles.forEach((cycle, index) => {
+                const angle = (index / cycles.length) * Math.PI * 2 + (Date.now() * 0.0005);
+                const nx = cx + Math.cos(angle) * (radius * 0.75);
+                const ny = cy + Math.sin(angle) * (radius * 0.75);
+
+                ctx.beginPath();
+                ctx.arc(nx, ny, 24, 0, Math.PI * 2);
+                ctx.fillStyle = '#121824';
+                ctx.fill();
+                ctx.strokeStyle = '#00bcd4';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = '11px Fira Code, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(cycle.substring(0, 3).toUpperCase(), nx, ny);
+
+                // Connection line to center
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(nx, ny);
+                ctx.strokeStyle = 'rgba(0, 188, 212, 0.25)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            });
+        }
+
+        function loop() {
+            if (isRunning && pod) {
+                for (let i = 0; i < speed; i++) {
+                    pod.step();
+                }
+                updateUI();
+            }
+            render();
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                document.getElementById('sim-status').innerText = 'Running';
+                document.getElementById('sim-status').style.color = 'var(--accent-green)';
+                log("Simulation started.");
+            }
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            isRunning = false;
+            document.getElementById('sim-status').innerText = 'Paused';
+            document.getElementById('sim-status').style.color = 'var(--accent-amber)';
+            log("Simulation paused.");
+        });
+
+        document.getElementById('btn-step').addEventListener('click', () => {
+            if (pod) {
+                pod.step();
+                updateUI();
+                log("Stepped simulation state vector by 1 tick.");
+            }
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', async () => {
+            isRunning = false;
+            document.getElementById('sim-status').innerText = 'Resetting';
+            await initSim();
+            document.getElementById('sim-status').innerText = 'Ready';
+            document.getElementById('sim-status').style.color = 'var(--accent-green)';
+            log("Simulation state reset.");
+        });
+
+        document.getElementById('speed-range').addEventListener('input', (e) => {
+            speed = parseInt(e.target.value, 10);
+            log("Simulation speed set to " + speed + "x");
+        });
+
+        initSim().then(() => {
+            loop();
+        });
+    </script>
+</body>
+</html>

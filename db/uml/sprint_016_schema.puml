@@ -1,0 +1,100 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 016: Thermodynamic State Vector & Monad Architecture
+
+package "src.thermodynamics" {
+  interface BoundaryFluxVector {
+    +heatFluxes: Map<string, number>
+    +radiationFlux: { solarIncoming: number, terrestrialOutgoing: number }
+    +workRate: number
+    +massFluxes: Map<string, number>
+    +specificEnthalpies: Map<string, number>
+    +specificEntropies: Map<string, number>
+  }
+
+  interface ThermodynamicStateVector {
+    +internalEnergy: number
+    +enthalpy: number
+    +entropy: number
+    +temperature: number
+    +ambientTemperature: number
+    +entropyGenerationRate: number
+    +exergyDestructionRate: number
+    +exergy: number
+  }
+
+  interface IThermodynamicSystem {
+    +getStateVector(): ThermodynamicStateVector
+    +getBoundaryFluxes(): BoundaryFluxVector
+    +stepThermodynamics(dt: number, fluxes: BoundaryFluxVector): void
+    +validateLaws(): ThermodynamicComplianceResult
+  }
+
+  interface ThermodynamicComplianceResult {
+    +isFirstLawSatisfied: boolean
+    +isSecondLawSatisfied: boolean
+    +energyResidual: number
+    +entropyResidual: number
+  }
+
+  class ThermodynamicStateMonad {
+    -state: ThermodynamicStateVector
+    -fluxes: BoundaryFluxVector
+    -errorMargin: number
+    + {static} initialize(initialState: ThermodynamicStateVector, initialFluxes: BoundaryFluxVector): ThermodynamicStateMonad
+    + transit(processFn: Function): ThermodynamicStateMonad
+    + extract(): { state: ThermodynamicStateVector, fluxes: BoundaryFluxVector }
+  }
+}
+
+package "Database & Blockchain Schema" {
+  class ThermodynamicStateRecord {
+    +state_id: UUID
+    +system_id: string
+    +internal_energy: numeric
+    +entropy: numeric
+    +temperature: numeric
+    +entropy_generation_rate: numeric
+    +exergy_destruction_rate: numeric
+    +recorded_at: timestamp
+  }
+
+  class BoundaryFluxRecord {
+    +flux_id: UUID
+    +state_id: UUID
+    +solar_incoming: numeric
+    +terrestrial_outgoing: numeric
+    +work_rate: numeric
+  }
+
+  class ThermodynamicMonadTransaction {
+    +transaction_id: UUID
+    +previous_state_id: UUID
+    +next_state_id: UUID
+    +is_second_law_satisfied: boolean
+    +mutation_signature: string
+  }
+
+  class ThermodynamicBlockchainBlock {
+    +block_id: UUID
+    +block_height: int64
+    +previous_block_hash: string
+    +merkle_root: string
+    +planetary_entropy_generation_aggregate: numeric
+    +block_signature: string
+  }
+}
+
+IThermodynamicSystem ..> ThermodynamicStateVector : returns >
+IThermodynamicSystem ..> BoundaryFluxVector : uses >
+IThermodynamicSystem ..> ThermodynamicComplianceResult : validates >
+ThermodynamicStateMonad --> ThermodynamicStateVector : wraps >
+ThermodynamicStateMonad --> BoundaryFluxVector : wraps >
+
+ThermodynamicStateRecord "1" *-- "0..*" BoundaryFluxRecord : has
+ThermodynamicMonadTransaction --> ThermodynamicStateRecord : transitions >
+ThermodynamicBlockchainBlock "1" o-- "0..*" ThermodynamicMonadTransaction : contains
+
+@enduml

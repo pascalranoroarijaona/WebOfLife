@@ -1,0 +1,109 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam backgroundcolor #FFFFFF
+
+title Web of Life - Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Architecture
+
+package "src.thermodynamics" {
+  
+  interface BoundaryFluxVector {
+    + radiativeFlux: number
+    + sensibleHeatFlux: number
+    + latentHeatFlux: number
+    + massFluxRates: [number, number, number, number]
+  }
+
+  interface ThermodynamicStateVector {
+    + time: number
+    + temperature: number
+    + ambientTemperature: number
+    + internalEnergy: number
+    + entropy: number
+    + exergy: number
+    + elementalStocks: [number, number, number, number]
+    + boundaryFluxes: BoundaryFluxVector
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+  }
+
+  interface IThermodynamicMonadProcess {
+    + id: string
+    + name: string
+    + step(currentState: ThermodynamicStateVector, dt: number): ThermodynamicStateVector
+    + validateInvariants(state: ThermodynamicStateVector): boolean
+  }
+
+  class ThermodynamicMonadProcessBase {
+    # id: string
+    # name: string
+    + step(currentState: ThermodynamicStateVector, dt: number): ThermodynamicStateVector
+    + validateInvariants(state: ThermodynamicStateVector): boolean
+    # computeFirstLaw(state: ThermodynamicStateVector, dt: number): number
+    # computeSecondLaw(state: ThermodynamicStateVector, dt: number): number
+    # applyGouyStodolaTheorem(sGen: number, t0: number): number
+  }
+
+  IThermodynamicMonadProcess <|.. ThermodynamicMonadProcessBase
+  ThermodynamicStateVector *-- BoundaryFluxVector : contains
+  ThermodynamicMonadProcessBase ..> ThermodynamicStateVector : transitions
+}
+
+package "Database Schema (SQL)" {
+  
+  class thermodynamic_monad_processes {
+    + monad_id: UUID <<PK>>
+    + process_name: VARCHAR
+    + process_status: process_status
+    + cumulative_exergy_efficiency: DOUBLE
+    + last_simulation_tick: BIGINT
+    + metadata: JSONB
+  }
+
+  class thermodynamic_state_vectors {
+    + vector_id: UUID <<PK>>
+    + monad_id: UUID <<FK>>
+    + simulation_tick: BIGINT
+    + timestamp: TIMESTAMPTZ
+    + temperature: DOUBLE
+    + ambient_temperature: DOUBLE
+    + internal_energy: DOUBLE
+    + entropy: DOUBLE
+    + exergy: DOUBLE
+    + stock_carbon: DOUBLE
+    + stock_nitrogen: DOUBLE
+    + stock_phosphorus: DOUBLE
+    + stock_h2o: DOUBLE
+    + entropy_generation_rate: DOUBLE
+    + exergy_destruction_rate: DOUBLE
+    + invariants_valid: BOOLEAN
+  }
+
+  class boundary_flux_vectors {
+    + flux_id: UUID <<PK>>
+    + vector_id: UUID <<FK>>
+    + radiative_flux: DOUBLE
+    + sensible_heat_flux: DOUBLE
+    + latent_heat_flux: DOUBLE
+    + mass_flux_carbon: DOUBLE
+    + mass_flux_nitrogen: DOUBLE
+    + mass_flux_phosphorus: DOUBLE
+    + mass_flux_h2o: DOUBLE
+  }
+
+  class thermodynamic_block_ledger {
+    + block_id: UUID <<PK>>
+    + block_index: BIGINT
+    + previous_hash: VARCHAR
+    + merkle_root: VARCHAR
+    + total_entropy_generation: DOUBLE
+    + total_exergy_destruction: DOUBLE
+    + block_signature: VARCHAR
+  }
+
+  thermodynamic_monad_processes ||--o{ thermodynamic_state_vectors : records
+  thermodynamic_state_vectors ||--|{ boundary_flux_vectors : exposes
+}
+
+@enduml
