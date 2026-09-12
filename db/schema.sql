@@ -1,45 +1,34 @@
--- ============================================================================
--- Web of Life: Thermodynamic Blockchain & Relational Schema
--- Sprint 045: Thermodynamic State Vector Non-Negative Entropy Assertion Utility
--- ============================================================================
+-- Updated Schema & Ledger Definitions for Sprint 046
+-- Thermodynamic State Vector Non-Negative Entropy Exception Guard
 
 CREATE TABLE IF NOT EXISTS thermodynamic_states (
-    state_id VARCHAR(64) PRIMARY KEY,
-    entity_id VARCHAR(64) NOT NULL,
+    state_id UUID PRIMARY KEY,
+    pod_id UUID NOT NULL,
     internal_energy NUMERIC(20, 8) NOT NULL,
-    enthalpy NUMERIC(20, 8) NOT NULL,
-    entropy NUMERIC(20, 8) NOT NULL CHECK (entropy >= 0.0),
     temperature NUMERIC(12, 4) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    entropy NUMERIC(20, 8) NOT NULL,
+    entropy_generation_rate NUMERIC(20, 8) NOT NULL,
+    is_valid BOOLEAN NOT NULL DEFAULT TRUE,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_entropy_generation CHECK (entropy_generation_rate >= 0.0)
 );
 
-CREATE TABLE IF NOT EXISTS state_validation_ledger (
-    validation_id VARCHAR(64) PRIMARY KEY,
-    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
-    is_valid BOOLEAN NOT NULL,
-    error_message TEXT,
-    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    validator_signature VARCHAR(128) NOT NULL
+CREATE TABLE IF NOT EXISTS entropy_violation_audit_logs (
+    violation_id UUID PRIMARY KEY,
+    state_id UUID REFERENCES thermodynamic_states(state_id),
+    invalid_entropy_generation_rate NUMERIC(20, 8) NOT NULL,
+    error_message TEXT NOT NULL,
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_index SERIAL PRIMARY KEY,
-    block_hash VARCHAR(64) UNIQUE NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    nonce BIGINT NOT NULL
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
+    tx_hash VARCHAR(64) PRIMARY KEY,
+    block_number BIGINT NOT NULL,
+    state_id UUID REFERENCES thermodynamic_states(state_id),
+    signature VARCHAR(128) NOT NULL,
+    payload_hash VARCHAR(64) NOT NULL,
+    committed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS block_transactions (
-    transaction_id VARCHAR(64) PRIMARY KEY,
-    block_index INT REFERENCES blockchain_blocks(block_index),
-    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
-    monad_result_type VARCHAR(16) NOT NULL CHECK (monad_result_type IN ('SUCCESS', 'FAILURE')),
-    payload_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_thermodynamic_states_entropy ON thermodynamic_states(entropy);
-CREATE INDEX idx_validation_ledger_state ON state_validation_ledger(state_id);
-CREATE INDEX idx_transactions_block ON block_transactions(block_index);
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_pod ON thermodynamic_states(pod_id);
+CREATE INDEX IF NOT EXISTS idx_entropy_violations_state ON entropy_violation_audit_logs(state_id);

@@ -1,0 +1,47 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class ThermodynamicEntropyViolationError {
+    +entropyGenerationRate: number
+    +message: string
+    +name: string
+    +constructor(entropyGenerationRate: number, message?: string)
+}
+
+interface IStateValidator {
+    +validateOrThrowEntropy(state: ThermodynamicStateVector): void
+}
+
+class StateValidator implements IStateValidator {
+    +validateOrThrowEntropy(state: ThermodynamicStateVector): void
+}
+
+class ThermodynamicStateVector {
+    -internalEnergy: number
+    -temperature: number
+    -entropy: number
+    -entropyGenerationRate: number
+    +getEntropyGenerationRate(): number
+    +getInternalEnergy(): number
+    +getTemperature(): number
+}
+
+class MonadProcess {
+    -stateVector: ThermodynamicStateVector
+    +executeCycle(): ThermodynamicStateVector
+}
+
+class EarthPod {
+    -podId: string
+    -activeState: ThermodynamicStateVector
+    +commitState(state: ThermodynamicStateVector): void
+}
+
+ThermodynamicEntropyViolationError ..> ThermodynamicStateVector : references
+StateValidator ..> ThermodynamicStateVector : validates
+StateValidator --> ThermodynamicEntropyViolationError : throws
+MonadProcess --> ThermodynamicStateVector : produces
+EarthPod --> ThermodynamicStateVector : stores
+
+@enduml
