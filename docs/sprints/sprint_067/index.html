@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 067: Web of Life - Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+    <!-- Topbar Navigation -->
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/85 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-xl">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl animate-pulse">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Sprint 067</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Validator & Inventory Discrepancy Evaluator Core Active (60 FPS Draw Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/40 p-6 flex flex-col gap-6 overflow-y-auto z-20">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-cyan-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+                <button id="btn-validate" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition text-sm shadow-lg shadow-emerald-900/20 cursor-pointer">Run State Validator</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div id="sprint-telemetry" class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3 shadow-inner">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-cyan-400">67</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Inventory Status:</span>
+                        <span id="metric-inventory" class="font-mono font-bold text-emerald-400">Balanced</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Discrepancy:</span>
+                        <span id="metric-discrepancy" class="font-mono font-bold text-slate-200">0.00%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80 flex-1">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Evaluator Log</h2>
+                <div id="log-container" class="bg-slate-950/90 border border-slate-800/80 rounded-lg p-3 h-48 overflow-y-auto font-mono text-xs text-slate-300 space-y-1">
+                    <div class="text-cyan-400">[System] Initializing Thermodynamic State Vector Inventory Evaluator...</div>
+                    <div class="text-slate-400">[Validator] Baseline matrix loaded successfully.</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport / Canvas Container -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center">
+            <canvas id="webgl-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+            
+            <!-- Overlay HUD -->
+            <div class="absolute bottom-6 left-6 bg-slate-900/80 backdrop-blur border border-slate-800/80 rounded-lg p-4 pointer-events-none shadow-2xl max-w-md">
+                <h3 class="text-xs font-semibold uppercase tracking-widest text-cyan-400 mb-1">State Vector Analysis</h3>
+                <p id="hud-details" class="text-xs text-slate-300 font-mono">Monitoring thermodynamic monad equilibrium, entropy production rates, and resource inventory discrepancies in real-time.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-900/50 py-3 px-6 text-center text-xs text-slate-500">
+        Web of Life Simulation Engine &bull; Sprint 067 Thermodynamic State Vector Inventory Discrepancy Evaluator Core
+    </footer>
+
+    <!-- Client Script -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { StateValidator } from '../../../src/thermodynamics/state_validator.js';
+        import { ThermodynamicStructure } from '../../../src/thermodynamics/thermodynamic_structure.js';
+
+        const canvas = document.getElementById('webgl-canvas');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020617, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        camera.position.set(0, 15, 30);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0x06b6d4, 2, 50);
+        pointLight.position.set(0, 10, 10);
+        scene.add(pointLight);
+
+        // Core visual structure representing thermodynamic monads & inventory vectors
+        const structure = new ThermodynamicStructure(scene);
+        const validator = new StateValidator();
+
+        // Animation Loop Variables
+        let isRunning = true;
+        let generation = 1;
+        let entityCount = 67;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsTimer = performance.now();
+
+        // DOM elements for telemetry
+        const elFps = document.getElementById('metric-fps');
+        const elEntities = document.getElementById('metric-entities');
+        const elGen = document.getElementById('metric-gen');
+        const elInventory = document.getElementById('metric-inventory');
+        const elDiscrepancy = document.getElementById('metric-discrepancy');
+        const logContainer = document.getElementById('log-container');
+
+        function logMessage(msg, color = 'text-slate-300') {
+            const div = document.createElement('div');
+            div.className = color;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Controls Event Listeners
+        document.getElementById('btn-start').addEventListener('click', () => {
+            isRunning = true;
+            logMessage('Simulation resumed.', 'text-cyan-400');
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            isRunning = false;
+            logMessage('Simulation paused.', 'text-amber-400');
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            structure.reset();
+            generation = 1;
+            entityCount = 67;
+            elGen.textContent = generation;
+            elEntities.textContent = entityCount;
+            logMessage('World reset to baseline thermodynamic state.', 'text-emerald-400');
+        });
+
+        document.getElementById('btn-validate').addEventListener('click', () => {
+            const result = validator.validate(structure.getStateVector());
+            elInventory.textContent = result.balanced ? 'Balanced' : 'Discrepancy Detected';
+            elInventory.className = `font-mono font-bold ${result.balanced ? 'text-emerald-400' : 'text-rose-400'}`;
+            elDiscrepancy.textContent = `${(result.discrepancyRate * 100).toFixed(2)}%`;
+            logMessage(`State Validation Run: Discrepancy = ${(result.discrepancyRate * 100).toFixed(2)}%`, result.balanced ? 'text-emerald-400' : 'text-rose-400');
+        });
+
+        // Window resize
+        window.addEventListener('resize', () => {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Main Animation Loop
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            // FPS calculation
+            frameCount++;
+            if (now - fpsTimer >= 1000) {
+                elFps.textContent = Math.round((frameCount * 1000) / (now - fpsTimer));
+                frameCount = 0;
+                fpsTimer = now;
+            }
+
+            if (isRunning) {
+                structure.update(0.016);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+        logMessage('Thermodynamic State Vector Inventory Discrepancy Evaluator active.', 'text-cyan-400');
+    </script>
+</body>
+</html>

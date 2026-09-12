@@ -1,0 +1,120 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 067: Thermodynamic State Validator & Monad Architecture
+
+package "Thermodynamics Core" {
+  class StateVector {
+    - vectorId: string
+    - timestamp: Date
+    - energyFlux: number
+    - entropy: number
+    - stocks: Map<string, number>
+    + getStocks(): Record<string, number>
+    + getStock(key: string): number
+  }
+
+  class StateValidator {
+    - globalTolerance: number
+    + constructor(globalTolerance: number)
+    + evaluateDiscrepancy(actual: StateVector, expected: StateVector, customTolerances?: Record<string, number>): ValidationResult
+  }
+
+  interface IStateValidator {
+    + evaluateDiscrepancy(actual: StateVector, expected: StateVector, customTolerances?: Record<string, number>): ValidationResult
+  }
+
+  class ValidationResult {
+    + isValid: boolean
+    + differences: Record<string, number>
+    + violations: Record<string, string>
+  }
+
+  StateValidator ..|> IStateValidator : implements
+  StateValidator --> ValidationResult : produces
+  StateValidator ..> StateVector : inspects
+}
+
+package "Monad & Ledger Process" {
+  class MonadProcess {
+    - processType: string
+    + execute(input: StateVector): StateVector
+  }
+
+  class BlockchainLedger {
+    - blockIndex: number
+    - merkleRoot: string
+    + commitTransaction(tx: MonadTransaction): void
+  }
+
+  class MonadTransaction {
+    - transactionId: string
+    - energyDelta: number
+    - entropyDelta: number
+    - signature: string
+  }
+
+  MonadProcess --> StateVector : transforms
+  BlockchainLedger *-- MonadTransaction : contains
+  MonadTransaction --> StateValidator : verified via
+}
+
+package "Database Persistence Models" {
+  entity "thermodynamic_state_vectors" as DBVector {
+    * vector_id : UUID <<PK>>
+    --
+    entity_id : UUID
+    timestamp : TIMESTAMPTZ
+    energy_flux : NUMERIC
+    entropy : NUMERIC
+  }
+
+  entity "thermodynamic_stocks" as DBStock {
+    * stock_id : UUID <<PK>>
+    --
+    vector_id : UUID <<FK>>
+    element_key : VARCHAR
+    stock_value : NUMERIC
+  }
+
+  entity "state_validations" as DBValidation {
+    * validation_id : UUID <<PK>>
+    --
+    actual_vector_id : UUID <<FK>>
+    expected_vector_id : UUID <<FK>>
+    is_valid : BOOLEAN
+    global_tolerance : NUMERIC
+  }
+
+  entity "validation_element_differences" as DBDiff {
+    * difference_id : UUID <<PK>>
+    --
+    validation_id : UUID <<FK>>
+    element_key : VARCHAR
+    absolute_difference : NUMERIC
+    applied_tolerance : NUMERIC
+    violation_flag : BOOLEAN
+    violation_message : TEXT
+  }
+
+  entity "monad_transactions" as DBTx {
+    * transaction_id : UUID <<PK>>
+    --
+    source_vector_id : UUID <<FK>>
+    target_vector_id : UUID <<FK>>
+    validation_id : UUID <<FK>>
+    energy_delta : NUMERIC
+    entropy_delta : NUMERIC
+    signature : VARCHAR
+  }
+
+  DBVector ||--o{ DBStock : contains
+  DBValidation ||--o{ DBDiff : details
+  DBVector ||--o{ DBValidation : actual
+  DBVector ||--o{ DBValidation : expected
+  DBValidation ||--o{ DBTx : secures
+}
+
+@enduml

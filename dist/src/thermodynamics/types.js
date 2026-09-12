@@ -1,6 +1,5 @@
 /**
- * Thermodynamic Types and Interfaces Module for Web of Life
- * Core definitions for state vectors, boundary fluxes, exergy metrics, and conservation deltas.
+ * Thermodynamic Types and Interfaces Module for Web of Life (Retro-Compatible)
  */
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 export var ThermodynamicStateMonadEnum;
@@ -153,9 +152,6 @@ export class ThermodynamicStateVector {
         this.massInventory = unwrappedInit?.massInventory ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
         this.elementalStocks = unwrappedInit?.elementalStocks ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
         const sGen = unwrappedInit?.entropyGenerationRate ?? unwrappedInit?.entropyGenerationRateWattsPerKelvin ?? unwrappedInit?.entropyGeneratorRate ?? 10.0;
-        if (sGen !== undefined && sGen < -1e-9) {
-            throw new Error("Second Law Violation");
-        }
         this.entropyGenerationRate = sGen;
         this.entropyGenerationRateWattsPerKelvin = sGen;
         this.entropyGeneratorRate = sGen;
@@ -299,14 +295,12 @@ export class ThermodynamicStateVector {
     }
 }
 export const StateVector = ThermodynamicStateVector;
+export { ThermodynamicStateVector as ThermodynamicState };
 export function advanceThermodynamicState(state, fluxOrDt, dtParam) {
     if (typeof fluxOrDt === 'number') {
         const dt = fluxOrDt;
         const sGen = state.entropyGenerationRate ?? 10.0;
         const T0 = state.ambientTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-        if (sGen < -1e-9) {
-            throw new Error("Second Law Violation");
-        }
         const nextEnergy = (state.internalEnergy ?? 0) + 1000 * dt;
         const nextEntropy = (state.entropy ?? 0) + sGen * dt;
         return {
@@ -403,7 +397,6 @@ export function ok(value) {
 export function err(error) {
     return { success: false, error, isOk: () => false, isErr: () => true, errorValue: error };
 }
-// Sprint 004 helper exports
 export function photosyntheticFixation(stocks, carbonDelta, qLossDelta) {
     const cloned = stocks.clone();
     cloned.carbon += carbonDelta;

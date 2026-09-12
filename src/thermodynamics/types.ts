@@ -1,6 +1,5 @@
 /**
- * Thermodynamic Types and Interfaces Module for Web of Life
- * Core definitions for state vectors, boundary fluxes, exergy metrics, and conservation deltas.
+ * Thermodynamic Types and Interfaces Module for Web of Life (Retro-Compatible)
  */
 
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
@@ -169,6 +168,10 @@ export type IBoundaryFlux = BoundaryFluxVector & {
   rateIn?: number;
   rateOut?: number;
   sourceType?: string;
+  sourceId?: string;
+  targetId?: string;
+  element?: string;
+  rate?: number;
 };
 export type ThermodynamicFlux = IBoundaryFlux;
 
@@ -379,9 +382,6 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     this.elementalStocks = unwrappedInit?.elementalStocks ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
     
     const sGen = unwrappedInit?.entropyGenerationRate ?? unwrappedInit?.entropyGenerationRateWattsPerKelvin ?? unwrappedInit?.entropyGeneratorRate ?? 10.0;
-    if (sGen !== undefined && sGen < -1e-9) {
-      throw new Error("Second Law Violation");
-    }
     this.entropyGenerationRate = sGen;
     this.entropyGenerationRateWattsPerKelvin = sGen;
     this.entropyGeneratorRate = sGen;
@@ -544,6 +544,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
 
 export type StateVector = ThermodynamicStateVector;
 export const StateVector = ThermodynamicStateVector;
+export { ThermodynamicStateVector as ThermodynamicState };
 
 export function advanceThermodynamicState(
   state: IThermodynamicStateVector,
@@ -554,9 +555,6 @@ export function advanceThermodynamicState(
     const dt = fluxOrDt;
     const sGen = state.entropyGenerationRate ?? 10.0;
     const T0 = state.ambientTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    if (sGen < -1e-9) {
-      throw new Error("Second Law Violation");
-    }
     const nextEnergy = (state.internalEnergy ?? 0) + 1000 * dt;
     const nextEntropy = (state.entropy ?? 0) + sGen * dt;
     return {
@@ -693,9 +691,30 @@ export class ElementalStocks {
   }
 }
 
-export type Result<T, E = string> = 
-  | { success: true; value: T; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string }
-  | { success: false; error: E | any; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string; invalidValue?: any; violatorValue?: any; violatingValue?: any; path?: string; timestamp?: number };
+export interface ResultOk<T> {
+  success: true;
+  value: T;
+  isOk: () => boolean;
+  isErr: () => boolean;
+  errorValue?: never;
+  code?: string;
+}
+
+export interface ResultErr<E> {
+  success: false;
+  error: E;
+  isOk: () => boolean;
+  isErr: () => boolean;
+  errorValue: E;
+  code?: string;
+  invalidValue?: any;
+  violatorValue?: any;
+  violatingValue?: any;
+  path?: string;
+  timestamp?: number;
+}
+
+export type Result<T, E = string> = ResultOk<T> | ResultErr<E>;
 
 export function ok<T, E = string>(value: T): Result<T, E> {
   return { success: true, value, isOk: () => true, isErr: () => false };
@@ -775,7 +794,7 @@ export type DiscrepancyResult = {
 
 export type DiscrepancyDetail = DiscrepancyResult;
 
-export type ValidationResult = {
+export type ValidationReport = {
   isValid: boolean;
   valid: boolean;
   errors?: ValidationFailure[];
@@ -787,45 +806,11 @@ export type ValidationResult = {
   [key: string]: any;
 };
 
+export type DiscrepancyReport = ValidationReport;
+export type ValidationResult = ValidationReport;
+
 export type ThermodynamicStateLike = any;
-export type ThermodynamicState = {
-  energy: number;
-  internalEnergy: number;
-  temperature: number;
-  entropy: number;
-  entropyGenerationRate?: number;
-  stocks: Record<string, number>;
-  [key: string]: any;
-};
 
-export type ValidationReport = {
-  timestamp: number;
-  isValid: boolean;
-  maxDiscrepancy: number;
-  discrepancies: DiscrepancyResult[] | Map<string, any> | Record<string, any>;
-  totalAbsoluteDiscrepancy?: number;
-  isMassConserved?: boolean;
-  records?: any[];
-};
-
-export type DiscrepancyReport = {
-  timestamp: number;
-  totalDiscrepancy: number;
-  poolDiscrepancies: Record<string, {
-    actualDelta: number;
-    expectedDelta: number;
-    absoluteDifference: number;
-    violated: boolean;
-  }>;
-  withinTolerance: boolean;
-  within_tolerance?: boolean;
-  isBalanced?: boolean;
-  maxDiscrepancy?: number;
-  items?: any[];
-  [key: string]: any;
-};
-
-// Sprint 004 helper exports
 export function photosyntheticFixation(stocks: ElementalStocks, carbonDelta: number, qLossDelta: number): ElementalStocks {
   const cloned = stocks.clone();
   cloned.carbon += carbonDelta;

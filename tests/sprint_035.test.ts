@@ -8,12 +8,12 @@ import assert from 'node:assert';
 import { 
   StateValidator, 
   ThermodynamicEntropyViolationError, 
-  executeThermodynamicTransition, 
-  type ThermodynamicState 
+  executeThermodynamicTransition,
+  ThermodynamicStateVector
 } from '../src/thermodynamics/state_validator.js';
 
 describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () => {
-  const validState: ThermodynamicState = {
+  const validState = new ThermodynamicStateVector({
     energy: 1e6,
     internalEnergy: 1e6,
     temperature: 288.15,
@@ -25,7 +25,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
       nitrogen: 3900000,
       phosphorus: 4e9
     }
-  };
+  });
 
   it('should validate a normal thermodynamic state with non-negative entropy and rates', () => {
     assert.strictEqual(StateValidator.validateEntropy(validState), true);
@@ -37,37 +37,37 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
   });
 
   it('should reject a state with negative absolute entropy', () => {
-    const invalidState: ThermodynamicState = {
+    const invalidState = new ThermodynamicStateVector({
       ...validState,
       entropy: -0.001
-    };
+    });
     assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
 
   it('should reject a state with negative entropy generation rate (sigma < 0)', () => {
-    const invalidState: ThermodynamicState = {
+    const invalidState = new ThermodynamicStateVector({
       ...validState,
       entropyGenerationRate: -0.5
-    };
+    });
     assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
 
   it('should reject a state with zero or negative temperature', () => {
-    const invalidState: ThermodynamicState = {
+    const invalidState = new ThermodynamicStateVector({
       ...validState,
       temperature: 0
-    };
+    });
     assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
 
   it('should execute thermodynamic transition successfully for compliant state changes', () => {
-    const transitionResult = executeThermodynamicTransition(validState, (s: any) => ({
+    const transitionResult = executeThermodynamicTransition(validState, (s: any) => new ThermodynamicStateVector({
       ...s,
       entropy: s.entropy + 10,
       entropyGenerationRate: s.entropyGenerationRate + 1
@@ -76,7 +76,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
   });
 
   it('should return error monad on unphysical transition violating Second Law', () => {
-    const transitionResult = executeThermodynamicTransition(validState, (s: any) => ({
+    const transitionResult = executeThermodynamicTransition(validState, (s: any) => new ThermodynamicStateVector({
       ...s,
       entropyGenerationRate: -5.0
     }));
