@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { StateValidator, DiscrepancyDetail, ThermodynamicStateVector } from '../src/thermodynamics/state_validator.js';
-import { BoundaryFluxRates, ValidationResult } from '../src/thermodynamics/types.js';
+import { BoundaryFluxRates, ValidationResult, ValidationReport } from '../src/thermodynamics/types.js';
 
 describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', () => {
   it('1. Balanced Flux Test - validates successful conservation when stock deltas match boundary fluxes', () => {
@@ -54,8 +54,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
     const fluxes: BoundaryFluxRates = { fluxes: fluxesMap };
 
     let hookCalled = false;
-    let capturedResult: ValidationResult | null = null;
-    validator.registerConservationHook((res: ValidationResult) => {
+    let capturedResult: ValidationReport | null = null;
+    validator.registerConservationHook((res: ValidationReport) => {
       hookCalled = true;
       capturedResult = res;
     });

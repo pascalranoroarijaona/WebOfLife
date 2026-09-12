@@ -24,7 +24,7 @@ describe('Sprint 067: StateValidator Core Helper', () => {
     const result = validator.evaluateDiscrepancy(expected, actual);
     assert.strictEqual(result.isValid, false);
     assert.ok((result.differences!['C'] ?? 0) > 1e-6);
-    const violationsObj = result.violations as Record<string, string>;
+    const violationsObj = result.violations as unknown as Record<string, string>;
     assert.ok(violationsObj['C'] !== undefined);
   });
 
@@ -35,7 +35,7 @@ describe('Sprint 067: StateValidator Core Helper', () => {
 
     const result = validator.evaluateDiscrepancy(expected, actual, { C: 0.01 });
     assert.strictEqual(result.isValid, true);
-    const violationsObj = result.violations as Record<string, string>;
+    const violationsObj = result.violations as unknown as Record<string, string>;
     assert.strictEqual(violationsObj['C'], undefined);
   });
 

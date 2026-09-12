@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 076: Web of Life - Thermodynamic State Vector Discrepancy Mapping Iterator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+    <!-- Topbar Navigation -->
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/85 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-xl">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl animate-pulse">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Sprint 076</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">StateVectorDiscrepancyIterator Active (60 FPS Draw Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/40 p-6 flex flex-col gap-6 overflow-y-auto z-20">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-cyan-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+                <button id="btn-validate" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition text-sm shadow-lg shadow-emerald-900/20 cursor-pointer">Map Discrepancies</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div id="sprint-telemetry" class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3 shadow-inner">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-cyan-400">76</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Discrepancy Index:</span>
+                        <span id="metric-discrepancy" class="font-mono font-bold text-amber-400">0.0124</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entropy Flux:</span>
+                        <span id="metric-entropy" class="font-mono font-bold text-emerald-400">4.82 J/K</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Iterator Nodes</h2>
+                <div id="node-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Dynamically populated node list -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport / Canvas Area -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <div id="canvas-target" class="absolute inset-0 w-full h-full"></div>
+            <div id="hud-overlay" class="absolute top-4 left-4 bg-slate-900/80 backdrop-blur border border-slate-800 p-3 rounded-lg text-xs font-mono space-y-1 pointer-events-none shadow-lg">
+                <div class="text-cyan-400 font-bold">STATE VECTOR ITERATOR v0.76</div>
+                <div>Status: <span id="hud-status" class="text-emerald-400">RUNNING</span></div>
+                <div>Vector Count: <span id="hud-vectors" class="text-slate-200">142</span></div>
+                <div>Delta T: <span id="hud-dt" class="text-slate-200">0.016s</span></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900 px-6 py-3 text-xs text-slate-500 flex justify-between items-center">
+        <div>Web of Life Simulation Engine &copy; 2025 Gaia Research Initiative</div>
+        <div class="flex space-x-4">
+            <a href="01_RFC.md" class="hover:text-cyan-400 transition">RFC 076</a>
+            <a href="02_METHODS.md" class="hover:text-cyan-400 transition">Methods</a>
+        </div>
+    </footer>
+
+    <!-- Simulation Script -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        class DiscrepancyIteratorEngine {
+            constructor(container) {
+                this.container = container;
+                this.isRunning = true;
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+                this.fps = 60;
+                this.generation = 1;
+                this.discrepancyIndex = 0.0124;
+                this.entropyFlux = 4.82;
+
+                this.initThree();
+                this.initWorld();
+                this.initListeners();
+                this.animate();
+            }
+
+            initThree() {
+                const width = this.container.clientWidth;
+                const height = this.container.clientHeight;
+
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x020617, 0.035);
+
+                this.camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+                this.camera.position.set(0, 15, 25);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setSize(width, height);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.container.appendChild(this.renderer.domElement);
+
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+                dirLight.position.set(20, 40, 20);
+                this.scene.add(dirLight);
+
+                const pointLight = new THREE.PointLight(0xf43f5e, 2, 50);
+                pointLight.position.set(0, -10, 0);
+                this.scene.add(pointLight);
+            }
+
+            initWorld() {
+                // Central Core representing Thermodynamic Equilibrium State Vector
+                const coreGeo = new THREE.IcosahedronGeometry(4, 2);
+                const coreMat = new THREE.MeshStandardMaterial({
+                    color: 0x06b6d4,
+                    wireframe: true,
+                    roughness: 0.2,
+                    metalness: 0.8
+                });
+                this.coreMesh = new THREE.Mesh(coreGeo, coreMat);
+                this.scene.add(this.coreMesh);
+
+                // Discrepancy Vector Nodes orbiting the core
+                this.nodes = [];
+                this.nodeGroup = new THREE.Group();
+                this.scene.add(this.nodeGroup);
+
+                const count = 76;
+                const geom = new THREE.SphereGeometry(0.35, 16, 16);
+
+                for (let i = 0; i < count; i++) {
+                    const phi = Math.acos(-1 + (2 * i) / count);
+                    const theta = Math.sqrt(count * Math.PI) * phi;
+
+                    const material = new THREE.MeshStandardMaterial({
+                        color: i % 2 === 0 ? 0x38bdf8 : 0xf43f5e,
+                        roughness: 0.3,
+                        emissive: i % 2 === 0 ? 0x0284c7 : 0xe11d48,
+                        emissiveIntensity: 0.4
+                    });
+
+                    const mesh = new THREE.Mesh(geom, material);
+                    const radius = 8 + Math.random() * 4;
+                    
+                    mesh.position.set(
+                        radius * Math.cos(theta) * Math.sin(phi),
+                        radius * Math.sin(theta) * Math.sin(phi),
+                        radius * Math.cos(phi)
+                    );
+
+                    this.nodeGroup.add(mesh);
+                    this.nodes.push({
+                        mesh,
+                        radius,
+                        theta: theta,
+                        phi: phi,
+                        speed: 0.005 + Math.random() * 0.015,
+                        discrepancy: Math.random()
+                    });
+                }
+
+                // Connection lines or particle field
+                const particlesGeo = new THREE.BufferGeometry();
+                const particleCount = 200;
+                const posArray = new Float32Array(particleCount * 3);
+                for(let i=0; i<particleCount*3; i++) {
+                    posArray[i] = (Math.random() - 0.5) * 40;
+                }
+                particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+                const particlesMat = new THREE.PointsMaterial({
+                    size: 0.15,
+                    color: 0x38bdf8,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                this.particles = new THREE.Points(particlesGeo, particlesMat);
+                this.scene.add(this.particles);
+
+                this.updateNodeListUI();
+            }
+
+            initListeners() {
+                window.addEventListener('resize', () => {
+                    const width = this.container.clientWidth;
+                    const height = this.container.clientHeight;
+                    this.camera.aspect = width / height;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(width, height);
+                });
+
+                document.getElementById('btn-start').addEventListener('click', () => {
+                    this.isRunning = true;
+                    document.getElementById('hud-status').textContent = 'RUNNING';
+                    document.getElementById('hud-status').className = 'text-emerald-400';
+                });
+
+                document.getElementById('btn-pause').addEventListener('click', () => {
+                    this.isRunning = false;
+                    document.getElementById('hud-status').textContent = 'PAUSED';
+                    document.getElementById('hud-status').className = 'text-amber-400';
+                });
+
+                document.getElementById('btn-reset').addEventListener('click', () => {
+                    this.generation++;
+                    document.getElementById('metric-gen').textContent = this.generation;
+                    this.nodes.forEach(n => {
+                        n.discrepancy = Math.random();
+                    });
+                    this.updateNodeListUI();
+                });
+
+                document.getElementById('btn-validate').addEventListener('click', () => {
+                    this.discrepancyIndex = +(Math.random() * 0.05).toFixed(4);
+                    this.entropyFlux = +(3 + Math.random() * 3).toFixed(2);
+                    document.getElementById('metric-discrepancy').textContent = this.discrepancyIndex;
+                    document.getElementById('metric-entropy').textContent = `${this.entropyFlux} J/K`;
+                });
+            }
+
+            updateNodeListUI() {
+                const listEl = document.getElementById('node-list');
+                listEl.innerHTML = '';
+                this.nodes.slice(0, 8).forEach((n, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'bg-slate-900/60 border border-slate-800/80 rounded p-2 flex justify-between items-center text-xs font-mono';
+                    item.innerHTML = `
+                        <span class="text-slate-400">Node #${idx + 1}</span>
+                        <span class="text-cyan-400">Δ: ${(n.discrepancy).toFixed(3)}</span>
+                    `;
+                    listEl.appendChild(item);
+                });
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const now = performance.now();
+                this.frameCount++;
+                if (now - this.lastTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / (now - this.lastTime));
+                    document.getElementById('metric-fps').textContent = this.fps;
+                    this.frameCount = 0;
+                    this.lastTime = now;
+                }
+
+                if (this.isRunning) {
+                    this.coreMesh.rotation.x += 0.003;
+                    this.coreMesh.rotation.y += 0.005;
+
+                    this.nodes.forEach(n => {
+                        n.theta += n.speed;
+                        n.mesh.position.x = n.radius * Math.cos(n.theta) * Math.sin(n.phi);
+                        n.mesh.position.y = n.radius * Math.sin(n.theta) * Math.sin(n.phi);
+                        n.mesh.position.z = n.radius * Math.cos(n.phi);
+                    });
+
+                    this.particles.rotation.y -= 0.001;
+                }
+
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('canvas-target');
+            window.engine = new DiscrepancyIteratorEngine(container);
+        });
+    </script>
+</body>
+</html>

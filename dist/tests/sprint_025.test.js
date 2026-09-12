@@ -7,6 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { computeEntropyGeneration, computeExergyDestruction, ThermodynamicMonad } from '../src/thermodynamics/methods.js';
+import { ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', () => {
     it('should compute non-negative entropy generation rates adhering to Second Law', () => {
         const metrics = computeEntropyGeneration(1000, 300, 5.0, 2.0);
@@ -34,23 +35,27 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
         assert.ok(exergyMetrics.secondLawEfficiency >= 0 && exergyMetrics.secondLawEfficiency <= 1);
     });
     it('should wrap states in ThermodynamicMonad and validate Second Law compliance', () => {
-        const mockVector = {
+        const mockVector = new ThermodynamicStateVector({
             timestamp: 0,
+            tick: 0,
             internalEnergy: 1e6,
+            energy: 1e6,
+            enthalpy: 1.1e6,
             totalEntropy: 500,
             entropy: 500,
+            temperature: 298.15,
+            systemTemperature: 298.15,
             ambientTemperature: 298.15,
             ambientReferenceTemp: 298.15,
+            referenceTemperature: 298.15,
             entropyGenerationRate: 1.7,
             exergyDestructionRate: 298.15 * 1.7,
+            exergy: 2e5,
             stocks: {},
-            temperature: 298.15,
             pressure: 101325,
             volume_V: 1.0,
-            enthalpy: 1.1e6,
-            exergy: 2e5,
             boundaryFluxes: { solarRadiationIn: 1000, longwaveRadiationOut: 900, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-        };
+        });
         const mockFluxItem = {
             speciesId: 'CO2',
             molarRate: 1.0,
@@ -102,23 +107,27 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
         assert.strictEqual(nextMonad.getState().timestamp, 1);
     });
     it('should reject monad state transitions that violate the Second Law', () => {
-        const mockVector = {
+        const mockVector = new ThermodynamicStateVector({
             timestamp: 0,
+            tick: 0,
             internalEnergy: 1e6,
+            energy: 1e6,
+            enthalpy: 1.1e6,
             totalEntropy: 500,
             entropy: 500,
+            temperature: 298.15,
+            systemTemperature: 298.15,
             ambientTemperature: 298.15,
             ambientReferenceTemp: 298.15,
+            referenceTemperature: 298.15,
             entropyGenerationRate: 1.0,
             exergyDestructionRate: 298.15,
+            exergy: 2e5,
             stocks: {},
-            temperature: 298.15,
             pressure: 101325,
             volume_V: 1.0,
-            enthalpy: 1.1e6,
-            exergy: 2e5,
             boundaryFluxes: { solarRadiationIn: 1000, longwaveRadiationOut: 900, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
-        };
+        });
         const boundaryFluxes = {
             solarRadiationIn: 1000,
             longwaveRadiationOut: 900,

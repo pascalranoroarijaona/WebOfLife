@@ -1,0 +1,98 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #2C3E50
+
+title Sprint 076: Thermodynamic State Vector Discrepancy Mapping Iterator
+
+package "src.thermodynamics" {
+    
+    interface DiscrepancyRecord {
+        + element: 'C' | 'N' | 'P' | 'H2O'
+        + expected: number
+        + actual: number
+        + discrepancy: number
+        + timestamp: number
+        + isWithinTolerance: boolean
+    }
+
+    interface DiscrepancySummary {
+        + totalRecords: number
+        + maxDiscrepancy: number
+        + conserved: boolean
+        + records: DiscrepancyRecord[]
+    }
+
+    interface IStateValidator {
+        + mapDiscrepancies(stocks: Map<string, number>, baseline: Map<string, number>): DiscrepancySummary
+    }
+
+    class BaseStateValidator {
+        # tolerance: number
+        + validateVector(vector: ThermodynamicStateVector): Result
+    }
+
+    class StateVectorDiscrepancyIterator {
+        - tolerance: number
+        + mapDiscrepancies(stocks: Map<string, number>, baseline: Map<string, number>): DiscrepancySummary
+        + aggregateDiscrepancies(records: DiscrepancyRecord[]): DiscrepancySummary
+        - calculateEntropyDelta(expected: number, actual: number): number
+    }
+
+    BaseStateValidator <|-- StateVectorDiscrepancyIterator
+    IStateValidator <|.. StateVectorDiscrepancyIterator
+    StateVectorDiscrepancyIterator --> DiscrepancySummary : produces
+    DiscrepancySummary *-- DiscrepancyRecord : contains
+}
+
+package "Database Schema" {
+    class thermodynamic_stocks {
+        + stock_id: UUID
+        + entity_id: VARCHAR
+        + element_type: VARCHAR
+        + stock_value: NUMERIC
+        + baseline_value: NUMERIC
+        + updated_at: TIMESTAMP
+    }
+
+    class discrepancy_records {
+        + record_id: UUID
+        + stock_id: UUID
+        + element: VARCHAR
+        + expected: NUMERIC
+        + actual: NUMERIC
+        + discrepancy: NUMERIC
+        + is_within_tolerance: BOOLEAN
+        + entropy_generation: NUMERIC
+        + recorded_at: TIMESTAMP
+    }
+
+    class thermodynamic_blocks {
+        + block_id: UUID
+        + block_height: BIGINT
+        + prev_hash: VARCHAR
+        + merkle_root: VARCHAR
+        + state_vector_hash: VARCHAR
+        + validator_signature: TEXT
+        + created_at: TIMESTAMP
+    }
+
+    class thermodynamic_transactions {
+        + tx_id: UUID
+        + block_id: UUID
+        + record_id: UUID
+        + sender_entity: VARCHAR
+        + receiver_entity: VARCHAR
+        + enthalpy_delta: NUMERIC
+        + entropy_delta: NUMERIC
+        + transaction_signature: VARCHAR
+        + executed_at: TIMESTAMP
+    }
+
+    thermodynamic_stocks ||--o{ discrepancy_records : tracks
+    thermodynamic_blocks ||--o{ thermodynamic_transactions : contains
+    discrepancy_records ||--o{ thermodynamic_transactions : references
+}
+
+@enduml

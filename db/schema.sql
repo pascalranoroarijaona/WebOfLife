@@ -1,56 +1,71 @@
 -- ============================================================================
 -- Web of Life Database & Thermodynamic Blockchain Schema
--- Sprint 075: Thermodynamic State Vector Elemental Tolerance Comparison Guard
+-- Sprint 076: Thermodynamic State Vector Discrepancy Mapping Iterator
 -- ============================================================================
 
+-- Enable UUID extension if not present
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Thermodynamic Monad Pods & State Vectors
-CREATE TABLE earth_pods (
-    pod_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
+-- ----------------------------------------------------------------------------
+-- 1. Thermodynamic Stock Collections & Elemental Baselines
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_id VARCHAR(255) NOT NULL,
+    element_type VARCHAR(10) CHECK (element_type IN ('C', 'N', 'P', 'H2O')),
+    stock_value NUMERIC(20, 8) NOT NULL,
+    baseline_value NUMERIC(20, 8) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID REFERENCES earth_pods(pod_id) ON DELETE CASCADE,
-    carbon_stock NUMERIC(18, 6) NOT NULL,
-    nitrogen_stock NUMERIC(18, 6) NOT NULL,
-    phosphorus_stock NUMERIC(18, 6) NOT NULL,
-    water_stock NUMERIC(18, 6) NOT NULL,
-    entropy_measure NUMERIC(18, 6) NOT NULL,
-    solar_input_constraint NUMERIC(18, 6) NOT NULL,
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_stocks_entity 
+    ON thermodynamic_stocks(entity_id, element_type);
+
+-- ----------------------------------------------------------------------------
+-- 2. Discrepancy Records Ledger (First & Second Law Validation)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS discrepancy_records (
+    record_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    stock_id UUID REFERENCES thermodynamic_stocks(stock_id) ON DELETE CASCADE,
+    element VARCHAR(10) CHECK (element IN ('C', 'N', 'P', 'H2O')),
+    expected NUMERIC(20, 8) NOT NULL,
+    actual NUMERIC(20, 8) NOT NULL,
+    discrepancy NUMERIC(20, 8) NOT NULL,
+    is_within_tolerance BOOLEAN NOT NULL,
+    entropy_generation NUMERIC(20, 8) DEFAULT 0.0 CHECK (entropy_generation >= 0),
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Elemental Tolerance Comparison Audits (Sprint 075)
-CREATE TABLE tolerance_validation_audits (
-    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
-    element_name VARCHAR(64) NOT NULL, -- e.g., 'Carbon', 'Nitrogen', 'Phosphorus', 'Water'
-    difference_value NUMERIC(18, 6) NOT NULL,
-    tolerance_threshold NUMERIC(18, 6) NOT NULL,
-    is_compliant BOOLEAN NOT NULL,
-    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE INDEX IF NOT EXISTS idx_discrepancy_records_tolerance 
+    ON discrepancy_records(is_within_tolerance);
+
+-- ----------------------------------------------------------------------------
+-- 3. Thermodynamic Blockchain Block & Transaction Signatures
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT UNIQUE NOT NULL,
+    prev_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    state_vector_hash VARCHAR(64) NOT NULL,
+    validator_signature TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Thermodynamic Blockchain Ledger Transactions
-CREATE TABLE block_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_index BIGINT NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL,
-    pod_id UUID REFERENCES earth_pods(pod_id),
-    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
+    record_id UUID REFERENCES discrepancy_records(record_id),
+    sender_entity VARCHAR(255) NOT NULL,
+    receiver_entity VARCHAR(255) NOT NULL,
+    enthalpy_delta NUMERIC(20, 8) NOT NULL,
+    entropy_delta NUMERIC(20, 8) NOT NULL,
     transaction_signature VARCHAR(128) NOT NULL,
-    first_law_conserved BOOLEAN NOT NULL,
-    second_law_compliant BOOLEAN NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for performance and time-series efficiency
-CREATE INDEX idx_state_vectors_pod_id ON thermodynamic_state_vectors(pod_id, recorded_at DESC);
-CREATE INDEX idx_tolerance_audits_vector ON tolerance_validation_audits(vector_id, is_compliant);
-CREATE INDEX idx_block_transactions_index ON block_transactions(block_index DESC);
+CREATE INDEX IF NOT EXISTS idx_thermo_tx_block 
+    ON thermodynamic_transactions(block_id);

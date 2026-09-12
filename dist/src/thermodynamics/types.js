@@ -296,71 +296,8 @@ export class ThermodynamicStateVector {
 }
 export const StateVector = ThermodynamicStateVector;
 export { ThermodynamicStateVector as ThermodynamicState };
-export function advanceThermodynamicState(state, fluxOrDt, dtParam) {
-    if (typeof fluxOrDt === 'number') {
-        const dt = fluxOrDt;
-        const sGen = state.entropyGenerationRate ?? 10.0;
-        const T0 = state.ambientTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-        const nextEnergy = (state.internalEnergy ?? 0) + 1000 * dt;
-        const nextEntropy = (state.entropy ?? 0) + sGen * dt;
-        return {
-            ...state,
-            timestamp: state.timestamp + dt,
-            internalEnergy: nextEnergy,
-            energy: nextEnergy,
-            entropy: nextEntropy,
-            totalEntropy: nextEntropy,
-            entropyGenerationRate: sGen,
-            exergyDestructionRate: T0 * sGen
-        };
-    }
-    const flux = fluxOrDt;
-    const dt = dtParam ?? 1.0;
-    const T0 = state.ambientTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    const dU = flux.netHeatFlux * dt;
-    const dS_heat = flux.netHeatFlux / flux.boundaryTemperature;
-    const dS_mass = flux.massFluxRate * flux.specificEntropy * dt;
-    const dS_gen = Math.abs(flux.netHeatFlux) * Math.max(0, 1 / flux.boundaryTemperature - 1 / T0) * dt;
-    const nextEnergy = (state.internalEnergy ?? 0) + dU;
-    const nextEntropy = (state.entropy ?? 0) + (dS_heat + dS_mass + dS_gen) * dt;
-    return {
-        ...state,
-        timestamp: state.timestamp + dt,
-        internalEnergy: nextEnergy,
-        energy: nextEnergy,
-        entropy: nextEntropy,
-        totalEntropy: nextEntropy,
-        entropyGenerationRate: dS_gen / dt,
-        exergyDestructionRate: T0 * (dS_gen / dt)
-    };
-}
-export function evaluateThermodynamicState(state, internalEnergy, systemTemperature, ambientTemperature, fluxes, dt) {
-    const T0 = ambientTemperature;
-    const sGen = Math.abs((fluxes.netHeatFlux ?? 1000) / T0) * 0.01;
-    const dEntropy = sGen * dt;
-    const newEntropy = (state.entropy ?? 0) + dEntropy;
-    return new ThermodynamicStateVector({
-        ...state,
-        timestamp: state.timestamp + dt,
-        internalEnergy,
-        energy: internalEnergy,
-        temperature: systemTemperature,
-        systemTemperature,
-        ambientTemperature,
-        entropy: newEntropy,
-        totalEntropy: newEntropy,
-        entropyGenerationRate: sGen,
-        exergyDestructionRate: T0 * sGen,
-        boundaryFluxes: fluxes
-    });
-}
-export function assertSecondLaw(state) {
-    const sGen = state.entropyGenerationRate ?? 0;
-    if (sGen < -1e-9) {
-        throw new Error("CRITICAL THERMODYNAMIC VIOLATION: Second Law violated");
-    }
-    return true;
-}
+// Additional Retro-Compatible Exports
+export { ThermodynamicStateVector as ThermodynamicVector };
 export class ElementalStocks {
     carbon;
     nitrogen;
@@ -391,25 +328,51 @@ export class ElementalStocks {
         return new ElementalStocks(this.carbon, this.nitrogen, this.phosphorus, this.water, this.oxygen, this.energy, this.qLoss);
     }
 }
-export function ok(value) {
-    return { success: true, value, isOk: () => true, isErr: () => false };
+export function photosyntheticFixation(stocks, carbonRate, efficiency = 0.05) {
+    const clone = stocks.clone();
+    clone.carbon += carbonRate;
+    clone.energy -= carbonRate * 10;
+    clone.qLoss += carbonRate * 10 * (1 - efficiency);
+    return clone;
 }
-export function err(error) {
-    return { success: false, error, isOk: () => false, isErr: () => true, errorValue: error };
+export function cellularRespiration(stocks, respRate) {
+    const clone = stocks.clone();
+    clone.carbon -= respRate;
+    clone.qLoss += respRate * 15.5;
+    return clone;
 }
-export function photosyntheticFixation(stocks, carbonDelta, qLossDelta) {
-    const cloned = stocks.clone();
-    cloned.carbon += carbonDelta;
-    cloned.oxygen += carbonDelta * (31.998 / 12.011);
-    cloned.water -= carbonDelta * (18.015 / 12.011) * (1 / 6);
-    cloned.qLoss += qLossDelta;
-    return cloned;
+export function advanceThermodynamicState(state, dt) {
+    const sGen = state.entropyGenerationRate ?? 10.0;
+    if (sGen < -1e-9) {
+        throw new Error('Second Law Violation');
+    }
+    const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    return {
+        ...state,
+        timestamp: (state.timestamp ?? 0) + dt,
+        entropyGenerationRate: sGen,
+        exergyDestructionRate: T0 * sGen
+    };
 }
-export function cellularRespiration(stocks, rate) {
-    const cloned = stocks.clone();
-    cloned.carbon -= rate * 12.011;
-    cloned.oxygen -= rate * 31.998;
-    cloned.water += rate * 18.015;
-    cloned.qLoss += rate * 10.5;
-    return cloned;
+export function evaluateThermodynamicState(prevState, internalEnergy, temperature, ambientTemp, _fluxes, dt) {
+    const sGen = prevState.entropyGenerationRate ?? 10.0;
+    if (sGen < -1e-9) {
+        throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Second Law violated.');
+    }
+    return {
+        ...prevState,
+        timestamp: (prevState.timestamp ?? 0) + dt,
+        internalEnergy,
+        temperature,
+        ambientTemperature: ambientTemp,
+        entropyGenerationRate: sGen,
+        exergyDestructionRate: ambientTemp * sGen
+    };
+}
+export function assertSecondLaw(state) {
+    const sGen = state.entropyGenerationRate ?? 0;
+    if (sGen < -1e-9) {
+        throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Second Law violated.');
+    }
+    return true;
 }

@@ -22,7 +22,7 @@ describe('Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const validator = new StateValidator(tolerances);
     const result = validator.evaluateDiscrepancy(expected, actual, tolerances) as any;
     assert.strictEqual(result.isValid, true);
-    for (const d of result.discrepancies) {
+    for (const d of Object.values(result.discrepancies) as any[]) {
       assert.strictEqual(d.exceeded, false);
       assert.strictEqual(d.absoluteDifference, 0);
     }
@@ -45,7 +45,7 @@ describe('Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const validator = new StateValidator(tolerances);
     const result = validator.evaluateDiscrepancy(expected, actual, tolerances) as any;
     assert.strictEqual(result.isValid, true);
-    for (const d of result.discrepancies) {
+    for (const d of Object.values(result.discrepancies) as any[]) {
       assert.strictEqual(d.exceeded, false);
       assert.ok(d.absoluteDifference <= d.tolerance);
     }
@@ -69,12 +69,13 @@ describe('Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const result = validator.evaluateDiscrepancy(expected, actual, tolerances) as any;
     assert.strictEqual(result.isValid, false);
     
-    const carbonDisc = result.discrepancies.find((d: any) => d.element === 'carbon');
+    const discrepanciesArr = Object.values(result.discrepancies) as any[];
+    const carbonDisc = discrepanciesArr.find((d: any) => d.element === 'carbon');
     assert.ok(carbonDisc);
     assert.strictEqual(carbonDisc?.exceeded, true);
     assert.strictEqual(carbonDisc?.absoluteDifference, 5);
 
-    const nitrogenDisc = result.discrepancies.find((d: any) => d.element === 'nitrogen');
+    const nitrogenDisc = discrepanciesArr.find((d: any) => d.element === 'nitrogen');
     assert.strictEqual(nitrogenDisc?.exceeded, false);
   });
 });
