@@ -2,9 +2,9 @@
  * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad } from './thermodynamics/types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad, BoundaryFluxArray } from './thermodynamics/types.js';
 import { executeThermodynamicStep } from './thermodynamics/thermodynamic_monad_process.js';
-export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep };
+export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray };
 export var EntropyState;
 (function (EntropyState) {
     EntropyState["STEADY"] = "STEADY";
@@ -74,6 +74,7 @@ export class ThermodynamicStructure {
             entropyGenerationRate: dotSGen,
             exergyDestructionRate: T0 * dotSGen,
             exergy: 1e10,
+            stocks: {},
             boundaryFluxes,
             thermalFluxes: {
                 solarInbound: 1.74e17,
@@ -216,6 +217,7 @@ export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
         temperature: sysTemp,
         ambientTemperature: T0,
         ambientReferenceTemp: T0,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: dotSGen,
         exergyDestructionRate: dotI,
         exergy: state.exergy ?? 1e5,
@@ -273,7 +275,7 @@ export function applyMassTransport(stock, state, massFluxes, specificEnthalpy, s
     const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
     const sensible = bfRecord.sensibleHeatFlux ?? 0;
     const latent = bfRecord.latentHeatFlux ?? 0;
-    const massFluxArr = Array.isArray(massFluxes) ? [] : [];
+    const massFluxArr = [];
     const boundaryFluxes = {
         ...bfRecord,
         heatFluxes: heatFluxesArr,
@@ -293,6 +295,7 @@ export function applyMassTransport(stock, state, massFluxes, specificEnthalpy, s
         temperature: T0,
         ambientTemperature: T0,
         ambientReferenceTemp: T0,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: dotSGen,
         exergyDestructionRate: dotI,
         exergy: state.exergy ?? 1e5,

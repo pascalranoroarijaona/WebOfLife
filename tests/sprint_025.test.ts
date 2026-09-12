@@ -70,13 +70,16 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
       exergyFlux: 80
     };
 
-    const mockBoundaryFluxes: BoundaryFluxArray = {
-      incomingSolarRadiation: mockFluxItem,
-      outgoingThermalRadiation: mockFluxItem,
-      matterFluxes: [mockFluxItem],
-      netHeatFlux: 500,
-      netWorkFlux: 0
-    };
+    const mockBoundaryFluxes = new BoundaryFluxArray();
+    mockBoundaryFluxes.solarRadiationIn = 1000;
+    mockBoundaryFluxes.longwaveRadiationOut = 900;
+    mockBoundaryFluxes.sensibleHeatFlux = 0;
+    mockBoundaryFluxes.latentHeatFlux = 0;
+    mockBoundaryFluxes.netMassFlux = 0;
+    mockBoundaryFluxes.matterFluxes = [mockFluxItem];
+    mockBoundaryFluxes.massFluxes = [mockFluxItem];
+    mockBoundaryFluxes.netHeatFlux = 500;
+    mockBoundaryFluxes.netWorkFlux = 0;
 
     const entropyMetrics: EntropyGenerationMetrics = {
       thermalDissipation: 1.0,
@@ -102,7 +105,7 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
     const monad = ThermodynamicMonad.unit(initialState);
     assert.strictEqual(monad.getState().timestamp, 0);
 
-    const nextMonad = monad.chain((curr) => ({
+    const nextMonad = monad.chain((curr: any) => ({
       ...curr,
       timestamp: 1,
       entropyMetrics: {
@@ -125,25 +128,18 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
       exergy: 2e5
     };
 
-    const mockFluxItem = {
-      speciesId: 'H2O',
-      molarRate: 1.0,
-      massRate: 18.0,
-      enthalpyFlux: 100,
-      entropyFlux: 1.0,
-      exergyFlux: 80
-    };
+    const boundaryFluxes = new BoundaryFluxArray();
+    boundaryFluxes.solarRadiationIn = 1000;
+    boundaryFluxes.longwaveRadiationOut = 900;
+    boundaryFluxes.matterFluxes = [];
+    boundaryFluxes.massFluxes = [];
+    boundaryFluxes.netHeatFlux = 100;
+    boundaryFluxes.netWorkFlux = 0;
 
     const initialState: ThermodynamicStateSnapshot = {
       timestamp: 0,
       stateVector: mockVector,
-      boundaryFluxes: {
-        incomingSolarRadiation: mockFluxItem,
-        outgoingThermalRadiation: mockFluxItem,
-        matterFluxes: [],
-        netHeatFlux: 100,
-        netWorkFlux: 0
-      },
+      boundaryFluxes,
       entropyMetrics: {
         thermalDissipation: 1.0,
         chemicalReactionEntropy: 0,
@@ -160,7 +156,7 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
     const monad = ThermodynamicMonad.unit(initialState);
 
     assert.throws(() => {
-      monad.chain((curr) => ({
+      monad.chain((curr: any) => ({
         ...curr,
         timestamp: 1,
         entropyMetrics: {

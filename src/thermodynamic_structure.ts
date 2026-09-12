@@ -109,6 +109,7 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
       entropyGenerationRate: dotSGen,
       exergyDestructionRate: T0 * dotSGen,
       exergy: 1e10,
+      stocks: {},
       boundaryFluxes,
       thermalFluxes: {
         solarInbound: 1.74e17,
@@ -276,6 +277,7 @@ export function applyThermalFlux(
     temperature: sysTemp,
     ambientTemperature: T0,
     ambientReferenceTemp: T0,
+    stocks: state.stocks ?? {},
     entropyGenerationRate: dotSGen,
     exergyDestructionRate: dotI,
     exergy: state.exergy ?? 1e5,
@@ -347,7 +349,7 @@ export function applyMassTransport(
   const sensible = bfRecord.sensibleHeatFlux ?? 0;
   const latent = bfRecord.latentHeatFlux ?? 0;
 
-  const massFluxArr = Array.isArray(massFluxes) ? [] : [];
+  const massFluxArr: any[] = [];
 
   const boundaryFluxes: IBoundaryFluxArray = {
     ...bfRecord,
@@ -369,6 +371,7 @@ export function applyMassTransport(
     temperature: T0,
     ambientTemperature: T0,
     ambientReferenceTemp: T0,
+    stocks: state.stocks ?? {},
     entropyGenerationRate: dotSGen,
     exergyDestructionRate: dotI,
     exergy: state.exergy ?? 1e5,

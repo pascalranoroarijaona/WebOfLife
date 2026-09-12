@@ -7,6 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { computeEntropyGeneration, computeExergyDestruction, ThermodynamicMonad } from '../src/thermodynamics/methods.js';
+import { BoundaryFluxArray } from '../src/thermodynamics/types.js';
 describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', () => {
     it('should compute non-negative entropy generation rates adhering to Second Law', () => {
         const metrics = computeEntropyGeneration(1000, 300, 5.0, 2.0);
@@ -51,13 +52,16 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
             entropyFlux: 1.0,
             exergyFlux: 80
         };
-        const mockBoundaryFluxes = {
-            incomingSolarRadiation: mockFluxItem,
-            outgoingThermalRadiation: mockFluxItem,
-            matterFluxes: [mockFluxItem],
-            netHeatFlux: 500,
-            netWorkFlux: 0
-        };
+        const mockBoundaryFluxes = new BoundaryFluxArray();
+        mockBoundaryFluxes.solarRadiationIn = 1000;
+        mockBoundaryFluxes.longwaveRadiationOut = 900;
+        mockBoundaryFluxes.sensibleHeatFlux = 0;
+        mockBoundaryFluxes.latentHeatFlux = 0;
+        mockBoundaryFluxes.netMassFlux = 0;
+        mockBoundaryFluxes.matterFluxes = [mockFluxItem];
+        mockBoundaryFluxes.massFluxes = [mockFluxItem];
+        mockBoundaryFluxes.netHeatFlux = 500;
+        mockBoundaryFluxes.netWorkFlux = 0;
         const entropyMetrics = {
             thermalDissipation: 1.0,
             chemicalReactionEntropy: 0.5,
@@ -98,24 +102,17 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
             entropy: 500,
             exergy: 2e5
         };
-        const mockFluxItem = {
-            speciesId: 'H2O',
-            molarRate: 1.0,
-            massRate: 18.0,
-            enthalpyFlux: 100,
-            entropyFlux: 1.0,
-            exergyFlux: 80
-        };
+        const boundaryFluxes = new BoundaryFluxArray();
+        boundaryFluxes.solarRadiationIn = 1000;
+        boundaryFluxes.longwaveRadiationOut = 900;
+        boundaryFluxes.matterFluxes = [];
+        boundaryFluxes.massFluxes = [];
+        boundaryFluxes.netHeatFlux = 100;
+        boundaryFluxes.netWorkFlux = 0;
         const initialState = {
             timestamp: 0,
             stateVector: mockVector,
-            boundaryFluxes: {
-                incomingSolarRadiation: mockFluxItem,
-                outgoingThermalRadiation: mockFluxItem,
-                matterFluxes: [],
-                netHeatFlux: 100,
-                netWorkFlux: 0
-            },
+            boundaryFluxes,
             entropyMetrics: {
                 thermalDissipation: 1.0,
                 chemicalReactionEntropy: 0,

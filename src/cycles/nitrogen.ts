@@ -2,7 +2,7 @@
  * @fileoverview Nitrogen Cycle implementation extending BaseCycle (Sprint 015)
  */
 import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
-import { BoundaryFlux } from '../thermodynamics/types.js';
+import { IBoundaryFlux } from '../thermodynamics/types.js';
 
 export class NitrogenCycle extends BaseCycle {
   constructor() {
@@ -19,7 +19,7 @@ export class NitrogenCycle extends BaseCycle {
   }
 
   public step(dt: number, solarFlux: number): void {
-    const boundaryFlux: BoundaryFlux = {
+    const boundaryFlux: IBoundaryFlux = {
       netHeatFlux: solarFlux * 1e-5,
       netMassFlux: 0.5,
       solarIncoming: solarFlux,

@@ -23,6 +23,7 @@ export class BaseCycle {
             entropyGenerationRate: 15.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
             exergy: 1e10,
+            stocks: {},
             boundaryFluxes: {
                 solarRadiationIn: 1.74e17,
                 longwaveRadiationOut: 1.74e17 * 0.99,

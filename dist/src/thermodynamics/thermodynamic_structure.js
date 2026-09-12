@@ -2,9 +2,9 @@
  * Thermodynamic Structure and Base Implementations (Sprint 021 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, advanceThermodynamicState } from './types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, BoundaryFluxArray, advanceThermodynamicState } from './types.js';
 import { executeThermodynamicStep } from './thermodynamic_monad_process.js';
-export { ThermodynamicStateMonad, executeThermodynamicStep, advanceThermodynamicState };
+export { ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, advanceThermodynamicState };
 export var EntropyState;
 (function (EntropyState) {
     EntropyState["STEADY"] = "STEADY";
@@ -74,6 +74,7 @@ export class ThermodynamicStructure {
             entropyGenerationRate: dotSGen,
             exergyDestructionRate: T0 * dotSGen,
             exergy: 1e10,
+            stocks: {},
             boundaryFluxes,
             thermalFluxes: {
                 solarInbound: 1.74e17,
@@ -215,6 +216,7 @@ export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
         temperature: sysTemp,
         ambientTemperature: T0,
         ambientReferenceTemp: T0,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: dotSGen,
         exergyDestructionRate: dotI,
         exergy: state.exergy ?? 1e5,
@@ -291,6 +293,7 @@ export function applyMassTransport(stock, state, massFluxes, specificEnthalpy, s
         temperature: T0,
         ambientTemperature: T0,
         ambientReferenceTemp: T0,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: dotSGen,
         exergyDestructionRate: dotI,
         exergy: state.exergy ?? 1e5,

@@ -21,6 +21,7 @@ export function executeThermodynamicStep(
     const T0 = STANDARD_AMBIENT_TEMPERATURE_K;
     const nextState = {
         ...stateOrParams,
+        stocks: stateOrParams.stocks ?? {},
         entropyGenerationRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
@@ -53,6 +54,7 @@ export function stepThermodynamicMonad(
     const T0 = state.referenceTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     const nextState = {
         ...state,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
@@ -64,11 +66,12 @@ export function stepThermodynamicMonad(
 }
 
 export class ThermodynamicMonadProcess {
-  constructor(public id: string, public name: string, initialState?: ThermodynamicStateVector) {
+  constructor(public id: string = 'monad_default', public name: string = 'Default Monad', initialState?: ThermodynamicStateVector) {
     if (initialState) {
       initialStageValidator(initialState);
       this.stateVector = {
         ...initialState,
+        stocks: initialState.stocks ?? {},
         temperature: initialState.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K
       };
     }
@@ -77,6 +80,7 @@ export class ThermodynamicMonadProcess {
     timestamp: 0,
     internalEnergy: 1e8,
     entropy: 2e5,
+    stocks: {},
     entropyGenerationRate: 5.0,
     exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
     temperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -89,6 +93,7 @@ export class ThermodynamicMonadProcess {
     }
     this.stateVector = {
       ...state,
+      stocks: state.stocks ?? {},
       temperature: state.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K
     };
   }
@@ -112,13 +117,22 @@ export class ThermodynamicMonadProcess {
     const sGen = state.entropyGenerationRate ?? 5.0;
     if (sGen < -1e-9) throw new Error("Second Law Violation");
     const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    
+    let updatedElementalStocks = state.elementalStocks;
+    if (Array.isArray(state.elementalStocks) && state.boundaryFluxes && Array.isArray(state.boundaryFluxes.massFluxRates)) {
+      const mRates = state.boundaryFluxes.massFluxRates;
+      updatedElementalStocks = state.elementalStocks.map((stock: number, i: number) => stock + (Number(mRates[i]) || 0) * dt);
+    }
+
     const nextState = {
       ...state,
       time: (state.time ?? state.timestamp ?? 0) + dt,
       timestamp: (state.timestamp ?? 0) + dt,
       internalEnergy: (state.internalEnergy ?? 0) + 1000 * dt,
+      stocks: state.stocks ?? {},
       entropyGenerationRate: sGen,
-      exergyDestructionRate: T0 * sGen
+      exergyDestructionRate: T0 * sGen,
+      elementalStocks: updatedElementalStocks
     };
     return nextState;
   }
@@ -135,6 +149,7 @@ export class ThermodynamicMonadProcess {
       ...currentState,
       timestamp: (currentState.timestamp ?? 0) + dt,
       internalEnergy: (currentState.internalEnergy ?? 1e12) + 1000 * dt,
+      stocks: currentState.stocks ?? {},
       entropyGenerationRate: sGen,
       exergyDestructionRate: T0 * sGen,
       boundaryFluxes: newFluxes,

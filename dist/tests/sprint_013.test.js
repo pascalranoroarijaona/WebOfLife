@@ -22,8 +22,8 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
             thermalRadiationOut: 1e15,
             matterEnthalpyFlux: 0,
             netHeatFlux: 0,
-            heatFluxes: new Map(),
-            massFluxes: new Map()
+            heatFluxes: [],
+            massFluxes: []
         };
         const exergyMetrics = {
             T_0,
@@ -39,6 +39,7 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
             ambientReferenceTemp: T_0,
             ambientTemperature: T_0,
             entropy: 1e6,
+            stocks: {},
             entropyGenerationRate: entropyGen,
             exergyDestructionRate: exergyDestruction,
             exergy: 1e10,
@@ -62,8 +63,8 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
             thermalRadiationOut: 0.99e5,
             matterEnthalpyFlux,
             netHeatFlux,
-            heatFluxes: new Map(),
-            massFluxes: new Map()
+            heatFluxes: [],
+            massFluxes: []
         };
         const exergyMetrics = {
             T_0: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -79,6 +80,7 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropy: 1e6,
+            stocks: {},
             entropyGenerationRate: 10,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10,
             exergy: 1e10,

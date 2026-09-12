@@ -1,0 +1,96 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F9F9F9
+skinparam classBorderColor #333333
+
+title Sprint 031: Thermodynamic State Vector Validation & Monad Architecture
+
+package "src.thermodynamics" {
+    
+    interface ValidationResult {
+        + isValid: boolean
+        + errors: string[]
+        + warnings: string[]
+    }
+
+    interface StateValidatorOptions {
+        + strictMode?: boolean
+        + tolerance?: number
+        + requireSolarInputBinding?: boolean
+    }
+
+    class ThermodynamicStateVector {
+        + vectorId: string
+        + simulationStep: number
+        + temperature: number
+        + entropy: number
+        + dissipationRate: number
+        + solarInput: number
+        + stocks: Record<string, number>
+    }
+
+    class StateValidator {
+        - options: StateValidatorOptions
+        + __init__(options: StateValidatorOptions)
+        + validateState(state: ThermodynamicStateVector): ValidationResult
+        + assertValidState(state: ThermodynamicStateVector): void
+        + validateTransition(prior: ThermodynamicStateVector, next: ThermodynamicStateVector): ValidationResult
+    }
+
+    class ThermodynamicMonadProcess {
+        - validator: StateValidator
+        + __init__(validator: StateValidator)
+        + step(state: ThermodynamicStateVector, transitionFn: Function): ThermodynamicStateVector
+    }
+}
+
+package "Database & Ledger Models" {
+    class ThermodynamicStateVectorTable {
+        + vector_id: UUID
+        + simulation_step: BIGINT
+        + timestamp: TIMESTAMPTZ
+        + temperature: DOUBLE
+        + entropy: DOUBLE
+        + dissipation_rate: DOUBLE
+        + solar_input: DOUBLE
+        + is_valid: BOOLEAN
+    }
+
+    class MonadStocksTable {
+        + stock_id: UUID
+        + vector_id: UUID
+        + timestamp: TIMESTAMPTZ
+        + stock_type: VARCHAR
+        + stock_amount: DOUBLE
+    }
+
+    class ThermodynamicTransitionsTable {
+        + transition_id: UUID
+        + prior_vector_id: UUID
+        + next_vector_id: UUID
+        + net_stock_change: DOUBLE
+        + first_law_satisfied: BOOLEAN
+        + second_law_satisfied: BOOLEAN
+    }
+
+    class BlockchainAuditLedgerTable {
+        + block_id: UUID
+        + previous_hash: VARCHAR
+        + current_hash: VARCHAR
+        + validator_signature: VARCHAR
+    }
+}
+
+-- Relationships & Dependencies
+StateValidator --> ThermodynamicStateVector : inspects >
+StateValidator --> ValidationResult : produces >
+StateValidator o-- StateValidatorOptions : configures >
+ThermodynamicMonadProcess --> StateValidator : uses >
+ThermodynamicMonadProcess --> ThermodynamicStateVector : transforms >
+
+ThermodynamicStateVectorTable "1" *-- "many" MonadStocksTable : contains stocks >
+ThermodynamicStateVectorTable "1" -- "1" ThermodynamicTransitionsTable : initiates transition >
+ThermodynamicTransitionsTable "1" -- "1" BlockchainAuditLedgerTable : secures block >
+
+@enduml

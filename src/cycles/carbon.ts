@@ -2,7 +2,7 @@
  * @fileoverview Carbon Cycle implementation extending BaseCycle (Sprint 015)
  */
 import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
-import { BoundaryFlux } from '../thermodynamics/types.js';
+import { IBoundaryFlux } from '../thermodynamics/types.js';
 
 export class CarbonCycle extends BaseCycle {
   constructor(options?: { initialStocks?: Record<string, number> }) {
@@ -23,7 +23,7 @@ export class CarbonCycle extends BaseCycle {
   }
 
   public step(dt: number, solarFlux: number): void {
-    const boundaryFlux: BoundaryFlux = {
+    const boundaryFlux: IBoundaryFlux = {
       netHeatFlux: solarFlux * 1e-4,
       netMassFlux: 1.2,
       solarIncoming: solarFlux,

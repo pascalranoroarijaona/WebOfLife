@@ -1,7 +1,7 @@
 /**
  * @fileoverview Base Cycle extending IThermodynamicModel (Sprint 015 & Retro-Compatibility)
  */
-import { IThermodynamicModel, IThermodynamicStateVector, ThermodynamicStateVector, BoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K, BoundaryFluxVector, ThermodynamicComplianceResult } from '../thermodynamics/types.js';
+import { IThermodynamicModel, IThermodynamicStateVector, ThermodynamicStateVector, IBoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K, BoundaryFluxVector, ThermodynamicComplianceResult } from '../thermodynamics/types.js';
 import { calculateFirstLawResidual, evaluateSecondLaw, stepThermodynamicMonad } from '../thermodynamics/methods.js';
 
 export { stepThermodynamicMonad };
@@ -9,7 +9,7 @@ export { stepThermodynamicMonad };
 export abstract class BaseCycle implements IThermodynamicModel {
   public id: string;
   protected stateVector: ThermodynamicStateVector;
-  protected stocks: Map<string, number> = new Map();
+  public stocks: Map<string, number> = new Map();
 
   constructor(public name: string, initialStocks?: Record<string, number>) {
     this.id = `${name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 9)}`;
@@ -24,6 +24,7 @@ export abstract class BaseCycle implements IThermodynamicModel {
       entropyGenerationRate: 15.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
       exergy: 1e10,
+      stocks: {},
       boundaryFluxes: {
         solarRadiationIn: 1.74e17,
         longwaveRadiationOut: 1.74e17 * 0.99,
@@ -69,7 +70,7 @@ export abstract class BaseCycle implements IThermodynamicModel {
   }
 
   public stepThermodynamics(dt: number, _fluxes?: BoundaryFluxVector): void {
-    const defaultFlux: BoundaryFlux = {
+    const defaultFlux: IBoundaryFlux = {
       fluxId: `${this.name}_solar_in`,
       species: 'energy',
       massFlowRate: 0,

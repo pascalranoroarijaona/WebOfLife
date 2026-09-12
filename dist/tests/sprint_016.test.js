@@ -13,6 +13,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             totalEntropy: 5000,
             temperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            stocks: {},
             entropyGenerationRate: -1.0, // Invalid negative entropy generation
             exergyDestructionRate: 0,
             exergy: 1e5,
@@ -31,9 +32,9 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             latentHeatFlux: 0,
             netMassFlux: 0
         };
-        const monad = ThermodynamicStateMonad.initialize(initialState, initialFluxes);
+        const monad = ThermodynamicStateMonad.initialize(initialState);
         assert.throws(() => {
-            monad.transit((state, fluxes) => executeThermodynamicStep(state, fluxes, 1.0));
+            monad.transit((state, fluxes) => executeThermodynamicStep(state, fluxes));
         }, /Second Law Violation/);
     });
     it('should validate exact computation of exergy destruction rate (\dot{I} = T_0 \dot{S}_{gen})', () => {
@@ -45,6 +46,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             totalEntropy: 5000,
             temperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            stocks: {},
             entropyGenerationRate: 5.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
             exergy: 1e5,
@@ -63,8 +65,8 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             latentHeatFlux: 0,
             netMassFlux: 0
         };
-        const monad = ThermodynamicStateMonad.initialize(initialState, initialFluxes);
-        const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f, 1.0)).getState();
+        const monad = ThermodynamicStateMonad.initialize(initialState);
+        const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f)).getState();
         const T0 = extractedState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
         const sGen = extractedState.entropyGenerationRate ?? 0;
         const iDest = extractedState.exergyDestructionRate ?? 0;

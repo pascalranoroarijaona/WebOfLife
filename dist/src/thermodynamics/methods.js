@@ -6,7 +6,7 @@
 import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad } from './types.js';
 const T_0 = STANDARD_AMBIENT_TEMPERATURE_K;
 export function computeEntropyGeneration(netHeatFlux, boundaryTemperature, chemicalDissipationRate, diffusiveFluxRate) {
-    if (chemicalDissipationRate < 0) {
+    if (chemicalDissipationRate < 0 || diffusiveFluxRate < 0) {
         throw new Error('ThermodynamicViolationError: Negative chemical dissipation rate');
     }
     const safeBoundaryTemp = boundaryTemperature === 0 ? 1e-6 : Math.abs(boundaryTemperature);
@@ -86,6 +86,7 @@ export function evaluateSecondLaw(state) {
     const T0 = state.deadStateTemperature ?? state.ambientTemperature ?? T_0;
     return {
         ...state,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
@@ -101,6 +102,7 @@ export function stepThermodynamicMonad(state, boundaryFlux, netEnergy, dt, dtSte
         ...state,
         timestamp: (state.timestamp ?? 0) + (dt ?? 0),
         internalEnergy: (state.internalEnergy ?? 0) + netEnergy * dtStep,
+        stocks: state.stocks ?? {},
         entropyGenerationRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
@@ -139,11 +141,12 @@ export function computeThermodynamicProcess(params) {
         timestamp: (currentState.timestamp ?? 0) + params.timeStep,
         temperature: currentState.temperature ?? T0,
         specificEnthalpy: currentState.specificEnthalpy ?? 250000.0,
+        stocks: currentState.stocks ?? params.stockInputs ?? {},
         entropyGenerationRate: sGen,
         exergyDestructionRate: T0 * sGen,
         validateSecondLaw: () => sGen >= 0
     };
-    const updatedStockValueMap = {};
+    const updatedStockValueMap = { ...(currentState.stocks ?? {}) };
     if (params.stockInputs) {
         for (const [k, v] of Object.entries(params.stockInputs)) {
             updatedStockValueMap[k] = v;
@@ -170,6 +173,7 @@ export function computePhotosynthesisThermodynamics(prevState, carbonFlux, tempe
     return {
         ...prevState,
         timestamp: (prevState.timestamp ?? 0) + dt,
+        stocks: prevState.stocks ?? {},
         entropyGenerationRate: sGen,
         exergyDestructionRate: T0 * sGen,
         boundaryFluxes: [
@@ -193,6 +197,7 @@ export class ThermodynamicMonadEngine {
             ...initialState,
             timestamp: (initialState.timestamp ?? 0) + dt,
             internal_energy_U: (initialState.internal_energy_U ?? initialState.internalEnergy ?? 0) + deltaInternalEnergy_U,
+            stocks: initialState.stocks ?? {},
             entropyGenerationRate: sGen,
             exergyDestructionRate: T0 * sGen
         };
