@@ -9,8 +9,11 @@ describe('Sprint 052: Thermodynamic State Vector Stock Conservation Asserter', (
                 ['C_organic', 1500.0],
                 ['H2O_liquid', 50000.0]
             ]),
+            internalEnergy: 1e5,
+            totalEntropy: 1000,
             enthalpy: 1e5,
-            entropy: 1000
+            entropy: 1000,
+            temperature: 298.15
         };
         const postState = {
             timestamp: 10,
@@ -18,8 +21,11 @@ describe('Sprint 052: Thermodynamic State Vector Stock Conservation Asserter', (
                 ['C_organic', 1550.0],
                 ['H2O_liquid', 49950.0]
             ]),
+            internalEnergy: 1e5,
+            totalEntropy: 1005,
             enthalpy: 1e5,
-            entropy: 1005
+            entropy: 1005,
+            temperature: 298.15
         };
         const boundaryFluxes = new Map([
             ['C_organic', 5.0], // 5.0 units/s * 10s = 50.0 delta
@@ -41,14 +47,20 @@ describe('Sprint 052: Thermodynamic State Vector Stock Conservation Asserter', (
         const preState = {
             timestamp: 0,
             stocks: new Map([['Energy', 1000.0]]),
+            internalEnergy: 1000,
+            totalEntropy: 100,
             enthalpy: 1000,
-            entropy: 100
+            entropy: 100,
+            temperature: 298.15
         };
         const postState = {
             timestamp: 1,
             stocks: new Map([['Energy', 1500.0]]), // Unaccounted energy gain
+            internalEnergy: 1500,
+            totalEntropy: 110,
             enthalpy: 1500,
-            entropy: 110
+            entropy: 110,
+            temperature: 298.15
         };
         const boundaryFluxes = new Map([['Energy', 10.0]]); // Expected delta: 10 * 1 = 10
         const validator = new StateValidator(1e-6);
@@ -64,8 +76,11 @@ describe('Sprint 052: Thermodynamic State Vector Stock Conservation Asserter', (
                 ['Nitrogen', 3900000.0],
                 ['Water', 1338000000.0]
             ]),
+            internalEnergy: 5e12,
+            totalEntropy: 2e10,
             enthalpy: 5e12,
-            entropy: 2e10
+            entropy: 2e10,
+            temperature: 298.15
         };
         const postState = {
             timestamp: 101,
@@ -74,8 +89,11 @@ describe('Sprint 052: Thermodynamic State Vector Stock Conservation Asserter', (
                 ['Nitrogen', 3900000.0],
                 ['Water', 1338000000.0]
             ]),
+            internalEnergy: 5.01e12,
+            totalEntropy: 2.01e10,
             enthalpy: 5.01e12,
-            entropy: 2.01e10
+            entropy: 2.01e10,
+            temperature: 298.15
         };
         const boundaryFluxes = new Map([
             ['Carbon', 2.0],

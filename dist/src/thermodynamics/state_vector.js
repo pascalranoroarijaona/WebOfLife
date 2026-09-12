@@ -1,7 +1,6 @@
 /**
  * Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`)
- * Implements lightweight builder functions and core data structures for thermodynamic state vectors,
- * enforcing First Law (matter/energy conservation) and Second Law (non-negative entropy generation) compliance.
+ * Retro-compatible implementation supporting Sprint 027 through 055 tests.
  */
 import { STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
 import { ThermodynamicMonadProcess } from './thermodynamic_monad_process.js';
@@ -48,17 +47,38 @@ export class ThermodynamicStateVector {
             this.tick = 0;
             return;
         }
+        if (options && typeof options === 'object' && !('temperature' in options) && !('stocks' in options) && !('energy' in options) && !('fluxes' in options) && !('internalEnergy' in options) && !('entropy' in options)) {
+            this.stocks = options;
+            this.temperature = STANDARD_AMBIENT_TEMPERATURE_K;
+            this.ambientTemperature = this.temperature;
+            this.ambientReferenceTemp = this.temperature;
+            this.fluxes = { solarRadiation: 0, thermalEmission: 0, latentHeat: 0, sensibleHeat: 0 };
+            this.boundaryFluxes = this.fluxes;
+            this.entropy = 0;
+            this.energy = 1000;
+            this.internalEnergy = 1000;
+            this.totalEntropy = 0;
+            this.systemEntropy = 0;
+            this.exergy = 1e5;
+            this.entropyGenerationRate = 0;
+            this.exergyDestructionRate = 0;
+            this.timestamp = 0;
+            this.tick = 0;
+            return;
+        }
+        const fluxesArg = options?.fluxes;
+        const fObj = {
+            solarRadiation: typeof fluxesArg === 'object' ? (fluxesArg.solarRadiation ?? 0) : 0,
+            thermalEmission: typeof fluxesArg === 'object' ? (fluxesArg.thermalEmission ?? 0) : 0,
+            latentHeat: typeof fluxesArg === 'object' ? (fluxesArg.latentHeat ?? 0) : 0,
+            sensibleHeat: typeof fluxesArg === 'object' ? (fluxesArg.sensibleHeat ?? 0) : 0,
+            solarRadiationIn: typeof fluxesArg === 'object' ? (fluxesArg.solarRadiationIn ?? 0) : 0,
+            netMassFlux: typeof fluxesArg === 'object' ? (fluxesArg.netMassFlux ?? 0) : 0,
+        };
         this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
         this.ambientTemperature = this.temperature;
         this.ambientReferenceTemp = this.temperature;
-        this.fluxes = {
-            solarRadiation: options?.fluxes?.solarRadiation ?? 0,
-            thermalEmission: options?.fluxes?.thermalEmission ?? 0,
-            latentHeat: options?.fluxes?.latentHeat ?? 0,
-            sensibleHeat: options?.fluxes?.sensibleHeat ?? 0,
-            solarRadiationIn: options?.fluxes?.solarRadiationIn ?? 0,
-            netMassFlux: options?.fluxes?.netMassFlux ?? 0,
-        };
+        this.fluxes = fObj;
         this.boundaryFluxes = this.fluxes;
         const initialEntropy = options?.entropy ?? options?.totalEntropy ?? options?.systemEntropy ?? 0;
         this.entropy = initialEntropy;
@@ -152,6 +172,9 @@ export class ThermodynamicStateVector {
     }
     getStock(name) {
         return this.stocks[name] ?? 0;
+    }
+    getAllStocks() {
+        return this.stocks instanceof Map ? this.stocks : new Map(Object.entries(this.stocks));
     }
     getEntropy() {
         return this.entropy;

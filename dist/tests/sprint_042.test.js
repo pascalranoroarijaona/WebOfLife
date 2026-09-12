@@ -3,8 +3,8 @@ import assert from 'node:assert';
 import { assertNonNegativeEntropy } from '../src/thermodynamics/state_validator.js';
 describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion Utility', () => {
     it('should return success for valid zero or positive entropy states', () => {
-        const validZeroState = { entropy: 0, energy: 100, internalEnergy: 100, temperature: 300 };
-        const validPosState = { entropy: 1542.5, energy: 5000, internalEnergy: 5000, temperature: 298.15 };
+        const validZeroState = { entropy: 0, energy: 100, internalEnergy: 100, temperature: 300, entropyGenerationRate: 0 };
+        const validPosState = { entropy: 1542.5, energy: 5000, internalEnergy: 5000, temperature: 298.15, entropyGenerationRate: 1.0 };
         const resZero = assertNonNegativeEntropy(validZeroState);
         assert.strictEqual(resZero.success, true);
         if (resZero.success) {
@@ -17,7 +17,7 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
         }
     });
     it('should return failure for negative entropy states', () => {
-        const negativeState = { entropy: -10.5, energy: 1000, internalEnergy: 1000, temperature: 300 };
+        const negativeState = { entropy: -10.5, energy: 1000, internalEnergy: 1000, temperature: 300, entropyGenerationRate: 0 };
         const res = assertNonNegativeEntropy(negativeState);
         assert.strictEqual(res.success, false);
         if (!res.success) {
@@ -26,8 +26,8 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
         }
     });
     it('should intercept malformed or non-numeric entropy states gracefully', () => {
-        const missingNumberState = { entropy: NaN, energy: 500, internalEnergy: 500, temperature: 300 };
-        const invalidTypeState = { entropy: "not-a-number", energy: 200, internalEnergy: 200, temperature: 300 };
+        const missingNumberState = { entropy: NaN, energy: 500, internalEnergy: 500, temperature: 300, entropyGenerationRate: 0 };
+        const invalidTypeState = { entropy: "not-a-number", energy: 200, internalEnergy: 200, temperature: 300, entropyGenerationRate: 0 };
         const resNaN = assertNonNegativeEntropy(missingNumberState);
         assert.strictEqual(resNaN.success, false);
         if (!resNaN.success) {

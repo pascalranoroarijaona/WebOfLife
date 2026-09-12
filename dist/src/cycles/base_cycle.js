@@ -38,7 +38,11 @@ export class BaseCycle {
                 boundaryTemperatures: [],
                 massFluxes: [],
                 specificEnthalpies: [],
-                specificEntropies: []
+                specificEntropies: [],
+                heatFluxRate: 1.74e17,
+                massFluxRate: 0,
+                enthalpyInflowRate: 1.74e17,
+                entropyInflowRate: 15.0
             },
             validateFirstLaw: () => this.validateFirstLaw(),
             validateSecondLaw: () => this.validateSecondLaw(),
@@ -87,7 +91,11 @@ export class BaseCycle {
             boundaryTemperatures: [5778],
             massFluxes: [0],
             specificEnthalpies: [0],
-            specificEntropies: [0]
+            specificEntropies: [0],
+            heatFluxRate: 1e5,
+            massFluxRate: 0,
+            enthalpyInflowRate: 1e5,
+            entropyInflowRate: 1e5 / 5778
         };
         const res = stepThermodynamicMonad(this.stateVector, defaultFlux, 1e5 * dt, (1e5 / 5778) * dt, dt);
         this.stateVector = 'state' in res ? res.state : res;
@@ -104,7 +112,11 @@ export class BaseCycle {
             longwaveRadiationOut: 0.99e5,
             sensibleHeatFlux: 0,
             latentHeatFlux: 0,
-            netMassFlux: 0
+            netMassFlux: 0,
+            heatFluxRate: 1e5,
+            massFluxRate: 0,
+            enthalpyInflowRate: 1e5,
+            entropyInflowRate: 1e5 / 5778
         };
     }
     validateFirstLaw() {

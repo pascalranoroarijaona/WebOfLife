@@ -1,5 +1,5 @@
 /**
- * Thermodynamic Monad Process with Entropy Guard Integration (Sprint 48 & Retro-Compatibility)
+ * Thermodynamic Monad Process with Entropy Guard Integration (Retro-Compatible)
  */
 import { ThermodynamicStateVector } from './state_vector.js';
 import { validateOrThrowEntropy } from './state_validator.js';
@@ -43,7 +43,10 @@ export class ThermodynamicMonadProcess {
   public validateInvariants(state?: ThermodynamicStateVector | any): boolean {
     const target = state ?? this.stateVector;
     const sGen = target.entropyGenerationRate ?? 0;
-    return sGen >= -1e-9;
+    if (sGen < -1e-9) {
+      throw new Error('Second Law Violation');
+    }
+    return true;
   }
 
   public bind(stateOrFn: any, transitionFn?: any): any {
@@ -120,9 +123,6 @@ export class ThermodynamicMonadProcess {
     return nextState;
   }
 
-  /**
-   * Static step alias expected by sprint tests (e.g. sprint_027.test.ts).
-   */
   public static step(
     state: IThermodynamicStateVector | ThermodynamicStateVector,
     fluxDelta: any,

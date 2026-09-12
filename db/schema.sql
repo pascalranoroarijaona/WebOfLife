@@ -1,68 +1,70 @@
 -- ============================================================================
--- Web of Life Database Schema: Sprint 054 Extension
--- Thermodynamic State Vector Stock Conservation Asserter & Ledger Integration
+-- Web of Life: Thermodynamic Blockchain & Relational Schema
+-- Sprint 055 Update: Thermodynamic State Vector Stock Conservation & Flux Ledger
 -- ============================================================================
 
--- Enable TimescaleDB extension if not already present
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Thermodynamic State Vectors Table (Time-series hypertable)
+-- Enum for Thermodynamic Elemental Tracking
+CREATE TYPE elemental_type AS ENUM ('C', 'N', 'P', 'H2O', 'ENERGY');
+
+-- Thermodynamic State Vectors Table
 CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    timestamp TIMESTAMPTZ NOT NULL,
-    earth_pod_id UUID NOT NULL,
-    stocks JSONB NOT NULL, -- Key-value map of element stocks (C, N, P, H2O, Energy)
-    total_entropy DOUBLE PRECISION NOT NULL,
-    metadata JSONB DEFAULT '{}'::jsonb
-);
-
--- Convert to TimescaleDB hypertable for optimal time-series query performance
-SELECT create_hypertable('thermodynamic_state_vectors', 'timestamp', if_not_exists => TRUE);
-
--- 2. Boundary Fluxes Table (Tracks energetic and mass inputs/outputs per interval)
-CREATE TABLE IF NOT EXISTS thermodynamic_boundary_fluxes (
-    flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    timestamp TIMESTAMPTZ NOT NULL,
-    earth_pod_id UUID NOT NULL,
-    stock_key VARCHAR(64) NOT NULL,
-    influx_rate DOUBLE PRECISION NOT NULL,
-    outflux_rate DOUBLE PRECISION NOT NULL,
-    flux_source VARCHAR(128) NOT NULL, -- e.g., 'SOLAR_RADIATION', 'DEEP_VENT', 'RADIOGENIC'
-    delta_time DOUBLE PRECISION NOT NULL
-);
-
-SELECT create_hypertable('thermodynamic_boundary_fluxes', 'timestamp', if_not_exists => TRUE);
-
--- 3. Conservation Validation Audit Ledger (Records StateValidator assertions)
-CREATE TABLE IF NOT EXISTS conservation_validation_audits (
-    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    timestamp TIMESTAMPTZ NOT NULL,
-    earth_pod_id UUID NOT NULL,
-    previous_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
-    current_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
-    is_valid BOOLEAN NOT NULL,
-    first_law_satisfied BOOLEAN NOT NULL,
-    second_law_satisfied BOOLEAN NOT NULL,
-    max_residual DOUBLE PRECISION NOT NULL,
-    violation_details JSONB DEFAULT NULL,
-    blockchain_tx_hash VARCHAR(64) UNIQUE
-);
-
-SELECT create_hypertable('conservation_validation_audits', 'timestamp', if_not_exists => TRUE);
-
--- 4. Thermodynamic Blockchain Ledger (Immutable audit trail for thermodynamic proofs)
-CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
-    block_index BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
-    previous_hash VARCHAR(64) NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_id VARCHAR(255) NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    validator_signature VARCHAR(128) NOT NULL,
-    audit_id UUID REFERENCES conservation_validation_audits(audit_id)
+    entropy_j_k NUMERIC(20, 8) NOT NULL,
+    free_energy_j NUMERIC(20, 8) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for performance and referential lookups
-CREATE INDEX IF NOT EXISTS idx_state_vectors_pod_time ON thermodynamic_state_vectors(earth_pod_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_boundary_fluxes_pod_time ON thermodynamic_boundary_fluxes(earth_pod_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_conservation_audits_valid ON conservation_validation_audits(is_valid) WHERE is_valid = FALSE;
-CREATE INDEX IF NOT EXISTS idx_blockchain_hash ON thermodynamic_blockchain_blocks(block_hash);
+-- Thermodynamic Stocks Table (Tracks individual pool masses/energies)
+CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
+    stock_id VARCHAR(255) PRIMARY KEY,
+    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+    element elemental_type NOT NULL,
+    stock_value NUMERIC(20, 8) NOT NULL CHECK (stock_value >= 0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Flux Vectors Table (Tracks boundary flux rates between stocks)
+CREATE TABLE IF NOT EXISTS flux_vectors (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_id VARCHAR(255) REFERENCES thermodynamic_stocks(stock_id),
+    target_id VARCHAR(255) REFERENCES thermodynamic_stocks(stock_id),
+    element elemental_type NOT NULL,
+    rate NUMERIC(20, 8) NOT NULL, -- Units per second
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Delta Calculation Ledger (Persists results from ThermodynamicStateValidator)
+CREATE TABLE IF NOT EXISTS delta_calculation_ledger (
+    calculation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+    stock_id VARCHAR(255) REFERENCES thermodynamic_stocks(stock_id),
+    element elemental_type NOT NULL,
+    expected_delta NUMERIC(20, 8) NOT NULL,
+    net_inflow NUMERIC(20, 8) NOT NULL,
+    net_outflow NUMERIC(20, 8) NOT NULL,
+    is_conserved BOOLEAN NOT NULL,
+    delta_time NUMERIC(15, 6) NOT NULL,
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Blockchain Block Transactions for Thermodynamic State Validation
+CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
+    block_index SERIAL PRIMARY KEY,
+    block_hash VARCHAR(64) UNIQUE NOT NULL,
+    previous_block_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
+    validator_signature TEXT NOT NULL,
+    nonce BIGINT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance optimization during time-series validation
+CREATE INDEX idx_thermodynamic_stocks_vector ON thermodynamic_stocks(vector_id);
+CREATE INDEX idx_flux_vectors_source_target ON flux_vectors(source_id, target_id);
+CREATE INDEX idx_delta_ledger_stock ON delta_calculation_ledger(stock_id, calculated_at);
+CREATE INDEX idx_blockchain_hash ON thermodynamic_blockchain_blocks(block_hash);

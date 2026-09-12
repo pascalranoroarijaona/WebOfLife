@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 13%
-SPRINT_GOAL: Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement inventory mass conservation checks verifying stock deltas against boundary flux rates within tolerance bounds.
+Roadmap Completion: 12%
+SPRINT_GOAL: Thermodynamic State Vector Stock Conservation Delta Calculator (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical calculation of expected stock deltas from boundary flux rates and simulation time steps.
 
 ## Web of Life Master Backlog
 
@@ -220,11 +220,13 @@ SPRINT_GOAL: Thermodynamic State Vector Stock Conservation Asserter (`src/thermo
 - [x] Thermodynamic State Vector Non-Negative Entropy Assertion Utility (`src/thermodynamics/state_validator.ts`): Implement a pure helper function `assertNonNegativeEntropy(state)` that inspects state objects and returns a Result object instead of throwing.
 - [x] Thermodynamic State Vector Non-Negative Entropy Exception Guard (`src/thermodynamics/state_validator.ts`): Implement a strict assertion wrapper `validateOrThrowEntropy(state)` that triggers a `ThermodynamicEntropyViolationError` if $\dot{S}_{\text{gen}} < 0$.
 - [x] Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
-- [ ] Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement inventory mass conservation checks verifying stock deltas against boundary flux rates within tolerance bounds.
-- [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper wrapper function that integrates property checks, entropy assertions, and stock conservation validators for monad step executions.
+- [ ] Thermodynamic State Vector Stock Conservation Delta Calculator (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical calculation of expected stock deltas from boundary flux rates and simulation time steps.
+- [ ] Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/thermodynamics/state_validator.ts`): Implement discrepancy comparison logic evaluating absolute differences between actual stock deltas and expected flux-derived deltas.
+- [ ] Thermodynamic State Vector Tolerance Compliance Checker (`src/thermodynamics/state_validator.ts`): Implement tolerance-bound checking functions that compare stock discrepancies against registered elemental limits.
+- [ ] Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement complete inventory mass conservation verification combining delta calculation, discrepancy evaluation, and strict violation throwing.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
-- [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
+- [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}T_{\text{source}}}$).
 - [ ] Prigogine Minimum Entropy Production Monad (`src/thermodynamics/dissipative_stability.ts`): Create an analytic monad method that tracks temporal changes in internal entropy generation ($\frac{d\dot{S}_{\text{gen}}}{dt}$), evaluating whether regional subsystems are relaxing toward Prigogine’s minimum entropy production state or sliding toward bifurcation/collapse.
 - [ ] H3 Spatial Index Types (`src/spatial/h3_types.ts`): Define strict TypeScript interfaces for H3 cell addresses, resolution tiers (res 3–4 for global macro-cells), and lat/lon coordinate mappings.
 - [ ] Uber H3 Spatial Index Layer (`src/spatial/h3_grid.ts`): Implement a binding module that initializes base resolution global cell indices, handles parent/child cell indexing lookups, and translates lat/lon coordinates into valid H3 cell addresses for monad spatial anchoring.

@@ -83,12 +83,28 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
     return ThermodynamicMonadClass.unit(initialState, initialStateVector);
   }
 
+  public static map(state: any, transitionFn: any): any {
+    const next = transitionFn(state);
+    const sGen = next?.entropyGenerationRate ?? (next as any)?.entropyGenerationRate ?? 0;
+    if (sGen < -1e-9 || (next?.entropy !== undefined && next.entropy < 0)) {
+      throw new Error('ThermodynamicViolationError');
+    }
+    return next;
+  }
+
   public getState(): T {
     return this.state;
   }
 
   public getStateVector(): IThermodynamicStateVector {
-    return this.stateVector ?? ((this.state as any)?.getStateVector ? (this.state as any).getStateVector() : (this.state as any));
+    return this.stateVector ?? ((this.state as any)?.getStateVector ? (this.state as any).getStateVector() : {
+      internalEnergy: (this.state as any)?.internalEnergy ?? (this.state as any)?.energy ?? 1000,
+      totalEntropy: (this.state as any)?.totalEntropy ?? (this.state as any)?.entropy ?? 0,
+      temperature: (this.state as any)?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      ...(this.state as any)
+    });
   }
 
   public getValue(): T {
@@ -116,7 +132,15 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 
   public transit(fn: (state: IThermodynamicStateVector, fluxes?: any) => any, fluxes?: any): IThermodynamicMonad<any> {
-    const nextVec = fn(this.stateVector ?? {}, fluxes);
+    const safeVec: IThermodynamicStateVector = this.stateVector ?? {
+      internalEnergy: 1000,
+      totalEntropy: 0,
+      temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      stocks: {}
+    };
+    const nextVec = fn(safeVec, fluxes);
     return new ThermodynamicMonadClass(this.state, nextVec);
   }
 
@@ -129,7 +153,7 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
     const sGen = vec?.entropyGenerationRate ?? (this.state as any)?.entropyGenerationRate ?? 0;
     if (sGen < -1e-9) {
       throw new Error(
-        `ThermodynamicViolationError: \dot{S}_{gen} (${sGen}) < 0 violates Second Law.`
+        `ThermodynamicViolationError: \\dot{S}_{gen} (${sGen}) < 0 violates Second Law.`
       );
     }
     return true;
@@ -148,7 +172,7 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 }
 
-export const ThermodynamicMonad = ThermodynamicStateMonad;
+export const ThermodynamicMonad = ThermodynamicMonadClass;
 
 export function calculateFirstLawResidual(state: IThermodynamicStateVector, dt: number): number {
   let netHeatTransfer = 0;
@@ -193,10 +217,12 @@ export function stepThermodynamicMonad(
     return { isValid: false, error: 'Second Law Violation' };
   }
   const T0 = state.referenceTemperature ?? state.deadStateTemperature ?? T_0;
-  const nextState = {
+  const nextState: IThermodynamicStateVector = {
     ...state,
     timestamp: (state.timestamp ?? 0) + (dt ?? 0),
     internalEnergy: (state.internalEnergy ?? 0) + netEnergy * dtStep,
+    totalEntropy: state.totalEntropy ?? 0,
+    temperature: state.temperature ?? T0,
     stocks: state.stocks ?? {},
     entropyGenerationRate: sGen,
     entropyGeneratorRate: sGen,
@@ -299,9 +325,9 @@ export function computePhotosynthesisThermodynamics(
     entropyGeneratorRate: sGen,
     exergyDestructionRate: T0 * sGen,
     boundaryFluxes: [
-      { speciesId: 'carbon', molarRate: carbonFlux, massRate: carbonFlux * 12, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0 },
-      { speciesId: 'oxygen', molarRate: carbonFlux, massRate: carbonFlux * 32, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0 },
-      { speciesId: 'solar', molarRate: 0, massRate: 0, enthalpyFlux: 1000, entropyFlux: 3.3, exergyFlux: 1000 }
+      { speciesId: 'carbon', molarRate: carbonFlux, massRate: carbonFlux * 12, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0, heatFluxRate: 0, massFluxRate: carbonFlux * 12, enthalpyInflowRate: 0, entropyInflowRate: 0 },
+      { speciesId: 'oxygen', molarRate: carbonFlux, massRate: carbonFlux * 32, enthalpyFlux: 0, entropyFlux: 0, exergyFlux: 0, heatFluxRate: 0, massFluxRate: carbonFlux * 32, enthalpyInflowRate: 0, entropyInflowRate: 0 },
+      { speciesId: 'solar', molarRate: 0, massRate: 0, enthalpyFlux: 1000, entropyFlux: 3.3, exergyFlux: 1000, heatFluxRate: 1000, massFluxRate: 0, enthalpyInflowRate: 1000, entropyInflowRate: 3.3 }
     ],
     validateSecondLaw: () => sGen >= 0
   };

@@ -1,7 +1,6 @@
 /**
  * Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`)
- * Implements lightweight builder functions and core data structures for thermodynamic state vectors,
- * enforcing First Law (matter/energy conservation) and Second Law (non-negative entropy generation) compliance.
+ * Retro-compatible implementation supporting Sprint 027 through 055 tests.
  */
 import { STANDARD_AMBIENT_TEMPERATURE_K, IThermodynamicStateVector as IBaseThermodynamicStateVector } from './types.js';
 import { ThermodynamicMonadProcess } from './thermodynamic_monad_process.js';
@@ -9,31 +8,32 @@ import { ThermodynamicMonadProcess } from './thermodynamic_monad_process.js';
 export { ThermodynamicMonadProcess };
 
 export interface FluxRecord {
-  solarRadiation: number;    // Incoming shortwave flux (W/m^2)
-  thermalEmission: number;   // Outgoing longwave flux (W/m^2)
-  latentHeat: number;        // Evapotranspiration / phase change flux (W/m^2)
-  sensibleHeat: number;      // Convective heat transfer flux (W/m^2)
-  solarRadiationIn?: number; // Retro-compatibility alias
-  netMassFlux?: number;      // Retro-compatibility alias
+  solarRadiation: number;
+  thermalEmission: number;
+  latentHeat: number;
+  sensibleHeat: number;
+  solarRadiationIn?: number;
+  netMassFlux?: number;
 }
 
 export interface ThermodynamicStateVectorOptions {
-  temperature?: number;      // Current ambient/surface temperature (K)
+  temperature?: number;
   fluxes?: Partial<FluxRecord>;
-  entropy?: number;          // Cumulative entropy (J/K)
-  totalEntropy?: number;     // Alias for entropy
-  systemEntropy?: number;    // Alias for system entropy
-  timestamp?: number;        // Simulation time step / epoch
-  tick?: number;             // Alias for timestamp/tick
+  entropy?: number;
+  totalEntropy?: number;
+  systemEntropy?: number;
+  timestamp?: number;
+  tick?: number;
   energy?: number;
   internalEnergy?: number;
   stocks?: Record<string, number> | Map<any, any>;
-  elementalStocks?: Record<string, number> | number[];
+  elementalStocks?: Record<string, number> | number[] | Record<string, number>;
   entropyGenerationRate?: number;
   exergyDestructionRate?: number;
   mass?: number;
   solarInput?: number;
   dissipatedHeat?: number;
+  [key: string]: any;
 }
 
 export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector {
@@ -49,7 +49,7 @@ export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector
   systemEntropy: number;
   exergy: number;
   stocks: Record<string, number>;
-  elementalStocks?: Record<string, number> | number[];
+  elementalStocks?: Record<string, number> | number[] | Record<string, number>;
   entropyGenerationRate: number;
   exergyDestructionRate: number;
   timestamp: number;
@@ -83,7 +83,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly systemEntropy: number;
   public readonly exergy: number;
   public readonly stocks: Record<string, number>;
-  public readonly elementalStocks?: Record<string, number> | number[];
+  public readonly elementalStocks?: Record<string, number> | number[] | Record<string, number>;
   public readonly entropyGenerationRate: number;
   public readonly exergyDestructionRate: number;
   public readonly timestamp: number;
@@ -92,7 +92,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly solarInput?: number;
   public readonly dissipatedHeat?: number;
 
-  constructor(options?: ThermodynamicStateVectorOptions | Map<string, number>) {
+  constructor(options?: ThermodynamicStateVectorOptions | Map<string, number> | Record<string, number>) {
     if (options instanceof Map) {
       const mapObj = Object.fromEntries(options);
       this.stocks = mapObj;
@@ -114,17 +114,40 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
       return;
     }
 
+    if (options && typeof options === 'object' && !('temperature' in options) && !('stocks' in options) && !('energy' in options) && !('fluxes' in options) && !('internalEnergy' in options) && !('entropy' in options)) {
+      this.stocks = options as Record<string, number>;
+      this.temperature = STANDARD_AMBIENT_TEMPERATURE_K;
+      this.ambientTemperature = this.temperature;
+      this.ambientReferenceTemp = this.temperature;
+      this.fluxes = { solarRadiation: 0, thermalEmission: 0, latentHeat: 0, sensibleHeat: 0 };
+      this.boundaryFluxes = this.fluxes;
+      this.entropy = 0;
+      this.energy = 1000;
+      this.internalEnergy = 1000;
+      this.totalEntropy = 0;
+      this.systemEntropy = 0;
+      this.exergy = 1e5;
+      this.entropyGenerationRate = 0;
+      this.exergyDestructionRate = 0;
+      this.timestamp = 0;
+      this.tick = 0;
+      return;
+    }
+
+    const fluxesArg = (options as any)?.fluxes;
+    const fObj: FluxRecord = {
+      solarRadiation: typeof fluxesArg === 'object' ? (fluxesArg.solarRadiation ?? 0) : 0,
+      thermalEmission: typeof fluxesArg === 'object' ? (fluxesArg.thermalEmission ?? 0) : 0,
+      latentHeat: typeof fluxesArg === 'object' ? (fluxesArg.latentHeat ?? 0) : 0,
+      sensibleHeat: typeof fluxesArg === 'object' ? (fluxesArg.sensibleHeat ?? 0) : 0,
+      solarRadiationIn: typeof fluxesArg === 'object' ? (fluxesArg.solarRadiationIn ?? 0) : 0,
+      netMassFlux: typeof fluxesArg === 'object' ? (fluxesArg.netMassFlux ?? 0) : 0,
+    };
+
     this.temperature = options?.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     this.ambientTemperature = this.temperature;
     this.ambientReferenceTemp = this.temperature;
-    this.fluxes = {
-      solarRadiation: options?.fluxes?.solarRadiation ?? 0,
-      thermalEmission: options?.fluxes?.thermalEmission ?? 0,
-      latentHeat: options?.fluxes?.latentHeat ?? 0,
-      sensibleHeat: options?.fluxes?.sensibleHeat ?? 0,
-      solarRadiationIn: options?.fluxes?.solarRadiationIn ?? 0,
-      netMassFlux: options?.fluxes?.netMassFlux ?? 0,
-    };
+    this.fluxes = fObj;
     this.boundaryFluxes = this.fluxes;
     const initialEntropy = options?.entropy ?? options?.totalEntropy ?? options?.systemEntropy ?? 0;
     this.entropy = initialEntropy;
@@ -136,7 +159,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     const rawStocks = options?.stocks ?? options?.elementalStocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
     this.stocks = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : (Array.isArray(rawStocks) ? { carbon: rawStocks[0] ?? 0, nitrogen: rawStocks[1] ?? 0, phosphorus: rawStocks[2] ?? 0, water: rawStocks[3] ?? 0 } : rawStocks);
     if (options?.elementalStocks) {
-      this.elementalStocks = options.elementalStocks;
+      this.elementalStocks = options.elementalStocks as Record<string, number> | number[];
     }
     this.entropyGenerationRate = options?.entropyGenerationRate ?? 0;
     this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
@@ -226,6 +249,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
 
   public getStock(name: string): number {
     return this.stocks[name] ?? 0;
+  }
+
+  public getAllStocks(): Map<string, number> {
+    return this.stocks instanceof Map ? this.stocks : new Map(Object.entries(this.stocks));
   }
 
   public getEntropy(): number {

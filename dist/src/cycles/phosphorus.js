@@ -29,7 +29,11 @@ export class PhosphorusCycle extends BaseCycle {
             boundaryTemperatures: [290.0],
             massFluxes: [0.1],
             specificEnthalpies: [150],
-            specificEntropies: [0.8]
+            specificEntropies: [0.8],
+            heatFluxRate: solarFlux * 1e-6,
+            massFluxRate: 0.1,
+            enthalpyInflowRate: solarFlux * 1e-6,
+            entropyInflowRate: (solarFlux * 1e-6) / 290.0
         };
         const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-6 * dt, (solarFlux * 1e-6 / 290.0) * dt, dt);
         this.stateVector = 'state' in res ? res.state : res;

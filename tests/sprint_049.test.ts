@@ -14,7 +14,7 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
       dissipatedHeat: 0
     });
 
-    const result = withEntropyCheck(initialState, (s) => new ThermodynamicStateVector({
+    const result = withEntropyCheck(initialState, (s: any) => new ThermodynamicStateVector({
       ...s,
       internalEnergy: (s.internalEnergy ?? 1000) - 100,
       entropy: (s.entropy ?? 100) + 2.0, // System entropy increases
@@ -36,7 +36,7 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
       dissipatedHeat: 0
     });
 
-    const result = withEntropyCheck(initialState, (s) => new ThermodynamicStateVector({
+    const result = withEntropyCheck(initialState, (s: any) => new ThermodynamicStateVector({
       ...s,
       internalEnergy: (s.internalEnergy ?? 5000) + 1000,
       entropy: (s.entropy ?? 500) - 1.0, // Local ordering / entropy reduction
@@ -59,7 +59,7 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
       dissipatedHeat: 0
     });
 
-    const result = withEntropyCheck(initialState, (s) => new ThermodynamicStateVector({
+    const result = withEntropyCheck(initialState, (s: any) => new ThermodynamicStateVector({
       ...s,
       entropy: (s.entropy ?? 100) - 5.0 // Impossible spontaneous reduction in entropy with zero compensation
     }));
@@ -80,7 +80,7 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
     });
 
     const monad = new EntropyMonad(initialState);
-    const finalMonad = monad.bind((s) => new ThermodynamicStateVector({
+    const finalMonad = monad.bind((s: any) => new ThermodynamicStateVector({
       ...s,
       entropy: (s.entropy ?? 200) + 1.0,
       dissipatedHeat: (s.dissipatedHeat ?? 0) + 100

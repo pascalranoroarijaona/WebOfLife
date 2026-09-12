@@ -16,8 +16,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
       ['water', 1337999990.0] // Delta = -10.0
     ]);
 
-    const previous: StateVector = { timestamp: 0, stocks: prevStocks };
-    const current: StateVector = { timestamp: 1, stocks: currStocks };
+    const previous: StateVector = { timestamp: 0, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 };
+    const current: StateVector = { timestamp: 1, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 };
 
     const fluxesMap = new Map<string, number>([
       ['carbon', 2.0], // 2.0 * 1s = 2.0 expected delta
@@ -45,8 +45,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
       ['nitrogen', 3900100.0] // Actual delta = +100.0 (Mass leak!)
     ]);
 
-    const previous: StateVector = { timestamp: 10, stocks: prevStocks };
-    const current: StateVector = { timestamp: 12, stocks: currStocks }; // dt = 2s
+    const previous: StateVector = { timestamp: 10, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 };
+    const current: StateVector = { timestamp: 12, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 }; // dt = 2s
 
     const fluxesMap = new Map<string, number>([
       ['nitrogen', 5.0] // Expected net flux rate = 5.0 -> expected delta over 2s = 10.0
@@ -85,8 +85,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
     const prevStocks = new Map<string, number>([['phosphorus', 1000.0]]);
     const currStocks = new Map<string, number>([['phosphorus', 1000.0 + 0.00005]]); // error = 5e-5 (< epsilon)
 
-    const previous: StateVector = { timestamp: 0, stocks: prevStocks };
-    const current: StateVector = { timestamp: 1, stocks: currStocks };
+    const previous: StateVector = { timestamp: 0, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 };
+    const current: StateVector = { timestamp: 1, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 };
     const fluxes: BoundaryFluxRates = { fluxes: new Map([['phosphorus', 0.0]]) };
 
     // Within tolerance -> valid
@@ -95,7 +95,7 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
 
     // Just outside tolerance -> invalid
     const currStocksBad = new Map<string, number>([['phosphorus', 1000.0 + 0.0002]]); // error = 2e-4 (> epsilon)
-    const currentBad: StateVector = { timestamp: 1, stocks: currStocksBad };
+    const currentBad: StateVector = { timestamp: 1, stocks: currStocksBad, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15 };
     const resOutside = validator.validateConservation(previous, currentBad, fluxes, 1.0);
     assert.strictEqual(resOutside.valid, false, 'Delta exceeding tolerance threshold should be invalid');
   });

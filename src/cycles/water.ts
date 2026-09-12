@@ -33,7 +33,11 @@ export class WaterCycle extends BaseCycle {
       boundaryTemperatures: [300.0],
       massFluxes: [15.0],
       specificEnthalpies: [2260000],
-      specificEntropies: [600]
+      specificEntropies: [600],
+      heatFluxRate: solarFlux * 1e-3,
+      massFluxRate: 15.0,
+      enthalpyInflowRate: solarFlux * 1e-3,
+      entropyInflowRate: (solarFlux * 1e-3) / 300.0
     };
     const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-3 * dt, (solarFlux * 1e-3 / 300.0) * dt, dt);
     this.stateVector = 'state' in res ? res.state : res;

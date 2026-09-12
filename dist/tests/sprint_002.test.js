@@ -27,7 +27,11 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
                 heatFluxes: [],
                 radiativeNet: 0,
                 massFluxes: [],
-                netMassEnthalpyFlux: 0
+                netMassEnthalpyFlux: 0,
+                workRate: 0,
+                specificEnthalpies: [],
+                specificEntropies: [],
+                radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 900 }
             }
         };
         const nextState = evaluateThermodynamicState(prevState, 1000050, 288.15, 288.15, {
@@ -39,7 +43,11 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
             heatFluxes: [],
             radiativeNet: 100,
             massFluxes: [],
-            netMassEnthalpyFlux: 0
+            netMassEnthalpyFlux: 0,
+            workRate: 0,
+            specificEnthalpies: [],
+            specificEntropies: [],
+            radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 900 }
         }, 1.0);
         assert.strictEqual(nextState.timestamp, 1.0);
         assert.ok((nextState.entropyGenerationRate ?? 0) >= 0);

@@ -9,7 +9,9 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
       energy: 1000,
       entropy: 0,
       temperature: 300,
-      biomass: 50
+      biomass: 50,
+      internalEnergy: 1000,
+      totalEntropy: 0
     };
 
     const result = assertNonNegativeEntropy(state);
@@ -24,7 +26,9 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
       energy: 5000,
       entropy: 125.4,
       temperature: 298.15,
-      biomass: 200
+      biomass: 200,
+      internalEnergy: 5000,
+      totalEntropy: 125.4
     };
 
     const result = assertNonNegativeEntropy(state);
@@ -39,7 +43,9 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
       energy: 1000,
       entropy: -5.2,
       temperature: 295,
-      biomass: 10
+      biomass: 10,
+      internalEnergy: 1000,
+      totalEntropy: -5.2
     };
 
     const result = assertNonNegativeEntropy(state);

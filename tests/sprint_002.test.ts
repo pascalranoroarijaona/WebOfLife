@@ -28,7 +28,11 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
         heatFluxes: [],
         radiativeNet: 0,
         massFluxes: [],
-        netMassEnthalpyFlux: 0
+        netMassEnthalpyFlux: 0,
+        workRate: 0,
+        specificEnthalpies: [],
+        specificEntropies: [],
+        radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 900 }
       }
     };
 
@@ -46,7 +50,11 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
         heatFluxes: [],
         radiativeNet: 100,
         massFluxes: [],
-        netMassEnthalpyFlux: 0
+        netMassEnthalpyFlux: 0,
+        workRate: 0,
+        specificEnthalpies: [],
+        specificEntropies: [],
+        radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 900 }
       },
       1.0
     );
