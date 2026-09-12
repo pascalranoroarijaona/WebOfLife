@@ -1,0 +1,62 @@
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam backgroundColor #F9F9F9
+
+package "Web of Life Thermodynamic Engine" {
+    
+    class ThermodynamicStateVector {
+        +vectorId: string
+        +cycleIndex: number
+        +elements: Map<string, number>
+        +totalEntropy: number
+        +get(element: string): number
+        +toJSON(): string
+    }
+
+    class ThermodynamicToleranceConfig {
+        +defaultTolerance: number
+        +elementalTolerances: Map<string, number>
+        +getTolerance(element: string): number
+    }
+
+    class DiscrepancyResult {
+        +readonly isValid: boolean
+        +readonly discrepancies: Record<string, { expected: number; actual: number; delta: number; tolerance: number }>
+        +readonly maxDelta: number
+    }
+
+    class ThermodynamicStateValidator {
+        -defaultTolerance: number
+        +constructor(defaultTolerance?: number)
+        +evaluateDiscrepancy(expected: ThermodynamicStateVector, actual: ThermodynamicStateVector, tolerances?: ThermodynamicToleranceConfig): DiscrepancyResult
+    }
+
+    class MonadStockManager {
+        +stockId: string
+        +entityId: string
+        +elementType: string
+        +stockValue: number
+        +entropyContent: number
+        +updateStock(delta: number): void
+    }
+
+    class ThermodynamicBlock {
+        +blockHash: string
+        +previousBlockHash: string
+        +merkleRoot: string
+        +timestamp: Date
+        +stateVectorId: string
+        +auditId: string
+        +nonce: number
+        +validateBlock(): boolean
+    }
+}
+
+ThermodynamicStateValidator ..> ThermodynamicStateVector : inspects >
+ThermodynamicStateValidator ..> ThermodynamicToleranceConfig : uses >
+ThermodynamicStateValidator ..> DiscrepancyResult : produces >
+ThermodynamicBlock --> ThermodynamicStateVector : references state >
+ThermodynamicBlock --> DiscrepancyResult : records audit >
+MonadStockManager --> ThermodynamicStateVector : feeds inventory >
+
+@enduml

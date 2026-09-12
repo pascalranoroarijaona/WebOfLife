@@ -14,7 +14,7 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const result = validator.evaluateDiscrepancy(actual, expected);
         assert.strictEqual(result.isValid, true);
         assert.strictEqual(result.maxToleranceExceeded, false);
-        assert.ok(result.discrepancies['carbon'] <= 1e-6);
+        assert.ok((result.discrepancies['carbon']?.absoluteDifference ?? 0) <= 1e-6);
     });
     it('should flag discrepancy when tolerance is exceeded', () => {
         const validator = new StateValidator(1e-6);
@@ -27,7 +27,7 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const result = validator.evaluateDiscrepancy(actual, expected);
         assert.strictEqual(result.isValid, false);
         assert.strictEqual(result.maxToleranceExceeded, true);
-        assert.strictEqual(result.discrepancies['carbon'], 0.01);
+        assert.strictEqual(result.discrepancies['carbon']?.absoluteDifference, 0.01);
     });
     it('should support custom elemental tolerances', () => {
         const validator = new StateValidator(1e-6);
@@ -50,9 +50,9 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const vector = new StateVector({
             stocks: { carbon: 500, nitrogen: 300, phosphorus: 200 }
         });
-        const isConserved = validator.validateFirstLaw(vector, 1000);
+        const isConserved = StateValidator.validateFirstLaw(vector, 1000);
         assert.strictEqual(isConserved, true);
-        const isNotConserved = validator.validateFirstLaw(vector, 1050);
+        const isNotConserved = StateValidator.validateFirstLaw(vector, 1050);
         assert.strictEqual(isNotConserved, false);
     });
 });

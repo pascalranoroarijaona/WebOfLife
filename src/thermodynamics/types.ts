@@ -5,6 +5,12 @@
 
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 
+export interface ThermodynamicToleranceConfig {
+  getDefaultTolerance?: () => number;
+  getElementTolerance?: (key: string) => number;
+  [key: string]: any;
+}
+
 export enum ThermodynamicStateMonadEnum {
   UNINITIALIZED = "UNINITIALIZED",
   STEADY_STATE = "STEADY_STATE",
@@ -758,27 +764,6 @@ export type ThermodynamicState = {
   [key: string]: any;
 };
 
-export type BoundaryFluxBoundary = FluxBoundary;
-
-export function photosyntheticFixation(stocks: any, carbonRate: number, efficiency: number): any {
-  if (stocks instanceof ElementalStocks) {
-    const next = stocks.clone();
-    next.carbon += carbonRate * efficiency;
-    return next;
-  }
-  return stocks;
-}
-
-export function cellularRespiration(stocks: any, respirationRate: number): any {
-  if (stocks instanceof ElementalStocks) {
-    const next = stocks.clone();
-    next.carbon += respirationRate;
-    next.qLoss += respirationRate * 10;
-    return next;
-  }
-  return stocks;
-}
-
 export type ValidationReport = {
   timestamp: number;
   isValid: boolean;
@@ -802,3 +787,22 @@ export type DiscrepancyReport = {
   items?: any[];
   [key: string]: any;
 };
+
+// Sprint 004 helper exports
+export function photosyntheticFixation(stocks: ElementalStocks, carbonDelta: number, qLossDelta: number): ElementalStocks {
+  const cloned = stocks.clone();
+  cloned.carbon += carbonDelta;
+  cloned.oxygen += carbonDelta * (31.998 / 12.011);
+  cloned.water -= carbonDelta * (18.015 / 12.011) * (1/6);
+  cloned.qLoss += qLossDelta;
+  return cloned;
+}
+
+export function cellularRespiration(stocks: ElementalStocks, rate: number): ElementalStocks {
+  const cloned = stocks.clone();
+  cloned.carbon -= rate * 12.011;
+  cloned.oxygen -= rate * 31.998;
+  cloned.water += rate * 18.015;
+  cloned.qLoss += rate * 10.5;
+  return cloned;
+}

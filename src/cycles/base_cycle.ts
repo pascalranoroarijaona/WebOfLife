@@ -64,7 +64,7 @@ export abstract class BaseCycle implements IThermodynamicModel {
   public calculateTotalMass(): number {
     let sum = 0;
     for (const val of this.stocks.values()) {
-      sum += val;
+      sum += Number(val) || 0;
     }
     return sum;
   }

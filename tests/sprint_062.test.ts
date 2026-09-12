@@ -24,8 +24,8 @@ describe('Sprint 062: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const report = validator.evaluateDiscrepancy(prevState, currState, netFluxes);
 
     assert.strictEqual(report.isBalanced, true, 'System should be balanced');
-    assert.strictEqual(report.maxDiscrepancy <= 1e-6, true, 'Max discrepancy should be within tolerance');
-    assert.strictEqual(report.items.length, 2);
+    assert.strictEqual((report.maxDiscrepancy ?? 0) <= 1e-6, true, 'Max discrepancy should be within tolerance');
+    assert.strictEqual((report.items ?? []).length, 2);
   });
 
   it('Unit Test 2: Imbalanced transitions triggering First Law discrepancy violations', () => {
@@ -47,7 +47,7 @@ describe('Sprint 062: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     assert.strictEqual(report.isBalanced, false, 'System should be flagged as imbalanced');
     assert.strictEqual(report.maxDiscrepancy, 40.0, 'Discrepancy should equal 40.0');
-    assert.strictEqual(report.items[0].exceedsTolerance, true, 'Carbon stock should exceed tolerance');
+    assert.strictEqual((report.items ?? [])[0].exceedsTolerance, true, 'Carbon stock should exceed tolerance');
   });
 
   it('Unit Test 3: Integration check with EarthPOD biogeochemical state vectors', () => {

@@ -1,43 +1,57 @@
 -- ============================================================================
--- Web of Life Database Schema: Sprint 063
--- Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper
+-- Web of Life Database Schema & Thermodynamic Ledger Definitions
+-- Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS thermodynamic_states (
-    state_id VARCHAR(64) PRIMARY KEY,
+-- Drop existing tables to enforce clean schema instantiation if rebuilding
+DROP TABLE IF EXISTS thermodynamic_discrepancy_audits CASCADE;
+DROP TABLE IF EXISTS thermodynamic_state_vectors CASCADE;
+DROP TABLE IF EXISTS thermodynamic_blocks CASCADE;
+DROP TABLE IF EXISTS monad_stocks CASCADE;
+
+-- 1. Monad Stocks Ledger (Matter & Energy Conservation Tracking)
+CREATE TABLE monad_stocks (
+    stock_id VARCHAR(64) PRIMARY KEY,
     entity_id VARCHAR(64) NOT NULL,
-    timestamp BIGINT NOT NULL,
-    carbon DECIMAL(18, 8) NOT NULL,
-    nitrogen DECIMAL(18, 8) NOT NULL,
-    phosphorus DECIMAL(18, 8) NOT NULL,
-    water DECIMAL(18, 8) NOT NULL,
-    energy DECIMAL(18, 8) NOT NULL,
-    entropy DECIMAL(18, 8) NOT NULL,
+    element_type VARCHAR(32) NOT NULL, -- e.g., 'CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER', 'SOLAR_ENERGY'
+    stock_value NUMERIC(20, 10) NOT NULL CHECK (stock_value >= 0.0),
+    entropy_content NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Thermodynamic State Vectors (Capturing state vectors per simulation cycle)
+CREATE TABLE thermodynamic_state_vectors (
+    vector_id VARCHAR(64) PRIMARY KEY,
+    cycle_index BIGINT NOT NULL,
+    vector_data JSONB NOT NULL, -- Map of element keys to scalar values
+    total_entropy NUMERIC(20, 10) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS state_validation_records (
-    validation_id VARCHAR(64) PRIMARY KEY,
-    actual_state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
-    expected_state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+-- 3. Thermodynamic Discrepancy Audits (Sprint 064 Ledger Persistence)
+CREATE TABLE thermodynamic_discrepancy_audits (
+    audit_id VARCHAR(64) PRIMARY KEY,
+    expected_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+    actual_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
     is_valid BOOLEAN NOT NULL,
-    discrepancies JSONB NOT NULL,
-    max_tolerance_exceeded BOOLEAN NOT NULL,
-    first_law_satisfied BOOLEAN NOT NULL,
-    timestamp BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    max_delta NUMERIC(20, 10) NOT NULL,
+    discrepancy_details JSONB NOT NULL, -- Detailed element-wise expected, actual, delta, and tolerance
+    evaluated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS blockchain_transactions (
-    tx_hash VARCHAR(64) PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    validation_id VARCHAR(64) REFERENCES state_validation_records(validation_id),
-    signature VARCHAR(128) NOT NULL,
-    payload_hash VARCHAR(64) NOT NULL,
-    timestamp BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- 4. Thermodynamic Blockchain Blocks (Immutable Transaction Ledgers)
+CREATE TABLE thermodynamic_blocks (
+    block_hash VARCHAR(64) PRIMARY KEY,
+    previous_block_hash VARCHAR(64) REFERENCES thermodynamic_blocks(block_hash),
+    merkle_root VARCHAR(64) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    state_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
+    audit_id VARCHAR(64) REFERENCES thermodynamic_discrepancy_audits(audit_id),
+    nonce BIGINT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity ON thermodynamic_states(entity_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_state_validation_valid ON state_validation_records(is_valid);
-CREATE INDEX IF NOT EXISTS idx_blockchain_block ON blockchain_transactions(block_number);
+-- Indexes for performance optimization on time-series and state checks
+CREATE INDEX idx_monad_stocks_entity ON monad_stocks(entity_id);
+CREATE INDEX idx_state_vectors_cycle ON thermodynamic_state_vectors(cycle_index);
+CREATE INDEX idx_discrepancy_audits_valid ON thermodynamic_discrepancy_audits(is_valid);
+CREATE INDEX idx_blocks_prev_hash ON thermodynamic_blocks(previous_block_hash);

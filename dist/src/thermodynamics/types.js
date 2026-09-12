@@ -393,20 +393,20 @@ export function ok(value) {
 export function err(error) {
     return { success: false, error, isOk: () => false, isErr: () => true, errorValue: error };
 }
-export function photosyntheticFixation(stocks, carbonRate, efficiency) {
-    if (stocks instanceof ElementalStocks) {
-        const next = stocks.clone();
-        next.carbon += carbonRate * efficiency;
-        return next;
-    }
-    return stocks;
+// Sprint 004 helper exports
+export function photosyntheticFixation(stocks, carbonDelta, qLossDelta) {
+    const cloned = stocks.clone();
+    cloned.carbon += carbonDelta;
+    cloned.oxygen += carbonDelta * (31.998 / 12.011);
+    cloned.water -= carbonDelta * (18.015 / 12.011) * (1 / 6);
+    cloned.qLoss += qLossDelta;
+    return cloned;
 }
-export function cellularRespiration(stocks, respirationRate) {
-    if (stocks instanceof ElementalStocks) {
-        const next = stocks.clone();
-        next.carbon += respirationRate;
-        next.qLoss += respirationRate * 10;
-        return next;
-    }
-    return stocks;
+export function cellularRespiration(stocks, rate) {
+    const cloned = stocks.clone();
+    cloned.carbon -= rate * 12.011;
+    cloned.oxygen -= rate * 31.998;
+    cloned.water += rate * 18.015;
+    cloned.qLoss += rate * 10.5;
+    return cloned;
 }
