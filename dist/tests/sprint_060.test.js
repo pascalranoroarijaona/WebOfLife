@@ -15,7 +15,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
             ['carbon', 2.0],
             ['water', 1.0]
         ]);
-        const report = validator.validateStateVector(prevVector, currVector, fluxDeltas);
+        const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas);
         assert.strictEqual(report.isValid, true);
         assert.strictEqual(report.maxDiscrepancy, 0);
         assert.strictEqual(Array.isArray(report.discrepancies), true);
@@ -35,7 +35,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const fluxDeltas = new Map([
             ['carbon', 2.0]
         ]);
-        const report = validator.validateStateVector(prevVector, currVector, fluxDeltas);
+        const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas);
         assert.strictEqual(report.isValid, false);
         assert.ok((report.maxDiscrepancy ?? 0) > 1e-6);
         assert.strictEqual(Array.isArray(report.discrepancies), true);
@@ -56,7 +56,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
             phosphorus: 0.0,
             water: 5.2
         };
-        const report = validator.validateStateVector(prevVector, currVector, fluxDeltas);
+        const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas);
         assert.strictEqual(report.isValid, true);
     });
     it('should throw ThermodynamicDiscrepancyViolationError on negative entropy generation', () => {

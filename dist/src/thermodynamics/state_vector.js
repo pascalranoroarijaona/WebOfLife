@@ -6,7 +6,7 @@ import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateVector as BaseThermod
 export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
     computeDelta(previousState) {
         const deltas = {};
-        const prevStocks = previousState.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState.stocks ?? {});
+        const prevStocks = previousState?.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState?.stocks ?? {});
         const currStocks = this.stocks instanceof Map ? Object.fromEntries(this.stocks) : (this.stocks ?? {});
         const keys = new Set([...Object.keys(prevStocks), ...Object.keys(currStocks)]);
         for (const k of keys) {
@@ -42,7 +42,8 @@ export class ThermodynamicMonadProcess {
         this.state = state;
     }
     static unit(state) {
-        return new ThermodynamicMonadProcess(state);
+        const tsv = state instanceof ThermodynamicStateVector ? state : new ThermodynamicStateVector(state);
+        return new ThermodynamicMonadProcess(tsv);
     }
     static step(state, fluxDelta, dt) {
         const vec = state instanceof ThermodynamicStateVector ? state : new ThermodynamicStateVector(state);
@@ -58,7 +59,8 @@ export class ThermodynamicMonadProcess {
         });
     }
     bind(fn) {
-        this.state = fn(this.state);
+        const res = fn(this.state);
+        this.state = res instanceof ThermodynamicStateVector ? res : new ThermodynamicStateVector(res);
         return this;
     }
     extract() {
@@ -66,8 +68,8 @@ export class ThermodynamicMonadProcess {
     }
 }
 export function validateOrThrowEntropy(state) {
-    const sGen = state.entropyGenerationRate ?? (state instanceof ThermodynamicStateVector ? state.entropyGenerationRate : 0);
-    if (sGen < -1e-9) {
+    const sGen = state?.entropyGenerationRate ?? 0;
+    if (typeof sGen === 'number' && sGen < -1e-9) {
         throw new Error(`Second Law Violation: Entropy generation rate ${sGen} is less than zero.`);
     }
 }

@@ -8,9 +8,9 @@ import assert from 'node:assert';
 import { 
   StateValidator, 
   ThermodynamicEntropyViolationError, 
-  executeThermodynamicTransition,
-  ThermodynamicStateVector
+  executeThermodynamicTransition
 } from '../src/thermodynamics/state_validator.js';
+import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
 
 describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () => {
   const validState = new ThermodynamicStateVector({

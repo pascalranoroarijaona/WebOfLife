@@ -32,7 +32,8 @@ describe('Sprint 058 - Thermodynamic State Vector Stock Conservation Delta Calcu
             water: -250.0
         };
         const dt = 2.0;
-        const isValid = StateValidator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
+        const validator = new StateValidator(1e-9);
+        const isValid = validator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
         assert.strictEqual(isValid.valid, true);
     });
     it('should detect divergence and fail conservation validation when observed state violates expected deltas', () => {
@@ -46,7 +47,8 @@ describe('Sprint 058 - Thermodynamic State Vector Stock Conservation Delta Calcu
             carbon: 12.5
         };
         const dt = 2.0;
-        const isValid = StateValidator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
+        const validator = new StateValidator(1e-9);
+        const isValid = validator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
         assert.strictEqual(isValid.valid, false);
     });
     it('should handle time-step scaling correctly', () => {

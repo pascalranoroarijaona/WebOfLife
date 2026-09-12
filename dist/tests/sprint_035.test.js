@@ -4,7 +4,8 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { StateValidator, executeThermodynamicTransition, ThermodynamicStateVector } from '../src/thermodynamics/state_validator.js';
+import { StateValidator, executeThermodynamicTransition } from '../src/thermodynamics/state_validator.js';
+import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
 describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () => {
     const validState = new ThermodynamicStateVector({
         energy: 1e6,

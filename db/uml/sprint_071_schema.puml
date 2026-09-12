@@ -1,0 +1,49 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life Thermodynamics" {
+    enum ElementalStockKey {
+        CARBON
+        NITROGEN
+        PHOSPHORUS
+        WATER
+        ENERGY
+    }
+
+    class ThermodynamicStockMap {
+        + carbon: number
+        + nitrogen: number
+        + phosphorus: number
+        + water: number
+        + energy: number
+    }
+
+    class StateValidator {
+        + computeAbsoluteStockDelta(actual: ThermodynamicStockMap, expected: ThermodynamicStockMap): ThermodynamicStockMap
+    }
+
+    class ThermodynamicStateDiscrepancyRecord {
+        + discrepancyId: string
+        + actualVectorId: string
+        + expectedVectorId: string
+        + deltas: ThermodynamicStockMap
+        + validatedAt: Date
+        + persist(): void
+    }
+
+    class BlockchainTransaction {
+        + txHash: string
+        + blockIndex: number
+        + previousHash: string
+        + monadProcessId: string
+        + signature: string
+        + verify(): boolean
+    }
+}
+
+StateValidator ..> ThermodynamicStockMap : processes >
+StateValidator ..> ThermodynamicStateDiscrepancyRecord : generates >
+ThermodynamicStateDiscrepancyRecord --> ThermodynamicStockMap : uses delta representation
+BlockchainTransaction --> ThermodynamicStockMap : secures state vector
+
+@enduml

@@ -99,7 +99,7 @@ export class BaseCycle {
         };
         const res = stepThermodynamicMonad(this.stateVector, defaultFlux, 1e5 * dt, (1e5 / 5778) * dt, dt);
         const nextState = 'state' in res ? res.state : res;
-        this.stateVector = nextState instanceof ThermodynamicStateVector ? nextState : new ThermodynamicStateVector(nextState);
+        this.stateVector = (nextState && typeof nextState === 'object' && typeof nextState.clone === 'function') ? nextState : new ThermodynamicStateVector(nextState);
     }
     getBoundaryFluxes() {
         return {

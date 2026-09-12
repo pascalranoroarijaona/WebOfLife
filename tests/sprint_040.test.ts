@@ -25,7 +25,7 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
     const result = assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      const err = result.error as EntropyValidationError;
+      const err = result.error as any;
       assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_VIOLATION');
       assert.strictEqual(err.invalidValue, -50.2);
       assert.ok(err.path?.includes('entropy'));
@@ -44,7 +44,7 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
     const result = assertNonNegativeEntropy(nestedInvalidState);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      const err = result.error as EntropyValidationError;
+      const err = result.error as any;
       assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_VIOLATION');
       assert.strictEqual(err.invalidValue, -0.05);
       assert.ok(err.path?.includes('entropyGenerationRate'));

@@ -26,7 +26,7 @@ describe('Sprint 061: Thermodynamic State Vector Inventory Discrepancy Evaluator
             nitrogen: -2
         });
         const validator = new StateValidator(1e-6);
-        const report = validator.evaluate(prev, curr, structure, 1.0);
+        const report = validator.evaluate(prev, structure, 1.0);
         assert.strictEqual(report.totalAbsoluteDiscrepancy, 0);
         assert.strictEqual(report.isMassConserved, true);
         assert.strictEqual(report.records?.length, 2);
@@ -44,7 +44,7 @@ describe('Sprint 061: Thermodynamic State Vector Inventory Discrepancy Evaluator
             carbon: 5
         });
         const validator = new StateValidator(1e-6);
-        const report = validator.evaluate(prev, curr, structure, 1.0);
+        const report = validator.evaluate(curr, structure, 1.0);
         assert.strictEqual(report.totalAbsoluteDiscrepancy, 7);
         assert.strictEqual(report.isMassConserved, false);
         assert.strictEqual(report.records?.[0].absoluteDiscrepancy, 7);
@@ -61,10 +61,10 @@ describe('Sprint 061: Thermodynamic State Vector Inventory Discrepancy Evaluator
             phosphorus: 0
         });
         const tightValidator = new StateValidator(1e-8);
-        const reportTight = tightValidator.evaluate(prev, curr, structure, 1.0);
+        const reportTight = tightValidator.evaluate(curr, structure, 1.0);
         assert.strictEqual(reportTight.isMassConserved, false);
         const looseValidator = new StateValidator(1e-5);
-        const reportLoose = looseValidator.evaluate(prev, curr, structure, 1.0);
+        const reportLoose = looseValidator.evaluate(curr, structure, 1.0);
         assert.strictEqual(reportLoose.isMassConserved, true);
     });
 });

@@ -41,7 +41,8 @@ describe('Sprint 058 - Thermodynamic State Vector Stock Conservation Delta Calcu
     };
 
     const dt = 2.0;
-    const isValid = StateValidator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
+    const validator = new StateValidator(1e-9);
+    const isValid = validator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
 
     assert.strictEqual(isValid.valid, true);
   });
@@ -60,7 +61,8 @@ describe('Sprint 058 - Thermodynamic State Vector Stock Conservation Delta Calcu
     };
 
     const dt = 2.0;
-    const isValid = StateValidator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
+    const validator = new StateValidator(1e-9);
+    const isValid = validator.validateConservation(prevVector, nextVector, fluxes, dt, 1e-9);
 
     assert.strictEqual(isValid.valid, false);
   });

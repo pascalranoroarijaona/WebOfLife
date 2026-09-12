@@ -11,9 +11,9 @@ import {
 } from './types.js';
 
 export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
-  public computeDelta(previousState: ThermodynamicStateVector | BaseThermodynamicStateVector): Record<string, number> {
+  public computeDelta(previousState: ThermodynamicStateVector | BaseThermodynamicStateVector | any): Record<string, number> {
     const deltas: Record<string, number> = {};
-    const prevStocks = previousState.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState.stocks ?? {});
+    const prevStocks = previousState?.stocks instanceof Map ? Object.fromEntries(previousState.stocks) : (previousState?.stocks ?? {});
     const currStocks = this.stocks instanceof Map ? Object.fromEntries(this.stocks) : (this.stocks ?? {});
     const keys = new Set([...Object.keys(prevStocks), ...Object.keys(currStocks)]);
     for (const k of keys) {
@@ -51,8 +51,9 @@ export function createBaselineStateVector(init?: Partial<IThermodynamicStateVect
 export class ThermodynamicMonadProcess {
   constructor(private state: ThermodynamicStateVector = new ThermodynamicStateVector()) {}
 
-  public static unit(state: ThermodynamicStateVector): ThermodynamicMonadProcess {
-    return new ThermodynamicMonadProcess(state);
+  public static unit(state: ThermodynamicStateVector | any): ThermodynamicMonadProcess {
+    const tsv = state instanceof ThermodynamicStateVector ? state : new ThermodynamicStateVector(state);
+    return new ThermodynamicMonadProcess(tsv);
   }
 
   public static step(state: ThermodynamicStateVector | any, fluxDelta: any, dt: number): ThermodynamicStateVector {
@@ -69,8 +70,9 @@ export class ThermodynamicMonadProcess {
     });
   }
 
-  public bind(fn: (s: ThermodynamicStateVector) => ThermodynamicStateVector): ThermodynamicMonadProcess {
-    this.state = fn(this.state);
+  public bind(fn: (s: ThermodynamicStateVector) => ThermodynamicStateVector | any): ThermodynamicMonadProcess {
+    const res = fn(this.state);
+    this.state = res instanceof ThermodynamicStateVector ? res : new ThermodynamicStateVector(res);
     return this;
   }
 
@@ -79,9 +81,9 @@ export class ThermodynamicMonadProcess {
   }
 }
 
-export function validateOrThrowEntropy(state: IThermodynamicStateVector | ThermodynamicStateVector): void {
-  const sGen = state.entropyGenerationRate ?? (state instanceof ThermodynamicStateVector ? state.entropyGenerationRate : 0);
-  if (sGen < -1e-9) {
+export function validateOrThrowEntropy(state: IThermodynamicStateVector | ThermodynamicStateVector | any): void {
+  const sGen = state?.entropyGenerationRate ?? 0;
+  if (typeof sGen === 'number' && sGen < -1e-9) {
     throw new Error(`Second Law Violation: Entropy generation rate ${sGen} is less than zero.`);
   }
 }

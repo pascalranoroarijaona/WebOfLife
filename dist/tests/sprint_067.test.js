@@ -7,7 +7,7 @@ describe('Sprint 067: StateValidator Core Helper', () => {
         const validator = new StateValidator(1e-6);
         const actual = new StateVector({ stocks: { C: 100.0, H2O: 500.0 } });
         const expected = new StateVector({ stocks: { C: 100.0, H2O: 500.0 } });
-        const result = validator.evaluateDiscrepancy(actual, expected);
+        const result = validator.evaluateDiscrepancy(expected, actual);
         assert.strictEqual(result.isValid, true);
         assert.strictEqual(result.differences['C'], 0.0);
         assert.strictEqual(result.differences['H2O'], 0.0);
@@ -17,16 +17,16 @@ describe('Sprint 067: StateValidator Core Helper', () => {
         const validator = new StateValidator(1e-6);
         const actual = new StateVector({ stocks: { C: 100.000005, N: 10.0 } });
         const expected = new StateVector({ stocks: { C: 100.0, N: 10.0 } });
-        const result = validator.evaluateDiscrepancy(actual, expected);
+        const result = validator.evaluateDiscrepancy(expected, actual);
         assert.strictEqual(result.isValid, false);
-        assert.ok(result.differences['C'] > 1e-6);
+        assert.ok((result.differences['C'] ?? 0) > 1e-6);
         assert.ok(result.violations['C'] !== undefined);
     });
     it('TC-03: Custom tolerance suppresses violation on specific stocks', () => {
         const validator = new StateValidator(1e-6);
         const actual = new StateVector({ stocks: { C: 100.005, N: 10.0 } });
         const expected = new StateVector({ stocks: { C: 100.0, N: 10.0 } });
-        const result = validator.evaluateDiscrepancy(actual, expected, { C: 0.01 });
+        const result = validator.evaluateDiscrepancy(expected, actual, { C: 0.01 });
         assert.strictEqual(result.isValid, true);
         assert.strictEqual(result.violations['C'], undefined);
     });

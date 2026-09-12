@@ -31,7 +31,8 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
                 massFluxes: []
             }
         };
-        const result = ThermodynamicStateValidator.validate(validState);
+        const validator = new ThermodynamicStateValidator();
+        const result = validator.validateState(validState);
         assert.strictEqual(result.isValid, true);
         assert.strictEqual((result.violations ?? []).length, 0);
         assert.doesNotThrow(() => ThermodynamicStateValidator.assertValid(validState));
@@ -59,10 +60,15 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
                 massFluxes: []
             }
         };
-        const result = ThermodynamicStateValidator.validate(invalidEntropyState);
+        const validator = new ThermodynamicStateValidator();
+        const result = validator.validateState(invalidEntropyState);
         assert.strictEqual(result.isValid, false);
-        assert.ok((result.violations ?? []).some((v) => v.includes('Entropy') && v.includes('negative')));
-        assert.throws(() => ThermodynamicStateValidator.assertValid(invalidEntropyState), /State validation failed/);
+        const violations = result.violations ?? [];
+        const hasEntropyViolation = Array.isArray(violations)
+            ? violations.some((v) => typeof v === 'string' && v.includes('Entropy') && v.includes('negative'))
+            : typeof violations === 'object' && Object.values(violations).some((v) => typeof v === 'string' && v.includes('Entropy') && v.includes('negative'));
+        assert.ok(hasEntropyViolation);
+        assert.throws(() => ThermodynamicStateValidator.assertValid(invalidEntropyState), /Second Law Violation/);
     });
     it('3. States with negative entropy generation rates (S_gen < 0) are rejected', () => {
         const invalidGenState = {
@@ -87,10 +93,15 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
                 massFluxes: []
             }
         };
-        const result = ThermodynamicStateValidator.validate(invalidGenState);
+        const validator = new ThermodynamicStateValidator();
+        const result = validator.validateState(invalidGenState);
         assert.strictEqual(result.isValid, false);
-        assert.ok((result.violations ?? []).some((v) => v.includes('Dissipation rate') || v.includes('Entropy generation')));
-        assert.throws(() => ThermodynamicStateValidator.assertValid(invalidGenState), /State validation failed/);
+        const violations = result.violations ?? [];
+        const hasGenViolation = Array.isArray(violations)
+            ? violations.some((v) => typeof v === 'string' && (v.includes('Dissipation rate') || v.includes('Entropy generation')))
+            : typeof violations === 'object' && Object.values(violations).some((v) => typeof v === 'string' && (v.includes('Dissipation rate') || v.includes('Entropy generation')));
+        assert.ok(hasGenViolation);
+        assert.throws(() => ThermodynamicStateValidator.assertValid(invalidGenState), /Second Law Violation/);
     });
     it('4. Integration with EarthPod thermal and matter balance loops via ThermodynamicMonadProcess', () => {
         const earth = EarthPOD.getInstance();

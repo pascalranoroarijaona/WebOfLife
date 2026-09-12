@@ -51,7 +51,7 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(state);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      const err = result.error as EntropyValidationError;
+      const err = result.error as any;
       assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_VIOLATION');
       assert.strictEqual(err.invalidValue, -5.2);
       assert.ok(err.message.includes('Second Law Violation'));
@@ -69,7 +69,7 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(malformedState);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      const err = result.error as EntropyValidationError;
+      const err = result.error as any;
       assert.strictEqual(err.code, 'INVALID_STATE_VECTOR');
       assert.ok(isNaN(err.invalidValue));
     }
@@ -79,7 +79,7 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(null as unknown as ThermodynamicStateVector);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      const err = result.error as EntropyValidationError;
+      const err = result.error as any;
       assert.strictEqual(err.code, 'INVALID_STATE_VECTOR');
     }
   });

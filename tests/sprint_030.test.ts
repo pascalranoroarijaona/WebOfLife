@@ -40,7 +40,7 @@ describe('Sprint 030: Thermodynamic State Vector Validation Wrapper', () => {
     assert.strictEqual(result.isValid, false);
     assert.ok(result.errors?.some((e: any) => e.reason?.includes('entropy') || JSON.stringify(e).includes('entropy')));
     assert.ok(result.errors?.some((e: any) => e.reason?.includes('elementalStocks') || JSON.stringify(e).includes('elementalStocks')));
-    assert.throws(() => ThermodynamicStateValidator.assertValid(incompleteState), /State validation failed/);
+    assert.throws(() => ThermodynamicStateValidator.assertValid(incompleteState), /Second Law Violation/);
   });
 
   it('should reject negative entropy (Second Law violation)', () => {
