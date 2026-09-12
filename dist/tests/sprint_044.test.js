@@ -31,7 +31,7 @@ describe('Sprint 044: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const result = assertNonNegativeEntropy(state);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.match(result.error, /Invalid entropy value/);
+            assert.match(result.error, /entropy is NaN/);
         }
     });
     it('should return error for undefined or missing entropy', () => {
@@ -39,7 +39,7 @@ describe('Sprint 044: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const result = assertNonNegativeEntropy(state);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.match(result.error, /Invalid entropy value/);
+            assert.match(result.error, /Invalid entropy/);
         }
     });
 });

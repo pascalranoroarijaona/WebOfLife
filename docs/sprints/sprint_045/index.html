@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 045: Web of Life - Thermodynamic State Vector Non-Negative Entropy Assertion Utility</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sprint 045</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Validator & Non-Negative Entropy Assertion Utility Active (60 FPS Render Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/30 p-6 flex flex-col gap-6 overflow-y-auto">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-emerald-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-emerald-400">42</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sprint-telemetry" class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">State Vector Validation</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-2 text-xs font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Entropy ΔS:</span>
+                        <span id="telemetry-entropy" class="text-emerald-400">+1.42 J/K</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Non-Negative Valid:</span>
+                        <span id="telemetry-valid" class="text-emerald-400">PASS</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Assertion Checks:</span>
+                        <span id="telemetry-checks" class="text-slate-300">1,240 / s</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Viewport -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <canvas id="view-canvas" class="w-full h-full block"></canvas>
+            <div class="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-lg px-4 py-2 text-xs text-slate-400 pointer-events-none">
+                Thermodynamic State Vector & Non-Negative Entropy Assertion Active
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EarthPOD } from '../../../src/earth_pod.ts';
+        import { StateValidator } from '../../../src/thermodynamics/state_validator.ts';
+
+        const canvas = document.getElementById('view-canvas');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        camera.position.set(0, 30, 50);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // Grid helper
+        const grid = new THREE.GridHelper(60, 60, 0x10b981, 0x1e293b);
+        grid.position.y = -0.01;
+        scene.add(grid);
+
+        const earthPod = new EarthPOD();
+        scene.add(earthPod.mesh);
+
+        let isRunning = true;
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 60;
+        let gen = 1;
+        let checksCount = 0;
+
+        document.getElementById('btn-start').addEventListener('click', () => { isRunning = true; });
+        document.getElementById('btn-pause').addEventListener('click', () => { isRunning = false; });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            earthPod.reset();
+            gen++;
+            document.getElementById('metric-gen').textContent = gen;
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = canvas.clientWidth / canvas.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        });
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            frameCount++;
+            if (now - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (now - lastTime));
+                document.getElementById('metric-fps').textContent = fps;
+                frameCount = 0;
+                lastTime = now;
+            }
+
+            if (isRunning) {
+                earthPod.update(0.016);
+                
+                // Validate thermodynamic state vector & non-negative entropy assertion
+                const state = earthPod.getStateVector();
+                const isValid = StateValidator.assertNonNegativeEntropy(state);
+                
+                checksCount++;
+                document.getElementById('telemetry-entropy').textContent = `+${state.entropy.toFixed(2)} J/K`;
+                document.getElementById('telemetry-valid').textContent = isValid ? 'PASS' : 'FAIL';
+                document.getElementById('telemetry-valid').className = isValid ? 'text-emerald-400 font-bold' : 'text-rose-500 font-bold';
+                document.getElementById('telemetry-checks').textContent = `${(checksCount * 60).toLocaleString()} / s`;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

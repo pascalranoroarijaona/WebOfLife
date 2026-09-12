@@ -1,0 +1,59 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics Core" {
+  interface "Result<T, E>" as Result {
+    + success: boolean
+    + value?: T
+    + error?: E
+  }
+
+  class ThermodynamicStateVector {
+    + state_id: string
+    + entity_id: string
+    + internal_energy: number
+    + enthalpy: number
+    + entropy: number
+    + temperature: number
+  }
+
+  class StateValidator {
+    {static} + assertNonNegativeEntropy(state: ThermodynamicStateVector | { entropy: number }): Result<boolean, string>
+  }
+}
+
+package "Blockchain & Ledger" {
+  class BlockchainBlock {
+    + block_index: number
+    + block_hash: string
+    + previous_hash: string
+    + merkle_root: string
+    + timestamp: Date
+    + nonce: number
+  }
+
+  class BlockTransaction {
+    + transaction_id: string
+    + block_index: number
+    + state_id: string
+    + monad_result_type: string
+    + payload_signature: string
+  }
+
+  class StateValidationLedger {
+    + validation_id: string
+    + state_id: string
+    + is_valid: boolean
+    + error_message: string
+    + validated_at: Date
+    + validator_signature: string
+  }
+}
+
+ThermodynamicStateVector "1" --> "0..*" StateValidationLedger : validates
+StateValidator ..> Result : creates
+StateValidator ..> ThermodynamicStateVector : inspects
+BlockchainBlock "1" *-- "0..*" BlockTransaction : contains
+BlockTransaction "1" --> "1" ThermodynamicStateVector : records state
+
+@enduml

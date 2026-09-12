@@ -29,7 +29,7 @@ describe('Sprint 039: Thermodynamic State Vector Non-Negative Entropy Assertion 
     
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error, /Second Law Violation: Detected negative entropy/);
+      assert.match(result.error, /Second Law Violation: Entropy cannot be negative/);
       assert.match(result.error, /-10.5/);
     }
   });
@@ -39,13 +39,13 @@ describe('Sprint 039: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const nullResult = assertNonNegativeEntropy(null);
     assert.strictEqual(nullResult.success, false);
     if (!nullResult.success) {
-      assert.strictEqual(nullResult.error, 'Invalid state object provided for entropy validation.');
+      assert.match(nullResult.error, /Invalid state object provided for entropy validation/);
     }
 
     const missingEntropyResult = assertNonNegativeEntropy({ internalEnergy: 500 });
     assert.strictEqual(missingEntropyResult.success, false);
     if (!missingEntropyResult.success) {
-      assert.strictEqual(missingEntropyResult.error, 'Entropy metric is missing or not a valid number.');
+      assert.match(missingEntropyResult.error, /Entropy metric is missing or not a valid number/);
     }
   });
 

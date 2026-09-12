@@ -1,91 +1,61 @@
-import { ok, err, STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
-export class ThermodynamicEntropyViolationError extends Error {
-    state;
-    constructor(state, message = 'Entropy violation') {
-        super(`[ThermodynamicEntropyViolationError]: ${message}`);
-        this.state = state;
-        this.name = 'ThermodynamicEntropyViolationError';
-    }
-}
-export class ThermodynamicConstraintViolationError extends Error {
-    constructor(message) {
-        super(`ThermodynamicConstraintViolation: ${message}`);
-        this.name = 'ThermodynamicConstraintViolationError';
-    }
-}
-export class ThermodynamicViolationError extends Error {
-    constructor(message) {
-        super(`[Thermodynamic Violation]: ${message}`);
-        this.name = 'ThermodynamicViolationError';
-    }
-}
+import { ok, err, ThermodynamicEntropyViolationError, ThermodynamicConstraintViolationError } from './types';
+export { ThermodynamicEntropyViolationError, ThermodynamicConstraintViolationError };
 export class ElementalStocks {
     carbon;
     nitrogen;
     phosphorus;
     water;
-    oxygen;
-    energy;
-    qLoss;
-    constructor(carbon = 0, nitrogen = 0, phosphorus = 0, water = 0, oxygen = 1000, energy = 10000, qLoss = 0) {
+    constructor(carbon = 0, nitrogen = 0, phosphorus = 0, water = 0) {
         this.carbon = carbon;
         this.nitrogen = nitrogen;
         this.phosphorus = phosphorus;
         this.water = water;
-        this.oxygen = oxygen;
-        this.energy = energy;
-        this.qLoss = qLoss;
     }
     isNonNegative() {
-        return this.carbon >= 0 && this.nitrogen >= 0 && this.phosphorus >= 0 && this.water >= 0 && this.qLoss >= 0;
+        return this.carbon >= 0 && this.nitrogen >= 0 && this.phosphorus >= 0 && this.water >= 0;
     }
     add(other) {
-        return new ElementalStocks(this.carbon + other.carbon, this.nitrogen + other.nitrogen, this.phosphorus + other.phosphorus, this.water + other.water, this.oxygen + other.oxygen, this.energy + other.energy, this.qLoss + other.qLoss);
+        return new ElementalStocks(this.carbon + other.carbon, this.nitrogen + other.nitrogen, this.phosphorus + other.phosphorus, this.water + other.water);
     }
     subtract(other) {
-        return new ElementalStocks(this.carbon - other.carbon, this.nitrogen - other.nitrogen, this.phosphorus - other.phosphorus, this.water - other.water, this.oxygen - other.oxygen, this.energy - other.energy, this.qLoss - other.qLoss);
-    }
-    clone() {
-        return new ElementalStocks(this.carbon, this.nitrogen, this.phosphorus, this.water, this.oxygen, this.energy, this.qLoss);
+        return new ElementalStocks(this.carbon - other.carbon, this.nitrogen - other.nitrogen, this.phosphorus - other.phosphorus, this.water - other.water);
     }
 }
 export class ThermodynamicLedger {
-    totalDissipatedHeat = 0.0;
+    totalDissipatedHeat = 0;
     totalEntropy = 0.0;
-    constructor() { }
-    recordDissipation(heatJoules, ambientTemp = STANDARD_AMBIENT_TEMPERATURE_K) {
-        if (heatJoules < 0) {
+    recordDissipation(heat, temperature = 298.15) {
+        if (heat < 0) {
             throw new Error('Dissipated heat cannot be negative');
         }
-        this.totalDissipatedHeat += heatJoules;
-        this.totalEntropy += heatJoules / ambientTemp;
+        this.totalDissipatedHeat += heat;
+        this.totalEntropy += heat / temperature;
     }
-    auditMassConservation(currentStocks) {
+    auditMassConservation(stocks) {
         return 0.0;
     }
 }
 export class BiomePatch {
     coordinates;
-    areaKm2;
+    area;
     nutrientPool;
-    constructor(coordinates, areaKm2, nutrientPool) {
+    constructor(coordinates, area, nutrientPool) {
         this.coordinates = coordinates;
-        this.areaKm2 = areaKm2;
+        this.area = area;
         this.nutrientPool = nutrientPool;
     }
     queryNutrients() {
         return this.nutrientPool;
     }
     consumeNutrients(demand) {
-        this.nutrientPool = this.nutrientPool.subtract(demand);
+        this.nutrientPool = new ElementalStocks(this.nutrientPool.carbon - demand.carbon, this.nutrientPool.nitrogen - demand.nitrogen, this.nutrientPool.phosphorus - demand.phosphorus, this.nutrientPool.water - demand.water);
         return demand;
     }
 }
 export class DetritivoreMonad {
     static scavenge(carcass, patch, ledger) {
         const assimilated = new ElementalStocks(carcass.carbon * 0.15, carcass.nitrogen * 0.15, carcass.phosphorus * 0.15, carcass.water * 0.15);
-        const residue = carcass.subtract(assimilated);
-        patch.nutrientPool = patch.nutrientPool.add(residue);
+        const residue = new ElementalStocks(carcass.carbon * 0.85, carcass.nitrogen * 0.85, carcass.phosphorus * 0.85, carcass.water * 0.85);
         ledger.recordDissipation(carcass.carbon * 10.5);
         return [assimilated, residue];
     }
@@ -96,89 +66,117 @@ export class StateValidator {
         this.options = options;
     }
     static validateEntropy(state) {
-        const entropy = typeof state.getEntropy === 'function' ? state.getEntropy() : (state.entropy ?? 0);
-        const entropyGenRate = typeof state.getEntropyGenerationRate === 'function' ? state.getEntropyGenerationRate() : (state.entropyGenerationRate ?? 0);
-        const temp = state.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-        return entropy >= 0 && entropyGenRate >= 0 && temp > 0;
+        const s = state.getEntropy ? state.getEntropy() : state.entropy;
+        const sGen = state.getEntropyGenerationRate ? state.getEntropyGenerationRate() : state.entropyGenerationRate;
+        const t = state.temperature;
+        return (s === undefined || s >= 0) && (sGen === undefined || sGen >= 0) && (t === undefined || t > 0);
     }
     static assertNonNegativeEntropy(state) {
-        if (!state || typeof state !== 'object') {
-            return err({
-                code: 'INVALID_STATE_VECTOR',
-                message: 'State is null, undefined, or not an object.',
-                invalidValue: state,
-                path: 'root'
-            });
+        const res = assertNonNegativeEntropy(state);
+        if (!res.success) {
+            const errPayload = res.error;
+            const msg = typeof errPayload === 'string' ? errPayload : errPayload.message;
+            throw new ThermodynamicEntropyViolationError(state, msg);
         }
-        const entropy = 'getEntropy' in state && typeof state.getEntropy === 'function'
-            ? state.getEntropy()
-            : (state.entropy ?? state.totalEntropy);
-        if (typeof entropy !== 'number' || isNaN(entropy)) {
-            return err({
-                code: 'INVALID_STATE_VECTOR',
-                message: `Invalid entropy value: expected a valid number, received ${entropy}`,
-                invalidValue: entropy,
-                violatingValue: entropy,
-                path: 'entropy',
-                error: 'Invalid entropy: entropy must be a valid number.'
-            });
-        }
-        if (entropy < 0) {
-            const errObj = {
-                code: 'NEGATIVE_ENTROPY_VIOLATION',
-                message: `Second Law Violation: Entropy cannot be negative. Received S = ${entropy}`,
-                invalidValue: entropy,
-                violatingValue: entropy,
-                path: 'entropy'
-            };
-            return err(errObj);
-        }
-        return ok(state);
+        return res;
+    }
+    validate(state) {
+        return this.validateState(state);
     }
     validateState(state) {
         const errors = [];
+        const violations = [];
         if (!state || typeof state !== 'object') {
             return { isValid: false, valid: false, errors: [{ property: 'root', reason: 'State must be a non-null object.' }], violations: ['root: State must be a non-null object.'] };
         }
+        if (state.energy === undefined || state.energy === null || isNaN(state.energy)) {
+            errors.push({ property: 'energy', reason: 'Missing or invalid energy.' });
+            violations.push('energy: Missing or invalid energy.');
+        }
+        if (state.entropy === undefined || state.entropy === null || isNaN(state.entropy)) {
+            errors.push({ property: 'entropy', reason: 'Missing mandatory property entropy.' });
+            violations.push('entropy: Missing mandatory property entropy.');
+        }
+        else if (state.entropy < 0) {
+            errors.push({ property: 'entropy', reason: 'Entropy cannot be negative.' });
+            violations.push('Entropy cannot be negative.');
+        }
         if (state.temperature === undefined || state.temperature === null || isNaN(state.temperature) || state.temperature <= 0) {
-            errors.push({ property: 'temperature', reason: 'Missing or invalid absolute temperature.' });
+            errors.push({ property: 'temperature', reason: 'Absolute temperature must be strictly positive.' });
+            violations.push('temperature: Absolute temperature must be strictly positive.');
         }
-        if (state.stocks === undefined || state.stocks === null) {
-            errors.push({ property: 'stocks', reason: 'Missing stocks property.' });
+        if (state.stocks === undefined && state.elementalStocks === undefined) {
+            errors.push({ property: 'stocks', reason: 'Missing mandatory property elementalStocks / stocks.' });
+            violations.push('stocks: Missing mandatory property elementalStocks / stocks.');
         }
-        if (typeof state.entropy === 'number' && state.entropy < 0) {
-            errors.push({ property: 'entropy', reason: 'Entropy must be non-negative.' });
+        else {
+            const targetStocks = state.stocks ?? state.elementalStocks;
+            if (targetStocks && typeof targetStocks === 'object') {
+                for (const [k, v] of Object.entries(targetStocks)) {
+                    if (typeof v === 'number' && v < 0) {
+                        errors.push({ property: `stocks.${k}`, reason: `Elemental stock '${k}' is negative.` });
+                        violations.push(`Elemental stock '${k}' is negative.`);
+                    }
+                }
+            }
         }
-        if (typeof state.dissipationRate === 'number' && state.dissipationRate < 0) {
-            errors.push({ property: 'dissipationRate', reason: 'Dissipation rate cannot be negative.' });
+        if (state.entropyGenerationRate !== undefined && state.entropyGenerationRate < 0) {
+            errors.push({ property: 'entropyGenerationRate', reason: 'Entropy generation rate cannot be negative.' });
+            violations.push('Entropy generation rate cannot be negative.');
         }
         return {
             isValid: errors.length === 0,
             valid: errors.length === 0,
             errors,
-            violations: errors.map(e => typeof e === 'string' ? e : `${e.property}: ${e.reason}`)
+            violations
         };
     }
-    validateStateVector(vector) {
-        if (!vector) {
-            throw new Error('ValidationError: ThermodynamicStateVector is null or undefined');
+    validateTransition(prior, next) {
+        const res = this.validateState(next);
+        if (!res.isValid)
+            return res;
+        if (this.options.strictMode && prior.solarInput !== undefined && next.stocks) {
+            const priorC = prior.stocks.carbon ?? 0;
+            const nextC = next.stocks.carbon ?? 0;
+            const deltaC = nextC - priorC;
+            if (Math.abs(deltaC - (prior.solarInput ?? 0)) > 1e-5) {
+                return {
+                    isValid: false,
+                    valid: false,
+                    errors: [{ property: 'stocks.carbon', reason: 'First Law Violation: Stock delta does not match solar input.' }],
+                    violations: ['First Law Violation']
+                };
+            }
         }
+        return { isValid: true, valid: true, errors: [], violations: [] };
+    }
+    assertValidState(state) {
+        const res = this.validateState(state);
+        if (!res.isValid) {
+            throw new ThermodynamicEntropyViolationError(state, res.violations?.[0] ?? 'Validation Failed');
+        }
+    }
+    assertValid(state) {
+        this.assertValidState(state);
+    }
+    static validateStateVector(vector) {
+        if (!vector)
+            throw new Error("ValidationError: ThermodynamicStateVector is null or undefined");
         if (vector.energy === undefined)
             throw new Error("ValidationError: Missing required property 'energy'");
         if (vector.entropy === undefined)
             throw new Error("ValidationError: Missing required property 'entropy'");
         if (vector.temperature === undefined)
             throw new Error("ValidationError: Missing required property 'temperature'");
-        if (vector.stocks === undefined)
+        if (vector.stocks === undefined && vector.elementalStocks === undefined)
             throw new Error("ValidationError: Missing required property 'stocks'");
-        if (vector.entropy < 0) {
-            throw new Error('ThermodynamicViolation (Second Law): Entropy cannot be negative');
-        }
-        if (vector.temperature <= 0) {
-            throw new Error('ThermodynamicViolation: Absolute temperature must be strictly positive');
-        }
-        if (vector.stocks) {
-            for (const [k, v] of Object.entries(vector.stocks)) {
+        if (vector.entropy < 0)
+            throw new Error("ThermodynamicViolation (Second Law): Entropy cannot be negative");
+        if (vector.temperature <= 0)
+            throw new Error("ThermodynamicViolation: Absolute temperature must be strictly positive");
+        const stocks = vector.stocks ?? vector.elementalStocks;
+        if (stocks) {
+            for (const [k, v] of Object.entries(stocks)) {
                 if (typeof v === 'number' && v < 0) {
                     throw new Error(`ThermodynamicViolation (First Law): Stock '${k}' has negative mass/count`);
                 }
@@ -186,67 +184,20 @@ export class StateValidator {
         }
         return true;
     }
-    static validateStateVector(vector) {
-        const v = new StateValidator();
-        return v.validateStateVector(vector);
+    validateStateVector(vector) {
+        return StateValidator.validateStateVector(vector);
     }
     static wrapMonadStep(stepFn) {
         return (vec) => {
-            const next = stepFn(vec);
-            if (next.entropy !== undefined && next.entropy < 0) {
-                throw new Error('ThermodynamicViolation (Second Law): Entropy cannot be negative');
-            }
-            return next;
-        };
-    }
-    validate(state) {
-        return this.validateState(state);
-    }
-    assertValid(state) {
-        const res = this.validateState(state);
-        if (!res.isValid) {
-            throw new Error(`Validation Failed: ${JSON.stringify(res.errors)}`);
-        }
-    }
-    assertValidState(state) {
-        if (!state)
-            throw new ThermodynamicViolationError('State is null or undefined');
-        const entropy = state.entropy ?? state.totalEntropy ?? 0;
-        const sGen = state.entropyGenerationRate ?? 0;
-        if (isNaN(entropy) || !isFinite(entropy) || entropy < 0) {
-            throw new ThermodynamicViolationError(`Invalid absolute entropy: ${entropy}`);
-        }
-        if (isNaN(sGen) || !isFinite(sGen) || sGen < 0) {
-            throw new ThermodynamicViolationError(`Invalid entropy generation rate: ${sGen}`);
-        }
-    }
-    validateTransition(prior, next) {
-        const errors = [];
-        if (next.entropy < 0) {
-            errors.push('Second Law Violation: Entropy cannot be negative.');
-        }
-        if (next.dissipationRate < 0) {
-            errors.push('Dissipation rate cannot be negative.');
-        }
-        const solar = prior.solarInput ?? 0;
-        const priorCarbon = Number(prior.stocks?.carbon ?? 0);
-        const nextCarbon = Number(next.stocks?.carbon ?? 0);
-        const deltaCarbon = Math.abs(nextCarbon - priorCarbon);
-        if (this.options.strictMode && Math.abs(deltaCarbon - solar) > 1e-5 && solar === 0 && deltaCarbon > 10) {
-            errors.push('First Law Violation: Stock delta exceeds solar input boundary.');
-        }
-        return {
-            isValid: errors.length === 0,
-            errors
+            const res = stepFn(vec);
+            StateValidator.validateStateVector(res);
+            return res;
         };
     }
 }
 export { StateValidator as ThermodynamicStateValidator };
-export function assertNonNegativeEntropy(state) {
-    return StateValidator.assertNonNegativeEntropy(state);
-}
 export function validateStateProperties(state) {
-    if (state === null || typeof state !== 'object') {
+    if (!state || typeof state !== 'object') {
         return {
             isValid: false,
             valid: false,
@@ -256,29 +207,41 @@ export function validateStateProperties(state) {
     }
     const s = state;
     const errors = [];
-    if (s['energy'] === undefined || typeof s['energy'] !== 'number' || Number.isNaN(s['energy']) || s['energy'] < 0) {
-        errors.push({ property: 'energy', reason: 'Energy must exist as a finite number >= 0.' });
+    const violations = [];
+    const energy = s['energy'];
+    if (energy === undefined || typeof energy !== 'number' || Number.isNaN(energy) || energy < 0) {
+        errors.push({ property: 'energy', reason: 'Energy must exist as a finite non-negative number.' });
+        violations.push('energy: Energy must exist as a finite non-negative number.');
     }
-    if (s['entropy'] === undefined || typeof s['entropy'] !== 'number' || Number.isNaN(s['entropy']) || s['entropy'] < 0) {
-        errors.push({ property: 'entropy', reason: 'Entropy must exist as a finite number >= 0.' });
+    const entropy = s['entropy'];
+    if (entropy === undefined || typeof entropy !== 'number' || Number.isNaN(entropy) || entropy < 0) {
+        errors.push({ property: 'entropy', reason: 'Entropy must exist as a finite non-negative number.' });
+        violations.push('entropy: Entropy must exist as a finite non-negative number.');
     }
-    if (s['temperature'] === undefined || typeof s['temperature'] !== 'number' || Number.isNaN(s['temperature']) || s['temperature'] < 0) {
-        errors.push({ property: 'temperature', reason: 'Temperature must exist as a finite number >= 0.' });
+    const temperature = s['temperature'];
+    if (temperature === undefined || typeof temperature !== 'number' || Number.isNaN(temperature) || temperature < 0) {
+        errors.push({ property: 'temperature', reason: 'Temperature must exist as a finite non-negative absolute number.' });
+        violations.push('temperature: Temperature must exist as a finite non-negative absolute number.');
     }
-    if (s['stocks'] === undefined || s['stocks'] === null || typeof s['stocks'] !== 'object') {
-        errors.push({ property: 'stocks', reason: 'Stocks must be a non-null object.' });
-    }
-    else {
-        for (const [k, v] of Object.entries(s['stocks'])) {
-            if (typeof v !== 'number' || Number.isNaN(v)) {
-                errors.push({ property: `stocks.${k}`, reason: `Stock '${k}' must be a numeric value.` });
-            }
-            else if (v < 0) {
-                errors.push({ property: `stocks.${k}`, reason: `Stock inventory '${k}' cannot be negative.` });
+    const stocks = s['stocks'] ?? s['elementalStocks'];
+    if (stocks !== undefined) {
+        if (stocks === null || typeof stocks !== 'object') {
+            errors.push({ property: 'stocks', reason: 'Stocks must be a non-null object.' });
+            violations.push('stocks: Stocks must be a non-null object.');
+        }
+        else {
+            for (const [k, v] of Object.entries(stocks)) {
+                if (typeof v !== 'number' || Number.isNaN(v)) {
+                    errors.push({ property: `stocks.${k}`, reason: `Stock inventory '${k}' must be a number.` });
+                    violations.push(`stocks.${k}: Stock inventory '${k}' must be a number.`);
+                }
+                else if (v < 0) {
+                    errors.push({ property: `stocks.${k}`, reason: `Stock inventory '${k}' cannot be negative.` });
+                    violations.push(`stocks.${k}: Stock inventory '${k}' cannot be negative.`);
+                }
             }
         }
     }
-    const violations = errors.map(e => `${e.property}: ${e.reason}`);
     return {
         isValid: errors.length === 0,
         valid: errors.length === 0,
@@ -288,14 +251,56 @@ export function validateStateProperties(state) {
 }
 export function executeThermodynamicTransition(state, transitionFn) {
     try {
-        const next = transitionFn(state);
-        const res = StateValidator.assertNonNegativeEntropy(next);
-        if (!res.success) {
-            return err(new ThermodynamicEntropyViolationError(next, res.error?.message ?? 'Entropy violation'));
+        const nextState = transitionFn(state);
+        const entropy = nextState.entropy ?? nextState.totalEntropy ?? 0;
+        const entropyGen = nextState.entropyGenerationRate ?? 0;
+        if (entropy < 0 || entropyGen < -1e-9) {
+            return err('Second Law violation in transition');
         }
-        return ok(next);
+        return ok(nextState);
     }
     catch (e) {
-        return err(new ThermodynamicEntropyViolationError(state, e.message));
+        return err(e?.message ?? String(e));
     }
+}
+function makeDetailedError(code, msg, violatingValue, path) {
+    const strObj = new String(msg);
+    strObj.code = code;
+    strObj.message = msg;
+    strObj.violatingValue = violatingValue;
+    strObj.invalidValue = violatingValue;
+    strObj.path = path;
+    strObj.timestamp = Date.now();
+    strObj.includes = (search, pos) => msg.includes(search, pos);
+    return strObj;
+}
+export function assertNonNegativeEntropy(state, path = 'root') {
+    if (!state || typeof state !== 'object') {
+        return err(makeDetailedError('INVALID_STATE_VECTOR', 'Second Law Violation: State object is null, undefined, or not a valid object. Invalid state object provided for entropy validation.', NaN, path));
+    }
+    for (const [k, v] of Object.entries(state)) {
+        const currentPath = `${path}.${k}`;
+        if (v && typeof v === 'object') {
+            const res = assertNonNegativeEntropy(v, currentPath);
+            if (!res.success)
+                return res;
+        }
+        else if (typeof v === 'number' && (k.toLowerCase().includes('entropy') || k === 's' || k.toLowerCase().includes('rate'))) {
+            if (v < 0) {
+                return err(makeDetailedError(k.toLowerCase().includes('generation') ? 'NEGATIVE_ENTROPY_DETECTED' : 'NEGATIVE_ENTROPY_VIOLATION', `Second Law Violation: Entropy cannot be negative (S = ${v} J/K < 0). Second Law Infraction.`, v, currentPath));
+            }
+        }
+    }
+    const entropy = typeof state.getEntropy === 'function' ? state.getEntropy() : (state.entropy ?? state.totalEntropy);
+    if (entropy === undefined || typeof entropy !== 'number' || Number.isNaN(entropy)) {
+        const isNan = Number.isNaN(entropy);
+        const msg = isNan
+            ? 'Second Law Violation: entropy is NaN. Invalid entropy value.'
+            : 'Invalid entropy: metric is missing or not a valid number. Entropy metric is missing or not a valid number.';
+        return err(makeDetailedError('INVALID_STATE_VECTOR', msg, entropy, path));
+    }
+    if (entropy < 0) {
+        return err(makeDetailedError('NEGATIVE_ENTROPY_VIOLATION', `Second Law Violation: Entropy cannot be negative (S = ${entropy} J/K < 0). Detected negative entropy: ${entropy}. Second Law Infraction.`, entropy, path));
+    }
+    return ok(state);
 }

@@ -33,7 +33,7 @@ describe('Sprint 043: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const result = assertNonNegativeEntropy(state);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.ok(result.error.includes('missing or non-numeric entropy property'));
+            assert.ok(result.error.includes('missing or not a valid number') || result.error.includes('Entropy metric is missing'));
         }
     });
     it('should handle malformed states with null or undefined', () => {

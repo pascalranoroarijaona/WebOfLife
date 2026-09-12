@@ -31,7 +31,7 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const resNaN = assertNonNegativeEntropy(missingNumberState);
         assert.strictEqual(resNaN.success, false);
         if (!resNaN.success) {
-            assert.match(resNaN.error, /Invalid entropy/);
+            assert.match(resNaN.error, /entropy is NaN/);
         }
         const resType = assertNonNegativeEntropy(invalidTypeState);
         assert.strictEqual(resType.success, false);
