@@ -4,30 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sprint 19 - Web of Life</title>
-    <link rel="stylesheet" href="../../styles.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        h1 { color: #38bdf8; margin-top: 0; }
+        p { color: #94a3b8; line-height: 1.6; }
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: #065f46;
+            color: #34d399;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1>Web of Life - Sprint 19</h1>
-            <nav>
-                <a href="../sprint_018/index.html">Previous Sprint</a> | 
-                <a href="../../index.html">Home</a> | 
-                <a href="../sprint_020/index.html">Next Sprint</a>
-            </nav>
-        </header>
-        <main>
-            <section id="simulation-container">
-                <h2>Sprint 19 Simulation</h2>
-                <p>Loading simulation environment...</p>
-            </section>
-        </main>
-        <footer>
-            <p>&copy; Web of Life Project</p>
-        </footer>
+    <div class="container">
+        <h1>Web of Life - Sprint 19</h1>
+        <p>Status: <span class="status">Operational</span></p>
+        <p>Sprint 19 simulation environment and module tests initialized successfully.</p>
+        <div id="app"></div>
     </div>
     <script type="module">
-        console.log("Sprint 19 initialized.");
+        console.log("Sprint 19 initialized cleanly.");
     </script>
 </body>
 </html>

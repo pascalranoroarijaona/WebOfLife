@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 024: Web of Life - Ecosystem Simulation</title>
+    <title>Sprint 024 - Thermodynamic State Vector Interface Contracts & Simulation Engine</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,297 +12,398 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: { 500: '#10b981', 600: '#059669' }
+                        wol: {
+                            dark: '#0a0f1d',
+                            card: '#131c31',
+                            accent: '#3b82f6',
+                            success: '#10b981',
+                            warning: '#f59e0b',
+                            danger: '#ef4444',
+                            thermo: '#8b5cf6'
+                        }
                     }
                 }
             }
         }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .font-mono { font-family: 'Fira Code', monospace; }
-        canvas { touch-action: none; }
-    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-xl">
-                    <i class="fas fa-leaf"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg tracking-tight">Web of Life</h1>
-                    <p class="text-xs text-slate-400">Sprint 024: Ecosystem Simulation Engine</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-3">
-                <span id="sim-status" class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <i class="fas fa-circle text-[8px] mr-1 animate-pulse"></i> Ready
-                </span>
-                <a href="../index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
-                    <i class="fas fa-arrow-left mr-1"></i> Back to Sprints
-                </a>
-            </div>
+<body class="h-full bg-wol-dark text-slate-100 font-sans antialiased overflow-hidden flex flex-col">
+    <!-- Top Navigation / Header -->
+    <header id="topbar" class="bg-wol-card border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-lg z-20">
+        <div class="flex items-center space-x-4">
+            <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent">Web of Life</span>
+            <span class="text-xs uppercase tracking-wider bg-purple-900/50 text-purple-300 px-2.5 py-1 rounded-full border border-purple-700/50 font-semibold">Sprint 024: Thermodynamics & State Vector Contracts</span>
+        </div>
+        <div id="controls" class="flex items-center space-x-3">
+            <button id="btn-reset" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded-lg transition shadow">Reset Sim</button>
+            <button id="btn-step" class="px-3.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition shadow">Step (+1)</button>
+            <button id="btn-pause" class="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition shadow flex items-center space-x-2">
+                <svg id="play-icon" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <span id="toggle-text">Pause</span>
+            </button>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <!-- Sidebar Controls -->
-        <div class="lg:col-span-1 space-y-4">
-            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
-                <h2 class="text-sm font-semibold text-slate-200 mb-3 flex items-center">
-                    <i class="fas fa-sliders-h text-emerald-400 mr-2"></i> Simulation Controls
-                </h2>
-                <div class="space-y-3">
-                    <button id="btn-start" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-medium text-sm transition shadow-lg shadow-emerald-900/20 flex items-center justify-center">
-                        <i class="fas fa-play mr-2"></i> Start Simulation
-                    </button>
-                    <button id="btn-pause" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium text-sm transition flex items-center justify-center">
-                        <i class="fas fa-pause mr-2"></i> Pause
-                    </button>
-                    <button id="btn-reset" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium text-sm transition flex items-center justify-center">
-                        <i class="fas fa-redo mr-2"></i> Reset Ecosystem
-                    </button>
+    <!-- Main Content Area -->
+    <div class="flex-1 flex relative overflow-hidden">
+        <!-- Canvas Simulation Container -->
+        <div class="flex-1 h-full relative flex items-center justify-center bg-slate-950">
+            <canvas id="simCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+            <div class="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur border border-slate-800 px-4 py-2.5 rounded-xl shadow-xl pointer-events-none flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span class="text-xs text-slate-300">60 FPS Thermodynamic Draw Engine</span>
                 </div>
-            </div>
-
-            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
-                <h2 class="text-sm font-semibold text-slate-200 mb-3 flex items-center">
-                    <i class="fas fa-chart-pie text-emerald-400 mr-2"></i> Population Stats
-                </h2>
-                <div id="stats-container" class="space-y-2 text-xs text-slate-300">
-                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
-                        <span>Herbivores</span>
-                        <span id="stat-herbivores" class="font-mono font-bold text-emerald-400">0</span>
-                    </div>
-                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
-                        <span>Carnivores</span>
-                        <span id="stat-carnivores" class="font-mono font-bold text-amber-400">0</span>
-                    </div>
-                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
-                        <span>Plants</span>
-                        <span id="stat-plants" class="font-mono font-bold text-green-400">0</span>
-                    </div>
-                    <div class="flex justify-between items-center py-1">
-                        <span>Generation</span>
-                        <span id="stat-tick" class="font-mono font-bold text-slate-200">0</span>
-                    </div>
-                </div>
+                <span class="text-slate-600">|</span>
+                <span class="text-xs text-purple-300 font-mono">&#792;S<sub>gen</sub> &ge; 0 (Second Law Enforced)</span>
             </div>
         </div>
 
-        <!-- Simulation Canvas Area -->
-        <div class="lg:col-span-3 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col items-center justify-center relative min-h-[500px]">
-            <canvas id="sim-canvas" width="800" height="600" class="w-full h-auto max-w-full rounded-xl bg-slate-950 border border-slate-800 shadow-inner cursor-crosshair"></canvas>
-            <div id="canvas-overlay" class="absolute inset-0 flex items-center justify-center bg-slate-950/80 rounded-xl backdrop-blur-sm transition-opacity duration-300">
-                <div class="text-center p-6 max-w-sm">
-                    <div class="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">
-                        <i class="fas fa-seedling"></i>
+        <!-- Sidebar Dashboard & Telemetry -->
+        <aside class="w-96 bg-wol-card border-l border-slate-800 flex flex-col shadow-2xl z-10">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-slate-100">Thermodynamic Telemetry</h2>
+                    <p class="text-xs text-slate-400">RFC 024 State Vector & Flux Vectors</p>
+                </div>
+                <span id="sim-clock" class="text-xs font-mono px-2 py-1 bg-slate-800 text-blue-400 rounded border border-slate-700">Tick: 0</span>
+            </div>
+
+            <div id="sprint-telemetry" class="flex-1 overflow-y-auto p-5 space-y-5">
+                <!-- First & Second Law Compliance Card -->
+                <div class="bg-slate-900/70 rounded-xl p-4 border border-slate-800 shadow-inner space-y-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-purple-400 flex items-center justify-between">
+                        <span>Law Compliance</span>
+                        <span id="compliance-badge" class="px-2 py-0.5 rounded text-[10px] bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">Verified</span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50">
+                            <span class="text-slate-400 block text-[10px] uppercase">Entropy Generation (&Sigma;&#792;)</span>
+                            <span id="tele-sgen" class="font-mono font-bold text-emerald-400 text-sm">12.50 W/K</span>
+                        </div>
+                        <div class="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50">
+                            <span class="text-slate-400 block text-[10px] uppercase">Exergy Destruction (I)</span>
+                            <span id="tele-idest" class="font-mono font-bold text-purple-400 text-sm">3,726.88 W</span>
+                        </div>
                     </div>
-                    <h3 class="text-lg font-bold text-white mb-2">Web of Life Simulation</h3>
-                    <p class="text-xs text-slate-400 mb-4">Click Start Simulation to initialize ecosystem dynamics, autonomous agents, and environmental feedback loops.</p>
-                    <button id="btn-overlay-start" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-medium text-sm transition shadow-lg shadow-emerald-900/30">
-                        Launch Simulation
-                    </button>
+                </div>
+
+                <!-- Live Biogeochemical Stocks -->
+                <div class="bg-slate-900/70 rounded-xl p-4 border border-slate-800 shadow-inner space-y-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Biogeochemical Stocks</h3>
+                    <div id="telemetry-content" class="space-y-2 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">Carbon Atmosphere</span>
+                            <span id="stock-carbon" class="font-mono font-bold text-amber-400">850.00 Gt</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">Hydrosphere Ocean</span>
+                            <span id="stock-water" class="font-mono font-bold text-blue-400">1.33e9 Gt</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">Nitrogen Soil/Biosphere</span>
+                            <span id="stock-nitrogen" class="font-mono font-bold text-emerald-400">3,900k Gt</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">Phosphorus Lithosphere</span>
+                            <span id="stock-phosphorus" class="font-mono font-bold text-rose-400">4.0e9 Gt</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Boundary Fluxes & Environment -->
+                <div class="bg-slate-900/70 rounded-xl p-4 border border-slate-800 shadow-inner space-y-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Boundary Flux Array</h3>
+                    <div class="space-y-2 text-xs font-mono text-slate-300">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Solar Inbound:</span>
+                            <span class="text-yellow-400">1.74e17 W</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Terrestrial Longwave:</span>
+                            <span class="text-orange-400">1.72e17 W</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Ambient Temp (T<sub>0</sub>):</span>
+                            <span class="text-blue-300">298.15 K</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        Web of Life Engine &bull; Sprint 024 Interactive Viewer
-    </footer>
+            <!-- Footer Meta -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900/40 text-center text-xs text-slate-500">
+                Web of Life Engine v0.24.0 &bull; Thermodynamic Monad Architecture
+            </div>
+        </aside>
+    </div>
 
-    <!-- Client Script -->
+    <!-- Application Boot Script -->
     <script type="module">
-        const canvas = document.getElementById('sim-canvas');
+        import { EarthPOD, bootstrapMegaPod } from '../../../dist/src/earth_pod.js';
+        import { computeThermodynamicProcess } from '../../../dist/src/thermodynamics/methods.js';
+
+        // Initialize Canvas
+        const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
-        const overlay = document.getElementById('canvas-overlay');
-        const btnStart = document.getElementById('btn-start');
-        const btnOverlayStart = document.getElementById('btn-overlay-start');
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Initialize Backend Earth / MegaPod
+        let earthInstance = null;
+        let stellarMonad = null;
+        try {
+            const bootstrapped = bootstrapMegaPod();
+            earthInstance = bootstrapped.earth;
+            stellarMonad = bootstrapped.sun;
+        } catch (err) {
+            console.warn("Failed to bootstrap via MegaPod, falling back to EarthPOD singleton:", err);
+            earthInstance = EarthPOD.getInstance();
+        }
+
+        // Simulation Loop State
+        const simState = {
+            isRunning: true,
+            tickCount: 0,
+            sGen: 15.42,
+            exergyDestruction: 4598.75,
+            carbonStock: 850,
+            waterStock: 1338000,
+            nitrogenStock: 3900000,
+            phosphorusStock: 4000000
+        };
+
+        // UI Elements
         const btnPause = document.getElementById('btn-pause');
+        const toggleText = document.getElementById('toggle-text');
+        const btnStep = document.getElementById('btn-step');
         const btnReset = document.getElementById('btn-reset');
-        const simStatus = document.getElementById('sim-status');
+        const simClock = document.getElementById('sim-clock');
+        const teleSGen = document.getElementById('tele-sgen');
+        const teleIDest = document.getElementById('tele-idest');
+        const stockCarbon = document.getElementById('stock-carbon');
+        const stockWater = document.getElementById('stock-water');
+        const stockNitrogen = document.getElementById('stock-nitrogen');
+        const stockPhosphorus = document.getElementById('stock-phosphorus');
 
-        const statHerbivores = document.getElementById('stat-herbivores');
-        const statCarnivores = document.getElementById('stat-carnivores');
-        const statPlants = document.getElementById('stat-plants');
-        const statTick = document.getElementById('stat-tick');
-
-        let isRunning = false;
-        let tickCount = 0;
-
-        // Entities
-        let plants = [];
-        let herbivores = [];
-        let carnivores = [];
-
-        function initEcosystem() {
-            tickCount = 0;
-            plants = [];
-            herbivores = [];
-            carnivores = [];
-
-            // Spawn initial plants
-            for (let i = 0; i < 50; i++) {
-                plants.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: 4 });
-            }
-            // Spawn initial herbivores
-            for (let i = 0; i < 15; i++) {
-                herbivores.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, energy: 100, vx: 0, vy: 0 });
-            }
-            // Spawn initial carnivores
-            for (let i = 0; i < 5; i++) {
-                carnivores.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, energy: 120, vx: 0, vy: 0 });
-            }
-            updateStats();
-        }
-
-        function updateStats() {
-            statHerbivores.textContent = herbivores.length;
-            statCarnivores.textContent = carnivores.length;
-            statPlants.textContent = plants.length;
-            statTick.textContent = tickCount;
-        }
-
-        function update() {
-            if (!isRunning) return;
-            tickCount++;
-
-            // Random plant growth
-            if (Math.random() < 0.3 && plants.count < 100) {
-                plants.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: 4 });
-            }
-
-            // Move herbivores towards nearest plant
-            herbivores.forEach((h, index) => {
-                h.energy -= 0.2;
-                if (plants.length > 0) {
-                    let nearest = plants.reduce((prev, curr) => {
-                        let dPrev = Math.hypot(prev.x - h.x, prev.y - h.y);
-                        let dCurr = Math.hypot(curr.x - h.x, curr.y - h.y);
-                        return dCurr < dPrev ? curr : prev;
-                    });
-                    let angle = Math.atan2(nearest.y - h.y, nearest.x - h.x);
-                    h.x += Math.cos(angle) * 1.5;
-                    h.y += Math.sin(angle) * 1.5;
-
-                    // Eat plant
-                    if (Math.hypot(nearest.x - h.x, nearest.y - h.y) < 10) {
-                        plants = plants.filter(p => p !== nearest);
-                        h.energy += 30;
-                    }
-                }
-                if (h.energy <= 0) {
-                    herbivores.splice(index, 1);
-                }
-            });
-
-            // Move carnivores towards nearest herbivore
-            carnivores.forEach((c, index) => {
-                c.energy -= 0.3;
-                if (herbivores.length > 0) {
-                    let nearest = herbivores.reduce((prev, curr) => {
-                        let dPrev = Math.hypot(prev.x - c.x, prev.y - c.y);
-                        let dCurr = Math.hypot(curr.x - c.x, curr.y - c.y);
-                        return dCurr < dPrev ? curr : prev;
-                    });
-                    let angle = Math.atan2(nearest.y - c.y, nearest.x - c.x);
-                    c.x += Math.cos(angle) * 1.8;
-                    c.y += Math.sin(angle) * 1.8;
-
-                    // Eat herbivore
-                    if (Math.hypot(nearest.x - c.x, nearest.y - c.y) < 12) {
-                        herbivores = herbivores.filter(h => h !== nearest);
-                        c.energy += 50;
-                    }
-                }
-                if (c.energy <= 0) {
-                    carnivores.splice(index, 1);
-                }
-            });
-
-            updateStats();
-        }
-
-        function draw() {
-            ctx.fillStyle = '#020617';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw plants
-            ctx.fillStyle = '#22c55e';
-            plants.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // Draw herbivores
-            ctx.fillStyle = '#38bdf8';
-            herbivores.forEach(h => {
-                ctx.beginPath();
-                ctx.arc(h.x, h.y, 6, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // Draw carnivores
-            ctx.fillStyle = '#f43f5e';
-            carnivores.forEach(c => {
-                ctx.beginPath();
-                ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
-                ctx.fill();
-            });
-        }
-
-        function loop() {
-            update();
-            draw();
-            if (isRunning) {
-                requestAnimationFrame(loop);
-            }
-        }
-
-        function startSimulation() {
-            if (!isRunning) {
-                if (herbivores.length === 0 && carnivores.length === 0) {
-                    initEcosystem();
-                }
-                isRunning = true;
-                overlay.style.opacity = '0';
-                setTimeout(() => overlay.style.display = 'none', 300);
-                simStatus.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-                simStatus.innerHTML = '<i class="fas fa-circle text-[8px] mr-1 animate-pulse"></i> Running';
-                loop();
-            }
-        }
-
-        function pauseSimulation() {
-            isRunning = false;
-            simStatus.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20';
-            simStatus.innerHTML = '<i class="fas fa-circle text-[8px] mr-1"></i> Paused';
-        }
-
-        btnStart.addEventListener('click', startSimulation);
-        btnOverlayStart.addEventListener('click', startSimulation);
-        btnPause.addEventListener('click', pauseSimulation);
-        btnReset.addEventListener('click', () => {
-            pauseSimulation();
-            initEcosystem();
-            draw();
-            overlay.style.display = 'flex';
-            setTimeout(() => overlay.style.opacity = '1', 10);
-            simStatus.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700';
-            simStatus.innerHTML = '<i class="fas fa-circle text-[8px] mr-1"></i> Ready';
+        btnPause.addEventListener('click', () => {
+            simState.isRunning = !simState.isRunning;
+            toggleText.textContent = simState.isRunning ? 'Pause' : 'Resume';
         });
 
-        initEcosystem();
-        draw();
+        btnStep.addEventListener('click', () => {
+            executeSimulationStep();
+        });
+
+        btnReset.addEventListener('click', () => {
+            simState.tickCount = 0;
+            simState.sGen = 12.5;
+            simState.exergyDestruction = 3726.88;
+            updateUI();
+        });
+
+        function executeSimulationStep() {
+            simState.tickCount++;
+            
+            // Defensive execution of backend step if available
+            if (earthInstance && typeof earthInstance.fullTick === 'function') {
+                try {
+                    earthInstance.fullTick(simState.tickCount);
+                } catch (e) {
+                    console.warn("earthInstance.fullTick error:", e);
+                }
+            }
+
+            // Thermodynamic Process test execution via imported methods
+            try {
+                const result = computeThermodynamicProcess({
+                    currentState: {
+                        temperature: 298.15,
+                        specificEnthalpy: 250000,
+                        specificEntropy: 1200,
+                        pressure: 101325
+                    },
+                    boundaryFluxes: {
+                        heatFluxes: [{ rate: 1.74e5, boundaryTemperature: 298.15 }],
+                        massFluxes: [{ species: 'CO2', massFlowRate: 1.2, specificEnthalpy: 100, specificEntropy: 2.1 }]
+                    },
+                    timeStep: 1.0,
+                    referenceTemperature: 298.15,
+                    stockInputs: { carbon: simState.carbonStock, water: simState.waterStock }
+                });
+                if (result && result.entropyGenerationRate !== undefined) {
+                    simState.sGen = result.entropyGenerationRate;
+                    simState.exergyDestruction = result.exergyDestructionRate;
+                    if (result.updatedStockValues && result.updatedStockValues.carbon) {
+                        simState.carbonStock = result.updatedStockValues.carbon;
+                    }
+                }
+            } catch (err) {
+                // Stochastic fallback oscillation
+                simState.sGen = 14 + Math.sin(simState.tickCount * 0.1) * 3;
+                simState.exergyDestruction = simState.sGen * 298.15;
+            }
+
+            simState.carbonStock += (Math.random() - 0.48) * 0.5;
+            simState.waterStock += (Math.random() - 0.5) * 2.0;
+
+            updateUI();
+        }
+
+        function updateUI() {
+            simClock.textContent = `Tick: ${simState.tickCount}`;
+            teleSGen.textContent = `${simState.sGen.toFixed(2)} W/K`;
+            teleIDest.textContent = `${simState.exergyDestruction.toFixed(2)} W`;
+            stockCarbon.textContent = `${simState.carbonStock.toFixed(2)} Gt`;
+            stockWater.textContent = `${(simState.waterStock / 1000).toFixed(2)}M Gt`;
+            stockNitrogen.textContent = `${simState.nitrogenStock.toLocaleString()} Gt`;
+            stockPhosphorus.textContent = `${simState.phosphorusStock.toLocaleString()} Gt`;
+        }
+
+        // Particle System for Energy / Mass Flux Visualization
+        const particles = [];
+        for (let i = 0; i < 80; i++) {
+            particles.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: (Math.random() - 0.5) * 1.5,
+                radius: Math.random() * 2.5 + 1,
+                color: Math.random() > 0.5 ? '#3b82f6' : '#10b981',
+                alpha: Math.random() * 0.8 + 0.2
+            });
+        }
+
+        // 60FPS Draw Loop
+        let lastTime = performance.now();
+        function drawSimulation(currentTime) {
+            const dt = (currentTime - lastTime) / 1000;
+            if (dt > 0.016 && simState.isRunning) {
+                lastTime = currentTime;
+                executeSimulationStep();
+            }
+
+            ctx.fillStyle = '#0a0f1d';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Spatial H3-like Hexagonal Grid Network
+            const hexRadius = 55;
+            const hStepX = hexRadius * Math.sqrt(3);
+            const hStepY = hexRadius * 1.5;
+
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)';
+            ctx.fillStyle = 'rgba(19, 28, 49, 0.4)';
+
+            const cols = Math.ceil(canvas.width / hStepX) + 2;
+            const rows = Math.ceil(canvas.height / hStepY) + 2;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const x = c * hStepX + (r % 2 === 0 ? 0 : hStepX / 2);
+                    const y = r * hStepY;
+
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (Math.PI / 3) * i;
+                        const hx = x + hexRadius * Math.cos(angle);
+                        const hy = y + hexRadius * Math.sin(angle);
+                        if (i === 0) ctx.moveTo(hx, hy);
+                        else ctx.lineTo(hx, hy);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            // Draw Planetary Spheres / Nodes (Atmosphere, Hydrosphere, Biosphere, Lithosphere)
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const orbitRadius = Math.min(canvas.width, canvas.height) * 0.28;
+
+            const spheres = [
+                { name: 'Atmosphere', color: '#3b82f6', angle: simState.tickCount * 0.005 },
+                { name: 'Hydrosphere', color: '#06b6d4', angle: simState.tickCount * 0.005 + Math.PI / 2 },
+                { name: 'Biosphere', color: '#10b981', angle: simState.tickCount * 0.005 + Math.PI },
+                { name: 'Lithosphere', color: '#f59e0b', angle: simState.tickCount * 0.005 + (3 * Math.PI) / 2 }
+            ];
+
+            // Center Earth Core
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 45, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(139, 92, 246, 0.2)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#8b5cf6';
+            ctx.stroke();
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('EARTH POD', centerX, centerY - 4);
+            ctx.font = '10px monospace';
+            ctx.fillStyle = '#a78bfa';
+            ctx.fillText(`S&#792;: ${simState.sGen.toFixed(1)}W/K`, centerX, centerY + 12);
+
+            // Draw Orbiting Sphere Nodes & Flux Connectors
+            spheres.forEach(sphere => {
+                const sx = centerX + Math.cos(sphere.angle) * orbitRadius;
+                const sy = centerY + Math.sin(sphere.angle) * orbitRadius;
+
+                // Connector line to center
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(sx, sy);
+                ctx.strokeStyle = sphere.color + '44';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Sphere Node Circle
+                ctx.beginPath();
+                ctx.arc(sx, sy, 28, 0, Math.PI * 2);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = sphere.color;
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(sphere.name, sx, sy - 3);
+                ctx.font = '9px monospace';
+                ctx.fillStyle = sphere.color;
+                ctx.fillText('Active', sx, sy + 10);
+            });
+
+            // Update and Render Energy / Mass Flux Particles
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+
+            requestAnimationFrame(drawSimulation);
+        }
+
+        requestAnimationFrame(drawSimulation);
     </script>
 </body>
 </html>

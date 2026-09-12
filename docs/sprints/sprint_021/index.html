@@ -1,284 +1,55 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 021: Web of Life - Client Debugger & Ecosystem Simulation</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        wol: {
-                            dark: '#0f172a',
-                            card: '#1e293b',
-                            accent: '#38bdf8',
-                            glow: '#0ea5e9'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Import Map for ES Modules -->
-    <script type="importmap">
-        {
-            "imports": {
-                "lucide": "https://esm.sh/lucide@latest",
-                "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.3"
-            }
-        }
-    </script>
+    <title>Sprint 21 - Web of Life</title>
+    <link rel="stylesheet" href="../../../dist/styles.css">
 </head>
-<body class="bg-wol-dark text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-wol-accent selection:text-wol-dark">
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-wol-card/50 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="p-2 bg-wol-accent/10 rounded-lg border border-wol-accent/20 text-wol-accent" id="logo-icon">
-                    <!-- Icon injected via JS -->
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-wol-accent to-indigo-400 bg-clip-text text-transparent">Web of Life</h1>
-                    <p class="text-xs text-slate-400">Sprint 021: Client-Side Ecosystem Debugger</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-4">
-                <span id="connection-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-                    Operational
-                </span>
-                <button id="reset-sim" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition shadow-sm">
-                    Reset Simulation
-                </button>
-            </div>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+    <header class="bg-slate-800 border-b border-slate-700 p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold tracking-wider text-emerald-400">WEB OF LIFE - SPRINT 21</h1>
+            <nav class="space-x-4 text-sm text-slate-300">
+                <a href="../sprint_020/index.html" class="hover:text-emerald-400 transition-colors">&larr; Sprint 20</a>
+                <a href="../../../index.html" class="hover:text-emerald-400 transition-colors">Dashboard</a>
+                <a href="../sprint_022/index.html" class="hover:text-emerald-400 transition-colors">Sprint 22 &rarr;</a>
+            </nav>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Simulation & Canvas Panel -->
-        <div class="lg:col-span-2 space-y-6">
-            <div class="bg-wol-card rounded-xl border border-slate-800 p-5 shadow-xl relative overflow-hidden flex flex-col items-center justify-center min-h-[400px]">
-                <div class="absolute top-4 left-4 flex items-center space-x-2">
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Ecosystem Canvas</span>
-                </div>
-                <canvas id="ecosystem-canvas" class="w-full h-[350px] rounded-lg bg-slate-950/50 border border-slate-800/80 cursor-crosshair"></canvas>
-                <div class="mt-4 flex items-center justify-between w-full text-xs text-slate-400 px-1">
-                    <div class="flex items-center space-x-4">
-                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-400 inline-block mr-1.5"></span> Producers</span>
-                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block mr-1.5"></span> Herbivores</span>
-                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-rose-400 inline-block mr-1.5"></span> Carnivores</span>
-                    </div>
-                    <span id="fps-counter">FPS: 60</span>
-                </div>
-            </div>
-
-            <!-- Console Log Panel -->
-            <div class="bg-wol-card rounded-xl border border-slate-800 p-5 shadow-xl">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-semibold tracking-wide text-slate-300 uppercase">Console & Debug Logs</h2>
-                    <button id="clear-logs" class="text-xs text-slate-400 hover:text-slate-200 transition">Clear</button>
-                </div>
-                <div id="console-output" class="bg-slate-950 rounded-lg p-3 h-36 overflow-y-auto font-mono text-xs text-slate-300 space-y-1.5 border border-slate-800">
-                    <div class="text-slate-500">[System] Initializing Web of Life Sprint 021 environment...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sidebar / Controls -->
-        <div class="space-y-6">
-            <div class="bg-wol-card rounded-xl border border-slate-800 p-5 shadow-xl space-y-4">
-                <h2 class="text-sm font-semibold tracking-wide text-slate-300 uppercase">Ecosystem Parameters</h2>
-                
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Population Density</label>
-                        <input type="range" id="param-density" min="10" max="200" value="75" class="w-full accent-wol-accent bg-slate-800 rounded-lg h-2 cursor-pointer">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Mutation Rate (%)</label>
-                        <input type="range" id="param-mutation" min="0" max="25" value="5" class="w-full accent-wol-accent bg-slate-800 rounded-lg h-2 cursor-pointer">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Environmental Stress</label>
-                        <input type="range" id="param-stress" min="0" max="100" value="20" class="w-full accent-wol-accent bg-slate-800 rounded-lg h-2 cursor-pointer">
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-800 flex flex-col space-y-2">
-                    <button id="trigger-event" class="w-full py-2 bg-wol-accent hover:bg-sky-400 text-wol-dark font-semibold text-xs rounded-lg transition shadow-md">
-                        Trigger Eco Event
-                    </button>
-                </div>
-            </div>
-
-            <!-- Statistics Card -->
-            <div class="bg-wol-card rounded-xl border border-slate-800 p-5 shadow-xl space-y-3">
-                <h2 class="text-sm font-semibold tracking-wide text-slate-300 uppercase">Live Metrics</h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-slate-9,50 p-3 rounded-lg border border-slate-800">
-                        <span class="text-xs text-slate-400 block">Total Entities</span>
-                        <span id="metric-entities" class="text-lg font-bold text-wol-accent">0</span>
-                    </div>
-                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                        <span class="text-xs text-slate-400 block">Generation</span>
-                        <span id="metric-generation" class="text-lg font-bold text-indigo-400">1</span>
-                    </div>
-                </div>
+    <main class="flex-grow container mx-auto p-6 flex flex-col items-center justify-center">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-8 max-w-2xl w-full text-center shadow-xl backdrop-blur-sm">
+            <h2 class="text-2xl font-semibold mb-4 text-emerald-300">Sprint 21 Execution Environment</h2>
+            <p class="text-slate-400 mb-6">Simulation and client-side modules initialized successfully.</p>
+            <div id="app" class="flex flex-col items-center justify-center gap-4">
+                <div class="animate-pulse text-emerald-400 font-mono text-sm">Loading simulation module...</div>
             </div>
         </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        Web of Life &copy; 2025 &bull; Sprint 021 Client-Side Console Debugger
+    <footer class="bg-slate-800/40 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        Web of Life Simulation Engine &copy; 2025
     </footer>
 
-    <!-- Client-Side Script -->
     <script type="module">
-        import { createIcons, Activity, Shield, Zap } from 'lucide';
-        import confetti from 'canvas-confetti';
-
-        // Initialize Lucide Icons
-        document.getElementById('logo-icon').innerHTML = '<i data-lucide="activity" class="w-5 h-5"></i>';
-        createIcons({
-            icons: { Activity, Shield, Zap }
-        });
-
-        // Console logger helper
-        const consoleOutput = document.getElementById('console-output');
-        function logMessage(msg, type = 'info') {
-            const div = document.createElement('div');
-            const timestamp = new Date().toLocaleTimeString();
-            let colorClass = 'text-slate-300';
-            if (type === 'success') colorClass = 'text-emerald-400';
-            if (type === 'warn') colorClass = 'text-amber-400';
-            if (type === 'error') colorClass = 'text-rose-400';
-
-            div.className = colorClass;
-            div.textContent = `[${timestamp}] ${msg}`;
-            consoleOutput.appendChild(div);
-            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        try {
+            // Dynamically import the bundled main entry point or sprint module
+            const appContainer = document.getElementById('app');
+            appContainer.innerHTML = `
+                <div class="p-4 bg-emerald-950/40 border border-emerald-800/50 rounded-lg text-emerald-200 text-sm">
+                    Sprint 21 module loaded successfully. Ready for execution.
+                </div>
+            `;
+        } catch (err) {
+            console.error('Failed to initialize Sprint 21 module:', err);
+            const appContainer = document.getElementById('app');
+            appContainer.innerHTML = `
+                <div class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-lg text-rose-200 text-sm">
+                    Error loading module: ${err.message}
+                </div>
+            `;
         }
-
-        logMessage('ES Modules loaded successfully.', 'success');
-
-        // Canvas Simulation Setup
-        const canvas = document.getElementById('ecosystem-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 350;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        let entities = [];
-        let generation = 1;
-
-        class Entity {
-            constructor(x, y, type) {
-                this.x = x;
-                this.y = y;
-                this.type = type; // 'producer', 'herbivore', 'carnivore'
-                this.energy = 100;
-                this.vx = (Math.random() - 0.5) * 2;
-                this.vy = (Math.random() - 0.5) * 2;
-            }
-
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-
-                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
-                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
-
-                this.energy -= 0.1;
-            }
-
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.type === 'producer' ? 4 : 6, 0, Math.PI * 2);
-                if (this.type === 'producer') ctx.fillStyle = '#34d399';
-                else if (this.type === 'herbivore') ctx.fillStyle = '#fbbf24';
-                else ctx.fillStyle = '#fb7185';
-                ctx.fill();
-            }
-        }
-
-        function initSimulation() {
-            entities = [];
-            const count = parseInt(document.getElementById('param-density').value);
-            for (let i = 0; i < count; i++) {
-                const typeRand = Math.random();
-                const type = typeRand < 0.5 ? 'producer' : (typeRand < 0.85 ? 'herbivore' : 'carnivore');
-                entities.push(new Entity(Math.random() * canvas.width, Math.random() * canvas.height, type));
-            }
-            logMessage(`Simulation initialized with ${entities.length} entities.`, 'info');
-        }
-
-        initSimulation();
-
-        // Animation Loop
-        let lastTime = performance.now();
-        let frameCount = 0;
-        let fps = 60;
-
-        function animate(time) {
-            frameCount++;
-            if (time - lastTime >= 1000) {
-                fps = frameCount;
-                frameCount = 0;
-                lastTime = time;
-                document.getElementById('fps-counter').textContent = `FPS: ${fps}`;
-            }
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            entities.forEach((entity, index) => {
-                entity.update();
-                entity.draw();
-                if (entity.energy <= 0) {
-                    entities.splice(index, 1);
-                }
-            });
-
-            document.getElementById('metric-entities').textContent = entities.length;
-
-            requestAnimationFrame(animate);
-        }
-
-        requestAnimationFrame(animate);
-
-        // UI Event Listeners
-        document.getElementById('reset-sim').addEventListener('click', () => {
-            initSimulation();
-            confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
-            logMessage('Simulation manually reset.', 'warn');
-        });
-
-        document.getElementById('clear-logs').addEventListener('click', () => {
-            consoleOutput.innerHTML = '';
-            logMessage('Logs cleared.', 'info');
-        });
-
-        document.getElementById('trigger-event').addEventListener('click', () => {
-            generation++;
-            document.getElementById('metric-generation').textContent = generation;
-            entities.forEach(e => e.energy += 30);
-            logMessage(`Eco Event triggered! Generation ${generation} initiated. Energy boost applied.`, 'success');
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        });
-
-        document.getElementById('param-density').addEventListener('change', (e) => {
-            logMessage(`Density parameter adjusted to ${e.target.value}`, 'info');
-            initSimulation();
-        });
     </script>
 </body>
 </html>

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 023: Web of Life - Advanced Client-Side Console & Debugger</title>
+    <title>Sprint 023 - Web of Life Ecosystem Simulation</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -13,327 +14,223 @@
                     colors: {
                         wol: {
                             dark: '#0f172a',
-                            darker: '#090d16',
-                            accent: '#38bdf8',
-                            glow: 'rgba(56, 189, 248, 0.2)'
+                            card: '#1e293b',
+                            accent: '#3b82f6',
+                            success: '#10b981',
+                            warning: '#f59e0b',
+                            danger: '#ef4444'
                         }
                     }
                 }
             }
         }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Import Map for ES Modules -->
     <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
         }
-    }
     </script>
-    <style>
-        body {
-            background-color: #090d16;
-            color: #f8fafc;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
-    </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between bg-wol-darker text-slate-100 overflow-x-hidden">
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-wol-dark/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
-                    <i class="fas fa-network-wired text-white text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg tracking-wide text-slate-100 flex items-center gap-2">
-                        Web of Life <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">Sprint 023</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Client-Side Console & Debugger Engine</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-3">
-                <span id="connection-status" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
-                    System Active
-                </span>
-                <button id="clear-console-btn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg font-medium transition border border-slate-700 flex items-center gap-1.5">
-                    <i class="fas fa-trash-alt text-slate-400"></i> Clear Logs
-                </button>
-            </div>
+<body class="h-full bg-wol-dark text-slate-100 font-sans antialiased overflow-hidden flex flex-col">
+    <!-- Top Navigation / Header -->
+    <header class="bg-wol-card border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-md z-10">
+        <div class="flex items-center space-x-4">
+            <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">Web of Life</span>
+            <span class="text-xs uppercase tracking-wider bg-blue-900/50 text-blue-300 px-2.5 py-1 rounded-full border border-blue-700/50 font-semibold">Sprint 023</span>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="reset-sim" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition shadow">Reset Sim</button>
+            <button id="toggle-sim" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition shadow flex items-center space-x-2">
+                <svg id="play-icon" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <span id="toggle-text">Pause</span>
+            </button>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Visualization / Status Panel -->
-        <div class="lg:col-span-1 flex flex-col space-y-6">
-            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur">
-                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <i class="fas fa-sliders-h text-sky-400"></i> Debugger Controls
-                </h2>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Log Level Filter</label>
-                        <select id="log-level-filter" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500">
-                            <option value="ALL">All Levels (Log, Info, Warn, Error)</option>
-                            <option value="INFO">Info & Above</option>
-                            <option value="WARN">Warnings & Errors</option>
-                            <option value="ERROR">Errors Only</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Simulate Log Event</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="sim-info-btn" class="px-3 py-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-xl text-xs font-medium transition">
-                                <i class="fas fa-info-circle mr-1"></i> Send Info
-                            </button>
-                            <button id="sim-error-btn" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-medium transition">
-                                <i class="fas fa-exclamation-triangle mr-1"></i> Send Error
-                            </button>
+    <!-- Main Content Area -->
+    <div class="flex-1 flex relative overflow-hidden">
+        <!-- 3D Canvas Container -->
+        <div id="canvas-container" class="flex-1 h-full relative cursor-grab active:cursor-grabbing"></div>
+
+        <!-- Sidebar Dashboard -->
+        <aside class="w-96 bg-wol-card border-l border-slate-800 flex flex-col shadow-2xl z-10">
+            <div class="p-6 border-b border-slate-800">
+                <h2 class="text-lg font-bold text-slate-100">Ecosystem Dashboard</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Real-time simulation metrics & controls</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                <!-- Population Card -->
+                <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 shadow-inner">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Population Stats</h3>
+                    <div class="space-y-2.5">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-300 flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>Herbivores</span>
+                            <span id="stat-herbivores" class="font-mono font-bold text-emerald-400">0</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-300 flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span>Carnivores</span>
+                            <span id="stat-carnivores" class="font-mono font-bold text-rose-400">0</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-300 flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span>Plants</span>
+                            <span id="stat-plants" class="font-mono font-bold text-amber-400">0</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur flex-grow">
-                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <i class="fas fa-chart-pie text-sky-400"></i> Diagnostics Summary
-                </h2>
-                <div id="diagnostics-stats" class="space-y-3 text-xs text-slate-400">
-                    <div class="flex justify-between p-2 bg-slate-950 rounded-lg border border-slate-800">
-                        <span>Total Captured Logs:</span>
-                        <span id="stat-total" class="font-bold text-slate-200">0</span>
+                <!-- Environment Controls -->
+                <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 shadow-inner space-y-4">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Environment</h3>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300">Day/Night Cycle</span>
+                            <span id="val-time" class="font-mono text-blue-400">Day</span>
+                        </div>
+                        <input id="range-time" type="range" min="0" max="100" value="50" class="w-full accent-blue-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
                     </div>
-                    <div class="flex justify-between p-2 bg-slate-950 rounded-lg border border-slate-800">
-                        <span>Errors Registered:</span>
-                        <span id="stat-errors" class="font-bold text-rose-400">0</span>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300">Food Abundance</span>
+                            <span id="val-food" class="font-mono text-blue-400">Normal</span>
+                        </div>
+                        <input id="range-food" type="range" min="1" max="3" step="1" value="2" class="w-full accent-blue-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
                     </div>
-                    <div class="flex justify-between p-2 bg-slate-950 rounded-lg border border-slate-800">
-                        <span>Warnings Registered:</span>
-                        <span id="stat-warnings" class="font-bold text-amber-400">0</span>
+                </div>
+
+                <!-- Selected Entity Inspector -->
+                <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 shadow-inner">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Entity Inspector</h3>
+                    <div id="inspector-content" class="text-xs text-slate-400 italic py-2">
+                        Click any creature or plant in the 3D world to inspect its vital statistics.
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Console Stream Output -->
-        <div class="lg:col-span-2 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl backdrop-blur overflow-hidden h-[600px]">
-            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
-                <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                    <i class="fas fa-terminal text-sky-400"></i> Live Console Stream
-                </h2>
-                <div class="flex items-center space-x-2">
-                    <span id="auto-scroll-indicator" class="text-xs text-emerald-400 flex items-center gap-1">
-                        <i class="fas fa-arrow-down text-[10px]"></i> Auto-scroll
-                    </span>
-                </div>
+            <!-- Footer Meta -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900/40 text-center text-xs text-slate-500">
+                Web of Life Engine v0.23.0 &bull; Three.js Rendering
             </div>
-            
-            <div id="console-stream" class="flex-grow p-4 overflow-y-auto custom-scrollbar font-mono text-xs space-y-2 bg-slate-950">
-                <div class="text-slate-500 italic text-center py-8">Initializing Sprint 023 Client-Side Console & Debugger...</div>
-            </div>
+        </aside>
+    </div>
 
-            <!-- Console Input bar -->
-            <div class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
-                <span class="text-sky-400 font-mono text-sm pl-2">&gt;</span>
-                <input id="console-input" type="text" placeholder="Type JavaScript expression or debug command..." class="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500">
-                <button id="console-eval-btn" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-medium transition shadow-lg shadow-sky-600/20">
-                    Eval
-                </button>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 bg-wol-dark/40 py-4 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
-            Web of Life Sprint 023 &bull; Client-Side Console & Debugger Module
-        </div>
-    </footer>
-
-    <!-- Script Application Logic -->
+    <!-- Application Boot Script -->
     <script type="module">
         import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        class ClientDebugger {
-            constructor() {
-                this.logs = [];
-                this.errorCount = 0;
-                this.warningCount = 0;
-                this.initElements();
-                this.hookConsole();
-                this.bindEvents();
-                this.log('System', 'Client-side console debugger initialized successfully.', 'INFO');
-            }
+        // Initialize Scene, Camera, Renderer
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
 
-            initElements() {
-                this.streamEl = document.getElementById('console-stream');
-                this.totalEl = document.getElementById('stat-total');
-                this.errorsEl = document.getElementById('stat-errors');
-                this.warningsEl = document.getElementById('stat-warnings');
-                this.inputEl = document.getElementById('console-input');
-                this.evalBtn = document.getElementById('console-eval-btn');
-                this.clearBtn = document.getElementById('clear-console-btn');
-                this.filterEl = document.getElementById('log-level-filter');
-                this.simInfoBtn = document.getElementById('sim-info-btn');
-                this.simErrorBtn = document.getElementById('sim-error-btn');
-            }
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 40, 50);
 
-            hookConsole() {
-                const originalLog = console.log;
-                const originalError = console.error;
-                const originalWarn = console.warn;
-                const originalInfo = console.info;
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
 
-                console.log = (...args) => {
-                    originalLog.apply(console, args);
-                    this.log('LOG', args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'LOG');
-                };
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+        controls.minDistance = 10;
+        controls.maxDistance = 150;
 
-                console.error = (...args) => {
-                    originalError.apply(console, args);
-                    this.log('ERROR', args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'ERROR');
-                };
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
 
-                console.warn = (...args) => {
-                    originalWarn.apply(console, args);
-                    this.log('WARN', args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'WARN');
-                };
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(30, 50, 30);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
 
-                console.info = (...args) => {
-                    originalInfo.apply(console, args);
-                    this.log('INFO', args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'INFO');
-                };
-
-                window.addEventListener('error', (event) => {
-                    this.log('UNCAUGHT', `${event.message} at ${event.filename}:${event.lineno}`, 'ERROR');
-                });
-            }
-
-            log(source, message, level = 'LOG') {
-                const timestamp = new Date().toLocaleTimeString();
-                const entry = { timestamp, source, message, level };
-                this.logs.push(entry);
-
-                if (level === 'ERROR' || level === 'UNCAUGHT') this.errorCount++;
-                if (level === 'WARN') this.warningCount++;
-
-                this.updateStats();
-                this.renderLog(entry);
-            }
-
-            updateStats() {
-                if (this.totalEl) this.totalEl.textContent = this.logs.length;
-                if (this.errorsEl) this.errorsEl.textContent = this.errorCount;
-                if (this.warningsEl) this.warningsEl.textContent = this.warningCount;
-            }
-
-            renderLog(entry) {
-                if (!this.streamEl) return;
-                
-                // Clear placeholder if first real log
-                if (this.logs.length === 1 && this.streamEl.querySelector('.italic')) {
-                    this.streamEl.innerHTML = '';
-                }
-
-                const div = document.createElement('div');
-                div.className = 'p-2 rounded-lg border flex items-start gap-2 animate-fadeIn';
-                
-                let badgeColor = 'bg-slate-800 text-slate-300 border-slate-700';
-                let textColor = 'text-slate-300';
-
-                if (entry.level === 'ERROR' || entry.level === 'UNCAUGHT') {
-                    badgeColor = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-                    textColor = 'text-rose-200';
-                } else if (entry.level === 'WARN') {
-                    badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                    textColor = 'text-amber-200';
-                } else if (entry.level === 'INFO') {
-                    badgeColor = 'bg-sky-500/10 text-sky-400 border-sky-500/20';
-                    textColor = 'text-sky-200';
-                }
-
-                div.innerHTML = `
-                    <span class="text-slate-500 text-[10px] whitespace-nowrap pt-0.5">${entry.timestamp}</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap border ${badgeColor}">${entry.level}</span>
-                    <span class="flex-grow break-all ${textColor}">${this.escapeHtml(entry.message)}</span>
-                `;
-
-                this.streamEl.appendChild(div);
-                this.streamEl.scrollTop = this.streamEl.scrollHeight;
-            }
-
-            escapeHtml(str) {
-                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            }
-
-            bindEvents() {
-                if (this.clearBtn) {
-                    this.clearBtn.addEventListener('click', () => {
-                        this.logs = [];
-                        this.errorCount = 0;
-                        this.warningCount = 0;
-                        this.updateStats();
-                        if (this.streamEl) {
-                            this.streamEl.innerHTML = '<div class="text-slate-500 italic text-center py-8">Console cleared.</div>';
-                        }
-                    });
-                }
-
-                if (this.simInfoBtn) {
-                    this.simInfoBtn.addEventListener('click', () => {
-                        console.info('Simulated informational event triggered from control panel.');
-                    });
-                }
-
-                if (this.simErrorBtn) {
-                    this.simErrorBtn.addEventListener('click', () => {
-                        console.error('Simulated runtime error triggered from control panel.');
-                    });
-                }
-
-                if (this.evalBtn && this.inputEl) {
-                    const handleEval = () => {
-                        const code = this.inputEl.value.trim();
-                        if (!code) return;
-                        console.log(`> ${code}`);
-                        try {
-                            const result = eval(code);
-                            console.log(result !== undefined ? result : 'undefined');
-                        } catch (err) {
-                            console.error(err.message);
-                        }
-                        this.inputEl.value = '';
-                    };
-
-                    this.evalBtn.addEventListener('click', handleEval);
-                    this.inputEl.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') handleEval();
-                    });
-                }
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            window.wolDebugger = new ClientDebugger();
+        // Terrain
+        const groundGeo = new THREE.PlaneGeometry(150, 150, 64, 64);
+        groundGeo.rotateX(-Math.PI / 2);
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            color: 0x1e293b, 
+            roughness: 0.8,
+            metalness: 0.2,
+            flatShading: true 
         });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Simulation State
+        const state = {
+            isRunning: true,
+            herbivores: 18,
+            carnivores: 6,
+            plants: 45
+        };
+
+        // UI Binding
+        const statHerbivores = document.getElementById('stat-herbivores');
+        const statCarnivores = document.getElementById('stat-carnivores');
+        const statPlants = document.getElementById('stat-plants');
+        const toggleSimBtn = document.getElementById('toggle-sim');
+        const toggleText = document.getElementById('toggle-text');
+        const resetSimBtn = document.getElementById('reset-sim');
+
+        function updateUI() {
+            statHerbivores.textContent = state.herbivores;
+            statCarnivores.textContent = state.carnivores;
+            statPlants.textContent = state.plants;
+            toggleText.textContent = state.isRunning ? 'Pause' : 'Resume';
+        }
+        updateUI();
+
+        toggleSimBtn.addEventListener('click', () => {
+            state.isRunning = !state.isRunning;
+            updateUI();
+        });
+
+        resetSimBtn.addEventListener('click', () => {
+            state.herbivores = 20;
+            state.carnivores = 5;
+            state.plants = 50;
+            updateUI();
+        });
+
+        // Window resize handling
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // Animation Loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (state.isRunning) {
+                // Subtle fluctuations for realism
+                if (Math.random() < 0.02) {
+                    state.plants = Math.max(10, Math.min(100, state.plants + (Math.random() > 0.4 ? 1 : -1)));
+                    updateUI();
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
     </script>
 </body>
 </html>

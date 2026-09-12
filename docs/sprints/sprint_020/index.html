@@ -4,48 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sprint 20 - Web of Life</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: #0f172a;
-            color: #f8fafc;
-            margin: 0;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 800px;
-            background: #1e293b;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            text-align: center;
-        }
-        h1 { color: #38bdf8; margin-top: 0; }
-        p { color: #94a3b8; line-height: 1.6; }
-        .status {
-            display: inline-block;
-            margin-top: 1rem;
-            padding: 0.5rem 1rem;
-            background: #065f46;
-            color: #34d399;
-            border-radius: 9999px;
-            font-weight: 600;
-        }
-    </style>
+    <link rel="stylesheet" href="../../../dist/styles.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
 </head>
 <body>
-    <div class="container">
-        <h1>Sprint 20: Web of Life</h1>
-        <p>Client-side debugging and module resolution complete. All systems operational.</p>
-        <div class="status" id="status-badge">Operational</div>
+    <div id="app">
+        <header>
+            <h1>Web of Life - Sprint 20</h1>
+            <nav>
+                <a href="../../index.html">Sprints Index</a>
+            </nav>
+        </header>
+        <main>
+            <div id="canvas-container"></div>
+            <div id="ui-overlay">
+                <h2>Sprint 20: Ecosystem Simulation & Diagnostics</h2>
+                <p>Initializing Web of Life simulation environment...</p>
+            </div>
+        </main>
     </div>
     <script type="module">
-        console.log("Sprint 20 module loaded successfully.");
+        import * as THREE from 'three';
+        console.log('Sprint 20 initialized with Three.js version:', THREE.REVISION);
+        
+        const container = document.getElementById('canvas-container');
+        if (container) {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.6);
+            container.appendChild(renderer.domElement);
+
+            const geometry = new THREE.BoxGeometry();
+            const material = new THREE.MeshBasicMaterial({ color: 0x44aa88, wireframe: true });
+            const cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+
+            camera.position.z = 5;
+
+            function animate() {
+                requestAnimationFrame(animate);
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
     </script>
 </body>
 </html>

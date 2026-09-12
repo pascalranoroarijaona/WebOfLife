@@ -1,82 +1,286 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Sprint 7: Web of Life Simulation & Debug Console</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 007: Web of Life - Client Debugger & Simulation</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for UI icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
-            font-family: monospace;
-            background: #111;
-            color: #0f0;
-            margin: 0;
-            padding: 20px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
-        h1 { color: #ff0; }
-        .container {
-            display: flex;
-            gap: 20px;
-        }
-        panel {
-            flex: 1;
-            border: 1px solid #333;
-            padding: 15px;
-            background: #1a1a1a;
-        }
-        button {
-            background: #222;
-            color: #0f0;
-            border: 1px solid #0f0;
-            padding: 8px 16px;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        button:hover { background: #0f0; color: #000; }
-        pre { background: #000; padding: 10px; border: 1px solid #222; max-height: 400px; overflow-y: auto; }
     </style>
 </head>
-<body>
-    <h1>Web of Life - Sprint 7 Debug Console</h1>
-    <p>Status: <span id="status">Ready</span></p>
-    
-    <div class="container">
-        <div style="flex: 1;">
-            <button id="run-tests-btn">Run Sprint 7 Diagnostics</button>
-            <button id="start-sim-btn">Start Ecosystem Simulation</button>
-            <h3>Console Output</h3>
-            <pre id="console-output"></pre>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold shadow-lg shadow-emerald-900/50">
+                    <i class="fa-solid fa-seedling"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white">Web of Life</h1>
+                    <p class="text-xs text-slate-400">Sprint 007: Client Console & Simulation Debugger</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span id="connection-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">
+                    <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Ready
+                </span>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <script type="module">
-        const output = document.getElementById('console-output');
-        function log(msg) {
-            console.log(msg);
-            output.textContent += msg + '\n';
-            output.scrollTop = output.scrollHeight;
-        }
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        <!-- Simulation Control & Stats (Col 1-2) -->
+        <section class="lg:col-span-2 space-y-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-md font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-emerald-500"></i> Ecosystem Telemetry
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button id="btn-start" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition shadow-lg shadow-emerald-900/30 flex items-center gap-1.5">
+                            <i class="fa-solid fa-play"></i> Start
+                        </button>
+                        <button id="btn-pause" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-medium transition shadow-lg shadow-amber-900/30 flex items-center gap-1.5">
+                            <i class="fa-solid fa-pause"></i> Pause
+                        </button>
+                        <button id="btn-reset" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-medium transition shadow-lg shadow-rose-900/30 flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate-right"></i> Reset
+                        </button>
+                    </div>
+                </div>
 
-        document.getElementById('run-tests-btn').addEventListener('click', () => {
-            log('[DIAGNOSTICS] Running Sprint 7 test suite...');
-            setTimeout(() => {
-                log('[SUCCESS] All Sprint 7 modules initialized cleanly without 404s.');
-                document.getElementById('status').textContent = 'Tests Passed';
-            }, 200);
-        });
+                <!-- Canvas Visualizer -->
+                <div class="relative w-full h-80 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center">
+                    <canvas id="sim-canvas" class="w-full h-full cursor-crosshair"></canvas>
+                    <div id="canvas-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center text-slate-600 text-sm font-mono">
+                        [ Simulation Viewport Ready ]
+                    </div>
+                </div>
 
-        document.getElementById('start-sim-btn').addEventListener('click', () => {
-            log('[SIMULATION] Initializing Web of Life Ecosystem...');
-            let ticks = 0;
-            const interval = setInterval(() => {
-                ticks++;
-                log(`[TICK ${ticks}] Ecosystem stable. Organisms thriving.`);
-                if (ticks >= 5) {
-                    clearInterval(interval);
-                    log('[SIMULATION] Completed sample run.');
+                <!-- Quick Stats Grid -->
+                <div class="grid grid-cols-3 gap-3 mt-4">
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3">
+                        <div class="text-xs text-slate-400 font-medium">Population</div>
+                        <div id="stat-pop" class="text-xl font-bold text-emerald-400 mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3">
+                        <div class="text-xs text-slate-400 font-medium">Energy Pool</div>
+                        <div id="stat-energy" class="text-xl font-bold text-cyan-400 mt-1">100.0%</div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3">
+                        <div class="text-xs text-slate-400 font-medium">Generations</div>
+                        <div id="stat-gen" class="text-xl font-bold text-purple-400 mt-1">0</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Client-Side Console Log (Col 3) -->
+        <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-[520px]">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-md font-semibold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-terminal text-emerald-500"></i> Console Debugger
+                </h2>
+                <button id="btn-clear-console" class="text-xs text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-trash-can"></i> Clear
+                </button>
+            </div>
+            
+            <!-- Terminal Log Window -->
+            <div id="console-output" class="flex-1 bg-slate-950 font-mono text-xs rounded-lg p-3 border border-slate-800 overflow-y-auto space-y-1.5 select-text">
+                <div class="text-slate-500">[System] Initializing Web of Life client console...</div>
+                <div class="text-emerald-400">[System] Sprint 007 environment loaded successfully.</div>
+            </div>
+
+            <!-- Command Input Form -->
+            <form id="console-form" class="mt-3 flex gap-2">
+                <input id="console-input" type="text" placeholder="Type command (e.g. 'help', 'status')..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-medium transition">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-3 text-center text-xs text-slate-500">
+        Web of Life &bull; Sprint 007 Client Diagnostics & Simulation Console
+    </footer>
+
+    <!-- Client-Side Debugger & Simulation Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const consoleOutput = document.getElementById('console-output');
+            const consoleForm = document.getElementById('console-form');
+            const consoleInput = document.getElementById('console-input');
+            const btnClear = document.getElementById('btn-clear-console');
+            
+            const btnStart = document.getElementById('btn-start');
+            const btnPause = document.getElementById('btn-pause');
+            const btnReset = document.getElementById('btn-reset');
+
+            const statPop = document.getElementById('stat-pop');
+            const statEnergy = document.getElementById('stat-energy');
+            const statGen = document.getElementById('stat-gen');
+            const canvas = document.getElementById('sim-canvas');
+            const ctx = canvas.getContext('2d');
+
+            let isRunning = false;
+            let population = 42;
+            let energy = 98.4;
+            let generation = 7;
+            let animationFrameId = null;
+
+            function logMessage(text, type = 'info') {
+                const div = document.createElement('div');
+                let colorClass = 'text-slate-300';
+                if (type === 'error') colorClass = 'text-rose-400';
+                if (type === 'success') colorClass = 'text-emerald-400';
+                if (type === 'warn') colorClass = 'text-amber-400';
+                
+                div.className = colorClass;
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+                consoleOutput.appendChild(div);
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+
+            btnClear.addEventListener('click', () => {
+                consoleOutput.innerHTML = '<div class="text-slate-500">[System] Console cleared.</div>';
+            });
+
+            consoleForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const cmd = consoleInput.value.trim();
+                if (!cmd) return;
+
+                logMessage(`> ${cmd}`, 'info');
+                consoleInput.value = '';
+
+                const parts = cmd.split(' ');
+                const action = parts[0].toLowerCase();
+
+                switch(action) {
+                    case 'help':
+                        logMessage('Available commands: help, status, start, pause, reset, clear, echo [msg]', 'success');
+                        break;
+                    case 'status':
+                        logMessage(`Status: Running=${isRunning}, Pop=${population}, Energy=${energy}%, Gen=${generation}`, 'success');
+                        break;
+                    case 'start':
+                        startSimulation();
+                        break;
+                    case 'pause':
+                        pauseSimulation();
+                        break;
+                    case 'reset':
+                        resetSimulation();
+                        break;
+                    case 'clear':
+                        consoleOutput.innerHTML = '';
+                        break;
+                    case 'echo':
+                        logMessage(parts.slice(1).join(' '), 'info');
+                        break;
+                    default:
+                        logMessage(`Unknown command: '${action}'. Type 'help' for options.`, 'error');
                 }
-            }, 500);
-        });
+            });
 
-        log('[INIT] Sprint 7 harness loaded successfully.');
+            function resizeCanvas() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            function draw() {
+                ctx.fillStyle = '#020617';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw some sample simulation nodes
+                ctx.fillStyle = '#22c55e';
+                for (let i = 0; i < population; i++) {
+                    const x = (i * 37) % (canvas.width - 20) + 10;
+                    const y = (i * 53) % (canvas.height - 20) + 10;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (isRunning) {
+                    generation += 0.01;
+                    energy = Math.max(0, Math.min(100, energy + (Math.random() - 0.5) * 0.5));
+                    statPop.textContent = Math.floor(population);
+                    statEnergy.textContent = energy.toFixed(1) + '%';
+                    statGen.textContent = Math.floor(generation);
+                    animationFrameId = requestAnimationFrame(draw);
+                }
+            }
+
+            function startSimulation() {
+                if (!isRunning) {
+                    isRunning = true;
+                    logMessage('Simulation started.', 'success');
+                    draw();
+                }
+            }
+
+            function pauseSimulation() {
+                if (isRunning) {
+                    isRunning = false;
+                    cancelAnimationFrame(animationFrameId);
+                    logMessage('Simulation paused.', 'warn');
+                }
+            }
+
+            function resetSimulation() {
+                isRunning = false;
+                cancelAnimationFrame(animationFrameId);
+                population = 42;
+                energy = 100.0;
+                generation = 0;
+                statPop.textContent = population;
+                statEnergy.textContent = energy.toFixed(1) + '%';
+                statGen.textContent = generation;
+                logMessage('Simulation reset to default state.', 'warn');
+                draw();
+            }
+
+            btnStart.addEventListener('click', startSimulation);
+            btnPause.addEventListener('click', pauseSimulation);
+            btnReset.addEventListener('click', resetSimulation);
+
+            // Initial render
+            draw();
+            logMessage('Sprint 007 client console fully initialized.', 'success');
+        });
     </script>
 </body>
 </html>

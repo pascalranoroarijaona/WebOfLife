@@ -1866,7 +1866,7 @@ def generate_docs_dashboard():
         "<div id='sidebar'>",
         "<h1>🌍 Web of Life Explorer</h1>",
         "<a id='backlog-link' class='backlog-btn' onclick=\"loadMarkdown('BACKLOG.md', 'backlog-link')\">📋 View Master BACKLOG.md</a>",
-        "<br/><audio controls style='width:80%; margin: 6px 0; height:28px;'>Repo Audio Intro<source src='sprints/gaia_repository_intro.mp3' type='audio/mpeg'>Audio non supporté.</audio>"
+        "<br/><audio controls style='width:80%; margin: 6px 0; height:28px;'>Repo Audio Intro<source src='gaia_repository_intro.mp3' type='audio/mpeg'>Audio non supporté.</audio>"
     ]
     
     for i, s_dir in enumerate(sprint_dirs):

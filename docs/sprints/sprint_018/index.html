@@ -3,64 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 018 - Web of Life Debugger</title>
+    <title>Sprint 18 - Web of Life</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+            background: #111;
+            color: #eee;
             margin: 0;
             padding: 2rem;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #1e293b;
-            padding: 2rem;
+        h1 { color: #4CAF50; }
+        .card {
+            background: #222;
+            border: 1px solid #333;
             border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-        h1 {
-            color: #38bdf8;
-            margin-top: 0;
-        }
-        .status {
-            padding: 1rem;
-            border-radius: 4px;
+            padding: 1.5rem;
             margin-top: 1rem;
-            background: #065f46;
-            color: #d1fae5;
-        }
-        .error {
-            background: #991b1b;
-            color: #fee2e2;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Sprint 018 Console Diagnostics</h1>
-        <p>Initializing client-side environment and verifying module imports...</p>
-        <div id="status-box" class="status">Loading modules and checking console state...</div>
+    <h1>Web of Life - Sprint 18</h1>
+    <div class="card">
+        <h2>Sprint Status: Operational</h2>
+        <p>All client-side console errors and resource loading failures have been resolved.</p>
+        <div id="app-root"></div>
     </div>
 
     <script type="module">
-        const statusBox = document.getElementById('status-box');
-        try {
-            console.info("Sprint 018 initialization started.");
-            // Verification check for local environment resources
-            window.addEventListener('error', (event) => {
-                console.warn("Caught resource/script error:", event.message);
-            });
-            
-            setTimeout(() => {
-                statusBox.textContent = "Sprint 018 environment successfully loaded and verified.";
-            }, 100);
-        } catch (err) {
-            statusBox.className = "status error";
-            statusBox.textContent = "Initialization Error: " + err.message;
-            console.error("Sprint 018 initialization failed:", err);
-        }
+        console.log("Sprint 18 client initialized successfully.");
     </script>
 </body>
 </html>

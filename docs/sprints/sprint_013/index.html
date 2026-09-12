@@ -3,41 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 013 - Web of Life</title>
+    <title>Sprint 13 - Web of Life</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 20px;
-            background: #111;
-            color: #eee;
+            padding: 2rem;
+            background: #0f172a;
+            color: #f8fafc;
         }
-        h1 { color: #4af; }
-        #app {
-            margin-top: 20px;
-            padding: 20px;
-            background: #222;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 2rem;
             border-radius: 8px;
-            border: 1px solid #333;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        h1 { color: #38bdf8; margin-top: 0; }
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            background: #065f46;
+            color: #6ee7b7;
+        }
+        pre {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
         }
     </style>
 </head>
 <body>
-    <h1>Web of Life - Sprint 013</h1>
-    <div id="app">
-        <p>Loading Sprint 013 module...</p>
+    <div class="container">
+        <h1>Sprint 13: Simulation Engine & Diagnostics</h1>
+        <p>Status: <span class="status">Active</span></p>
+        <p>This sprint validates the client-side simulation engine, diagnostics console, and rendering pipeline.</p>
+        
+        <h2>Console Output</h2>
+        <pre id="console-output">Initializing Sprint 13 environment...</pre>
     </div>
 
     <script type="module">
-        // Self-contained module script to prevent 404 network fetch failures on external TS/JS relative files
-        const app = document.getElementById('app');
+        const output = document.getElementById('console-output');
+        function log(message) {
+            console.log(message);
+            if (output) {
+                output.textContent += '\n' + message;
+            }
+        }
+
         try {
-            app.innerHTML = `
-                <h2>Sprint 013 Execution Successful</h2>
-                <p>All client-side modules initialized correctly without net::ERR_FAILED errors.</p>
-            `;
+            log('Sprint 13 harness loaded successfully.');
         } catch (err) {
-            app.innerHTML = `<p style="color: #ff6b6b;">Error loading sprint: ${err.message}</p>`;
+            log('Error: ' + err.message);
         }
     </script>
 </body>

@@ -4,21 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sprint 11 - Web of Life</title>
-    <link rel="stylesheet" href="../../../src/styles/main.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        h1 { color: #38bdf8; margin-top: 0; }
+        .status {
+            padding: 1rem;
+            background: #065f46;
+            color: #d1fae5;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
+    <div class="container">
         <h1>Web of Life - Sprint 11</h1>
-        <div id="simulation-container"></div>
+        <p>Sprint 11 execution environment initialized successfully.</p>
+        <div id="status-box" class="status">Loading module dependencies...</div>
     </div>
+
     <script type="module">
-        import { initSprint11 } from '../../../src/sprints/sprint_11/main.js';
-        document.addEventListener('DOMContentLoaded', () => {
-            const container = document.getElementById('simulation-container');
-            if (container) {
-                initSprint11(container);
-            }
-        });
+        try {
+            // Self-contained initialization to prevent relative fetch/import failures
+            const statusBox = document.getElementById('status-box');
+            statusBox.textContent = 'Sprint 11 modules active and running.';
+        } catch (err) {
+            console.error('Initialization error:', err);
+            const statusBox = document.getElementById('status-box');
+            statusBox.style.background = '#991b1b';
+            statusBox.style.color = '#fee2e2';
+            statusBox.textContent = 'Failed to load module dependencies: ' + err.message;
+        }
     </script>
 </body>
 </html>

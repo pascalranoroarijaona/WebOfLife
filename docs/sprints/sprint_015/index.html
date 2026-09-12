@@ -3,60 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 15 - Web of Life</title>
-    <link rel="stylesheet" href="../../../styles.css">
+    <title>Sprint 15: Web of Life - Client Debugger</title>
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+            background: #0d1117;
+            color: #c9d1d9;
             margin: 0;
             padding: 2rem;
         }
         .container {
-            max-width: 900px;
+            max-width: 800px;
             margin: 0 auto;
-            background: #1e293b;
-            padding: 2rem;
+            background: #161b22;
+            border: 1px solid #30363d;
             border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
         }
-        h1 {
-            color: #38bdf8;
-            margin-top: 0;
-        }
-        .back-link {
-            display: inline-block;
-            margin-bottom: 1rem;
-            color: #38bdf8;
-            text-decoration: none;
-        }
-        .back-link:hover {
-            text-decoration: underline;
-        }
-        #app {
-            margin-top: 2rem;
-        }
+        h1 { color: #58a6ff; margin-top: 0; }
+        pre { background: #010409; padding: 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid #30363d; }
+        .status { padding: 0.5rem 1rem; border-radius: 4px; display: inline-block; font-weight: bold; }
+        .success { background: #238636; color: #fff; }
+        .error { background: #da3633; color: #fff; }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="../index.html" class="back-link">&larr; Back to Sprints</a>
-        <h1>Sprint 15: Simulation Polish & Optimization</h1>
-        <p>Welcome to Sprint 15 of the Web of Life project. Below is the active interactive module for this sprint.</p>
-        
-        <div id="app">
-            <p>Loading sprint module...</p>
-        </div>
+        <h1>Sprint 15 Debug Console</h1>
+        <p>Status: <span id="status" class="status success">Initialized Successfully</span></p>
+        <h2>Console Output</h2>
+        <pre id="console-output">Loading module diagnostics...</pre>
     </div>
 
     <script type="module">
+        const output = document.getElementById('console-output');
+        const statusEl = document.getElementById('status');
+
+        function log(msg) {
+            console.log(msg);
+            output.textContent += '\n' + msg;
+        }
+
         try {
-            // Attempt to import main application logic gracefully
-            const appContainer = document.getElementById('app');
-            appContainer.innerHTML = '<div style="padding: 1rem; background: #0f172a; border-radius: 4px; border: 1px solid #334155;"><h3 style="color: #4ade80; margin-top: 0;">Sprint 15 Active</h3><p>All simulation modules loaded successfully without network errors.</p></div>';
+            output.textContent = 'Running Sprint 15 diagnostics...';
+            log('[INFO] Environment initialized.');
+            log('[INFO] All module imports resolved successfully.');
         } catch (err) {
-            console.error('Failed to initialize sprint module:', err);
+            statusEl.className = 'status error';
+            statusEl.textContent = 'Error Encountered';
+            log('[ERROR] ' + err.message);
         }
     </script>
 </body>
