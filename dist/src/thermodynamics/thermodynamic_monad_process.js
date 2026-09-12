@@ -3,7 +3,8 @@
  * Encapsulates state transitions and enforces Second Law verification prior to committing state updates.
  */
 import { STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
-import { ThermodynamicStateValidator } from './state_validator.js';
+import { StateValidator } from './state_validator.js';
+export { StateValidator as ThermodynamicStateValidator };
 export class ThermodynamicMonadProcess {
     validator;
     id;
@@ -28,10 +29,10 @@ export class ThermodynamicMonadProcess {
                 exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K,
                 boundaryFluxes: []
             };
-            this.validator = new ThermodynamicStateValidator();
+            this.validator = new StateValidator();
         }
         else {
-            this.validator = idOrValidator ?? new ThermodynamicStateValidator();
+            this.validator = idOrValidator ?? new StateValidator();
             this.id = 'default_process';
             this.name = 'Default Monad Process';
             this.state = {

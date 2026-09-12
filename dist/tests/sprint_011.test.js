@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
-import { advanceThermodynamicState, ThermodynamicStateMonad } from '../src/thermodynamics/thermodynamic_structure.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateMonad } from '../src/thermodynamics/thermodynamic_structure.js';
 import { EarthPOD } from '../src/earth_pod.js';
 describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Compliance', () => {
     const baseState = {
@@ -23,9 +23,9 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
             sensibleHeatFlux: 0,
             latentHeatFlux: 0,
             netMassFlux: 0,
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiativeNet: 0,
-            massFluxes: new Map()
+            massFluxes: []
         },
         thermalFluxes: {
             solarInbound: 1.74e17,

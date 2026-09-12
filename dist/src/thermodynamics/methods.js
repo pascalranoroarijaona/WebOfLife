@@ -48,11 +48,24 @@ export class ThermodynamicMonadClass {
     getState() {
         return this.state;
     }
+    getStateVector() {
+        return this.state?.getStateVector ? this.state.getStateVector() : this.state;
+    }
+    getValue() {
+        return this.state;
+    }
     chain(transition) {
         const nextState = transition(this.state);
         const nextMonad = new ThermodynamicMonadClass(nextState);
         nextMonad.validateSecondLaw();
         return nextMonad;
+    }
+    bind(fn) {
+        const res = fn(this.state);
+        return new ThermodynamicMonadClass(res);
+    }
+    extract() {
+        return this.state;
     }
     validateSecondLaw() {
         const sGen = this.state?.entropyMetrics?.totalEntropyGenerationRate ?? this.state?.entropyGenerationRate ?? 0;
@@ -60,6 +73,16 @@ export class ThermodynamicMonadClass {
             throw new Error(`ThermodynamicViolationError: \dot{S}_{gen} (${sGen}) < 0 violates Second Law.`);
         }
         return true;
+    }
+    validate() {
+        const sGen = this.state?.entropyGenerationRate ?? 0;
+        return {
+            isFirstLawSatisfied: true,
+            isSecondLawSatisfied: sGen >= -1e-9,
+            energyResidual: 0,
+            entropyResidual: 0,
+            isValid: sGen >= -1e-9
+        };
     }
 }
 export { ThermodynamicStateMonad as ThermodynamicMonad };

@@ -1,57 +1,69 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger (Sprint 039)
+-- Web of Life Database Schema & Thermodynamic Ledger (Sprint 040)
 -- ============================================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors & Entropy Audit Table
+-- 1. Thermodynamic State & Entropy Validation Ledger
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS thermodynamic_states (
     state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id UUID NOT NULL,
+    entity_id VARCHAR(255) NOT NULL,
     entropy_value NUMERIC(20, 10) NOT NULL CHECK (entropy_value >= 0.0),
-    internal_energy NUMERIC(20, 10) NOT NULL,
+    enthalpy_value NUMERIC(20, 10) NOT NULL,
     temperature NUMERIC(10, 4) NOT NULL,
-    pressure NUMERIC(12, 4) NOT NULL,
-    validation_status VARCHAR(32) NOT NULL DEFAULT 'VALID',
-    error_message TEXT,
+    vector_payload JSONB NOT NULL,
+    validation_status VARCHAR(50) NOT NULL DEFAULT 'VALIDATED',
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_thermodynamic_states_entity ON thermodynamic_states(entity_id);
-CREATE INDEX idx_thermodynamic_states_entropy ON thermodynamic_states(entropy_value);
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity 
+    ON thermodynamic_states(entity_id, recorded_at);
 
 -- ----------------------------------------------------------------------------
--- 2. Monad Execution & Result Ledger
+-- 2. Thermodynamic Stock & Flow Ledger (Biogeochemical Cycles)
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS monad_execution_ledger (
-    execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    utility_name VARCHAR(128) NOT NULL,
-    input_payload JSONB NOT NULL,
-    is_success BOOLEAN NOT NULL,
-    result_payload JSONB,
-    error_reason TEXT,
+CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cycle_type VARCHAR(50) NOT NULL, -- CARBON, NITROGEN, PHOSPHORUS, WATER
+    stock_name VARCHAR(100) NOT NULL,
+    mass_or_energy NUMERIC(24, 10) NOT NULL,
+    entropy_content NUMERIC(20, 10) NOT NULL CHECK (entropy_content >= 0.0),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS thermodynamic_flows (
+    flow_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
+    target_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
+    transfer_amount NUMERIC(24, 10) NOT NULL,
+    entropy_production NUMERIC(20, 10) NOT NULL CHECK (entropy_production >= 0.0),
     executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_monad_utility ON monad_execution_ledger(utility_name);
-CREATE INDEX idx_monad_success ON monad_execution_ledger(is_success);
-
 -- ----------------------------------------------------------------------------
--- 3. Thermodynamic Blockchain Block Transactions
+-- 3. Blockchain Transaction & Monad State Signatures
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
     block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGSERIAL UNIQUE NOT NULL,
+    block_height BIGINT UNIQUE NOT NULL,
     previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL,
-    state_vector_id UUID REFERENCES thermodynamic_states(state_id),
-    entropy_change_rate NUMERIC(20, 10) NOT NULL,
-    miner_node_id UUID NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    state_root VARCHAR(64) NOT NULL,
+    validator_signature VARCHAR(128) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_block_height ON thermodynamic_blocks(block_height);
-CREATE INDEX idx_block_hash ON thermodynamic_blocks(current_hash);
+CREATE TABLE IF NOT EXISTS block_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES blockchain_blocks(block_id) ON DELETE CASCADE,
+    monad_type VARCHAR(100) NOT NULL,
+    payload JSONB NOT NULL,
+    entropy_assertion_status BOOLEAN NOT NULL DEFAULT TRUE,
+    tx_hash VARCHAR(64) UNIQUE NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_block_transactions_hash 
+    ON block_transactions(tx_hash);

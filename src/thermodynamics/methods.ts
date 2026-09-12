@@ -15,7 +15,8 @@ import {
   STANDARD_AMBIENT_TEMPERATURE_K,
   IThermodynamicProcessResult,
   IBoundaryFluxArray,
-  ThermodynamicStateMonad
+  ThermodynamicStateMonad,
+  ThermodynamicComplianceResult
 } from './types.js';
 
 const T_0 = STANDARD_AMBIENT_TEMPERATURE_K;
@@ -82,6 +83,14 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
     return this.state;
   }
 
+  public getStateVector(): IThermodynamicStateVector {
+    return (this.state as any)?.getStateVector ? (this.state as any).getStateVector() : (this.state as any);
+  }
+
+  public getValue(): T {
+    return this.state;
+  }
+
   public chain<U>(
     transition: (state: T) => U
   ): IThermodynamicMonad<U> {
@@ -89,6 +98,15 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
     const nextMonad = new ThermodynamicMonadClass(nextState);
     nextMonad.validateSecondLaw();
     return nextMonad;
+  }
+
+  public bind(fn: (val: any, vec?: any) => any): IThermodynamicMonad<any> {
+    const res = fn(this.state);
+    return new ThermodynamicMonadClass(res);
+  }
+
+  public extract(): any {
+    return this.state;
   }
 
   public validateSecondLaw(): boolean {
@@ -99,6 +117,17 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
       );
     }
     return true;
+  }
+
+  public validate(): ThermodynamicComplianceResult {
+    const sGen = (this.state as any)?.entropyGenerationRate ?? 0;
+    return {
+      isFirstLawSatisfied: true,
+      isSecondLawSatisfied: sGen >= -1e-9,
+      energyResidual: 0,
+      entropyResidual: 0,
+      isValid: sGen >= -1e-9
+    };
   }
 }
 

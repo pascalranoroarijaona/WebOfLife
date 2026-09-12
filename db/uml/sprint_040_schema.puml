@@ -1,0 +1,77 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 040: Thermodynamic State Vector & Non-Negative Entropy Architecture
+
+package "src.thermodynamics" {
+  
+  interface "Result<T, E>" as Result {
+    +success: boolean
+    +value?: T
+    +error?: E
+  }
+
+  class EntropyValidationError {
+    +code: "NEGATIVE_ENTROPY_DETECTED"
+    +message: string
+    +violatingValue: number
+    +path: string
+  }
+
+  class ThermodynamicStateVector {
+    +entropy: number
+    +enthalpy: number
+    +temperature: number
+    +validateVector(): Result<true, EntropyValidationError>
+  }
+
+  class ThermodynamicStructure {
+    +components: Map<string, any>
+    +getAggregateEntropy(): number
+  }
+
+  class StateValidator {
+    {static} +assertNonNegativeEntropy(state: ThermodynamicStateVector | ThermodynamicStructure | Record<string, any>): Result<true, EntropyValidationError>
+  }
+
+  class ThermodynamicMonadProcess {
+    +processState(state: ThermodynamicStateVector): Result<ThermodynamicStateVector, EntropyValidationError>
+  }
+}
+
+package "Database.Schema" {
+  class ThermodynamicStateTable {
+    +state_id: UUID
+    +entity_id: VARCHAR
+    +entropy_value: NUMERICAL (>= 0)
+    +enthalpy_value: NUMERICAL
+    +vector_payload: JSONB
+    +recorded_at: TIMESTAMP
+  }
+
+  class ThermodynamicStockTable {
+    +stock_id: UUID
+    +cycle_type: VARCHAR
+    +mass_or_energy: NUMERICAL
+    +entropy_content: NUMERICAL (>= 0)
+  }
+
+  class BlockchainBlockTable {
+    +block_id: UUID
+    +block_height: BIGINT
+    +merkle_root: VARCHAR
+    +state_root: VARCHAR
+  }
+}
+
+StateValidator ..> Result : produces
+StateValidator ..> EntropyValidationError : creates
+StateValidator --> ThermodynamicStateVector : inspects
+StateValidator --> ThermodynamicStructure : inspects
+ThermodynamicMonadProcess --> StateValidator : delegates validation
+ThermodynamicStateVector --> ThermodynamicStateTable : persists
+ThermodynamicStockTable --> BlockchainBlockTable : anchors state
+
+@enduml
