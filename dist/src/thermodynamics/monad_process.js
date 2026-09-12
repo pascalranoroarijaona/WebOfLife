@@ -1,9 +1,9 @@
 /**
  * Thermodynamic Monad Process Module (Retro-Compatible)
  */
-import { ThermodynamicStateVector } from './state_vector.js';
+import { ThermodynamicStateVector, StateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator } from './state_validator.js';
-export { StateValidator as ThermodynamicStateValidator, StateValidator, validateOrThrowEntropy, ThermodynamicStateVector };
+export { StateValidator as ThermodynamicStateValidator, StateValidator, validateOrThrowEntropy, ThermodynamicStateVector, StateVector };
 export class ThermodynamicMonadProcess {
     validator = new StateValidator();
     execute(currentState) {

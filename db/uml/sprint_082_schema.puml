@@ -1,0 +1,77 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+
+title Web of Life - Sprint 082: Thermodynamic State Vector Inventory Discrepancy Evaluator
+
+package "Thermodynamics Domain" {
+  interface IStateDiscrepancyReport {
+    + timestamp: number
+    + absoluteDiscrepancy: Map<string, number>
+    + relativeDiscrepancy: Map<string, number>
+    + totalMassDelta: number
+    + energyViolationDetected: boolean
+    + entropyDelta: number
+  }
+
+  interface IStateValidator {
+    + evaluateDiscrepancy(actual: StateVector, expected: StateVector): IStateDiscrepancyReport
+  }
+
+  class StateDiscrepancyEvaluator {
+    - tolerance: number
+    + constructor(tolerance: number)
+    + evaluateDiscrepancy(actual: StateVector, expected: StateVector): IStateDiscrepancyReport
+  }
+
+  class StateVector {
+    + getEntropy(): number
+    + toMap(): Map<string, number>
+  }
+
+  class ThermodynamicStructure {
+    + validateLaws(): boolean
+  }
+}
+
+package "Database & Ledger Models" {
+  class ThermodynamicStateVectorTable {
+    + vector_id: UUID
+    + entity_id: string
+    + vector_type: string
+    + timestamp: DateTime
+    + entropy: float
+    + state_payload: JSONB
+  }
+
+  class StateDiscrepancyReportTable {
+    + report_id: UUID
+    + actual_vector_id: UUID
+    + expected_vector_id: UUID
+    + eval_timestamp: DateTime
+    + total_mass_delta: float
+    + energy_violation_detected: boolean
+    + entropy_delta: float
+    + absolute_discrepancy_payload: JSONB
+    + relative_discrepancy_payload: JSONB
+  }
+
+  class ThermodynamicMonadTransactionTable {
+    + tx_id: UUID
+    + block_id: UUID
+    + report_id: UUID
+    + first_law_conserved: boolean
+    + second_law_valid: boolean
+    + signature: string
+  }
+}
+
+IStateValidator <|.. StateDiscrepancyEvaluator
+StateDiscrepancyEvaluator ..> IStateDiscrepancyReport : creates
+StateDiscrepancyEvaluator --> StateVector : inspects
+ThermodynamicStructure <|-- StateVector
+
+StateDiscrepancyReportTable --> ThermodynamicStateVectorTable : actual / expected
+ThermodynamicMonadTransactionTable --> StateDiscrepancyReportTable : references
+
+@enduml
