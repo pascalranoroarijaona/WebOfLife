@@ -30,7 +30,7 @@ describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', (
     const result = validator.assertConservation(prevState, currState, boundary, 1.0);
 
     assert.strictEqual(result.isValid, true);
-    assert.strictEqual((result.violations ?? []).length, 0);
+    assert.strictEqual(Object.keys(result.violations ?? {}).length, 0);
   });
 
   it('should verify solar input and thermal dissipation balance for energy stocks', () => {

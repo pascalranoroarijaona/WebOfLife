@@ -1,0 +1,75 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 072 Thermodynamic State Vector Architecture
+
+class StateValidator {
+    + computeAbsoluteStockDelta(actual: Record<string, number>, expected: Record<string, number>): Record<string, number>
+    + validateStateVector(actual: StateVector, expected: StateVector, tolerance: number): boolean
+}
+
+class StateVector {
+    + vectorId: string
+    + stocks: Map<string, number>
+    + timestamp: number
+    + getElement(key: string): number
+}
+
+class ThermodynamicStructure {
+    + structureId: string
+    + energyPotential: number
+    + entropy: number
+    + evaluateDissipation(): number
+}
+
+class ThermodynamicBlockchainBlock {
+    + blockIndex: number
+    + previousHash: string
+    + hash: string
+    + timestamp: number
+    + transactions: ThermodynamicTransaction[]
+    + computeHash(): string
+}
+
+class ThermodynamicTransaction {
+    + transactionId: string
+    + payload: Record<string, any>
+    + entropyDelta: number
+    + solarFlux: number
+}
+
+class ElementalStockRecord {
+    + stockId: string
+    + entityId: string
+    + elementKey: string
+    + quantity: number
+    + units: string
+}
+
+class StateVectorValidationRecord {
+    + validationId: string
+    + transactionId: string
+    + actualVectorJson: string
+    + expectedVectorJson: string
+    + isValid: boolean
+}
+
+class ThermodynamicStockDeltaRecord {
+    + deltaId: string
+    + validationId: string
+    + elementKey: string
+    + actualValue: number
+    + expectedValue: number
+    + absoluteDelta: number
+}
+
+StateValidator ..> StateVector : inspects
+StateVector "1" *-- "*" ThermodynamicStructure : composes
+ThermodynamicBlockchainBlock "1" *-- "*" ThermodynamicTransaction : contains
+StateVectorValidationRecord "1" *-- "*" ThermodynamicStockDeltaRecord : records
+StateValidator --> ThermodynamicStockDeltaRecord : generates metrics
+ElementalStockRecord -- StateVector : maps to persistence
+
+@enduml

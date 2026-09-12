@@ -40,7 +40,7 @@ describe('Sprint 068: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report = validator.evaluate(actual, expected);
     assert.strictEqual(report.isValid, true);
-    assert.ok(report.maxDiscrepancy <= 1e-3);
+    assert.ok((report.maxDiscrepancy ?? 0) <= 1e-3);
   });
 
   it('should detect state vectors exceeding tolerance bounds per element', () => {
@@ -63,7 +63,7 @@ describe('Sprint 068: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const nitrogenDisc = discrepancies.find((d: any) => d.element === 'nitrogen' || d.stockKey === 'nitrogen');
     assert.strictEqual(carbonDisc?.exceeded, true);
     assert.strictEqual(nitrogenDisc?.exceeded, false);
-    assert.ok(report.maxDiscrepancy >= 0.005);
+    assert.ok((report.maxDiscrepancy ?? 0) >= 0.005);
   });
 
   it('should handle custom tolerance overrides correctly', () => {

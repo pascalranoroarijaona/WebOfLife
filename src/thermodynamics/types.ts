@@ -800,7 +800,7 @@ export type ValidationReport = {
   isValid: boolean;
   valid: boolean;
   errors?: ValidationFailure[];
-  violations?: string[];
+  violations?: string[] | Record<string, string>;
   discrepancies?: Map<string, any> | Record<string, any> | DiscrepancyResult[];
   maxTolerance?: number;
   maxDelta?: number;
@@ -812,6 +812,7 @@ export type DiscrepancyReport = ValidationReport;
 export type ValidationResult = ValidationReport;
 
 export type ThermodynamicStateLike = IThermodynamicStateVector | Record<string, any>;
+export type ThermodynamicStockMap = Record<string, number>;
 
 export function photosyntheticFixation(stocks: ElementalStocks, carbonDelta: number, qLossDelta: number): ElementalStocks {
   const cloned = stocks.clone();

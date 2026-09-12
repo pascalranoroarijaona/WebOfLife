@@ -1,50 +1,59 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger Definitions
--- Sprint 071 Update: Thermodynamic State Vector Discrepancy & Absolute Deltas
+-- Web of Life Database Schema: Sprint 072 Extension
+-- Thermodynamic State Vector Discrepancy Absolute Difference Math Function
 -- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Drop tables if resetting in development
+DROP TABLE IF EXISTS thermodynamic_stock_deltas CASCADE;
+DROP TABLE IF EXISTS state_vector_validations CASCADE;
+DROP TABLE IF EXISTS thermodynamic_transactions CASCADE;
+DROP TABLE IF EXISTS elemental_stocks CASCADE;
 
--- Elemental types for thermodynamic tracking
-CREATE TYPE elemental_stock_key AS ENUM ('carbon', 'nitrogen', 'phosphorus', 'water', 'energy');
-
--- Thermodynamic Stock Vectors representing mass and energy states
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id UUID NOT NULL,
-    carbon NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    nitrogen NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    phosphorus NUMERIC(18, 6) NOT NULL DEFAULT 0.00000,
-    water NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    energy NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 1. Elemental Stocks (Carbon, Nitrogen, Phosphorus, Water, etc.)
+CREATE TABLE elemental_stocks (
+    stock_id VARCHAR(64) PRIMARY KEY,
+    entity_id VARCHAR(64) NOT NULL,
+    element_key VARCHAR(16) NOT NULL, -- e.g., 'C', 'N', 'P', 'H2O'
+    quantity NUMERIC(20, 8) NOT NULL CHECK (quantity >= 0),
+    units VARCHAR(32) NOT NULL DEFAULT 'moles',
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Thermodynamic State Vector Discrepancy Log (Sprint 071)
-CREATE TABLE IF NOT EXISTS thermodynamic_state_discrepancies (
-    discrepancy_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    actual_vector_id UUID REFERENCES thermodynamic_stock_vectors(vector_id),
-    expected_vector_id UUID REFERENCES thermodynamic_stock_vectors(vector_id),
-    delta_carbon NUMERIC(18, 6) NOT NULL,
-    delta_nitrogen NUMERIC(18, 6) NOT NULL,
-    delta_phosphorus NUMERIC(18, 6) NOT NULL,
-    delta_water NUMERIC(18, 6) NOT NULL,
-    delta_energy NUMERIC(18, 6) NOT NULL,
-    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 2. Thermodynamic Transactions (Blockchain Ledger)
+CREATE TABLE thermodynamic_transactions (
+    transaction_id VARCHAR(64) PRIMARY KEY,
+    block_index INTEGER NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    hash VARCHAR(64) NOT NULL,
+    payload_json JSONB NOT NULL,
+    entropy_delta NUMERIC(20, 8) NOT NULL,
+    solar_flux_input NUMERIC(20, 8) NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Immutable Blockchain Transactions for Monad Stock Transformations
-CREATE TABLE IF NOT EXISTS blockchain_transactions (
-    tx_hash VARCHAR(64) PRIMARY KEY,
-    block_index BIGINT NOT NULL,
-    previous_hash VARCHAR(64),
-    monad_process_id UUID NOT NULL,
-    state_vector_id UUID REFERENCES thermodynamic_stock_vectors(vector_id),
-    signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 3. State Vector Validations (Tracking Expected vs Actual Vectors)
+CREATE TABLE state_vector_validations (
+    validation_id VARCHAR(64) PRIMARY KEY,
+    transaction_id VARCHAR(64) REFERENCES thermodynamic_transactions(transaction_id),
+    actual_vector_json JSONB NOT NULL,
+    expected_vector_json JSONB NOT NULL,
+    is_valid BOOLEAN NOT NULL,
+    max_tolerance NUMERIC(10, 8) NOT NULL,
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for performance and time-series aggregation
-CREATE INDEX IF NOT EXISTS idx_thermo_vectors_entity ON thermodynamic_stock_vectors(entity_id, recorded_at);
-CREATE INDEX IF NOT EXISTS idx_discrepancies_validated ON thermodynamic_state_discrepancies(validated_at);
-CREATE INDEX IF NOT EXISTS idx_blockchain_block ON blockchain_transactions(block_index);
+-- 4. Thermodynamic Stock Deltas (Storing Absolute Stock Discrepancies from Sprint 072)
+CREATE TABLE thermodynamic_stock_deltas (
+    delta_id VARCHAR(64) PRIMARY KEY,
+    validation_id VARCHAR(64) REFERENCES state_vector_validations(validation_id),
+    element_key VARCHAR(16) NOT NULL,
+    actual_value NUMERIC(20, 8) NOT NULL,
+    expected_value NUMERIC(20, 8) NOT NULL,
+    absolute_delta NUMERIC(20, 8) NOT NULL CHECK (absolute_delta >= 0),
+    computed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance and time-series lookups
+CREATE INDEX idx_elemental_stocks_entity ON elemental_stocks(entity_id);
+CREATE INDEX idx_stock_deltas_validation ON thermodynamic_stock_deltas(validation_id);
+CREATE INDEX idx_transactions_block ON thermodynamic_transactions(block_index);

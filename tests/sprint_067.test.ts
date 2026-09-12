@@ -11,8 +11,8 @@ describe('Sprint 067: StateValidator Core Helper', () => {
 
     const result = validator.evaluateDiscrepancy(expected, actual);
     assert.strictEqual(result.isValid, true);
-    assert.strictEqual(result.differences['C'], 0.0);
-    assert.strictEqual(result.differences['H2O'], 0.0);
+    assert.strictEqual(result.differences!['C'], 0.0);
+    assert.strictEqual(result.differences!['H2O'], 0.0);
     assert.deepStrictEqual(result.violations, {});
   });
 
@@ -23,8 +23,9 @@ describe('Sprint 067: StateValidator Core Helper', () => {
 
     const result = validator.evaluateDiscrepancy(expected, actual);
     assert.strictEqual(result.isValid, false);
-    assert.ok((result.differences['C'] ?? 0) > 1e-6);
-    assert.ok(result.violations['C'] !== undefined);
+    assert.ok((result.differences!['C'] ?? 0) > 1e-6);
+    const violationsObj = result.violations as Record<string, string>;
+    assert.ok(violationsObj['C'] !== undefined);
   });
 
   it('TC-03: Custom tolerance suppresses violation on specific stocks', () => {
@@ -34,7 +35,8 @@ describe('Sprint 067: StateValidator Core Helper', () => {
 
     const result = validator.evaluateDiscrepancy(expected, actual, { C: 0.01 });
     assert.strictEqual(result.isValid, true);
-    assert.strictEqual(result.violations['C'], undefined);
+    const violationsObj = result.violations as Record<string, string>;
+    assert.strictEqual(violationsObj['C'], undefined);
   });
 
   it('Helper checkDiscrepancy works correctly', () => {
