@@ -1,56 +1,60 @@
 -- ============================================================================
 -- Web of Life Database Schema & Thermodynamic Ledger Definitions
--- Sprint 080: Thermodynamic State Vector Inventory Discrepancy Evaluator Wrapper
+-- Sprint 081 Update: State Validator & Discrepancy Evaluation Tables
 -- ============================================================================
 
--- Enable TimescaleDB extension if not already present
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors Table (Time-Series)
--- ----------------------------------------------------------------------------
+-- Compartments tracking biogeochemical stocks (Carbon, Nitrogen, Phosphorus, Water)
+CREATE TABLE IF NOT EXISTS thermodynamic_compartments (
+    compartment_id VARCHAR(64) PRIMARY KEY,
+    compartment_name VARCHAR(255) NOT NULL,
+    cycle_type VARCHAR(32) NOT NULL CHECK (cycle_type IN ('CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Thermodynamic State Vectors recorded over time
 CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    stock_data JSONB NOT NULL,
-    solar_flux_input DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (vector_id, timestamp)
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    compartment_id VARCHAR(64) NOT NULL REFERENCES thermodynamic_compartments(compartment_id),
+    total_mass DOUBLE PRECISION NOT NULL CHECK (total_mass >= 0),
+    internal_energy DOUBLE PRECISION NOT NULL,
+    entropy DOUBLE PRECISION NOT NULL CHECK (entropy >= 0),
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Convert to hypertable for high-frequency thermodynamic telemetry
-SELECT create_hypertable('thermodynamic_state_vectors', 'timestamp', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 2. State Discrepancy Evaluation Log Table
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS state_discrepancy_evaluations (
-    evaluation_id SERIAL,
-    vector_id VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    is_balanced BOOLEAN NOT NULL,
-    total_discrepancy DOUBLE PRECISION NOT NULL,
-    component_discrepancies JSONB NOT NULL,
-    entropy_delta DOUBLE PRECISION NOT NULL CHECK (entropy_delta >= 0.0),
-    tolerance_threshold DOUBLE PRECISION NOT NULL,
-    PRIMARY KEY (evaluation_id, timestamp)
+-- Discrepancy Evaluation Reports (Matching StateValidator output)
+CREATE TABLE IF NOT EXISTS thermodynamic_discrepancy_reports (
+    report_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    is_valid BOOLEAN NOT NULL,
+    total_mass_discrepancy DOUBLE PRECISION NOT NULL,
+    total_energy_discrepancy DOUBLE PRECISION NOT NULL,
+    tolerance_mass DOUBLE PRECISION NOT NULL,
+    tolerance_energy DOUBLE PRECISION NOT NULL,
+    evaluated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-SELECT create_hypertable('state_discrepancy_evaluations', 'timestamp', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Blockchain Transaction Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_ledger (
-    block_id VARCHAR(64) PRIMARY KEY,
-    parent_block_id VARCHAR(64),
-    vector_id VARCHAR(64) NOT NULL,
-    evaluation_id INTEGER NOT NULL,
-    transaction_signature VARCHAR(128) NOT NULL,
-    first_law_conserved BOOLEAN NOT NULL,
-    second_law_entropy_valid BOOLEAN NOT NULL,
-    committed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (evaluation_id) REFERENCES state_discrepancy_evaluations(evaluation_id)
+-- Compartment-level breakdown of discrepancies per evaluation report
+CREATE TABLE IF NOT EXISTS compartment_discrepancy_details (
+    detail_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    report_id UUID NOT NULL REFERENCES thermodynamic_discrepancy_reports(report_id) ON DELETE CASCADE,
+    compartment_id VARCHAR(64) NOT NULL REFERENCES thermodynamic_compartments(compartment_id),
+    mass_discrepancy DOUBLE PRECISION NOT NULL,
+    energy_discrepancy DOUBLE PRECISION NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_blockchain_vector_id ON thermodynamic_blockchain_ledger(vector_id);
+-- Thermodynamic Monad Stock Transactions & Ledger Blocks
+CREATE TABLE IF NOT EXISTS thermodynamic_monad_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_compartment_id VARCHAR(64) REFERENCES thermodynamic_compartments(compartment_id),
+    target_compartment_id VARCHAR(64) REFERENCES thermodynamic_compartments(compartment_id),
+    mass_delta DOUBLE PRECISION NOT NULL,
+    energy_delta DOUBLE PRECISION NOT NULL,
+    report_id UUID REFERENCES thermodynamic_discrepancy_reports(report_id),
+    block_hash VARCHAR(64) NOT NULL,
+    committed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_state_vectors_compartment ON thermodynamic_state_vectors(compartment_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_discrepancy_reports_valid ON thermodynamic_discrepancy_reports(is_valid, evaluated_at);
+CREATE INDEX IF NOT EXISTS idx_monad_transactions_hash ON thermodynamic_monad_transactions(block_hash);

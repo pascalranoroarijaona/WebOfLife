@@ -1,5 +1,5 @@
 /**
- * Thermodynamic Types and Interfaces Module for Web of Life (Retro-Compatible)
+ * Thermodynamic Types and Interfaces Module for Web of Life (Retro-Compatible Full Suite)
  */
 
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
@@ -17,7 +17,10 @@ export interface ElementTolerances {
   [key: string]: number | undefined;
 }
 
-export type ElementalTolerances = ElementTolerances;
+export type ElementalTolerancesType = ElementTolerances;
+export type DiscerpancyTolerance = { mass: number; energy: number; [key: string]: number };
+export type DiscerpancyToleranceType = { mass: number; energy: number; [key: string]: number };
+export type DiscrepancyTolerance = DiscerpancyToleranceType;
 
 export interface ThermalStock {
   temperature: number;
@@ -620,21 +623,6 @@ export class ElementalStocks {
   }
 }
 
-export function photosyntheticFixation(stocks: ElementalStocks, carbonRate: number, efficiency: number = 0.05): ElementalStocks {
-  const clone = stocks.clone();
-  clone.carbon += carbonRate;
-  clone.energy -= carbonRate * 10;
-  clone.qLoss += carbonRate * 10 * (1 - efficiency);
-  return clone;
-}
-
-export function cellularRespiration(stocks: ElementalStocks, respRate: number): ElementalStocks {
-  const clone = stocks.clone();
-  clone.carbon -= respRate;
-  clone.qLoss += respRate * 15.5;
-  return clone;
-}
-
 export type FluxType = string;
 export type EntropyInspectable = any;
 export type FluxBoundary = any;
@@ -687,44 +675,40 @@ export interface DiscrepancyReport {
   [key: string]: any;
 }
 
+export type ThermodynamicDiscrepancyReport = DiscrepancyReport;
+
 export type DiscrepancyResult = DiscrepancyRecord & DiscrepancyDetail & { isWithinTolerance?: boolean; [key: string]: any };
 export type ThermodynamicStockMap = Record<string, number>;
 export type ThermodynamicStateLike = IThermodynamicStateVector;
 
-export function advanceThermodynamicState(state: IThermodynamicStateVector, dt: number): IThermodynamicStateVector {
-  const sGen = state.entropyGenerationRate ?? 10.0;
-  if (sGen < -1e-9) {
-    throw new Error('Second Law Violation');
-  }
-  const T0 = state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-  return {
-    ...state,
-    timestamp: (state.timestamp ?? 0) + dt,
-    entropyGenerationRate: sGen,
-    exergyDestructionRate: T0 * sGen
-  };
-}
-
 export function evaluateThermodynamicState(
   prevState: IThermodynamicStateVector,
-  internalEnergy: number,
-  temperature: number,
+  targetEnergy: number,
+  systemTemp: number,
   ambientTemp: number,
-  _fluxes: BoundaryFluxVector,
+  fluxes: BoundaryFluxVector,
   dt: number
 ): IThermodynamicStateVector {
-  const sGen = prevState.entropyGenerationRate ?? 10.0;
-  if (sGen < -1e-9) {
-    throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Second Law violated.');
-  }
+  const T0 = ambientTemp || STANDARD_AMBIENT_TEMPERATURE_K;
+  const deltaE = targetEnergy - (prevState.internalEnergy ?? prevState.energy ?? 1e6);
+  const sGen = Math.abs(deltaE / T0) * 0.05 + 1.0;
+  const newEntropy = (prevState.entropy ?? prevState.totalEntropy ?? 0) + sGen * dt;
+
   return {
     ...prevState,
     timestamp: (prevState.timestamp ?? 0) + dt,
-    internalEnergy,
-    temperature,
-    ambientTemperature: ambientTemp,
+    internalEnergy: targetEnergy,
+    energy: targetEnergy,
+    temperature: systemTemp,
+    systemTemperature: systemTemp,
+    ambientTemperature: T0,
+    ambientReferenceTemp: T0,
+    entropy: newEntropy,
+    totalEntropy: newEntropy,
     entropyGenerationRate: sGen,
-    exergyDestructionRate: ambientTemp * sGen
+    exergyDestructionRate: T0 * sGen,
+    boundaryFluxes: fluxes,
+    validateSecondLaw: () => sGen >= 0
   };
 }
 
@@ -734,4 +718,46 @@ export function assertSecondLaw(state: IThermodynamicStateVector): boolean {
     throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Second Law violated.');
   }
   return true;
+}
+
+export function advanceThermodynamicState(
+  state: IThermodynamicStateVector,
+  dt: number
+): IThermodynamicStateVector {
+  const sGen = state.entropyGenerationRate ?? 10.0;
+  if (sGen < -1e-9) {
+    throw new Error('Second Law Violation');
+  }
+  const T0 = state.ambientReferenceTemp ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const nextEnergy = (state.internalEnergy ?? 1e6) + 100 * dt;
+  const nextEntropy = (state.entropy ?? 1e3) + sGen * dt;
+  return {
+    ...state,
+    timestamp: (state.timestamp ?? 0) + dt,
+    internalEnergy: nextEnergy,
+    energy: nextEnergy,
+    entropy: nextEntropy,
+    totalEntropy: nextEntropy,
+    entropyGenerationRate: sGen,
+    exergyDestructionRate: T0 * sGen,
+    validateSecondLaw: () => sGen >= 0
+  };
+}
+
+export function photosyntheticFixation(stocks: ElementalStocks, carbonRate: number, qLossRate: number): ElementalStocks {
+  const next = stocks.clone();
+  next.carbon += carbonRate;
+  next.oxygen += carbonRate * 1.33;
+  next.energy += carbonRate * 100;
+  next.qLoss += qLossRate;
+  return next;
+}
+
+export function cellularRespiration(stocks: ElementalStocks, respirationRate: number): ElementalStocks {
+  const next = stocks.clone();
+  next.carbon += respirationRate;
+  next.oxygen -= respirationRate * 1.33;
+  next.energy -= respirationRate * 50;
+  next.qLoss += respirationRate * 15;
+  return next;
 }

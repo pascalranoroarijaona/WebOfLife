@@ -1,0 +1,64 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics Core" {
+  class ThermodynamicStateVector {
+    - compartmentId: string
+    - totalMass: number
+    - internalEnergy: number
+    - entropy: number
+    + getTotalMass(): number
+    + getInternalEnergy(): number
+    + getEntropy(): number
+  }
+
+  class DiscrepancyTolerance {
+    + mass: number
+    + energy: number
+  }
+
+  class ThermodynamicDiscrepancyReport {
+    + isValid: boolean
+    + totalMassDiscrepancy: number
+    + totalEnergyDiscrepancy: number
+    + compartmentDiscrepancies: Map<string, number>
+    + timestamp: number
+  }
+
+  interface IStateValidator {
+    + evaluateDiscrepancy(actualMap: Map<string, ThermodynamicStateVector>, expectedMap: Map<string, ThermodynamicStateVector>, tolerance?: DiscrepancyTolerance): ThermodynamicDiscrepancyReport
+  }
+
+  class StateValidator {
+    - defaultTolerance: DiscrepancyTolerance
+    + evaluateDiscrepancy(actualMap: Map<string, ThermodynamicStateVector>, expectedMap: Map<string, ThermodynamicStateVector>, tolerance?: DiscrepancyTolerance): ThermodynamicDiscrepancyReport
+  }
+
+  IStateValidator <|.. StateValidator
+  StateValidator ..> ThermodynamicStateVector : consumes
+  StateValidator ..> ThermodynamicDiscrepancyReport : produces
+  StateValidator ..> DiscrepancyTolerance : uses
+}
+
+package "Blockchain & Monad Ledger" {
+  class ThermodynamicMonadProcess {
+    - validator: IStateValidator
+    + processTransition(actualMap: Map<string, ThermodynamicStateVector>, expectedMap: Map<string, ThermodynamicStateVector>): boolean
+  }
+
+  class MonadTransactionRecord {
+    + transactionId: string
+    + sourceCompartment: string
+    + targetCompartment: string
+    + massDelta: number
+    + energyDelta: number
+    + blockHash: string
+    + committedAt: Date
+  }
+
+  ThermodynamicMonadProcess --> IStateValidator : delegates validation
+  ThermodynamicMonadProcess --> MonadTransactionRecord : commits
+}
+
+@enduml

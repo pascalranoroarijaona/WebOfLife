@@ -5,7 +5,8 @@ import {
   ThermodynamicLedger, 
   BiomePatch, 
   DetritivoreMonad, 
-  ThermodynamicStateValidator 
+  ThermodynamicStateValidator,
+  ThermodynamicStateVector 
 } from '../src/thermodynamics/state_validator.js';
 import { EarthPOD, bootstrapMegaPod } from '../src/earth_pod.js';
 
