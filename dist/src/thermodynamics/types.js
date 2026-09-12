@@ -1,6 +1,6 @@
 /**
  * @file src/thermodynamics/types.ts
- * @description Comprehensive Thermodynamic Type Contracts, Interfaces, Monads, and Retro-Compatibility Aliases (Sprints 1-25).
+ * @description Comprehensive Thermodynamic Type Contracts, Interfaces, Monads, and Retro-Compatibility Aliases (Sprints 1-28).
  */
 export const STANDARD_AMBIENT_TEMPERATURE_K = 298.15;
 export var FluxType;
@@ -11,6 +11,14 @@ export var FluxType;
     FluxType["LATENT_HEAT"] = "LATENT_HEAT";
     FluxType["MASS_FLUX"] = "MASS_FLUX";
 })(FluxType || (FluxType = {}));
+export class ThermodynamicValidationError extends Error {
+    stateVector;
+    constructor(message, stateVector) {
+        super(message);
+        this.stateVector = stateVector;
+        this.name = 'ThermodynamicValidationError';
+    }
+}
 export class ElementalStocks {
     carbon;
     nitrogen;

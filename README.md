@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 7%
-SPRINT_GOAL: Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
+Roadmap Completion: 13%
+SPRINT_GOAL: Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper functions that assert required property existence and non-negative entropy fields prior to monad step executions.
 
 ## Web of Life Master Backlog
 
@@ -295,82 +295,29 @@ SPRINT_GOAL: Thermodynamic State Vector Baseline Structurer (`src/thermodynamics
 - [ ] Gamified Stewardship Policy Engine UI Controls (`src/visualization/tycoon_ui_controls.ts`): Interactive DOM slider inputs for global resource dispatch vectors $\mathbf{u}(t)$ (carbon taxes, renewable subsidies, agricultural allocation).
 - [ ] Spatial Exergy Destruction & Entropy Export Overlay (`src/visualization/entropy_export_overlay.ts`): Real-time Canvas 2D/WebGL heat-map overlay rendering spatial exergy destruction rates and entropy export ($\dot{S}_{\text{export}}$) across H3 geographical partitions.
 - [ ] Real-Time Planetary Health Scorecard (`src/visualization/planetary_scorecard.ts`): Interactive UI panel tracking real-time planetary health indices ($\mathcal{W} \times \mathcal{B} \times \mathcal{E}$) and tipping point proximity alerts.
-- [ ] Cryptographic Thermodynamic Ledger (`db/schema.sql`, `db/ledger.sqlite`, `src/ledger/block_chain.ts`): Implement an SQLite-backed append-only transaction ledger that records every monad mass/energy delta ($\Delta \text{Stock}$), computes cryptographic hashes linking sequential planetary "vortices", and validates $\Delta \text{Stock} = 0$ before block commitment.
 - [ ] Asynchronous Brainstorming Pipeline & AST Context Windowing (`agent_orchestrator.py`): Parallel `asyncio.gather()` execution and AST summary token optimization.
 
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
-
-<!-- BACKLOG_END -->
+### Phase 6 — Earth as a Blockchain: Proof of Ecological Work (PoEW) (Pending)
+- [ ] Thermodynamic Transaction Mempool (`src/ledger/mempool.ts`): Create an in-memory queue that captures every energy, matter, and information exchange between sub-PODs during a simulation tick before they are validated.
+- [ ] Proof of Ecological Work (PoEW) Validator (`src/ledger/poew_validator.ts`): Implement the consensus algorithm verifying that a batch of transactions perfectly conserves mass (First Law) and accurately accounts for exergy destruction (Second Law).
+- [ ] Vortex Block Generator & Hasher (`src/ledger/block_generator.ts`): Group validated transactions into a `ThermodynamicBlock`, hashing the entire Earth state vector combined with the previous block's hash to ensure temporal immutability.
+- [ ] SQLite Append-Only Immutable Ledger (`db/schema.sql`, `src/ledger/sqlite_ledger.ts`): Persist the validated blocks into a local SQLite database, creating a permanent, auditable cryptographic history of the planetary simulation.
 
 <!-- BACKLOG_END -->
 
 ---
 
-## 6. Philosophy
+## 6. Philosophy: The Earth as a Thermodynamic Blockchain
 
-This project treats ecology as rigorous thermodynamic accounting. Every living organism is an open dissipative system, every interaction is a stock transfer transaction, and planetary survival is an open game in energy and a finite game in matter. By rendering the code of reality explicit, transparent, and computable, we enable artificial intelligence and humanity to co-steer Earth toward sustainable, long-term state persistence.
+This project treats ecology as rigorous thermodynamic accounting, conceptualizing the **Earth Mega-POD as a macroscopic blockchain**. 
+
+In this paradigm:
+*   **Transactions** are the continuous exchanges of energy, matter, and information between biological and industrial sub-PODs.
+*   **Consensus** is achieved through the strict laws of physics: a transaction is only valid if it perfectly respects the First Law of Thermodynamics ($\Delta \text{Mass} = 0$, Energy in = Energy out).
+*   **Proof of Ecological Work (PoEW)** replaces arbitrary cryptographic hashing. The "work" is the actual exergy destroyed and entropy generated ($\Delta S \ge 0$) by maintaining far-from-equilibrium living systems. 
+*   **Blocks** are sequential temporal snapshots (planetary "vortices") of the Earth's total thermodynamic state.
+
+By rendering the code of reality explicit, transparent, and computable as an immutable ledger of physical limits, we enable artificial intelligence and humanity to co-steer Earth toward sustainable, long-term state persistence.
 
 ## License
 
