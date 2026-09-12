@@ -1,35 +1,47 @@
--- Updated Schema & Ledger Definitions for Sprint 033: Thermodynamic State Vector Property Validator Helper
+-- Sprint 034: Thermodynamic State Vector Non-Negative Entropy Assertion Schema
+-- Adds support for entropy validation tracking, thermodynamic state vectors, and Second Law compliance logs.
 
--- 1. Thermodynamic States Table
-CREATE TABLE IF NOT EXISTS thermodynamic_states (
-    state_id VARCHAR(64) PRIMARY KEY,
-    block_index BIGINT NOT NULL,
-    energy DOUBLE PRECISION NOT NULL CHECK (energy >= 0),
-    entropy DOUBLE PRECISION NOT NULL CHECK (entropy >= 0),
-    temperature DOUBLE PRECISION NOT NULL CHECK (temperature >= 0),
-    is_valid BOOLEAN NOT NULL DEFAULT FALSE,
-    validation_errors TEXT[],
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+BEGIN;
+
+-- Thermodynamic State Vectors Table with Non-Negative Constraints (Second Law)
+CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_id UUID NOT NULL,
+    entropy NUMERIC(20, 8) NOT NULL CHECK (entropy >= 0),
+    entropy_generation_rate NUMERIC(20, 8) NOT NULL CHECK (entropy_generation_rate >= 0),
+    temperature NUMERIC(10, 4) NOT NULL CHECK (temperature >= 0),
+    internal_energy NUMERIC(20, 8) NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Thermodynamic Stock Inventories Table (Linked to States)
-CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
-    stock_id SERIAL PRIMARY KEY,
-    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
-    stock_name VARCHAR(128) NOT NULL,
-    quantity DOUBLE PRECISION NOT NULL CHECK (quantity >= 0),
-    CONSTRAINT unique_state_stock UNIQUE (state_id, stock_name)
+-- Thermodynamic Validation Audit Log (Tracks assertions and violations)
+CREATE TABLE IF NOT EXISTS thermodynamic_validation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE,
+    is_valid BOOLEAN NOT NULL,
+    violation_type VARCHAR(64),
+    error_message TEXT,
+    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 3. Validation Audit Ledger (Blockchain Integration)
-CREATE TABLE IF NOT EXISTS validation_audit_ledger (
-    audit_id SERIAL PRIMARY KEY,
-    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
-    transaction_signature VARCHAR(128) NOT NULL,
-    validator_version VARCHAR(32) NOT NULL DEFAULT '0.33.0',
-    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Thermodynamic Monad Stock Transactions Ledger
+CREATE TABLE IF NOT EXISTS thermodynamic_monad_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_state_id UUID REFERENCES thermodynamic_state_vectors(id),
+    target_state_id UUID REFERENCES thermodynamic_state_vectors(id),
+    q_in NUMERIC(20, 8) NOT NULL DEFAULT 0.00000000,
+    q_out NUMERIC(20, 8) NOT NULL DEFAULT 0.00000000,
+    entropy_delta NUMERIC(20, 8) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL,
+    signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_valid ON thermodynamic_states(is_valid);
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_stocks_state ON thermodynamic_stocks(state_id);
+-- Indexing for high-performance time-series queries
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_vectors_entity_time 
+ON thermodynamic_state_vectors(entity_id, recorded_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_logs_validity 
+ON thermodynamic_validation_logs(is_valid, validated_at DESC);
+
+COMMIT;

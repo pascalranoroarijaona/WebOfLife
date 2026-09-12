@@ -17,8 +17,12 @@ export class NitrogenCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const boundaryFlux = {
-            netHeatFlux: solarFlux * 1e-5,
+            solarRadiationIn: solarFlux,
+            longwaveRadiationOut: solarFlux * 0.99,
+            sensibleHeatFlux: solarFlux * 1e-5,
+            latentHeatFlux: 0,
             netMassFlux: 0.5,
+            netHeatFlux: solarFlux * 1e-5,
             solarIncoming: solarFlux,
             terrestrialOutgoing: solarFlux * 0.99,
             heatFluxes: [solarFlux * 1e-5],

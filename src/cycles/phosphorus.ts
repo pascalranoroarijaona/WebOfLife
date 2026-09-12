@@ -2,7 +2,7 @@
  * @fileoverview Phosphorus Cycle implementation extending BaseCycle (Sprint 015)
  */
 import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
-import { IBoundaryFlux } from '../thermodynamics/types.js';
+import { IBoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K } from '../thermodynamics/types.js';
 
 export class PhosphorusCycle extends BaseCycle {
   constructor() {
@@ -20,8 +20,12 @@ export class PhosphorusCycle extends BaseCycle {
 
   public step(dt: number, solarFlux: number): void {
     const boundaryFlux: IBoundaryFlux = {
-      netHeatFlux: solarFlux * 1e-6,
+      solarRadiationIn: solarFlux,
+      longwaveRadiationOut: solarFlux * 0.99,
+      sensibleHeatFlux: solarFlux * 1e-6,
+      latentHeatFlux: 0,
       netMassFlux: 0.1,
+      netHeatFlux: solarFlux * 1e-6,
       solarIncoming: solarFlux,
       terrestrialOutgoing: solarFlux * 0.99,
       heatFluxes: [solarFlux * 1e-6],

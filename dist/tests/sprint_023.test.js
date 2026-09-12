@@ -7,8 +7,15 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
         const initialState = {
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e12,
             totalEntropy: 1e9,
+            entropy: 1e9,
+            exergy: 1e10,
+            stocks: {},
+            entropyGenerationRate: 10.0,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
             boundaryFluxes: {
                 fluxes: [],
                 netHeatRate: 0,
@@ -16,6 +23,8 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
                 netMassBalance: 0
             },
             exergyMetrics: {
+                T_0: STANDARD_AMBIENT_TEMPERATURE_K,
+                totalExergy: 1e11,
                 ambientTemperature: 288.15,
                 entropyGenerationRate: 10.0,
                 exergyDestructionRate: 2881.5,
@@ -52,10 +61,18 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
         const badState = {
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e6,
             totalEntropy: 1e3,
+            entropy: 1e3,
+            exergy: 1e5,
+            stocks: {},
+            exergyDestructionRate: 0,
             boundaryFluxes: { fluxes: [], netHeatRate: 0, netWorkRate: 0, netMassBalance: 0 },
             exergyMetrics: {
+                T_0: STANDARD_AMBIENT_TEMPERATURE_K,
+                totalExergy: 1e5,
                 ambientTemperature: 288.15,
                 entropyGenerationRate: -5.0, // Invalid
                 exergyDestructionRate: -1440.75,

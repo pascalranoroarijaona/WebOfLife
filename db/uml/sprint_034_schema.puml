@@ -1,0 +1,62 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Web of Life - Thermodynamics & Validation" {
+    
+    interface IStateValidator {
+        + validateEntropy(entropy: number): boolean
+        + validateEntropyGenerationRate(rate: number): boolean
+        + assertValidState(vector: IThermodynamicStateVector): void
+    }
+
+    class StateValidator {
+        + validateEntropy(entropy: number): boolean
+        + validateEntropyGenerationRate(rate: number): boolean
+        + assertValidState(vector: IThermodynamicStateVector): void
+    }
+
+    class ThermodynamicViolationError {
+        + name: string
+        + constructor(message: string)
+    }
+
+    interface IThermodynamicStateVector {
+        + entropy: number
+        + entropyGenerationRate: number
+        + temperature: number
+        + internalEnergy: number
+    }
+
+    class ThermodynamicMonadProcess {
+        - validator: IStateValidator
+        + processTick(vector: IThermodynamicStateVector): IThermodynamicStateVector
+    }
+
+    class ThermodynamicStateVectorRecord {
+        + id: UUID
+        + entityId: UUID
+        + entropy: number
+        + entropyGenerationRate: number
+        + temperature: number
+        + internalEnergy: number
+        + recordedAt: Date
+    }
+
+    class ThermodynamicValidationLog {
+        + id: UUID
+        + stateVectorId: UUID
+        + isValid: boolean
+        + violationType: string
+        + errorMessage: string
+        + validatedAt: Date
+    }
+
+    IStateValidator <|.. StateValidator : implements
+    StateValidator ..> ThermodynamicViolationError : throws
+    ThermodynamicMonadProcess --> IStateValidator : uses
+    ThermodynamicMonadProcess --> IThermodynamicStateVector : evaluates
+    ThermodynamicStateVectorRecord "1" --> "0..*" ThermodynamicValidationLog : generates
+}
+
+@enduml

@@ -7,7 +7,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { computeEntropyGeneration, computeExergyDestruction, ThermodynamicMonad } from '../src/thermodynamics/methods.js';
-import { BoundaryFluxArray } from '../src/thermodynamics/types.js';
 describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', () => {
     it('should compute non-negative entropy generation rates adhering to Second Law', () => {
         const metrics = computeEntropyGeneration(1000, 300, 5.0, 2.0);
@@ -36,13 +35,21 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
     });
     it('should wrap states in ThermodynamicMonad and validate Second Law compliance', () => {
         const mockVector = {
+            timestamp: 0,
+            internalEnergy: 1e6,
+            totalEntropy: 500,
+            entropy: 500,
+            ambientTemperature: 298.15,
+            ambientReferenceTemp: 298.15,
+            entropyGenerationRate: 1.7,
+            exergyDestructionRate: 298.15 * 1.7,
+            stocks: {},
             temperature: 298.15,
             pressure: 101325,
             volume: 1.0,
-            internalEnergy: 1e6,
             enthalpy: 1.1e6,
-            entropy: 500,
-            exergy: 2e5
+            exergy: 2e5,
+            boundaryFluxes: { solarRadiationIn: 1000, longwaveRadiationOut: 900, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
         };
         const mockFluxItem = {
             speciesId: 'CO2',
@@ -52,16 +59,18 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
             entropyFlux: 1.0,
             exergyFlux: 80
         };
-        const mockBoundaryFluxes = new BoundaryFluxArray();
-        mockBoundaryFluxes.solarRadiationIn = 1000;
-        mockBoundaryFluxes.longwaveRadiationOut = 900;
-        mockBoundaryFluxes.sensibleHeatFlux = 0;
-        mockBoundaryFluxes.latentHeatFlux = 0;
-        mockBoundaryFluxes.netMassFlux = 0;
-        mockBoundaryFluxes.matterFluxes = [mockFluxItem];
-        mockBoundaryFluxes.massFluxes = [mockFluxItem];
-        mockBoundaryFluxes.netHeatFlux = 500;
-        mockBoundaryFluxes.netWorkFlux = 0;
+        const mockBoundaryFluxes = {
+            solarRadiationIn: 1000,
+            longwaveRadiationOut: 900,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            matterFluxes: [mockFluxItem],
+            massFluxes: [mockFluxItem],
+            netHeatFlux: 500,
+            netWorkFlux: 0,
+            heatFluxes: []
+        };
         const entropyMetrics = {
             thermalDissipation: 1.0,
             chemicalReactionEntropy: 0.5,
@@ -94,21 +103,34 @@ describe('Sprint 25: Thermodynamic State Vector Interface Contracts & Methods', 
     });
     it('should reject monad state transitions that violate the Second Law', () => {
         const mockVector = {
+            timestamp: 0,
+            internalEnergy: 1e6,
+            totalEntropy: 500,
+            entropy: 500,
+            ambientTemperature: 298.15,
+            ambientReferenceTemp: 298.15,
+            entropyGenerationRate: 1.0,
+            exergyDestructionRate: 298.15,
+            stocks: {},
             temperature: 298.15,
             pressure: 101325,
             volume: 1.0,
-            internalEnergy: 1e6,
             enthalpy: 1.1e6,
-            entropy: 500,
-            exergy: 2e5
+            exergy: 2e5,
+            boundaryFluxes: { solarRadiationIn: 1000, longwaveRadiationOut: 900, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] }
         };
-        const boundaryFluxes = new BoundaryFluxArray();
-        boundaryFluxes.solarRadiationIn = 1000;
-        boundaryFluxes.longwaveRadiationOut = 900;
-        boundaryFluxes.matterFluxes = [];
-        boundaryFluxes.massFluxes = [];
-        boundaryFluxes.netHeatFlux = 100;
-        boundaryFluxes.netWorkFlux = 0;
+        const boundaryFluxes = {
+            solarRadiationIn: 1000,
+            longwaveRadiationOut: 900,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
+            matterFluxes: [],
+            massFluxes: [],
+            netHeatFlux: 100,
+            netWorkFlux: 0,
+            heatFluxes: []
+        };
         const initialState = {
             timestamp: 0,
             stateVector: mockVector,

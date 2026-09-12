@@ -14,12 +14,22 @@ describe('Sprint 022: Thermodynamic State Vector Interface Contracts & Exergy Ac
     const initialState: IThermodynamicStateVector = {
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      internalEnergy: 1e6,
+      totalEntropy: 5000,
+      entropy: 5000,
+      exergy: 1e10,
+      stocks: {},
+      entropyGenerationRate: 10.0,
+      exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
       internal_energy_U: 1e6,
       entropy_S: 5000,
       temperature_T: 300,
       pressure_P: 101325,
       volume_V: 10,
-      stock_masses: { carbon: 1000, water: 50000 }
+      stock_masses: { carbon: 1000, water: 50000 },
+      boundaryFluxes: []
     };
 
     const transition = engine.executeTransition(
@@ -44,12 +54,22 @@ describe('Sprint 022: Thermodynamic State Vector Interface Contracts & Exergy Ac
     const initialState: IThermodynamicStateVector = {
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      internalEnergy: 1e6,
+      totalEntropy: 1000,
+      entropy: 1000,
+      exergy: 1e10,
+      stocks: {},
+      entropyGenerationRate: 10.0,
+      exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
       internal_energy_U: 1e6,
       entropy_S: 1000,
       temperature_T: 298.15,
       pressure_P: 101325,
       volume_V: 1,
-      stock_masses: { nitrogen: 500 }
+      stock_masses: { nitrogen: 500 },
+      boundaryFluxes: []
     };
 
     const transition = engine.executeTransition(

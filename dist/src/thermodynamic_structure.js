@@ -2,9 +2,9 @@
  * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad, BoundaryFluxArray } from './thermodynamics/types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad } from './thermodynamics/types.js';
 import { executeThermodynamicStep } from './thermodynamics/thermodynamic_monad_process.js';
-export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray };
+export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep };
 export var EntropyState;
 (function (EntropyState) {
     EntropyState["STEADY"] = "STEADY";

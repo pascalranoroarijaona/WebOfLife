@@ -37,7 +37,9 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
             entropyGenerationRate: 12.5,
             exergyDestructionRate: 0, // will be evaluated
             exergy: 1e10,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            stocks: {},
             boundaryFluxes: []
         };
         const evaluated = evaluateSecondLaw(baseState);
@@ -55,7 +57,9 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
             entropyGenerationRate: 2.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 2.0,
             exergy: 1e10,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            stocks: {},
             boundaryFluxes: [
                 {
                     fluxId: 'test_flux',

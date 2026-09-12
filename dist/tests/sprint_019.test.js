@@ -36,6 +36,8 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
         totalEntropy: 1e6,
         temperature: 290.0,
         ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+        stocks: {},
         entropyGenerationRate: 0.0,
         exergyDestructionRate: 0.0,
         exergy: 5e9,

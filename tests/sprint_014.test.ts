@@ -5,7 +5,8 @@ import {
   BoundaryFluxArray, 
   ThermodynamicMetrics,
   STANDARD_AMBIENT_TEMPERATURE_K,
-  IBoundaryFluxArray 
+  IBoundaryFluxArray,
+  IThermodynamicStateVector 
 } from '../src/thermodynamics/types.js';
 import { 
   BaseThermodynamicSystem, 
@@ -49,6 +50,7 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
     entropyGenerationRate: 12.5,
     exergyDestructionRate: 12.5 * STANDARD_AMBIENT_TEMPERATURE_K,
     exergy: 1e10,
+    stocks: {},
     boundaryFluxes: defaultBoundaryFluxes
   };
 
@@ -77,7 +79,7 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
       internalEnergy: (s.internalEnergy ?? 1e15) + 1000
     }));
 
-    const resultingState = nextMonad.getState();
+    const resultingState = nextMonad.getState() as IThermodynamicStateVector;
     assert.strictEqual(resultingState.timestamp, 1);
     assert.strictEqual(resultingState.internalEnergy, 1e15 + 1000);
     const netMass = (!Array.isArray(resultingState.boundaryFluxes) && resultingState.boundaryFluxes) 

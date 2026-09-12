@@ -9,6 +9,13 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
     const initialState: IThermodynamicStateVector = {
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      internalEnergy: 1e6,
+      totalEntropy: 5000,
+      entropy: 5000,
+      exergy: 1e10,
+      stocks: {},
       internalEnergyJoules: 1e6,
       absoluteEntropyJoulesPerKelvin: 5000,
       entropyGenerationRate: 15.0,
@@ -27,6 +34,13 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
     const prevState: IThermodynamicStateVector = {
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      internalEnergy: 2e6,
+      totalEntropy: 10000,
+      entropy: 10000,
+      exergy: 1e10,
+      stocks: {},
       internalEnergyJoules: 2e6,
       absoluteEntropyJoulesPerKelvin: 10000,
       entropyGenerationRate: 10.0,
@@ -49,18 +63,32 @@ describe('Sprint 021: Thermodynamic State Vector Interface Contracts', () => {
     const initialState: IThermodynamicStateVector = {
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      internalEnergy: 1e6,
+      totalEntropy: 1000,
+      entropy: 1000,
+      exergy: 1e10,
+      stocks: {},
       entropyGenerationRate: 5.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
       boundaryFluxes: []
     };
 
-    const monad = ThermodynamicStateMonad.unit({ carbon: 100 }, initialState, 'test-process');
+    const monad = ThermodynamicStateMonad.unit({ carbon: 100 }, initialState);
 
     assert.throws(() => {
       monad.bind(() => {
         const invalidState: IThermodynamicStateVector = {
           timestamp: 1,
           temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+          ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+          ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+          internalEnergy: 1e6,
+          totalEntropy: 1000,
+          entropy: 1000,
+          exergy: 1e10,
+          stocks: {},
           entropyGenerationRate: -1.2, // Violation!
           exergyDestructionRate: -STANDARD_AMBIENT_TEMPERATURE_K * 1.2,
           boundaryFluxes: []

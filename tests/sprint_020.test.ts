@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { 
   ThermodynamicStateVector, 
-  ThermodynamicBoundaryFlux, 
+  IThermodynamicBoundaryFlux, 
   STANDARD_AMBIENT_TEMPERATURE_K 
 } from '../src/thermodynamics/types.js';
 import { 
@@ -13,7 +13,7 @@ import { bootstrapMegaPod } from '../src/earth_pod.js';
 
 describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', () => {
   it('should compute non-negative internal entropy generation rate correctly', () => {
-    const boundaryFluxes: ThermodynamicBoundaryFlux = {
+    const boundaryFluxes: any = {
       solarIncoming: 1.74e17,
       terrestrialOutgoing: 1.74e17 * 0.99,
       heatFluxes: [1000, -500],
@@ -36,10 +36,14 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 1e6,
       entropy: 5000,
+      totalEntropy: 5000,
+      exergy: 1e5,
       referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      stocks: {},
       entropyGenerationRate: 10,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10,
-      exergy: 1e5,
       boundaryFluxes: {
         solarIncoming: 1.74e17,
         terrestrialOutgoing: 1.74e17 * 0.99,
@@ -59,7 +63,7 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
       timestamp: 0
     };
 
-    const boundaryFlux: ThermodynamicBoundaryFlux = {
+    const boundaryFlux: any = {
       solarIncoming: 1.74e17,
       terrestrialOutgoing: 1.74e17 * 0.99,
       heatFluxes: [10000],
@@ -78,10 +82,14 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 1e6,
       entropy: 5000,
+      totalEntropy: 5000,
+      exergy: 1e5,
       referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      stocks: {},
       entropyGenerationRate: 5.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
-      exergy: 1e5,
       boundaryFluxes: {
         solarIncoming: 1.74e17,
         terrestrialOutgoing: 1.74e17 * 0.99,
@@ -101,7 +109,7 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
       timestamp: 0
     };
 
-    const boundaryFlux: ThermodynamicBoundaryFlux = {
+    const boundaryFlux: any = {
       solarIncoming: 1.74e17,
       terrestrialOutgoing: 1.74e17 * 0.99,
       heatFluxes: [200],

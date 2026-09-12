@@ -18,8 +18,12 @@ export class WaterCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const boundaryFlux = {
-            netHeatFlux: solarFlux * 1e-3,
+            solarRadiationIn: solarFlux,
+            longwaveRadiationOut: solarFlux * 0.99,
+            sensibleHeatFlux: solarFlux * 1e-3,
+            latentHeatFlux: 0,
             netMassFlux: 15.0,
+            netHeatFlux: solarFlux * 1e-3,
             solarIncoming: solarFlux,
             terrestrialOutgoing: solarFlux * 0.99,
             heatFluxes: [solarFlux * 1e-3],

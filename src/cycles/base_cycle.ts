@@ -18,6 +18,7 @@ export abstract class BaseCycle implements IThermodynamicModel {
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
       deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 1e8,
       entropy: 1e5,
       totalEntropy: 1e5,
@@ -71,6 +72,11 @@ export abstract class BaseCycle implements IThermodynamicModel {
 
   public stepThermodynamics(dt: number, _fluxes?: BoundaryFluxVector): void {
     const defaultFlux: IBoundaryFlux = {
+      solarRadiationIn: 1e5,
+      longwaveRadiationOut: 0.99e5,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0,
       fluxId: `${this.name}_solar_in`,
       species: 'energy',
       massFlowRate: 0,

@@ -11,6 +11,17 @@ import { computeThermodynamicProcess } from '../src/thermodynamics/methods.js';
 describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', () => {
     it('should validate Second Law non-negative entropy generation (S_gen >= 0)', () => {
         const currentState = {
+            timestamp: 0,
+            internalEnergy: 1e6,
+            totalEntropy: 1200.0,
+            entropy: 1200.0,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+            entropyGenerationRate: 10.0,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+            exergy: 1e5,
+            stocks: {},
+            boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 298.15,
             pressure: 101325,
             specificEntropy: 1200.0,
@@ -18,6 +29,11 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
             specificExergy: 50000.0
         };
         const boundaryFluxes = {
+            solarRadiationIn: 1000,
+            longwaveRadiationOut: 900,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
             heatFluxes: [{ rate: 1000.0, boundaryTemperature: 350.0 }],
             massFluxes: [],
             radiationFluxes: [{ power: 500.0, sourceTemperature: 5778.0, bandType: 'solar_shortwave' }]
@@ -34,12 +50,28 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
     });
     it('should verify exact exergy destruction rate calculation (I = T_0 * S_gen)', () => {
         const currentState = {
+            timestamp: 0,
+            internalEnergy: 1e6,
+            totalEntropy: 1150.0,
+            entropy: 1150.0,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+            entropyGenerationRate: 10.0,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+            exergy: 1e5,
+            stocks: {},
+            boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 300.0,
             pressure: 101325,
             specificEntropy: 1150.0,
             specificEnthalpy: 240000.0
         };
         const boundaryFluxes = {
+            solarRadiationIn: 2000,
+            longwaveRadiationOut: 1900,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
             heatFluxes: [{ rate: 2000.0, boundaryTemperature: 400.0 }],
             massFluxes: []
         };
@@ -57,12 +89,28 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
     });
     it('should perform First Law boundary flux energy closure and update stock values correctly', () => {
         const currentState = {
+            timestamp: 0,
+            internalEnergy: 1e6,
+            totalEntropy: 1100.0,
+            entropy: 1100.0,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+            entropyGenerationRate: 10.0,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+            exergy: 1e5,
+            stocks: { H2O: 1000.0, CO2: 400.0 },
+            boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 290.0,
             pressure: 101325,
             specificEntropy: 1100.0,
             specificEnthalpy: 230000.0
         };
         const boundaryFluxes = {
+            solarRadiationIn: 500,
+            longwaveRadiationOut: 490,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 1.5,
             heatFluxes: [{ rate: 500.0, boundaryTemperature: 310.0 }],
             massFluxes: [
                 { species: 'H2O', massFlowRate: 2.5, specificEnthalpy: 100000.0, specificEntropy: 300.0 },
@@ -83,6 +131,17 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
     });
     it('should throw or clamp on negative entropy generation scenarios to strictly enforce Second Law', () => {
         const currentState = {
+            timestamp: 0,
+            internalEnergy: 1e6,
+            totalEntropy: 2000.0,
+            entropy: 2000.0,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+            entropyGenerationRate: 10.0,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+            exergy: 1e5,
+            stocks: {},
+            boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, heatFluxes: [], massFluxes: [] },
             temperature: 300.0,
             pressure: 101325,
             specificEntropy: 2000.0,
@@ -90,6 +149,11 @@ describe('Sprint 024: Thermodynamic State Vector Interface Contracts & Laws', ()
         };
         // Artificial massive heat removal that might theoretically cause negative raw delta
         const boundaryFluxes = {
+            solarRadiationIn: 0,
+            longwaveRadiationOut: 0,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0,
             heatFluxes: [{ rate: -100000.0, boundaryTemperature: 10.0 }],
             massFluxes: []
         };

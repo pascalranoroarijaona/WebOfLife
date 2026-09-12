@@ -9,6 +9,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             internalEnergy: 1e6,
             totalEntropy: 1e4,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             entropy: 1e4,
             referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -16,6 +17,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
             exergy: 1e10,
             timestamp: 0,
+            stocks: {},
             boundaryFluxes: {
                 solarRadiationIn: 0,
                 longwaveRadiationOut: 0,
@@ -40,6 +42,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             internalEnergy: 1e6,
             totalEntropy: 1e4,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             entropy: 1e4,
             referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -47,6 +50,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             exergyDestructionRate: -5.0 * STANDARD_AMBIENT_TEMPERATURE_K,
             exergy: 1e10,
             timestamp: 0,
+            stocks: {},
             boundaryFluxes: {
                 solarRadiationIn: 0,
                 longwaveRadiationOut: 0,
@@ -69,6 +73,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             internalEnergy: 1e6,
             totalEntropy: 1e4,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             entropy: 1e4,
             referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -76,6 +81,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
             exergy: 1e10,
             timestamp: 0,
+            stocks: {},
             boundaryFluxes: {
                 solarRadiationIn: 0,
                 longwaveRadiationOut: 0,

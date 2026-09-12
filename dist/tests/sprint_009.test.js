@@ -15,15 +15,16 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
         entropyGenerationRate: 1.2e13,
         exergyDestructionRate: 255.0 * 1.2e13,
         exergy: 1e10,
+        stocks: {},
         boundaryFluxes: {
             solarRadiationIn: 0,
             longwaveRadiationOut: 0,
             sensibleHeatFlux: 0,
             latentHeatFlux: 0,
             netMassFlux: 0,
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiativeNet: 0,
-            massFluxes: new Map()
+            massFluxes: []
         },
         systemInternalEnergyJoules: 1.5e24,
         systemEntropyJoulesPerKelvin: 5.0e21,

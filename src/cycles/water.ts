@@ -2,7 +2,7 @@
  * @fileoverview Water Cycle implementation extending BaseCycle (Sprint 015)
  */
 import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
-import { IBoundaryFlux } from '../thermodynamics/types.js';
+import { IBoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K } from '../thermodynamics/types.js';
 
 export class WaterCycle extends BaseCycle {
   constructor() {
@@ -21,8 +21,12 @@ export class WaterCycle extends BaseCycle {
 
   public step(dt: number, solarFlux: number): void {
     const boundaryFlux: IBoundaryFlux = {
-      netHeatFlux: solarFlux * 1e-3,
+      solarRadiationIn: solarFlux,
+      longwaveRadiationOut: solarFlux * 0.99,
+      sensibleHeatFlux: solarFlux * 1e-3,
+      latentHeatFlux: 0,
       netMassFlux: 15.0,
+      netHeatFlux: solarFlux * 1e-3,
       solarIncoming: solarFlux,
       terrestrialOutgoing: solarFlux * 0.99,
       heatFluxes: [solarFlux * 1e-3],

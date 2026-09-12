@@ -2,6 +2,7 @@
  * @fileoverview Carbon Cycle implementation extending BaseCycle (Sprint 015)
  */
 import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K } from '../thermodynamics/types.js';
 export class CarbonCycle extends BaseCycle {
     constructor(options) {
         super("Carbon Cycle");
@@ -21,17 +22,21 @@ export class CarbonCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const boundaryFlux = {
-            netHeatFlux: solarFlux * 1e-4,
+            solarRadiationIn: solarFlux,
+            longwaveRadiationOut: solarFlux * 0.99,
+            sensibleHeatFlux: solarFlux * 1e-4,
+            latentHeatFlux: 0,
             netMassFlux: 1.2,
+            netHeatFlux: solarFlux * 1e-4,
             solarIncoming: solarFlux,
             terrestrialOutgoing: solarFlux * 0.99,
             heatFluxes: [solarFlux * 1e-4],
-            boundaryTemperatures: [298.15],
+            boundaryTemperatures: [STANDARD_AMBIENT_TEMPERATURE_K],
             massFluxes: [1.2],
             specificEnthalpies: [500],
             specificEntropies: [2.1]
         };
-        const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-4 * dt, (solarFlux * 1e-4 / 298.15) * dt, dt);
+        const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-4 * dt, (solarFlux * 1e-4 / STANDARD_AMBIENT_TEMPERATURE_K) * dt, dt);
         this.stateVector = 'state' in res ? res.state : res;
     }
 }

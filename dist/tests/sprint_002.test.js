@@ -17,15 +17,16 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
             exergyDestructionRate: 2881.5,
             exergy: 1e10,
             referenceTemperature: 288.15,
+            stocks: {},
             boundaryFluxes: {
                 solarRadiationIn: 1000,
                 longwaveRadiationOut: 900,
                 sensibleHeatFlux: 50,
                 latentHeatFlux: 50,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 0,
-                massFluxes: new Map(),
+                massFluxes: [],
                 netMassEnthalpyFlux: 0
             }
         };
@@ -35,9 +36,9 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
             sensibleHeatFlux: 50,
             latentHeatFlux: 50,
             netMassFlux: 0,
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiativeNet: 100,
-            massFluxes: new Map(),
+            massFluxes: [],
             netMassEnthalpyFlux: 0
         }, 1.0);
         assert.strictEqual(nextState.timestamp, 1.0);

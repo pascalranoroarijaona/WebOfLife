@@ -10,12 +10,14 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
     internalEnergy: 1e12,
     totalEntropy: 5e9,
     temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+    ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
     ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
     systemEntropy: 5e9,
     entropy: 5e9,
     entropyGenerationRate: 100.0,
     exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 100.0,
     exergy: 1e10,
+    stocks: {},
     boundaryFluxes: {
       solarRadiationIn: 0,
       longwaveRadiationOut: 0,
@@ -64,7 +66,7 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
   it('should support ThermodynamicStateMonad state transitions with invariant enforcement', () => {
     const monad = ThermodynamicStateMonad.of(baseState);
     const advancedMonad = monad.map((state: ThermodynamicStateVector) => advanceThermodynamicState(state, 2000, 150.0, 1.0));
-    const newState = advancedMonad.getState();
+    const newState: IThermodynamicStateVector = advancedMonad.getState() as IThermodynamicStateVector;
 
     assert.strictEqual(newState.entropyGenerationRate, 150.0);
     assert.strictEqual(newState.exergyDestructionRate, STANDARD_AMBIENT_TEMPERATURE_K * 150.0);
@@ -77,6 +79,9 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
       monad.map((state: ThermodynamicStateVector) => ({
         ...state,
         temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+        stocks: {},
         internalEnergy: 1e6,
         entropy: 1e3,
         entropyGenerationRate: -5.0,

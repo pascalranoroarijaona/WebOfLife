@@ -13,6 +13,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             totalEntropy: 5000,
             temperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             stocks: {},
             entropyGenerationRate: -1.0, // Invalid negative entropy generation
             exergyDestructionRate: 0,
@@ -46,6 +47,7 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             totalEntropy: 5000,
             temperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             stocks: {},
             entropyGenerationRate: 5.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,

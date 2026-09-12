@@ -20,7 +20,7 @@ export interface ThermodynamicStateVectorOptions {
   entropy?: number;          // Cumulative entropy (J/K)
   timestamp?: number;        // Simulation time step / epoch
   energy?: number;
-  stocks?: Record<string, number>;
+  stocks?: Record<string, number> | Map<any, any>;
   elementalStocks?: Record<string, number>;
   entropyGenerationRate?: number;
   exergyDestructionRate?: number;
@@ -31,14 +31,17 @@ export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector
   ambientTemperature: number;
   ambientReferenceTemp: number;
   fluxes: FluxRecord;
-  boundaryFluxes: FluxRecord;
+  boundaryFluxes: FluxRecord | any;
   entropy: number;
   energy: number;
+  internalEnergy: number;
+  totalEntropy: number;
+  exergy: number;
   stocks: Record<string, number>;
   entropyGenerationRate: number;
   exergyDestructionRate: number;
   timestamp: number;
-  clone(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector;
+  clone(overrides?: Partial<IThermodynamicStateVector> | ThermodynamicStateVectorOptions | any): IThermodynamicStateVector;
   validateFirstLaw(): boolean;
   validateSecondLaw(): boolean;
 }
@@ -51,6 +54,9 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly boundaryFluxes: FluxRecord;
   public readonly entropy: number;
   public readonly energy: number;
+  public readonly internalEnergy: number;
+  public readonly totalEntropy: number;
+  public readonly exergy: number;
   public readonly stocks: Record<string, number>;
   public readonly entropyGenerationRate: number;
   public readonly exergyDestructionRate: number;
@@ -71,20 +77,26 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     this.boundaryFluxes = this.fluxes;
     this.entropy = options?.entropy ?? 0;
     this.energy = options?.energy ?? 1000;
-    this.stocks = options?.stocks ?? options?.elementalStocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
+    this.internalEnergy = this.energy;
+    this.totalEntropy = this.entropy;
+    this.exergy = 1e5;
+    const rawStocks = options?.stocks ?? options?.elementalStocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
+    this.stocks = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks;
     this.entropyGenerationRate = options?.entropyGenerationRate ?? 0;
     this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
     this.timestamp = options?.timestamp ?? 0;
   }
 
-  public clone(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
+  public clone(overrides?: Partial<IThermodynamicStateVector> | ThermodynamicStateVectorOptions | any): IThermodynamicStateVector {
+    const rawStocks = overrides?.stocks ?? this.stocks;
+    const stocksObj = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks;
     return new ThermodynamicStateVector({
       temperature: overrides?.temperature ?? this.temperature,
-      fluxes: { ...this.fluxes, ...overrides?.fluxes },
+      fluxes: { ...this.fluxes, ...(overrides as any)?.fluxes },
       entropy: overrides?.entropy ?? this.entropy,
       timestamp: overrides?.timestamp ?? this.timestamp,
-      energy: overrides?.energy ?? this.energy,
-      stocks: overrides?.stocks ?? overrides?.elementalStocks ?? { ...this.stocks },
+      energy: overrides?.energy ?? overrides?.internalEnergy ?? this.energy,
+      stocks: stocksObj,
       entropyGenerationRate: overrides?.entropyGenerationRate ?? this.entropyGenerationRate,
       exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate
     });
@@ -157,7 +169,7 @@ export class ThermodynamicMonadProcess {
         entropy: newEntropy,
         timestamp: timestamp + dt,
         energy: energy + netFlux * dt,
-        stocks: { ...stocks }
+        stocks: stocks
       });
     }
 
@@ -167,7 +179,7 @@ export class ThermodynamicMonadProcess {
       entropy: newEntropy,
       timestamp: timestamp + dt,
       energy: energy + netFlux * dt,
-      stocks: { ...stocks }
+      stocks: stocks
     });
   }
 }

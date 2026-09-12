@@ -17,8 +17,12 @@ export class PhosphorusCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const boundaryFlux = {
-            netHeatFlux: solarFlux * 1e-6,
+            solarRadiationIn: solarFlux,
+            longwaveRadiationOut: solarFlux * 0.99,
+            sensibleHeatFlux: solarFlux * 1e-6,
+            latentHeatFlux: 0,
             netMassFlux: 0.1,
+            netHeatFlux: solarFlux * 1e-6,
             solarIncoming: solarFlux,
             terrestrialOutgoing: solarFlux * 0.99,
             heatFluxes: [solarFlux * 1e-6],
