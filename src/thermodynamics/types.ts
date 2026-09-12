@@ -329,7 +329,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     let unwrappedInit: any = init;
     if (init instanceof Map) {
       unwrappedInit = { stocks: Object.fromEntries(init) };
-    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init)) {
+    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init)) {
       unwrappedInit = { stocks: init };
     }
 
@@ -502,6 +502,15 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public getAllStocks(): Map<string, number> {
     return this.stocks instanceof Map ? this.stocks : new Map(Object.entries(this.stocks));
   }
+
+  public getInventoryMap(): Record<string, number> {
+    return this.getValues();
+  }
+
+  public getTotalMass(): number {
+    const vals = Object.values(this.getValues());
+    return vals.reduce((a, b) => a + Number(b), 0);
+  }
 }
 
 export type StateVector = ThermodynamicStateVector;
@@ -656,8 +665,8 @@ export class ElementalStocks {
 }
 
 export type Result<T, E = string> = 
-  | { success: true; value: T; isOk: () => boolean; isErr: () => boolean; errorValue?: E }
-  | { success: false; error: E; isOk: () => boolean; isErr: () => boolean; errorValue?: E };
+  | { success: true; value: T; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string }
+  | { success: false; error: E | any; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string; invalidValue?: any };
 
 export function ok<T, E = string>(value: T): Result<T, E> {
   return { success: true, value, isOk: () => true, isErr: () => false };
@@ -732,14 +741,23 @@ export type ValidationResult = {
   isValid: boolean;
   valid: boolean;
   errors?: ValidationFailure[];
-  violations?: ValidationFailure[];
+  violations?: string[];
   discrepancies?: Map<string, any>;
   maxTolerance?: number;
   [key: string]: any;
 };
 
 export type ThermodynamicStateLike = any;
-export type ThermodynamicState = any;
+export type ThermodynamicState = {
+  energy: number;
+  internalEnergy: number;
+  temperature: number;
+  entropy: number;
+  entropyGenerationRate?: number;
+  stocks: Record<string, number>;
+  [key: string]: any;
+};
+
 export type BoundaryFluxBoundary = FluxBoundary;
 
 export function photosyntheticFixation(stocks: any, carbonRate: number, efficiency: number): any {
@@ -766,7 +784,6 @@ export type ValidationReport = {
   isValid: boolean;
   maxDiscrepancy: number;
   discrepancies: DiscrepancyResult[] | Map<string, any>;
-  violations?: any[];
 };
 
 export type DiscrepancyReport = {
@@ -783,4 +800,5 @@ export type DiscrepancyReport = {
   isBalanced?: boolean;
   maxDiscrepancy?: number;
   items?: any[];
+  [key: string]: any;
 };

@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 11%
-SPRINT_GOAL: Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/thermodynamics/state_validator.ts`): Implement discrepancy comparison logic evaluating absolute differences between actual stock deltas and expected flux-derived deltas.
+Roadmap Completion: 13%
+SPRINT_GOAL: Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical comparison helper checking absolute differences against individual elemental tolerances.
 
 ## Web of Life Master Backlog
 
@@ -218,10 +218,12 @@ SPRINT_GOAL: Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/th
 - [x] Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
 - [x] Thermodynamic State Vector Property Validator Helper (`src/thermodynamics/state_validator.ts`): Implement a pure validation function `validateStateProperties(state)` that checks for the presence and validity of required thermodynamic properties (`energy`, `entropy`, `temperature`, `stocks`) without throwing errors.
 - [x] Thermodynamic State Vector Non-Negative Entropy Assertion Utility (`src/thermodynamics/state_validator.ts`): Implement a pure helper function `assertNonNegativeEntropy(state)` that inspects state objects and returns a Result object instead of throwing.
-- [x] Thermodynamic State Vector Non-Negative Entropy Exception Guard (`src/thermodynamics/state_validator.ts`): Implement a strict assertion wrapper `validateOrThrowEntropy(state)` that triggers a `ThermodynamicEntropyViolationError` if $\dot{S}_{\text{gen}} < 0$.
+- [x] ThermodynamicState Vector Non-Negative Entropy Exception Guard (`src/thermodynamics/state_validator.ts`): Implement a strict assertion wrapper `validateOrThrowEntropy(state)` that triggers a `ThermodynamicEntropyViolationError` if $\dot{S}_{\text{gen}} < 0$.
 - [x] Thermodynamic State Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
 - [x] Thermodynamic State Vector Stock Conservation Delta Calculator (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical calculation of expected stock deltas from boundary flux rates and simulation time steps.
-- [ ] Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/thermodynamics/state_validator.ts`): Implement discrepancy comparison logic evaluating absolute differences between actual stock deltas and expected flux-derived deltas.
+- [ ] Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical comparison helper checking absolute differences against individual elemental tolerances.
+- [ ] Thermodynamic State Vector Discrepancy Aggregator (`src/thermodynamics/state_validator.ts`): Implement array mapping and maximum discrepancy accumulation logic over evaluation results.
+- [ ] Thermodynamic State Vector Inventory Discrepancy Evaluator (`src/thermodynamics/state_validator.ts`): Implement complete discrepancy evaluation wrapper integrating core helper and aggregator into standard `evaluateDiscrepancy` method.
 - [ ] Thermodynamic State Vector Tolerance Compliance Checker (`src/thermodynamics/state_validator.ts`): Implement tolerance-bound checking functions that compare stock discrepancies against registered elemental limits.
 - [ ] Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement complete inventory mass conservation verification combining delta calculation, discrepancy evaluation, and strict violation throwing.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.

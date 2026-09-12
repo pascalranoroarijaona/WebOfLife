@@ -8,7 +8,6 @@ import { ThermodynamicMonadProcess } from '../src/thermodynamics/thermodynamic_m
 import { EarthPOD } from '../src/earth_pod.js';
 import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
 describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion', () => {
-    const validator = new ThermodynamicStateValidator();
     it('1. Valid states with S > 0 and S_gen >= 0 pass successfully', () => {
         const validState = {
             timestamp: 0,
@@ -32,10 +31,10 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
                 massFluxes: []
             }
         };
-        const result = validator.validate(validState);
+        const result = ThermodynamicStateValidator.validate(validState);
         assert.strictEqual(result.isValid, true);
         assert.strictEqual((result.violations ?? []).length, 0);
-        assert.doesNotThrow(() => validator.assertValid(validState));
+        assert.doesNotThrow(() => ThermodynamicStateValidator.assertValid(validState));
     });
     it('2. States with negative entropy (S < 0) throw immediate assertion errors', () => {
         const invalidEntropyState = {
@@ -60,10 +59,10 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
                 massFluxes: []
             }
         };
-        const result = validator.validate(invalidEntropyState);
+        const result = ThermodynamicStateValidator.validate(invalidEntropyState);
         assert.strictEqual(result.isValid, false);
         assert.ok((result.violations ?? []).some((v) => v.includes('Entropy') && v.includes('negative')));
-        assert.throws(() => validator.assertValid(invalidEntropyState), /State validation failed/);
+        assert.throws(() => ThermodynamicStateValidator.assertValid(invalidEntropyState), /State validation failed/);
     });
     it('3. States with negative entropy generation rates (S_gen < 0) are rejected', () => {
         const invalidGenState = {
@@ -88,10 +87,10 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
                 massFluxes: []
             }
         };
-        const result = validator.validate(invalidGenState);
+        const result = ThermodynamicStateValidator.validate(invalidGenState);
         assert.strictEqual(result.isValid, false);
         assert.ok((result.violations ?? []).some((v) => v.includes('Dissipation rate') || v.includes('Entropy generation')));
-        assert.throws(() => validator.assertValid(invalidGenState), /State validation failed/);
+        assert.throws(() => ThermodynamicStateValidator.assertValid(invalidGenState), /State validation failed/);
     });
     it('4. Integration with EarthPod thermal and matter balance loops via ThermodynamicMonadProcess', () => {
         const earth = EarthPOD.getInstance();

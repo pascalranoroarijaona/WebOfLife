@@ -1,0 +1,65 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class StateVector {
+  +carbon: number
+  +nitrogen: number
+  +phosphorus: number
+  +water: number
+  +energy: number
+  +entropy: number
+  +getTotalMass(): number
+}
+
+interface ValidationResult {
+  +readonly isValid: boolean
+  +readonly discrepancies: Record<string, number>
+  +readonly maxToleranceExceeded: boolean
+  +readonly timestamp: number
+}
+
+interface ElementTolerances {
+  +readonly [elementKey: string]: number
+}
+
+class StateValidator {
+  -defaultTolerance: number
+  +constructor(defaultTolerance: number)
+  +evaluateDiscrepancy(actual: StateVector, expected: StateVector, tolerances?: ElementTolerances): ValidationResult
+  +validateFirstLaw(vector: StateVector, totalMassExpected: number): boolean
+}
+
+class ThermodynamicStateRecord {
+  +stateId: string
+  +entityId: string
+  +timestamp: number
+  +vector: StateVector
+}
+
+class StateValidationRecord {
+  +validationId: string
+  +actualStateId: string
+  +expectedStateId: string
+  +isValid: boolean
+  +discrepancies: Record<string, number>
+  +maxToleranceExceeded: boolean
+  +firstLawSatisfied: boolean
+  +timestamp: number
+}
+
+class BlockchainTransaction {
+  +txHash: string
+  +blockNumber: number
+  +validationId: string
+  +signature: string
+  +payloadHash: string
+  +timestamp: number
+}
+
+StateValidator --> StateVector : evaluates
+StateValidator ..> ValidationResult : produces
+StateValidator ..> ElementTolerances : uses
+StateValidationRecord --> ThermodynamicStateRecord : links actual/expected
+BlockchainTransaction --> StateValidationRecord : anchors
+@enduml

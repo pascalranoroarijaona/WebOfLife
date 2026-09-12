@@ -19,7 +19,7 @@ export class ThermodynamicMonadProcess {
         if (typeof fluxFunction === 'function') {
             try {
                 const next = fluxFunction(state);
-                this.validator.assertValid(next);
+                StateValidator.assertValid(next);
                 return next;
             }
             catch (err) {

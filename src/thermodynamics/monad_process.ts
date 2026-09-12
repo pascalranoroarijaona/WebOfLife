@@ -27,7 +27,7 @@ export class ThermodynamicMonadProcess implements IMonadProcess {
     if (typeof fluxFunction === 'function') {
       try {
         const next = fluxFunction(state);
-        this.validator.assertValid(next);
+        StateValidator.assertValid(next);
         return next;
       } catch (err: any) {
         throw new Error(`Monad step aborted due to thermodynamic transition violation: ${err.message}`);

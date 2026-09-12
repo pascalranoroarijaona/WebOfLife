@@ -1,60 +1,43 @@
 -- ============================================================================
--- Web of Life Database & Thermodynamic Blockchain Schema (Sprint 062 Update)
+-- Web of Life Database Schema: Sprint 063
+-- Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper
 -- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- 1. Thermodynamic Stock State Vectors Table
 CREATE TABLE IF NOT EXISTS thermodynamic_states (
-    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id VARCHAR(255) NOT NULL,
+    state_id VARCHAR(64) PRIMARY KEY,
+    entity_id VARCHAR(64) NOT NULL,
     timestamp BIGINT NOT NULL,
-    stocks JSONB NOT NULL DEFAULT '{}'::jsonb,
+    carbon DECIMAL(18, 8) NOT NULL,
+    nitrogen DECIMAL(18, 8) NOT NULL,
+    phosphorus DECIMAL(18, 8) NOT NULL,
+    water DECIMAL(18, 8) NOT NULL,
+    energy DECIMAL(18, 8) NOT NULL,
+    entropy DECIMAL(18, 8) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity_time 
-ON thermodynamic_states (entity_id, timestamp DESC);
-
--- 2. Thermodynamic Flux Transactions Ledger Table
-CREATE TABLE IF NOT EXISTS thermodynamic_fluxes (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    transaction_hash VARCHAR(64) UNIQUE NOT NULL,
-    previous_state_id UUID REFERENCES thermodynamic_states(state_id),
-    current_state_id UUID REFERENCES thermodynamic_states(state_id),
-    net_fluxes JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_fluxes_hash 
-ON thermodynamic_fluxes (transaction_hash);
-
--- 3. State Vector Discrepancy Reports Table (Sprint 062 Addition)
-CREATE TABLE IF NOT EXISTS discrepancy_reports (
-    report_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    flux_id UUID REFERENCES thermodynamic_fluxes(flux_id) ON DELETE CASCADE,
-    timestamp BIGINT NOT NULL,
-    is_balanced BOOLEAN NOT NULL,
-    max_discrepancy NUMERIC(20, 10) NOT NULL,
-    tolerance NUMERIC(20, 10) NOT NULL DEFAULT 1e-6,
-    items JSONB NOT NULL DEFAULT '[]'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_discrepancy_reports_balanced 
-ON discrepancy_reports (is_balanced, timestamp DESC);
-
--- 4. Thermodynamic Blockchain Ledger Block Signatures
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT UNIQUE NOT NULL,
-    previous_block_hash VARCHAR(64) NOT NULL,
-    block_hash VARCHAR(64) UNIQUE NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
-    validator_signature VARCHAR(128) NOT NULL,
+CREATE TABLE IF NOT EXISTS state_validation_records (
+    validation_id VARCHAR(64) PRIMARY KEY,
+    actual_state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    expected_state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    is_valid BOOLEAN NOT NULL,
+    discrepancies JSONB NOT NULL,
+    max_tolerance_exceeded BOOLEAN NOT NULL,
+    first_law_satisfied BOOLEAN NOT NULL,
     timestamp BIGINT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_blocks_height 
-ON thermodynamic_blocks (block_height DESC);
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
+    tx_hash VARCHAR(64) PRIMARY KEY,
+    block_number BIGINT NOT NULL,
+    validation_id VARCHAR(64) REFERENCES state_validation_records(validation_id),
+    signature VARCHAR(128) NOT NULL,
+    payload_hash VARCHAR(64) NOT NULL,
+    timestamp BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity ON thermodynamic_states(entity_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_state_validation_valid ON state_validation_records(is_valid);
+CREATE INDEX IF NOT EXISTS idx_blockchain_block ON blockchain_transactions(block_number);

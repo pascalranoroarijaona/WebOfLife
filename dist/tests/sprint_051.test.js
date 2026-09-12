@@ -53,7 +53,7 @@ describe('Sprint 051: Thermodynamic State Vector Stock Conservation Asserter', (
         const validator = new ThermodynamicStateValidator(1e-6);
         const result = validator.assertConservation(prevState, currState, boundary, 1.0);
         assert.strictEqual(result.isValid, false);
-        const violations = result.violations ?? [];
+        const violations = (result.errors ?? []);
         assert.strictEqual(violations.length, 1);
         assert.strictEqual(violations[0].stockName, 'carbon');
         assert.strictEqual(violations[0].observedDelta, 100);
