@@ -3,7 +3,7 @@
  * Implements lightweight builder functions and core data structures for thermodynamic state vectors,
  * enforcing First Law (matter/energy conservation) and Second Law (non-negative entropy generation) compliance.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, IThermodynamicStateVector as IBaseThermodynamicStateVector } from './types.js';
 
 export interface FluxRecord {
   solarRadiation: number;    // Incoming shortwave flux (W/m^2)
@@ -19,15 +19,19 @@ export interface ThermodynamicStateVectorOptions {
   fluxes?: Partial<FluxRecord>;
   entropy?: number;          // Cumulative entropy (J/K)
   timestamp?: number;        // Simulation time step / epoch
+  energy?: number;
+  stocks?: Record<string, number>;
 }
 
-export interface IThermodynamicStateVector {
+export interface IThermodynamicStateVector extends IBaseThermodynamicStateVector {
   temperature: number;
   ambientTemperature: number;
   ambientReferenceTemp: number;
   fluxes: FluxRecord;
   boundaryFluxes: FluxRecord;
   entropy: number;
+  energy: number;
+  stocks: Record<string, number>;
   entropyGenerationRate: number;
   exergyDestructionRate: number;
   timestamp: number;
@@ -43,6 +47,8 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public readonly fluxes: FluxRecord;
   public readonly boundaryFluxes: FluxRecord;
   public readonly entropy: number;
+  public readonly energy: number;
+  public readonly stocks: Record<string, number>;
   public readonly entropyGenerationRate: number;
   public readonly exergyDestructionRate: number;
   public readonly timestamp: number;
@@ -61,17 +67,21 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     };
     this.boundaryFluxes = this.fluxes;
     this.entropy = options?.entropy ?? 0;
+    this.energy = options?.energy ?? 1000;
+    this.stocks = options?.stocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
     this.entropyGenerationRate = 0;
     this.exergyDestructionRate = 0;
     this.timestamp = options?.timestamp ?? 0;
   }
 
-  public clone(overrides?: ThermodynamicStateVectorOptions): ThermodynamicStateVector {
+  public clone(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
     return new ThermodynamicStateVector({
       temperature: overrides?.temperature ?? this.temperature,
       fluxes: { ...this.fluxes, ...overrides?.fluxes },
       entropy: overrides?.entropy ?? this.entropy,
       timestamp: overrides?.timestamp ?? this.timestamp,
+      energy: overrides?.energy ?? this.energy,
+      stocks: overrides?.stocks ?? { ...this.stocks },
     });
   }
 
@@ -88,14 +98,14 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
 /**
  * Lightweight builder function to instantiate baseline state vectors.
  */
-export function createBaselineStateVector(overrides?: ThermodynamicStateVectorOptions): ThermodynamicStateVector {
+export function createBaselineStateVector(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
   return new ThermodynamicStateVector(overrides);
 }
 
 /**
  * Backward compatibility alias expected by sprint tests (e.g., sprint_026.test.ts).
  */
-export function createThermodynamicStateVector(overrides?: ThermodynamicStateVectorOptions): ThermodynamicStateVector {
+export function createThermodynamicStateVector(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector {
   return createBaselineStateVector(overrides);
 }
 
@@ -110,10 +120,10 @@ export class ThermodynamicMonadProcess {
     dt: number
   ): IThermodynamicStateVector {
     const updatedFluxes: FluxRecord = {
-      solarRadiation: fluxDelta.solarRadiation ?? state.fluxes.solarRadiation,
-      thermalEmission: fluxDelta.thermalEmission ?? state.fluxes.thermalEmission,
-      latentHeat: fluxDelta.latentHeat ?? state.fluxes.latentHeat,
-      sensibleHeat: fluxDelta.sensibleHeat ?? state.fluxes.sensibleHeat,
+      solarRadiation: fluxDelta.solarRadiation ?? state.fluxes?.solarRadiation ?? 0,
+      thermalEmission: fluxDelta.thermalEmission ?? state.fluxes?.thermalEmission ?? 0,
+      latentHeat: fluxDelta.latentHeat ?? state.fluxes?.latentHeat ?? 0,
+      sensibleHeat: fluxDelta.sensibleHeat ?? state.fluxes?.sensibleHeat ?? 0,
     };
 
     const netFlux = updatedFluxes.solarRadiation - (
@@ -122,18 +132,37 @@ export class ThermodynamicMonadProcess {
       updatedFluxes.sensibleHeat
     );
 
-    const dEntropy = (Math.abs(netFlux) / state.temperature) * dt;
-    const newEntropy = state.entropy + dEntropy;
+    const temperature = state.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    const dEntropy = (Math.abs(netFlux) / temperature) * dt;
+    const entropy = state.entropy ?? 0;
+    const newEntropy = entropy + dEntropy;
 
     const heatCapacityParam = 2.0e5;
     const dT = (netFlux * dt) / heatCapacityParam;
-    const newTemperature = Math.max(0.1, state.temperature + dT);
+    const newTemperature = Math.max(0.1, temperature + dT);
 
-    return state.clone({
+    const energy = state.energy ?? state.internalEnergy ?? 1000;
+    const timestamp = state.timestamp ?? 0;
+    const stocks = state.stocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
+
+    if (typeof state.clone === 'function') {
+      return state.clone({
+        temperature: newTemperature,
+        fluxes: updatedFluxes,
+        entropy: newEntropy,
+        timestamp: timestamp + dt,
+        energy: energy + netFlux * dt,
+        stocks: { ...stocks }
+      });
+    }
+
+    return new ThermodynamicStateVector({
       temperature: newTemperature,
       fluxes: updatedFluxes,
       entropy: newEntropy,
-      timestamp: state.timestamp + dt,
+      timestamp: timestamp + dt,
+      energy: energy + netFlux * dt,
+      stocks: { ...stocks }
     });
   }
 }

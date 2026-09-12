@@ -1,6 +1,7 @@
 // File: src/earth_pod.ts
 import { ThermodynamicStructure, EntropyState, Stock, type Flow, applyThermalFlux, applyMassTransport } from './thermodynamics/thermodynamic_structure.js';
-import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, IBoundaryFluxArray, IExergyMetrics } from './thermodynamics/types.js';
+import { IThermodynamicStateVector as IBaseThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, IBoundaryFluxArray, IExergyMetrics } from './thermodynamics/types.js';
+import { IThermodynamicStateVector as IStateVectorValidator } from './thermodynamics/state_vector.js';
 import { CarbonCycle } from './cycles/carbon.js';
 import { WaterCycle } from './cycles/water.js';
 import { NitrogenCycle } from './cycles/nitrogen.js';
@@ -374,7 +375,7 @@ export class EarthPOD extends ThermodynamicStructure {
     return EarthPOD._instance;
   }
 
-  public getStateVector(): IThermodynamicStateVector {
+  public getStateVector(): IBaseThermodynamicStateVector & IStateVectorValidator {
     const netHeat = this.solarInputWatts * 0.01;
     const entropyGen = 150.0;
     const boundaryFluxes: IBoundaryFluxArray = {
@@ -399,22 +400,25 @@ export class EarthPOD extends ThermodynamicStructure {
       totalExergy: 1e12
     };
 
-    const vec: IThermodynamicStateVector = {
+    const vec: any = {
       tick: this.tickCreated,
       timestamp: this.tickCreated,
       internalEnergy: 1e12,
       totalEntropy: 5e9,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
-      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
       entropy: 5e9,
+      energy: 1e12,
+      stocks: { carbon: 850, nitrogen: 3900000, phosphorus: 4e9, water: 1338000000 },
       entropyGenerationRate: entropyGen,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
       exergy: 1e12,
       boundaryFluxes,
       exergyMetrics,
       validateSecondLaw: () => entropyGen >= 0,
-      validateFirstLaw: () => true
+      validateFirstLaw: () => true,
+      clone: (overrides?: any) => ({ ...vec, ...overrides })
     };
 
     return vec;

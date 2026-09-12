@@ -1,0 +1,90 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F9F9F9
+skinparam classBorderColor #333333
+
+title Web of Life - Sprint 029: Thermodynamic State Vector Validation & Monad Architecture
+
+package "src.thermodynamics" {
+    class ThermodynamicStateVector {
+        +energy: number
+        +entropy: number | { total: number }
+        +temperature: number
+        +stocks: Record<string, number>
+    }
+
+    interface IStateValidator {
+        +validateStateVector(vector: ThermodynamicStateVector): boolean
+        +assertNonNegativeEntropy(vector: ThermodynamicStateVector): void
+        +assertRequiredProperties(vector: ThermodynamicStateVector): void
+        +assertNonNegativeStocks(vector: ThermodynamicStateVector): void
+    }
+
+    class ThermodynamicStateValidator {
+        + {static} validateStateVector(vector: ThermodynamicStateVector): void
+        + {static} assertRequiredProperties(vector: ThermodynamicStateVector): void
+        + {static} assertNonNegativeEntropy(vector: ThermodynamicStateVector): void
+        + {static} assertNonNegativeStocks(vector: ThermodynamicStateVector): void
+        + {static} wrapMonadStep(stepFn: MonadStepFunction): MonadStepFunction
+    }
+
+    class ThermodynamicMonadProcess {
+        -validator: ThermodynamicStateValidator
+        +executeStep(vector: ThermodynamicStateVector): ThermodynamicStateVector
+    }
+
+    IStateValidator <|.. ThermodynamicStateValidator
+    ThermodynamicStateValidator --> ThermodynamicStateVector : inspects
+    ThermodynamicMonadProcess --> ThermodynamicStateValidator : uses wrapMonadStep
+    ThermodynamicMonadProcess --> ThermodynamicStateVector : transforms
+}
+
+package "Database & Ledger Schema" {
+    class thermodynamic_state_vectors {
+        +vector_id: UUID
+        +pod_id: UUID
+        +timestamp: TIMESTAMPTZ
+        +energy: DOUBLE PRECISION
+        +entropy: DOUBLE PRECISION
+        +temperature: DOUBLE PRECISION
+        +stocks: JSONB
+        +is_valid: BOOLEAN
+        +validation_error: TEXT
+    }
+
+    class monad_execution_logs {
+        +execution_id: UUID
+        +vector_id_input: UUID
+        +vector_id_output: UUID
+        +step_name: VARCHAR
+        +status: VARCHAR
+        +error_message: TEXT
+        +execution_time_ms: DOUBLE PRECISION
+    }
+
+    class thermodynamic_blocks {
+        +block_id: UUID
+        +block_height: BIGINT
+        +previous_hash: VARCHAR
+        +merkle_root: VARCHAR
+        +universe_entropy_change: DOUBLE PRECISION
+        +validator_signature: VARCHAR
+    }
+
+    class thermodynamic_transactions {
+        +tx_id: UUID
+        +block_id: UUID
+        +source_pod_id: UUID
+        +target_pod_id: UUID
+        +stock_type: VARCHAR
+        +quantity: DOUBLE PRECISION
+        +entropy_generated: DOUBLE PRECISION
+        +tx_signature: VARCHAR
+    }
+
+    thermodynamic_state_vectors ||--o{ monad_execution_logs : input/output
+    thermodynamic_blocks ||--o{ thermodynamic_transactions : contains
+}
+
+@enduml

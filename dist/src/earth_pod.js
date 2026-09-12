@@ -348,16 +348,19 @@ export class EarthPOD extends ThermodynamicStructure {
             internalEnergy: 1e12,
             totalEntropy: 5e9,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
-            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
+            ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
             entropy: 5e9,
+            energy: 1e12,
+            stocks: { carbon: 850, nitrogen: 3900000, phosphorus: 4e9, water: 1338000000 },
             entropyGenerationRate: entropyGen,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
             exergy: 1e12,
             boundaryFluxes,
             exergyMetrics,
             validateSecondLaw: () => entropyGen >= 0,
-            validateFirstLaw: () => true
+            validateFirstLaw: () => true,
+            clone: (overrides) => ({ ...vec, ...overrides })
         };
         return vec;
     }

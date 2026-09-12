@@ -180,6 +180,7 @@ export interface IThermodynamicStateVector {
   timestamp?: number;
   time?: number;
   internalEnergy?: number;
+  energy?: number;
   totalEntropy?: number;
   temperature?: number;
   ambientTemperature?: number;
@@ -198,6 +199,7 @@ export interface IThermodynamicStateVector {
   exergyDestructionRateWatts?: number;
   exergy?: number;
   boundaryFluxes?: IBoundaryFluxArray | BoundaryFluxArray | any;
+  fluxes?: any;
   boundaryHeatFlux?: any;
   boundaryFlux?: any;
   exergyMetrics?: IExergyMetrics;
@@ -205,6 +207,7 @@ export interface IThermodynamicStateVector {
   massFluxes?: Record<string, number> | any[];
   elementalStocks?: number[] | any;
   massInventory?: Record<string, number>;
+  stocks?: Record<string, number>;
   pressure?: number;
   volume?: number;
   specificEntropy?: number;
@@ -226,6 +229,7 @@ export interface IThermodynamicStateVector {
   pressure_P?: number;
   volume_V?: number;
   stock_masses?: Record<string, number>;
+  clone?: (overrides?: any) => IThermodynamicStateVector;
   validateSecondLaw?: () => boolean;
   validateFirstLaw?: () => boolean;
 }

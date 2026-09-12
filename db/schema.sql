@@ -1,56 +1,71 @@
--- Sprint 028: Spatial Equilibrium, Trophic Cascade Refinement, and Thermodynamic Ledger Stabilization
--- Database Schema Extensions
+-- ============================================================================
+-- Web of Life Database & Thermodynamic Blockchain Schema
+-- Sprint 029 Update: Thermodynamic State Vector Validation & Monad Ledger
+-- ============================================================================
 
--- Drop existing tables if re-provisioning for clean state
-DROP TABLE IF EXISTS thermodynamic_ledger_audit CASCADE;
-DROP TABLE IF EXISTS detritivore_scavenge_events CASCADE;
-DROP TABLE IF EXISTS biome_patch_nutrients CASCADE;
-DROP TABLE IF EXISTS spatial_nodes CASCADE;
+-- Enable UUID extension if not present
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Spatial Nodes and Biome Patches
-CREATE TABLE spatial_nodes (
-    node_id VARCHAR(64) PRIMARY KEY,
-    node_type VARCHAR(32) NOT NULL CHECK (node_type IN ('BiomePatch', 'ObstacleNode')),
-    coordinate_x DOUBLE PRECISION NOT NULL,
-    coordinate_y DOUBLE PRECISION NOT NULL,
-    carrying_capacity DOUBLE PRECISION NOT NULL CHECK (carrying_capacity >= 0),
-    connectivity_weights JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- ----------------------------------------------------------------------------
+-- 1. Thermodynamic State Vectors & Validation Logs
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pod_id UUID NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    energy DOUBLE PRECISION NOT NULL CHECK (energy >= 0),
+    entropy DOUBLE PRECISION NOT NULL CHECK (entropy >= 0),
+    temperature DOUBLE PRECISION NOT NULL CHECK (temperature > 0),
+    stocks JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_valid BOOLEAN NOT NULL DEFAULT TRUE,
+    validation_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE biome_patch_nutrients (
-    patch_id VARCHAR(64) PRIMARY KEY REFERENCES spatial_nodes(node_id) ON DELETE CASCADE,
-    carbon_stock DOUBLE PRECISION NOT NULL CHECK (carbon_stock >= 0),
-    nitrogen_stock DOUBLE PRECISION NOT NULL CHECK (nitrogen_stock >= 0),
-    phosphorus_stock DOUBLE PRECISION NOT NULL CHECK (phosphorus_stock >= 0),
-    sunlight_flux DOUBLE PRECISION NOT NULL CHECK (sunlight_flux >= 0),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE INDEX IF NOT EXISTS idx_thermo_vectors_pod_time 
+ON thermodynamic_state_vectors(pod_id, timestamp DESC);
+
+-- ----------------------------------------------------------------------------
+-- 2. Thermodynamic Monad Execution Ledger
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS monad_execution_logs (
+    execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vector_id_input UUID REFERENCES thermodynamic_state_vectors(vector_id),
+    vector_id_output UUID REFERENCES thermodynamic_state_vectors(vector_id),
+    step_name VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('SUCCESS', 'VALIDATION_FAILED', 'EXECUTION_ERROR')),
+    error_message TEXT,
+    execution_time_ms DOUBLE PRECISION NOT NULL,
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Detritivore Scavenge and Decomposition Events
-CREATE TABLE detritivore_scavenge_events (
-    event_id VARCHAR(64) PRIMARY KEY,
-    detritivore_id VARCHAR(64) NOT NULL,
-    carcass_id VARCHAR(64) NOT NULL,
-    assimilated_biomass DOUBLE PRECISION NOT NULL CHECK (assimilated_biomass >= 0),
-    residue_mass DOUBLE PRECISION NOT NULL CHECK (residue_mass >= 0),
-    entropy_increment DOUBLE PRECISION NOT NULL CHECK (entropy_increment >= 0),
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE INDEX IF NOT EXISTS idx_monad_logs_status 
+ON monad_execution_logs(status, executed_at DESC);
+
+-- ----------------------------------------------------------------------------
+-- 3. Thermodynamic Blockchain Stock Transactions
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT UNIQUE NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    universe_entropy_change DOUBLE PRECISION NOT NULL CHECK (universe_entropy_change >= 0),
+    validator_signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Thermodynamic Ledger & Conservation Audits (Blockchain Integration)
-CREATE TABLE thermodynamic_ledger_audit (
-    block_id VARCHAR(64) PRIMARY KEY,
-    previous_hash VARCHAR(128) NOT NULL,
-    merkle_root VARCHAR(128) NOT NULL,
-    total_system_mass DOUBLE PRECISION NOT NULL,
-    mass_discrepancy_delta DOUBLE PRECISION NOT NULL CHECK (ABS(mass_discrepancy_delta) <= 1e-12),
-    global_entropy DOUBLE PRECISION NOT NULL CHECK (global_entropy >= 0),
-    dissipated_heat_joules DOUBLE PRECISION NOT NULL CHECK (dissipated_heat_joules >= 0),
-    signature VARCHAR(256) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
+    source_pod_id UUID NOT NULL,
+    target_pod_id UUID NOT NULL,
+    stock_type VARCHAR(100) NOT NULL, -- e.g., 'CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER'
+    quantity DOUBLE PRECISION NOT NULL CHECK (quantity >= 0),
+    entropy_generated DOUBLE PRECISION NOT NULL CHECK (entropy_generated >= 0),
+    tx_signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for high-frequency queries
-CREATE INDEX idx_spatial_nodes_coords ON spatial_nodes(coordinate_x, coordinate_y);
-CREATE INDEX idx_ledger_audit_created ON thermodynamic_ledger_audit(created_at);
+CREATE INDEX IF NOT EXISTS idx_thermo_tx_block 
+ON thermodynamic_transactions(block_id);

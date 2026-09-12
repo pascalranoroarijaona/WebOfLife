@@ -11,6 +11,8 @@ export class ThermodynamicStateVector {
     fluxes;
     boundaryFluxes;
     entropy;
+    energy;
+    stocks;
     entropyGenerationRate;
     exergyDestructionRate;
     timestamp;
@@ -28,6 +30,8 @@ export class ThermodynamicStateVector {
         };
         this.boundaryFluxes = this.fluxes;
         this.entropy = options?.entropy ?? 0;
+        this.energy = options?.energy ?? 1000;
+        this.stocks = options?.stocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
         this.entropyGenerationRate = 0;
         this.exergyDestructionRate = 0;
         this.timestamp = options?.timestamp ?? 0;
@@ -38,6 +42,8 @@ export class ThermodynamicStateVector {
             fluxes: { ...this.fluxes, ...overrides?.fluxes },
             entropy: overrides?.entropy ?? this.entropy,
             timestamp: overrides?.timestamp ?? this.timestamp,
+            energy: overrides?.energy ?? this.energy,
+            stocks: overrides?.stocks ?? { ...this.stocks },
         });
     }
     validateFirstLaw() {
@@ -67,24 +73,41 @@ export function createThermodynamicStateVector(overrides) {
 export class ThermodynamicMonadProcess {
     static step(state, fluxDelta, dt) {
         const updatedFluxes = {
-            solarRadiation: fluxDelta.solarRadiation ?? state.fluxes.solarRadiation,
-            thermalEmission: fluxDelta.thermalEmission ?? state.fluxes.thermalEmission,
-            latentHeat: fluxDelta.latentHeat ?? state.fluxes.latentHeat,
-            sensibleHeat: fluxDelta.sensibleHeat ?? state.fluxes.sensibleHeat,
+            solarRadiation: fluxDelta.solarRadiation ?? state.fluxes?.solarRadiation ?? 0,
+            thermalEmission: fluxDelta.thermalEmission ?? state.fluxes?.thermalEmission ?? 0,
+            latentHeat: fluxDelta.latentHeat ?? state.fluxes?.latentHeat ?? 0,
+            sensibleHeat: fluxDelta.sensibleHeat ?? state.fluxes?.sensibleHeat ?? 0,
         };
         const netFlux = updatedFluxes.solarRadiation - (updatedFluxes.thermalEmission +
             updatedFluxes.latentHeat +
             updatedFluxes.sensibleHeat);
-        const dEntropy = (Math.abs(netFlux) / state.temperature) * dt;
-        const newEntropy = state.entropy + dEntropy;
+        const temperature = state.temperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+        const dEntropy = (Math.abs(netFlux) / temperature) * dt;
+        const entropy = state.entropy ?? 0;
+        const newEntropy = entropy + dEntropy;
         const heatCapacityParam = 2.0e5;
         const dT = (netFlux * dt) / heatCapacityParam;
-        const newTemperature = Math.max(0.1, state.temperature + dT);
-        return state.clone({
+        const newTemperature = Math.max(0.1, temperature + dT);
+        const energy = state.energy ?? state.internalEnergy ?? 1000;
+        const timestamp = state.timestamp ?? 0;
+        const stocks = state.stocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
+        if (typeof state.clone === 'function') {
+            return state.clone({
+                temperature: newTemperature,
+                fluxes: updatedFluxes,
+                entropy: newEntropy,
+                timestamp: timestamp + dt,
+                energy: energy + netFlux * dt,
+                stocks: { ...stocks }
+            });
+        }
+        return new ThermodynamicStateVector({
             temperature: newTemperature,
             fluxes: updatedFluxes,
             entropy: newEntropy,
-            timestamp: state.timestamp + dt,
+            timestamp: timestamp + dt,
+            energy: energy + netFlux * dt,
+            stocks: { ...stocks }
         });
     }
 }

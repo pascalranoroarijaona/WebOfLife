@@ -1,26 +1,42 @@
 /**
- * Thermodynamic State Vector Validation Wrapper (Sprint 028)
- * Provides validation helper functions that assert required property existence
- * and non-negative entropy fields prior to monad step executions.
+ * Thermodynamic State Vector Validation Wrapper & Extensions (Sprint 028 & 029)
+ * Provides validation helper functions, elemental stock arithmetic, thermodynamic ledgers,
+ * biome patches, and detritivore scavenge monads.
  */
+import { IThermodynamicStateVector } from './state_vector.js';
 
-import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
-
-@dataclassDecorator
 export class ElementalStocks {
   constructor(
-    public carbon: number,
-    public nitrogen: number,
-    public phosphorus: number,
-    public water: number
+    public carbon: number = 0,
+    public nitrogen: number = 0,
+    public phosphorus: number = 0,
+    public oxygen: number = 0,
+    public water: number = 0,
+    public biomass: number = 0,
+    public qLoss: number = 0
   ) {}
+
+  public isNonNegative(): boolean {
+    return (
+      this.carbon >= 0 &&
+      this.nitrogen >= 0 &&
+      this.phosphorus >= 0 &&
+      this.oxygen >= 0 &&
+      this.water >= 0 &&
+      this.biomass >= 0 &&
+      this.qLoss >= 0
+    );
+  }
 
   public add(other: ElementalStocks): ElementalStocks {
     return new ElementalStocks(
       this.carbon + other.carbon,
       this.nitrogen + other.nitrogen,
       this.phosphorus + other.phosphorus,
-      this.water + other.water
+      this.oxygen + other.oxygen,
+      this.water + other.water,
+      this.biomass + other.biomass,
+      this.qLoss + other.qLoss
     );
   }
 
@@ -29,100 +45,61 @@ export class ElementalStocks {
       this.carbon - other.carbon,
       this.nitrogen - other.nitrogen,
       this.phosphorus - other.phosphorus,
-      this.water - other.water
+      this.oxygen - other.oxygen,
+      this.water - other.water,
+      this.biomass - other.biomass,
+      this.qLoss - other.qLoss
     );
   }
 
-  public isNonNegative(): boolean {
-    return (
-      this.carbon >= 0.0 &&
-      this.nitrogen >= 0.0 &&
-      this.phosphorus >= 0.0 &&
-      this.water >= 0.0
+  public clone(): ElementalStocks {
+    return new ElementalStocks(
+      this.carbon,
+      this.nitrogen,
+      this.phosphorus,
+      this.oxygen,
+      this.water,
+      this.biomass,
+      this.qLoss
     );
   }
-}
-
-function dataclassDecorator<T extends { new (...args: any[]): {} }>(constructor: T) {
-  return class extends constructor {
-    constructor(...args: any[]) {
-      super(...args);
-    }
-  };
 }
 
 export class ThermodynamicLedger {
-  public totalEntropy: number;
-  public totalDissipatedHeat: number;
-  public initialSystemMass: ElementalStocks | null;
+  public totalDissipatedHeat: number = 0;
+  public totalEntropy: number = 0.0;
+  private baselineMass: ElementalStocks | null = null;
 
-  constructor(
-    totalEntropy: number = 0.0,
-    totalDissipatedHeat: number = 0.0,
-    initialSystemMass: ElementalStocks | null = null
-  ) {
-    this.totalEntropy = totalEntropy;
-    this.totalDissipatedHeat = totalDissipatedHeat;
-    this.initialSystemMass = initialSystemMass;
-  }
-
-  public recordDissipation(joules: number, ambientTemp: number = STANDARD_AMBIENT_TEMPERATURE_K): void {
-    if (joules < 0) {
-      throw new Error("Dissipated heat cannot be negative.");
+  public recordDissipation(heatJoules: number, ambientTemp: number = 298.15): void {
+    if (heatJoules < 0) {
+      throw new Error('Dissipated heat cannot be negative.');
     }
-    const deltaS = joules / ambientTemp;
-    this.totalEntropy += deltaS;
-    this.totalDissipatedHeat += joules;
+    this.totalDissipatedHeat += heatJoules;
+    if (ambientTemp > 0) {
+      this.totalEntropy += heatJoules / ambientTemp;
+    }
   }
 
   public auditMassConservation(currentMass: ElementalStocks): number {
-    if (this.initialSystemMass === null) {
-      this.initialSystemMass = currentMass;
+    if (!this.baselineMass) {
+      this.baselineMass = currentMass.clone();
       return 0.0;
     }
-
-    const diff =
-      Math.abs(currentMass.carbon - this.initialSystemMass.carbon) +
-      Math.abs(currentMass.nitrogen - this.initialSystemMass.nitrogen) +
-      Math.abs(currentMass.phosphorus - this.initialSystemMass.phosphorus) +
-      Math.abs(currentMass.water - this.initialSystemMass.water);
-
-    return Number(diff);
+    const diffCarbon = Math.abs(currentMass.carbon - this.baselineMass.carbon);
+    const diffNitrogen = Math.abs(currentMass.nitrogen - this.baselineMass.nitrogen);
+    return diffCarbon + diffNitrogen;
   }
 }
 
-export abstract class SpatialNode {
-  public coordinates: [number, number];
-  public carryingCapacity: number;
-
-  constructor(coordinates: [number, number], carryingCapacity: number) {
-    this.coordinates = coordinates;
-    this.carryingCapacity = carryingCapacity;
-  }
-
-  public abstract queryNutrients(): ElementalStocks;
-  public abstract consumeNutrients(demand: ElementalStocks): ElementalStocks;
-}
-
-export class BiomePatch extends SpatialNode {
-  public nutrientPool: ElementalStocks;
-
-  constructor(coordinates: [number, number], carryingCapacity: number, initialPool: ElementalStocks) {
-    super(coordinates, carryingCapacity);
-    this.nutrient_pool = initialPool;
-    this.nutrientPool = initialPool;
-  }
-
-  public get nutrient_pool(): ElementalStocks {
-    return this.nutrientPool;
-  }
-
-  public set nutrient_pool(val: ElementalStocks) {
-    this.nutrientPool = val;
-  }
+export class BiomePatch {
+  constructor(
+    public coordinates: [number, number],
+    public areaKm2: number,
+    public nutrientPool: ElementalStocks
+  ) {}
 
   public queryNutrients(): ElementalStocks {
-    return this.nutrientPool;
+    return this.nutrientPool.clone();
   }
 
   public consumeNutrients(demand: ElementalStocks): ElementalStocks {
@@ -132,12 +109,17 @@ export class BiomePatch extends SpatialNode {
       Math.min(this.nutrientPool.phosphorus, demand.phosphorus),
       Math.min(this.nutrientPool.water, demand.water)
     );
-    this.nutrientPool = this.nutrientPool.subtract(fulfilled);
+
+    this.nutrientPool.carbon -= fulfilled.carbon;
+    this.nutrientPool.nitrogen -= fulfilled.nitrogen;
+    this.nutrientPool.phosphorus -= fulfilled.phosphorus;
+    this.nutrientPool.water -= fulfilled.water;
+
     return fulfilled;
   }
 
-  public depositCarcass(carcassStocks: ElementalStocks): void {
-    this.nutrientPool = this.nutrientPool.add(carcassStocks);
+  public returnResidue(residue: ElementalStocks): void {
+    this.nutrientPool = this.nutrientPool.add(residue);
   }
 }
 
@@ -148,50 +130,115 @@ export class DetritivoreMonad {
     ledger: ThermodynamicLedger
   ): [ElementalStocks, ElementalStocks] {
     const assimilationEfficiency = 0.15;
-
     const assimilated = new ElementalStocks(
       carcass.carbon * assimilationEfficiency,
       carcass.nitrogen * assimilationEfficiency,
       carcass.phosphorus * assimilationEfficiency,
-      carcass.water * assimilationEfficiency
+      carcass.water * assimilationEfficiency,
+      0,
+      carcass.carbon * assimilationEfficiency
     );
 
-    const residue = carcass.subtract(assimilated);
+    const residue = new ElementalStocks(
+      carcass.carbon * (1 - assimilationEfficiency),
+      carcass.nitrogen * (1 - assimilationEfficiency),
+      carcass.phosphorus * (1 - assimilationEfficiency),
+      carcass.water * (1 - assimilationEfficiency)
+    );
 
-    const energyReleasedJoules = carcass.carbon * 10.5;
-    ledger.recordDissipation(energyReleasedJoules);
-
-    patch.depositCarcass(residue);
+    const heatGenerated = carcass.carbon * 10.5;
+    ledger.recordDissipation(heatGenerated);
+    patch.returnResidue(residue);
 
     return [assimilated, residue];
   }
 }
 
-export interface IThermodynamicStateValidator {
-  validateStateVector(state: IThermodynamicStateVector): boolean;
-  assertNonNegativeEntropy(state: IThermodynamicStateVector): void;
+export interface IStateValidator {
+  validateStateVector(vector: IThermodynamicStateVector): boolean;
+  assertNonNegativeEntropy(vector: IThermodynamicStateVector): void;
+  assertRequiredProperties(vector: IThermodynamicStateVector): void;
+  assertNonNegativeStocks(vector: IThermodynamicStateVector): void;
 }
 
-export class ThermodynamicStateValidator implements IThermodynamicStateValidator {
-  public validateStateVector(state: IThermodynamicStateVector): boolean {
-    if (!state) return false;
-    const entropy = state.entropy ?? state.totalEntropy ?? state.systemEntropy;
-    const sGen = state.entropyGenerationRate;
-    if (entropy === undefined || entropy === null || Number.isNaN(entropy)) return false;
-    if (sGen !== undefined && sGen < 0) return false;
+export type MonadStepFunction = (vector: IThermodynamicStateVector) => IThermodynamicStateVector;
+
+export class ThermodynamicStateValidator implements IStateValidator {
+  public static assertRequiredProperties(vector: IThermodynamicStateVector): void {
+    if (!vector) {
+      throw new Error('ValidationError: ThermodynamicStateVector is null or undefined.');
+    }
+    if (vector.energy === undefined) {
+      throw new Error("ValidationError: Missing required property 'energy'");
+    }
+    if (vector.entropy === undefined) {
+      throw new Error("ValidationError: Missing required property 'entropy'");
+    }
+    if (vector.temperature === undefined) {
+      throw new Error("ValidationError: Missing required property 'temperature'");
+    }
+    if (vector.stocks === undefined) {
+      throw new Error("ValidationError: Missing required property 'stocks'");
+    }
+  }
+
+  public assertRequiredProperties(vector: IThermodynamicStateVector): void {
+    ThermodynamicStateValidator.assertRequiredProperties(vector);
+  }
+
+  public static assertNonNegativeEntropy(vector: IThermodynamicStateVector): void {
+    const sGen = vector.entropyGenerationRate ?? 0;
+    const entropy = vector.entropy ?? 0;
+    if (entropy < 0) {
+      throw new Error(`ThermodynamicViolation (Second Law): Entropy cannot be negative. Found: ${entropy}`);
+    }
+    if (sGen < -1e-9) {
+      throw new Error(`ThermodynamicViolation (Second Law): Entropy generation rate cannot be negative. Found: ${sGen}`);
+    }
+  }
+
+  public assertNonNegativeEntropy(vector: IThermodynamicStateVector): void {
+    ThermodynamicStateValidator.assertNonNegativeEntropy(vector);
+  }
+
+  public static assertNonNegativeStocks(vector: IThermodynamicStateVector): void {
+    if (vector.temperature !== undefined && vector.temperature <= 0) {
+      throw new Error('ThermodynamicViolation: Absolute temperature must be strictly positive');
+    }
+    if (vector.stocks) {
+      for (const [key, value] of Object.entries(vector.stocks)) {
+        if (typeof value === 'number' && value < 0) {
+          throw new Error(`ThermodynamicViolation (First Law): Stock '${key}' has negative mass/count: ${value}`);
+        }
+      }
+    }
+  }
+
+  public assertNonNegativeStocks(vector: IThermodynamicStateVector): void {
+    ThermodynamicStateValidator.assertNonNegativeStocks(vector);
+  }
+
+  public static validateStateVector(vector: IThermodynamicStateVector): boolean {
+    this.assertRequiredProperties(vector);
+    this.assertNonNegativeEntropy(vector);
+    this.assertNonNegativeStocks(vector);
     return true;
   }
 
-  public assertNonNegativeEntropy(state: IThermodynamicStateVector): void {
-    if (!this.validateStateVector(state)) {
-      throw new Error("Thermodynamic State Validation Failed: Invalid or negative entropy/entropy generation detected.");
-    }
-    const entropy = state.entropy ?? state.totalEntropy ?? 0;
-    const sGen = state.entropyGenerationRate ?? 0;
-    if (entropy < 0 || sGen < 0) {
-      throw new Error(`Second Law Violation: Entropy (${entropy}) or Entropy Generation Rate (${sGen}) must be non-negative.`);
-    }
+  public validateStateVector(vector: IThermodynamicStateVector): boolean {
+    return ThermodynamicStateValidator.validateStateVector(vector);
+  }
+
+  public static wrapMonadStep(stepFn: MonadStepFunction): MonadStepFunction {
+    return (vector: IThermodynamicStateVector): IThermodynamicStateVector => {
+      this.assertRequiredProperties(vector);
+      this.assertNonNegativeEntropy(vector);
+      this.assertNonNegativeStocks(vector);
+      const nextVector = stepFn(vector);
+      this.assertRequiredProperties(nextVector);
+      this.assertNonNegativeEntropy(nextVector);
+      this.assertNonNegativeStocks(nextVector);
+      return nextVector;
+    };
   }
 }
-
-export const STATE_VALIDATOR = new ThermodynamicStateValidator();
