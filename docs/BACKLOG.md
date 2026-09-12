@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 13%
-SPRINT_GOAL: Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper functions that assert required property existence and non-negative entropy fields prior to monad step executions.
+SPRINT_GOAL: Thermodynamic State Vector Property Validator Helper (`src/thermodynamics/state_validator.ts`): Implement a pure validation function `validateStateProperties(state)` that checks for the presence and validity of required thermodynamic properties (`energy`, `entropy`, `temperature`, `stocks`) without throwing errors.
 
 ## Web of Life Master Backlog
 
@@ -10,7 +10,10 @@ SPRINT_GOAL: Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/
 - [x] Biogeochemical `CyclePOD` instances (Carbon, Water, Nitrogen, Phosphorus). (`src/cycles/carbon.ts`, `src/cycles/water.ts`, `src/cycles/nitrogen.ts`, `src/cycles/phosphorus.ts`)
 - [x] Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
 - [x] Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
-- [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper functions that assert required property existence and non-negative entropy fields prior to monad step executions.
+- [ ] Thermodynamic State Vector Property Validator Helper (`src/thermodynamics/state_validator.ts`): Implement a pure validation function `validateStateProperties(state)` that checks for the presence and validity of required thermodynamic properties (`energy`, `entropy`, `temperature`, `stocks`) without throwing errors.
+- [ ] Thermodynamic State Vector Non-Negative Entropy Assertion (`src/thermodynamics/state_validator.ts`): Implement validation utility checking that entropy and entropy generation rates are $\ge 0$ to satisfy the Second Law.
+- [ ] Thermodynamic State Vector Stock Conservation Asserter (`src/thermodynamics/state_validator.ts`): Implement inventory mass conservation checks verifying stock deltas against boundary flux rates within tolerance bounds.
+- [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper wrapper function that integrates property checks, entropy assertions, and stock conservation validators for monad step executions.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
 - [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).

@@ -1,0 +1,44 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics" {
+  interface ValidationFailure {
+    +property: string
+    +reason: string
+  }
+
+  interface ValidationResult {
+    +isValid: boolean
+    +errors: ValidationFailure[]
+  }
+
+  class StateValidator {
+    +{static} validateStateProperties(state: unknown): ValidationResult
+  }
+
+  class ThermodynamicStateVector {
+    +energy: number
+    +entropy: number
+    +temperature: number
+    +stocks: Map<string, number>
+  }
+}
+
+package "Blockchain & Ledger" {
+  class BlockchainTransaction {
+    +txHash: string
+    +blockIndex: number
+    +previousHash: string
+    +signature: string
+    +payload: ThermodynamicStateVector
+    +verify(): boolean
+  }
+}
+
+StateValidator ..> ValidationResult : produces
+ValidationResult *-- ValidationFailure : contains errors
+StateValidator ..> ThermodynamicStateVector : validates
+BlockchainTransaction --> ThermodynamicStateVector : secures state
+
+@enduml

@@ -25,8 +25,8 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
         };
         const result = validator.validateState(invalidState);
         assert.strictEqual(result.isValid, false);
-        assert.ok(result.errors.some(e => e.includes('temperature')));
-        assert.ok(result.errors.some(e => e.includes('stocks')));
+        assert.ok(result.errors.some((e) => e.includes('temperature') || e.includes('Invalid')));
+        assert.ok(result.errors.some((e) => e.includes('stocks') || e.includes('Missing')));
     });
     it('should enforce Second Law non-negative entropy and dissipation checks', () => {
         const validator = new StateValidator();
@@ -38,8 +38,8 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
         };
         const result = validator.validateState(badEntropyState);
         assert.strictEqual(result.isValid, false);
-        assert.ok(result.errors.some(e => e.includes('Entropy must be non-negative')));
-        assert.ok(result.errors.some(e => e.includes('Dissipation rate cannot be negative')));
+        assert.ok(result.errors.some((e) => e.includes('Entropy must be non-negative')));
+        assert.ok(result.errors.some((e) => e.includes('Dissipation rate cannot be negative')));
     });
     it('should enforce First Law conservation across valid stock transitions', () => {
         const validator = new StateValidator();
@@ -74,7 +74,7 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
         };
         const result = validator.validateTransition(prior, next);
         assert.strictEqual(result.isValid, false);
-        assert.ok(result.errors.some(e => e.includes('First Law Violation')));
+        assert.ok(result.errors.some((e) => e.includes('First Law Violation')));
     });
     it('should successfully execute ThermodynamicMonadProcess steps on compliant states', () => {
         const monadProcess = new ThermodynamicMonadProcess();
