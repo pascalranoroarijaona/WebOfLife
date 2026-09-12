@@ -1,0 +1,46 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics & Monad Architecture" {
+  
+  interface "Result<T, E>" as Result {
+    +success: boolean
+    +value?: T
+    +error?: E
+  }
+
+  interface ThermodynamicStateLike {
+    +entropy: number
+    +energy?: number
+    +temperature?: number
+  }
+
+  class StateValidator {
+    +{static} assertNonNegativeEntropy(state: ThermodynamicStateLike): Result<ThermodynamicStateLike, string>
+  }
+
+  class ThermodynamicLedgerBlock {
+    +blockId: number
+    +stateId: string
+    +previousHash: string
+    +currentHash: string
+    +transactionSignature: string
+    +cycleType: string
+    +entropyDelta: number
+    +timestamp: Date
+    +verifyIntegrity(): boolean
+  }
+
+  class BiogeochemicalCycleProcessor {
+    +cycleName: string
+    +processState(state: ThermodynamicStateLike): Result<ThermodynamicStateLike, string>
+  }
+
+  StateValidator ..> Result : creates
+  StateValidator ..> ThermodynamicStateLike : inspects
+  BiogeochemicalCycleProcessor --> StateValidator : uses
+  ThermodynamicLedgerBlock --> ThermodynamicStateLike : records
+}
+
+@enduml
