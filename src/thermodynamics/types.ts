@@ -4,6 +4,14 @@
 
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 
+export interface EntropyInspectable {
+  entropy?: number;
+  getEntropy?: () => number;
+  temperature?: number;
+  entropyGenerationRate?: number;
+  [key: string]: any;
+}
+
 export interface IThermodynamicBoundaryFlux {
   substance?: string;
   rate?: number;

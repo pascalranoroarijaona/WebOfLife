@@ -11,6 +11,7 @@ class MockThermodynamicState implements ThermodynamicState {
     public entropy: number,
     public entropyGenerationRate: number,
     public energy: number,
+    public internalEnergy: number = energy,
     public temperature: number = 288.15
   ) {}
 

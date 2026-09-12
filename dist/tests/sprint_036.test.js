@@ -5,11 +5,13 @@ class MockThermodynamicState {
     entropy;
     entropyGenerationRate;
     energy;
+    internalEnergy;
     temperature;
-    constructor(entropy, entropyGenerationRate, energy, temperature = 288.15) {
+    constructor(entropy, entropyGenerationRate, energy, internalEnergy = energy, temperature = 288.15) {
         this.entropy = entropy;
         this.entropyGenerationRate = entropyGenerationRate;
         this.energy = energy;
+        this.internalEnergy = internalEnergy;
         this.temperature = temperature;
     }
     getEntropy() {

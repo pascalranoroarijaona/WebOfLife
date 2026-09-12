@@ -237,6 +237,8 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Assertion Utility (
 
 ### Phase 1 — Thermodynamic Physics, Conservation & H3 Spatial Topologies (Pending)
 - [ ] Non-Linear Albedo-Temperature Feedback Loops (`src/thermodynamics/albedo_feedback.ts`): Coupled cryospheric melting (ice-albedo feedback) and vegetation browning feedbacks from local surface temperature variations within H3 hexagonal indices.
+- [ ] Surface Albedo Function Differentiation (`src/thermodynamics/albedo_feedback.ts`): Implement temperature-dependent surface albedo functions distinguishing ice/snow sheets ($\alpha \approx 0.8$), bare soil ($\alpha \approx 0.3$), and dense canopy ($\alpha \approx 0.15$).
+- [ ] Cryospheric Local Melting Flux Methods (`src/thermodynamics/cryosphere_coupling.ts`): Build local melting flux methods that translate net incoming shortwave radiation spikes into volumetric ice-melt stocks within high-latitude H3 cells.
 
 ### Phase 2 — Biosphere Stoichiometry, Mycorrhizae & Trophic Networks (Pending)
 - [ ] Stoichiometric Homeostasis & Elemental Coupling Configuration (`src/biosphere/stoichiometric_types.ts`): Define fixed Redfield stoichiometry data structures ($C:N:P = 106:16:1$) and homeostatic elasticity parameters.
@@ -314,6 +316,7 @@ SPRINT_GOAL: Thermodynamic State Vector Non-Negative Entropy Assertion Utility (
 ### Phase 6 — Earth as a Blockchain: Proof of Ecological Work (PoEW) (Pending)
 - [ ] Thermodynamic Transaction Mempool (`src/ledger/mempool.ts`): Create an in-memory queue that captures every energy, matter, and information exchange between sub-PODs during a simulation tick before they are validated.
 - [ ] Proof of Ecological Work (PoEW) Validator (`src/ledger/poew_validator.ts`): Implement the consensus algorithm verifying that a batch of transactions perfectly conserves mass (First Law) and accurately accounts for exergy destruction (Second Law).
+- [ ] Deterministic State Consensus Function (`src/ledger/poew_validator.ts`): Write a deterministic consensus function that ingests transactional state deltas and validates both First Law mass conservation ($\sum \Delta \text{Stock} = 0 \pm 10^{-6}$) and Second Law non-negative entropy generation ($\dot{S}_{\text{gen}} \ge 0$).
 - [ ] Vortex Block Generator & Hasher (`src/ledger/block_generator.ts`): Group validated transactions into a `ThermodynamicBlock`, hashing the entire Earth state vector combined with the previous block's hash to ensure temporal immutability.
 - [ ] SQLite Append-Only Immutable Ledger (`db/schema.sql`, `src/ledger/sqlite_ledger.ts`): Persist the validated blocks into a local SQLite database, creating a permanent, auditable cryptographic history of the planetary simulation.
 
