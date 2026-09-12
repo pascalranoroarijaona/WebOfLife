@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
-import { ThermodynamicStateValidator } from '../src/thermodynamics/state_validator.js';
+import { StateValidator } from '../src/thermodynamics/state_validator.js';
 describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calculator', () => {
     it('1. Verify zero-flux equilibrium leaves state vectors untouched (delta = 0)', () => {
         const state = new ThermodynamicStateVector({
@@ -10,7 +10,7 @@ describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calcul
         });
         const fluxes = [];
         const dt = 10.0;
-        const deltas = ThermodynamicStateValidator.calculateDelta(state, fluxes, dt);
+        const deltas = StateValidator.calculateDelta(state, fluxes, dt);
         const carbonResult = deltas.get('carbon');
         assert.ok(carbonResult);
         assert.strictEqual(carbonResult.expectedDelta, 0);
@@ -32,7 +32,7 @@ describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calcul
             { sourceId: 'carbon', targetId: 'atmosphere', element: 'C', rate: 2.0 }
         ];
         const dt = 5.0; // 5 seconds
-        const deltas = ThermodynamicStateValidator.calculateDelta(state, fluxes, dt);
+        const deltas = StateValidator.calculateDelta(state, fluxes, dt);
         const carbonResult = deltas.get('carbon');
         assert.ok(carbonResult);
         // Inflow = 5.0 * 5 = 25; Outflow = 2.0 * 5 = 10; Expected Delta = 15
@@ -57,7 +57,7 @@ describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calcul
         ];
         const dt = 5.0; // Outflow = 25, current = 10 -> projected = -15 (< 0)
         assert.throws(() => {
-            ThermodynamicStateValidator.calculateDelta(state, fluxes, dt);
+            StateValidator.calculateDelta(state, fluxes, dt);
         }, /Thermodynamic Violation \[Second Law\]/);
     });
 });

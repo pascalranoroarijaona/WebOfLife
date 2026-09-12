@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
-import { ThermodynamicStateValidator } from '../src/thermodynamics/state_validator.js';
+import { StateValidator } from '../src/thermodynamics/state_validator.js';
 import { FluxVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calculator', () => {
@@ -13,7 +13,7 @@ describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calcul
     const fluxes: FluxVector[] = [];
     const dt = 10.0;
 
-    const deltas = ThermodynamicStateValidator.calculateDelta(state, fluxes, dt);
+    const deltas = StateValidator.calculateDelta(state, fluxes, dt);
 
     const carbonResult = deltas.get('carbon');
     assert.ok(carbonResult);
@@ -39,7 +39,7 @@ describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calcul
     ];
     const dt = 5.0; // 5 seconds
 
-    const deltas = ThermodynamicStateValidator.calculateDelta(state, fluxes, dt);
+    const deltas = StateValidator.calculateDelta(state, fluxes, dt);
 
     const carbonResult = deltas.get('carbon');
     assert.ok(carbonResult);
@@ -68,7 +68,7 @@ describe('Sprint 055: Thermodynamic State Vector Stock Conservation Delta Calcul
     const dt = 5.0; // Outflow = 25, current = 10 -> projected = -15 (< 0)
 
     assert.throws(() => {
-      ThermodynamicStateValidator.calculateDelta(state, fluxes, dt);
+      StateValidator.calculateDelta(state, fluxes, dt);
     }, /Thermodynamic Violation \[Second Law\]/);
   });
 });

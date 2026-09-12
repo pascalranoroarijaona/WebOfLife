@@ -1,0 +1,97 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "src/thermodynamics" {
+  
+  interface IStateValidator {
+    +evaluateDiscrepancy(previousState: StateVector, currentState: StateVector, integratedFluxes: Record<string, number>, tolerance?: number): DiscrepancyReport
+  }
+
+  class StateValidator {
+    -toleranceThreshold: number
+    +constructor(toleranceThreshold: number)
+    +evaluateDiscrepancy(previousState: StateVector, currentState: StateVector, integratedFluxes: Record<string, number>, tolerance?: number): DiscrepancyReport
+  }
+
+  class DiscrepancyReport {
+    +timestamp: number
+    +totalDiscrepancy: number
+    +poolDiscrepancies: Record<string, PoolDiscrepancyDetail>
+    +withinTolerance: boolean
+  }
+
+  class StateVector {
+    +timestamp: number
+    +pools: Record<string, number>
+    +boundaryCondition: string
+  }
+
+  class MonadProcess {
+    +integrateFluxes(vector: StateVector): Record<string, number>
+  }
+}
+
+package "Database Schemas" {
+  entity "thermodynamic_state_vectors" {
+    * vector_id : UUID <<PK>>
+    --
+    simulation_step : BIGINT
+    timestamp : TIMESTAMPTZ
+    boundary_condition : VARCHAR
+  }
+
+  entity "pool_stocks" {
+    * stock_id : UUID <<PK>>
+    --
+    vector_id : UUID <<FK>>
+    pool_name : VARCHAR
+    stock_value : NUMERIC
+    element_type : VARCHAR
+  }
+
+  entity "discrepancy_reports" {
+    * report_id : UUID <<PK>>
+    --
+    vector_id : UUID <<FK>>
+    timestamp : BIGINT
+    total_discrepancy : NUMERIC
+    tolerance_threshold : NUMERIC
+    within_tolerance : BOOLEAN
+  }
+
+  entity "pool_discrepancies" {
+    * pool_discrepancy_id : UUID <<PK>>
+    --
+    report_id : UUID <<FK>>
+    pool_name : VARCHAR
+    actual_delta : NUMERIC
+    expected_delta : NUMERIC
+    absolute_difference : NUMERIC
+    violated : BOOLEAN
+  }
+
+  entity "blockchain_blocks" {
+    * block_id : UUID <<PK>>
+    --
+    block_height : BIGINT
+    previous_hash : VARCHAR
+    current_hash : VARCHAR
+    merkle_root : VARCHAR
+    state_vector_id : UUID <<FK>>
+    validator_report_id : UUID <<FK>>
+    miner_signature : VARCHAR
+  }
+}
+
+IStateValidator <|.. StateValidator
+StateValidator ..> DiscrepancyReport : generates
+StateValidator ..> StateVector : consumes
+MonadProcess ..> StateVector : transforms
+thermodynamic_state_vectors ||--o{ pool_stocks : contains
+thermodynamic_state_vectors ||--o| discrepancy_reports : validates
+discrepancy_reports ||--o{ pool_discrepancies : details
+thermodynamic_state_vectors ||--o| blockchain_blocks : anchors
+discrepancy_reports ||--o| blockchain_blocks : anchors
+
+@enduml
