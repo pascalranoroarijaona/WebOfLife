@@ -42,14 +42,14 @@ export const ThermodynamicStateMonad = {
             ...initObj,
             bind: (fn) => {
                 const res = fn(state);
-                const nextState = res?.nextState ?? (res?.stateVector ?? (res instanceof ThermodynamicStateVector ? res : state));
+                const nextState = res?.nextState ?? (res?.stateVector ?? res);
                 if ((nextState?.entropyGenerationRate ?? 0) < 0) {
                     throw new Error("Second Law Violation");
                 }
                 return ThermodynamicStateMonad.of(nextState);
             },
             chain: (fn) => ThermodynamicStateMonad.of(fn(state)),
-            getValue: () => (state?.carbon !== undefined ? state : state),
+            getValue: () => state,
             getEntropyGenerationRate: () => state?.entropyGenerationRate ?? 0
         };
     },
@@ -297,7 +297,6 @@ export class ThermodynamicStateVector {
 }
 export const StateVector = ThermodynamicStateVector;
 export { ThermodynamicStateVector as ThermodynamicState };
-// Additional Retro-Compatible Exports
 export { ThermodynamicStateVector as ThermodynamicVector };
 export class ElementalStocks {
     carbon;
@@ -369,17 +368,6 @@ export function evaluateThermodynamicState(prevState, internalEnergy, temperatur
         entropyGenerationRate: sGen,
         exergyDestructionRate: ambientTemp * sGen
     };
-}
-export class StateValidator {
-    tolerance;
-    constructor(tolerance = 1e-6) {
-        this.tolerance = tolerance;
-    }
-    evaluateDiscrepancy(actual, expected, tolerance) {
-        return { isBalanced: true, totalDiscrepancy: 0, entropyDelta: 0, vectorDiscrepancies: {} };
-    }
-}
-export class ThermodynamicStateValidator extends StateValidator {
 }
 export function assertSecondLaw(state) {
     const sGen = state.entropyGenerationRate ?? 0;

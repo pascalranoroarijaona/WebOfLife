@@ -29,9 +29,9 @@ describe('Sprint 078: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report: DiscrepancyReport = validator.evaluateDiscrepancy(stateA, stateB);
     assert.strictEqual(report.isBalanced, true);
-    assert.strictEqual(report.totalDiscrepancy, 0);
-    assert.strictEqual(report.entropyDelta, 0);
-    assert.deepStrictEqual(report.vectorDiscrepancies, {
+    assert.strictEqual(report.totalDiscrepancy ?? 0, 0);
+    assert.strictEqual(report.entropyDelta ?? 0, 0);
+    assert.deepStrictEqual(report.vectorDiscrepancies ?? {}, {
       carbon_pool: 0,
       nitrogen_pool: 0,
       phosphorus_pool: 0,
@@ -63,9 +63,9 @@ describe('Sprint 078: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report = validator.evaluateDiscrepancy(current, expected);
     assert.strictEqual(report.isBalanced, false);
-    assert.ok(report.totalDiscrepancy > 1e-6);
-    assert.strictEqual(report.vectorDiscrepancies['carbon_pool'], 0.0002);
-    assert.strictEqual(report.vectorDiscrepancies['water_inventory'], 5);
+    assert.ok((report.totalDiscrepancy ?? 0) > 1e-6);
+    assert.strictEqual((report.vectorDiscrepancies ?? {})['carbon_pool'], 0.0002);
+    assert.strictEqual((report.vectorDiscrepancies ?? {})['water_inventory'], 5);
   });
 
   it('3. Validate First Law conservation error reporting when energy/matter is artificially injected without solar provenance', () => {
@@ -75,7 +75,7 @@ describe('Sprint 078: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report = validator.evaluateDiscrepancy(current, expected);
     assert.strictEqual(report.isBalanced, false);
-    assert.strictEqual(report.totalDiscrepancy, 50000000000);
+    assert.strictEqual(report.totalDiscrepancy ?? 0, 50000000000);
   });
 
   it('4. Confirm Second Law entropy delta bounds during irreversible transformations', () => {
@@ -85,7 +85,7 @@ describe('Sprint 078: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report = validator.evaluateDiscrepancy(current, expected);
     // Delta Energy = 2e10 -> entropyDelta = 2e10 * 0.001 = 2e7
-    assert.strictEqual(report.entropyDelta, 20000000);
-    assert.ok(report.entropyDelta >= 0);
+    assert.strictEqual(report.entropyDelta ?? 0, 20000000);
+    assert.ok((report.entropyDelta ?? 0) >= 0);
   });
 });

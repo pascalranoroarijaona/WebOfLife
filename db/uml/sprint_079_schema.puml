@@ -1,0 +1,43 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class ElementTolerances {
+  +carbon: number
+  +nitrogen: number
+  +phosphorus: number
+  +water: number
+  +energy: number
+  +[key: string]: number
+}
+
+class DiscrepancyReport {
+  +isValid: boolean
+  +discrepancies: Record<string, { actual: number; expected: number; absoluteDifference: number; tolerance: number }>
+  +maxDiscrepancy: number
+}
+
+class ThermodynamicStateVector {
+  -stocks: Record<string, number>
+  +getStocks(): Record<string, number>
+  +getComponent(key: string): number
+}
+
+class ThermodynamicStateValidator {
+  -defaultTolerances: ElementTolerances
+  +evaluate(actual: ThermodynamicStateVector, expected: ThermodynamicStateVector, tolerances?: Partial<ElementTolerances>): DiscrepancyReport
+}
+
+class ThermodynamicMonadProcess {
+  -validator: ThermodynamicStateValidator
+  +executeTransition(input: ThermodynamicStateVector, expectedOutput: ThermodynamicStateVector): ThermodynamicStateVector
+  -rollback(reason: string): void
+}
+
+ThermodynamicStateValidator --> ElementTolerances : uses defaults & overrides
+ThermodynamicStateValidator --> DiscrepancyReport : generates
+ThermodynamicStateValidator ..> ThermodynamicStateVector : inspects actual & expected
+ThermodynamicMonadProcess --> ThermodynamicStateValidator : uses for pre/post validation
+ThermodynamicMonadProcess ..> ThermodynamicStateVector : transforms
+
+@enduml

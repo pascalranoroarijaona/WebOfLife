@@ -19,6 +19,17 @@ export interface ElementTolerances {
 
 export type ElementalTolerances = ElementTolerances;
 
+export interface ThermalStock {
+  temperature: number;
+  thermalEnergy: number;
+  [key: string]: any;
+}
+
+export interface BiogeochemicalStock {
+  totalMass: number;
+  [key: string]: any;
+}
+
 export interface ThermodynamicToleranceConfig {
   getDefaultTolerance?: () => number;
   getElementTolerance?: (key: string) => number;
@@ -66,14 +77,14 @@ export const ThermodynamicStateMonad = {
       ...initObj,
       bind: (fn: any) => {
         const res = fn(state);
-        const nextState = res?.nextState ?? (res?.stateVector ?? (res instanceof ThermodynamicStateVector ? res : state));
+        const nextState = res?.nextState ?? (res?.stateVector ?? res);
         if ((nextState?.entropyGenerationRate ?? 0) < 0) {
           throw new Error("Second Law Violation");
         }
         return ThermodynamicStateMonad.of(nextState);
       },
       chain: (fn: any) => ThermodynamicStateMonad.of(fn(state)),
-      getValue: () => (state?.carbon !== undefined ? state : state),
+      getValue: () => state,
       getEntropyGenerationRate: () => state?.entropyGenerationRate ?? 0
     };
   },
@@ -142,6 +153,7 @@ export interface IBoundaryFluxArray {
   netWorkFlux?: number;
   enthalpyInflowRate?: number;
   entropyInflowRate?: number;
+  [key: string]: any;
 }
 
 export type BoundaryFluxArray = IBoundaryFluxArray;
@@ -236,32 +248,6 @@ export interface IThermodynamicStateVector {
   getValues?: () => Record<string, number>;
   getAllStocks?: () => Map<string, number>;
   elementalStocks?: any;
-  internalEnergyJoules?: number;
-  absoluteEntropyJoulesPerKelvin?: number;
-  referenceTemperatureKelvin?: number;
-  internal_energy_U?: number;
-  entropy_S?: number;
-  temperature_T?: number;
-  pressure_P?: number;
-  volume_V?: number;
-  stock_masses?: Record<string, number>;
-  boundaryFlux?: any;
-  systemInternalEnergyJoules?: number;
-  systemEntropyJoulesPerKelvin?: number;
-  temperatureKelvin?: number;
-  deadStateTemperatureKelvin?: number;
-  planetaryEmissionWatts?: number;
-  entropyGenerationRateWattsPerKelvin?: number;
-  exergyDestructionRateWatts?: number;
-  exergyEfficiency?: number;
-  biomass?: number;
-  getSolarFlux?: () => number;
-  specificEntropy?: number;
-  specificEnthalpy?: number;
-  specificExergy?: number;
-  pressure?: number;
-  fluxes?: Record<string, number>;
-  computeDelta?: (previousState: ThermodynamicStateVector | any) => Record<string, number>;
   [key: string]: any;
 }
 
@@ -560,6 +546,7 @@ export interface DiscrepancyRecord {
   absoluteDifference?: number;
   exceeded?: boolean;
   stockKey?: string;
+  violated?: boolean;
 }
 
 export interface DiscrepancySummary {
@@ -573,7 +560,6 @@ export interface IStateValidator {
   mapDiscrepancies(stocks: Map<string, number>, baseline: Map<string, number>): DiscrepancySummary;
 }
 
-// Additional Retro-Compatible Exports
 export { ThermodynamicStateVector as ThermodynamicVector };
 export type ThermodynamicStateSnapshot = any;
 export type IThermodynamicMonad<T> = any;
@@ -651,34 +637,53 @@ export function cellularRespiration(stocks: ElementalStocks, respRate: number): 
 export type FluxType = string;
 export type EntropyInspectable = any;
 export type FluxBoundary = any;
-export type ValidationFailure = any;
+export type ValidationFailure = {
+  property?: string;
+  reason: string;
+  stockName?: string;
+  observedDelta?: number;
+  [key: string]: any;
+};
 export type BoundaryFluxRates = any;
 export type FluxVector = any;
 export type IFlowRateVector = any;
 export type FluxRateMap = any;
 
-// Sprint 012 Retro-Compatibility Types
-export interface ThermalStock {
-  temperature: number;
-  thermalEnergy: number;
-}
-
-export interface BiogeochemicalStock {
-  totalMass: number;
-}
-
 export interface ValidationResult {
   isValid: boolean;
   valid: boolean;
-  errors?: any[];
+  errors?: ValidationFailure[];
   violations?: Record<string, string> | string[] | ValidationFailure[] | any;
   discrepancies?: any;
+  maxTolerance?: number;
+  totalAbsoluteDiscrepancy?: number;
+  isMassConserved?: boolean;
+  records?: any[];
   [key: string]: any;
 }
 
-// Retro-compatible aliases for ValidationReport / ValidationResult
 export type ValidationReport = ValidationResult;
-export type DiscrepancyDetail = any;
+export type DiscrepancyDetail = {
+  expectedDelta?: number;
+  actualDelta?: number;
+  error?: number;
+  [key: string]: any;
+};
+
+export interface DiscrepancyReport {
+  isBalanced?: boolean;
+  withinTolerance?: boolean;
+  totalDiscrepancy?: number;
+  totalAbsoluteDiscrepancy?: number;
+  entropyDelta?: number;
+  vectorDiscrepancies?: Record<string, number>;
+  poolDiscrepancies?: Record<string, { violated: boolean; absoluteDifference: number; [key: string]: any }>;
+  isValid?: boolean;
+  maxDiscrepancy?: number;
+  isMassConserved?: boolean;
+  records?: any[];
+  [key: string]: any;
+}
 
 export function advanceThermodynamicState(state: IThermodynamicStateVector, dt: number): IThermodynamicStateVector {
   const sGen = state.entropyGenerationRate ?? 10.0;
@@ -715,17 +720,6 @@ export function evaluateThermodynamicState(
     entropyGenerationRate: sGen,
     exergyDestructionRate: ambientTemp * sGen
   };
-}
-
-export class StateValidator {
-  constructor(public tolerance: number = 1e-6) {}
-  public evaluateDiscrepancy(actual: any, expected: any, tolerance?: number): any {
-    return { isBalanced: true, totalDiscrepancy: 0, entropyDelta: 0, vectorDiscrepancies: {} };
-  }
-}
-
-export class ThermodynamicStateValidator extends StateValidator {
-  // empty subclass alias if needed
 }
 
 export function assertSecondLaw(state: IThermodynamicStateVector): boolean {
