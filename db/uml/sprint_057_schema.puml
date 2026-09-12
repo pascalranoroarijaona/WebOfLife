@@ -1,0 +1,99 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "Web of Life - Thermodynamic Engine" {
+
+    class Pod {
+        +UUID pod_id
+        +String pod_name
+        +Timestamp created_at
+    }
+
+    class StateVector {
+        +UUID vector_id
+        +UUID pod_id
+        +Timestamp timestamp
+        +double solarFluxInput
+        +double entropyDissipation
+        +boolean isValid
+        +getStock(key: String): double
+    }
+
+    class ThermodynamicStock {
+        +UUID stock_id
+        +UUID vector_id
+        +String stockKey
+        +double stockValue
+        +String unit
+    }
+
+    class BoundaryFluxRate {
+        +UUID flux_id
+        +UUID vector_id
+        +String stockKey
+        +double netRate
+    }
+
+    class StateValidator {
+        -double tolerance
+        +calculateExpectedDeltas(initialVector: StateVector, fluxRates: FluxRateMap, deltaTime: number): Map<string, number>
+        +validateConservation(previousVector: StateVector, currentVector: StateVector, fluxRates: FluxRateMap, deltaTime: number): ValidationResult
+    }
+
+    class ValidationResult {
+        +boolean isValid
+        +Map<string, number> expectedDeltas
+        +Map<string, number> discrepancies
+        +double maxTolerance
+    }
+
+    class StateValidationAudit {
+        +UUID audit_id
+        +UUID previous_vector_id
+        +UUID current_vector_id
+        +double deltaT
+        +double tolerance
+        +boolean isValid
+        +Timestamp audited_at
+    }
+
+    class StockDiscrepancy {
+        +UUID discrepancy_id
+        +UUID audit_id
+        +String stockKey
+        +double expectedDelta
+        +double actualDelta
+        +double discrepancyValue
+        +boolean exceedsTolerance
+    }
+
+    class ThermodynamicBlock {
+        +UUID block_id
+        +long blockHeight
+        +String prevHash
+        +String blockHash
+        +String merkleRoot
+        +String validatorSignature
+        +Timestamp timestamp
+    }
+
+    class BlockTransaction {
+        +UUID tx_id
+        +UUID block_id
+        +UUID audit_id
+        +String payloadHash
+        +double fee
+    }
+
+    Pod "1" *-- "*" StateVector : contains
+    StateVector "1" *-- "*" ThermodynamicStock : tracks
+    StateVector "1" *-- "*" BoundaryFluxRate : defines
+    StateValidator ..> StateVector : inspects
+    StateValidator ..> ValidationResult : returns
+    StateValidationAudit "1" *-- "*" StockDiscrepancy : records
+    ThermodynamicBlock "1" *-- "*" BlockTransaction : bundles
+    BlockTransaction "0..1" --> StateValidationAudit : references audit proof
+}
+
+@enduml

@@ -21,8 +21,7 @@ describe('Sprint 029: Thermodynamic State Vector Validation Wrapper', () => {
     assert.doesNotThrow(() => {
       ThermodynamicStateValidator.validateStateVector(validVector);
     });
-    const validator = new ThermodynamicStateValidator();
-    assert.strictEqual(validator.validateStateVector(validVector), true);
+    assert.strictEqual(ThermodynamicStateValidator.validateStateVector(validVector), true);
   });
 
   it('should throw ValidationError if vector is null or undefined', () => {

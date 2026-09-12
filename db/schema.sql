@@ -1,71 +1,95 @@
 -- ============================================================================
--- Web of Life Database & Thermodynamic Ledger Schema
--- Sprint 056: Thermodynamic State Vector Stock Conservation Delta Calculator
+-- WEB OF LIFE DATABASE SCHEMA - SPRINT 057
+-- Thermodynamic State Vector Stock Conservation & Delta Ledger
 -- ============================================================================
 
+-- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Thermodynamic Elements Enum
-CREATE TYPE thermodynamic_element AS ENUM (
-    'carbon',
-    'nitrogen',
-    'phosphorus',
-    'water',
-    'energy'
-);
+-- ============================================================================
+-- 1. THERMODYNAMIC PODS & STATE VECTORS
+-- ============================================================================
 
--- 2. EarthPods Table (Container for Thermodynamic Structures & State Vectors)
-CREATE TABLE earth_pods (
+CREATE TABLE IF NOT EXISTS pods (
     pod_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     pod_name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 3. Thermodynamic Stocks Table (Tracks mass/energy levels per element within an EarthPod)
-CREATE TABLE thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL REFERENCES earth_pods(pod_id) ON DELETE CASCADE,
-    element thermodynamic_element NOT NULL,
-    current_mass NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
-    capacity NUMERIC(20, 10),
-    last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_pod_element_stock UNIQUE (pod_id, element)
-);
-
--- 4. Flow Rate Vectors Table (Defines inflows and outflows per element)
-CREATE TABLE flow_rate_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL REFERENCES earth_pods(pod_id) ON DELETE CASCADE,
-    element thermodynamic_element NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. Flow Entries Table (Granular source/sink rates making up IFlowRateVector)
-CREATE TABLE flow_entries (
-    entry_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vector_id UUID NOT NULL REFERENCES flow_rate_vectors(vector_id) ON DELETE CASCADE,
-    flow_type VARCHAR(10) NOT NULL CHECK (flow_type IN ('inflow', 'outflow')),
-    entity_id VARCHAR(255) NOT NULL, -- sourceId or sinkId
-    rate NUMERIC(20, 10) NOT NULL CHECK (rate >= 0.0)
+CREATE TABLE IF NOT EXISTS state_vectors (
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pod_id UUID REFERENCES pods(pod_id) ON DELETE CASCADE,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    solar_flux_input DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    entropy_dissipation DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    is_valid BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. State Validation Ledger (Time-series audit trail of delta calculations and conservation checks)
-CREATE TABLE state_validation_ledger (
-    ledger_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vector_id UUID NOT NULL REFERENCES flow_rate_vectors(vector_id) ON DELETE CASCADE,
-    time_step NUMERIC(15, 6) NOT NULL,
-    net_rate NUMERIC(20, 10) NOT NULL,
-    expected_delta NUMERIC(20, 10) NOT NULL,
-    actual_delta NUMERIC(20, 10) NOT NULL,
-    discrepancy NUMERIC(20, 10) NOT NULL,
-    is_conserved BOOLEAN NOT NULL,
-    tolerance NUMERIC(12, 10) NOT NULL DEFAULT 1e-9,
-    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    block_signature VARCHAR(64) NOT NULL -- Cryptographic hash anchoring the state transition
+-- ============================================================================
+-- 2. STOCKS & CONSERVATION LEDGERS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vector_id UUID REFERENCES state_vectors(vector_id) ON DELETE CASCADE,
+    stock_key VARCHAR(100) NOT NULL,
+    stock_value DOUBLE PRECISION NOT NULL,
+    unit VARCHAR(50) NOT NULL DEFAULT 'mol/kg',
+    CONSTRAINT unique_vector_stock UNIQUE (vector_id, stock_key)
 );
 
--- Indexes for performance and time-series querying
-CREATE INDEX idx_state_validation_vector ON state_validation_ledger(vector_id);
-CREATE INDEX idx_state_validation_timestamp ON state_validation_ledger(validated_at);
-CREATE INDEX idx_flow_entries_vector ON flow_entries(vector_id);
+CREATE TABLE IF NOT EXISTS boundary_flux_rates (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vector_id UUID REFERENCES state_vectors(vector_id) ON DELETE CASCADE,
+    stock_key VARCHAR(100) NOT NULL,
+    net_rate DOUBLE PRECISION NOT NULL, -- Net inflows minus outflows per unit time
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- 3. STATE VALIDATOR AUDIT LEDGERS (Sprint 057 Integration)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS state_validation_audits (
+    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    previous_vector_id UUID REFERENCES state_vectors(vector_id) ON DELETE CASCADE,
+    current_vector_id UUID REFERENCES state_vectors(vector_id) ON DELETE CASCADE,
+    delta_t DOUBLE PRECISION NOT NULL,
+    tolerance DOUBLE PRECISION NOT NULL DEFAULT 1e-6,
+    is_valid BOOLEAN NOT NULL,
+    max_tolerance DOUBLE PRECISION NOT NULL,
+    audited_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_discrepancies (
+    discrepancy_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    audit_id UUID REFERENCES state_validation_audits(audit_id) ON DELETE CASCADE,
+    stock_key VARCHAR(100) NOT NULL,
+    expected_delta DOUBLE PRECISION NOT NULL,
+    actual_delta DOUBLE PRECISION NOT NULL,
+    discrepancy_value DOUBLE PRECISION NOT NULL,
+    exceeds_tolerance BOOLEAN NOT NULL
+);
+
+-- ============================================================================
+-- 4. BLOCKCHAIN TRANSACTIONS & PROOFS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT UNIQUE NOT NULL,
+    prev_hash VARCHAR(64) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    validator_signature VARCHAR(128) NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS block_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
+    audit_id UUID REFERENCES state_validation_audits(audit_id) ON DELETE SET NULL,
+    payload_hash VARCHAR(64) NOT NULL,
+    fee DOUBLE PRECISION DEFAULT 0.0
+);

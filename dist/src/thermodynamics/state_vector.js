@@ -253,7 +253,10 @@ export class ThermodynamicStateVector {
         return Object.keys(this.stocks);
     }
     getStock(name) {
-        return this.stocks[name] ?? 0;
+        if (this.stocks instanceof Map) {
+            return this.stocks.get(name) ?? 0;
+        }
+        return this.stocks?.[name] ?? 0;
     }
     getAllStocks() {
         return this.stocks instanceof Map ? this.stocks : new Map(Object.entries(this.stocks));

@@ -16,8 +16,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
       ['water', 1337999990.0]
     ]);
 
-    const previous: StateVector = { timestamp: 0, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
-    const current: StateVector = { timestamp: 1, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
+    const previous: StateVector = { timestamp: 0, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => prevStocks.get(k) ?? 0 };
+    const current: StateVector = { timestamp: 1, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => currStocks.get(k) ?? 0 };
 
     const fluxesMap = new Map<string, number>([
       ['carbon', 2.0],
@@ -44,8 +44,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
       ['nitrogen', 3900100.0]
     ]);
 
-    const previous: StateVector = { timestamp: 10, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
-    const current: StateVector = { timestamp: 12, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
+    const previous: StateVector = { timestamp: 10, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => prevStocks.get(k) ?? 0 };
+    const current: StateVector = { timestamp: 12, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => currStocks.get(k) ?? 0 };
 
     const fluxesMap = new Map<string, number>([
       ['nitrogen', 5.0]
@@ -87,15 +87,15 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
     const prevStocks = new Map<string, number>([['phosphorus', 1000.0]]);
     const currStocks = new Map<string, number>([['phosphorus', 1000.0 + 0.00005]]);
 
-    const previous: StateVector = { timestamp: 0, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
-    const current: StateVector = { timestamp: 1, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
+    const previous: StateVector = { timestamp: 0, stocks: prevStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => prevStocks.get(k) ?? 0 };
+    const current: StateVector = { timestamp: 1, stocks: currStocks, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => currStocks.get(k) ?? 0 };
     const fluxes: BoundaryFluxRates = { fluxes: new Map([['phosphorus', 0.0]]) };
 
     const resWithin = validator.validateConservation(previous, current, fluxes, 1.0);
     assert.strictEqual(resWithin.valid, true, 'Delta within tolerance threshold should be valid');
 
     const currStocksBad = new Map<string, number>([['phosphorus', 1000.0 + 0.0002]]);
-    const currentBad: StateVector = { timestamp: 1, stocks: currStocksBad, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100 };
+    const currentBad: StateVector = { timestamp: 1, stocks: currStocksBad, internalEnergy: 1000, totalEntropy: 100, temperature: 298.15, entropy: 100, getStock: (k: string) => currStocksBad.get(k) ?? 0 };
     const resOutside = validator.validateConservation(previous, currentBad, fluxes, 1.0);
     assert.strictEqual(resOutside.valid, false, 'Delta exceeding tolerance threshold should be invalid');
   });

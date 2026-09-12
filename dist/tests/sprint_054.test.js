@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { StateValidator } from '../src/thermodynamics/state_validator.js';
+import { StateValidator, ThermodynamicViolationException } from '../src/thermodynamics/state_validator.js';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
-import { ThermodynamicViolationException, STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
 describe('Sprint 054: Thermodynamic State Vector Stock Conservation Asserter', () => {
     it('should pass validation when stock delta matches net boundary flux within tolerance', () => {
         const validator = new StateValidator(1e-4);
@@ -28,8 +28,11 @@ describe('Sprint 054: Thermodynamic State Vector Stock Conservation Asserter', (
         ];
         const result = validator.validateStockConservation(prevState, currentState, fluxes, 10.0);
         assert.strictEqual(result.isValid, true);
-        assert.ok(result.discrepancies['carbon'] < 1e-4);
-        assert.ok(result.discrepancies['energy'] < 1e-4);
+        const discMap = result.discrepancies instanceof Map ? result.discrepancies : new Map(Object.entries(result.discrepancies ?? {}));
+        const carbonDisc = discMap.get('carbon') ?? result.discrepancies?.['carbon'];
+        const energyDisc = discMap.get('energy') ?? result.discrepancies?.['energy'];
+        assert.ok((carbonDisc?.error ?? 0) < 1e-4);
+        assert.ok((energyDisc?.error ?? 0) < 1e-4);
     });
     it('should throw First Law violation when actual stock delta deviates beyond tolerance', () => {
         const validator = new StateValidator(1e-5);

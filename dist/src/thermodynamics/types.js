@@ -1,5 +1,5 @@
 /**
- * Thermodynamic Types & Interfaces (Sprint 056 & Comprehensive Retro-Compatibility)
+ * Thermodynamic Types & Interfaces (Sprint 057 & Comprehensive Retro-Compatibility)
  */
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15; // 15°C standard Earth surface temperature
 export var EntropyState;
@@ -62,7 +62,7 @@ export class ThermodynamicStateVector {
             this.entropyGenerationRate = opts.entropyGenerationRate ?? opts.entropyGenerationRateWattsPerKelvin ?? opts.dissipationRate ?? 10.0;
             this.exergyDestructionRate = opts.exergyDestructionRate ?? opts.exergyDestructionRateWatts ?? (this.ambientTemperature * this.entropyGenerationRate);
             this.exergy = opts.exergy ?? 1e10;
-            this.stocks = opts.stocks ?? {};
+            this.stocks = opts.stocks ?? opts.elementalStocks ?? {};
             this.boundaryFluxes = opts.boundaryFluxes ?? opts.boundaryHeatFlux ?? opts.boundaryFlux ?? boundaryFluxes;
             this.boundaryHeatFlux = opts.boundaryHeatFlux;
             this.boundaryFlux = opts.boundaryFlux;
@@ -74,7 +74,7 @@ export class ThermodynamicStateVector {
             this.solarInputWatts = opts.solarInputWatts ?? this.solarInput;
             this.energy = opts.energy ?? opts.internalEnergy ?? 1e6;
             this.enthalpy = opts.enthalpy ?? opts.internalEnergy ?? 1e6;
-            this.elementalStocks = opts.elementalStocks;
+            this.elementalStocks = opts.elementalStocks ?? opts.stocks;
             this.planetaryEmissionWatts = opts.planetaryEmissionWatts;
             this.systemInternalEnergyJoules = opts.systemInternalEnergyJoules;
             this.entropyGenerationRateWattsPerKelvin = opts.entropyGenerationRateWattsPerKelvin ?? this.entropyGenerationRate;
@@ -106,7 +106,7 @@ export class ThermodynamicStateVector {
             this.solarInputWatts = solarInputWatts;
             this.energy = energy;
             this.enthalpy = enthalpy;
-            this.elementalStocks = elementalStocks;
+            this.elementalStocks = elementalStocks ?? stocks;
             this.planetaryEmissionWatts = planetaryEmissionWatts;
             this.systemInternalEnergyJoules = systemInternalEnergyJoules;
             this.entropyGenerationRateWattsPerKelvin = entropyGenerationRateWattsPerKelvin;
@@ -161,6 +161,12 @@ export class ThermodynamicStateVector {
     }
     getEntropy() {
         return this.entropy;
+    }
+    getStock(name) {
+        if (this.stocks instanceof Map) {
+            return this.stocks.get(name) ?? 0;
+        }
+        return this.stocks?.[name] ?? 0;
     }
     getEntropyGenerationRate() {
         return this.entropyGenerationRate;
@@ -227,7 +233,13 @@ export function evaluateThermodynamicState(state, newInternalEnergy, systemTemp,
         toObject: () => ({ ...state }),
         getEntropy: () => (state.entropy ?? 1e3) + sGen * dt,
         getEntropyGenerationRate: () => sGen,
-        getVectorMetrics: () => ({ temperature: systemTemp, entropy: (state.entropy ?? 1e3) + sGen * dt, entropyGenerationRate: sGen })
+        getVectorMetrics: () => ({ temperature: systemTemp, entropy: (state.entropy ?? 1e3) + sGen * dt, entropyGenerationRate: sGen }),
+        getStock: (name) => {
+            const s = state.stocks;
+            if (s instanceof Map)
+                return s.get(name) ?? 0;
+            return s?.[name] ?? 0;
+        }
     };
 }
 export function assertSecondLaw(state) {
@@ -260,7 +272,13 @@ export function advanceThermodynamicState(state, dt, fluxes) {
         toObject: () => ({ ...state }),
         getEntropy: () => (state.entropy ?? 1e3) + sGen * dt,
         getEntropyGenerationRate: () => sGen,
-        getVectorMetrics: () => ({ entropyGenerationRate: sGen })
+        getVectorMetrics: () => ({ entropyGenerationRate: sGen }),
+        getStock: (name) => {
+            const s = state.stocks;
+            if (s instanceof Map)
+                return s.get(name) ?? 0;
+            return s?.[name] ?? 0;
+        }
     };
 }
 export class ThermodynamicStateMonad {
@@ -398,7 +416,13 @@ export class BaseThermodynamicProcessMonad {
             toObject: () => ({ ...state }),
             getEntropy: () => state.entropy ?? 0,
             getEntropyGenerationRate: () => res.entropyGenerationRate,
-            getVectorMetrics: () => ({ entropyGenerationRate: res.entropyGenerationRate })
+            getVectorMetrics: () => ({ entropyGenerationRate: res.entropyGenerationRate }),
+            getStock: (name) => {
+                const s = state.stocks;
+                if (s instanceof Map)
+                    return s.get(name) ?? 0;
+                return s?.[name] ?? 0;
+            }
         };
     }
 }
@@ -427,12 +451,6 @@ export class ThermodynamicViolationError extends Error {
     constructor(message) {
         super(`ThermodynamicViolationError: ${message}`);
         this.name = 'ThermodynamicViolationError';
-    }
-}
-export class ThermodynamicViolationException extends Error {
-    constructor(message) {
-        super(`ThermodynamicViolationException: ${message}`);
-        this.name = 'ThermodynamicViolationException';
     }
 }
 export function photosyntheticFixation(stocks, carbonRate, efficiency) {

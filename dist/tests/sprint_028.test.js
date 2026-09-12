@@ -57,15 +57,14 @@ describe('Sprint 028: Spatial Equilibrium, Trophic Cascade & Thermodynamic Valid
         assert.strictEqual(ledger.totalDissipatedHeat, 200 * 10.5);
     });
     it('should validate thermodynamic state vectors with the state validator wrapper', () => {
-        const validator = new ThermodynamicStateValidator();
         const earth = EarthPOD.getInstance();
         const vec = earth.getStateVector();
-        assert.strictEqual(validator.validateStateVector(vec), true);
+        assert.strictEqual(ThermodynamicStateValidator.validateStateVector(vec), true);
         assert.doesNotThrow(() => {
             ThermodynamicStateValidator.assertNonNegativeEntropy(vec);
         });
         const invalidVec = { ...vec, entropyGenerationRate: -5.0 };
-        assert.strictEqual(validator.validateStateVector(invalidVec), true);
+        assert.strictEqual(ThermodynamicStateValidator.validateStateVector(invalidVec), true);
     });
     it('should successfully pass bootstrapMegaPod integration test', () => {
         const { sun, earth } = bootstrapMegaPod();

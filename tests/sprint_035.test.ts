@@ -14,6 +14,7 @@ import {
 
 describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () => {
   const validState: ThermodynamicState = {
+    energy: 1e6,
     internalEnergy: 1e6,
     temperature: 288.15,
     entropy: 1500.0,

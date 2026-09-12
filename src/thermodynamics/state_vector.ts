@@ -345,7 +345,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   }
 
   public getStock(name: string): number {
-    return this.stocks[name] ?? 0;
+    if (this.stocks instanceof Map) {
+      return this.stocks.get(name) ?? 0;
+    }
+    return this.stocks?.[name] ?? 0;
   }
 
   public getAllStocks(): Map<string, number> {

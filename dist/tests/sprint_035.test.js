@@ -7,6 +7,7 @@ import assert from 'node:assert';
 import { StateValidator, executeThermodynamicTransition } from '../src/thermodynamics/state_validator.js';
 describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () => {
     const validState = {
+        energy: 1e6,
         internalEnergy: 1e6,
         temperature: 288.15,
         entropy: 1500.0,
