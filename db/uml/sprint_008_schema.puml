@@ -1,0 +1,83 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #F9F9F9
+skinparam shadowing false
+
+title Web of Life - Sprint 008: Thermodynamic State Vector & Monad Class Architecture
+
+package "src.thermodynamics" {
+    
+    interface IThermodynamicStateVector {
+        + timestamp: number
+        + T_0: number
+        + internalEnergy: number
+        + entropy: number
+        + entropyGenerationRate: number
+        + exergyDestructionRate: number
+        + boundaryHeatFlux: BoundaryHeatFluxArray
+        + massInventory: Record<string, number>
+    }
+
+    interface BoundaryHeatFluxArray {
+        + solarIn: number
+        + infraredOut: number
+        + sensibleLatentFlux: number
+    }
+
+    interface IThermodynamicSystem {
+        + getStateVector(): IThermodynamicStateVector
+        + calculateEntropyGeneration(dt: number): number
+        + verifyFirstLaw(previousState: IThermodynamicStateVector, currentState: IThermodynamicStateVector, dt: number): boolean
+        + verifySecondLaw(): boolean
+    }
+
+    class "ThermodynamicMonad<T>" as ThermodynamicMonad {
+        - value: T
+        - stateVector: IThermodynamicStateVector
+        - constructor(value: T, stateVector: IThermodynamicStateVector)
+        + {static} unit<T>(value: T, initialVector: IThermodynamicStateVector): ThermodynamicMonad<T>
+        + bind<U>(fn: function): ThermodynamicMonad<U>
+        + getStateVector(): IThermodynamicStateVector
+    }
+}
+
+package "Database Models (SQL)" {
+    class ThermodynamicStateVectorTable {
+        + id: UUID
+        + pod_id: UUID
+        + timestamp: TIMESTAMPTZ
+        + t_zero: NUMERIC
+        + internal_energy: NUMERIC
+        + entropy: NUMERIC
+        + entropy_generation_rate: NUMERIC
+        + exergy_destruction_rate: NUMERIC
+        + solar_in: NUMERIC
+        + infrared_out: NUMERIC
+        + sensible_latent_flux: NUMERIC
+        + mass_inventory: JSONB
+    }
+
+    class ThermodynamicMonadTransactionTable {
+        + transaction_id: UUID
+        + pod_id: UUID
+        + parent_transaction_id: UUID
+        + timestamp: TIMESTAMPTZ
+        + payload_type: VARCHAR
+        + input_vector_hash: VARCHAR
+        + output_vector_hash: VARCHAR
+        + entropy_generation_delta: NUMERIC
+        + first_law_verified: BOOLEAN
+        + second_law_verified: BOOLEAN
+        + blockchain_signature: VARCHAR
+        + raw_payload: JSONB
+    }
+}
+
+IThermodynamicStateVector *-- BoundaryHeatFluxArray : contains
+IThermodynamicSystem ..> IThermodynamicStateVector : produces / consumes
+ThermodynamicMonad o-- IThermodynamicStateVector : wraps state
+ThermodynamicMonadTransactionTable ..> ThermodynamicMonad : persists state transition
+ThermodynamicStateVectorTable ..> IThermodynamicStateVector : maps to schema
+
+@enduml

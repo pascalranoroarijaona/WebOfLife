@@ -1,0 +1,91 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Web of Life - Thermodynamic & Biogeochemical Architecture (Sprint 005)" {
+
+    interface ReservoirMap {
+        +{field} [reservoirName: string]: number
+    }
+
+    interface FluxRateMap {
+        +{field} [fluxName: string]: number
+    }
+
+    class ThermodynamicState<T> {
+        +value: T
+        +energyUsed: number
+        +entropyGenerated: number
+    }
+
+    abstract class CyclePOD {
+        #stocks: ReservoirMap
+        +__init__(initialStocks: ReservoirMap)
+        +{abstract} step(deltaTime: number, solarInput: number): void
+        +getStocks(): Readonly<ReservoirMap>
+        #transfer(from: string, to: string, amount: number): void
+    }
+
+    class CarbonCyclePOD {
+        +step(deltaTime: number, solarInput: number): void
+        -photosynthesis(solarInput: number): void
+        -respiration(): void
+        -outgassing(): void
+        -weathering(): void
+    }
+
+    class WaterCyclePOD {
+        +step(deltaTime: number, solarInput: number): void
+        -evaporation(solarInput: number): void
+        -precipitation(): void
+        -runoff(): void
+    }
+
+    class NitrogenCyclePOD {
+        +step(deltaTime: number, solarInput: number): void
+        -fixation(solarInput: number): void
+        -nitrification(): void
+        -denitrification(): void
+        -assimilation(): void
+    }
+
+    class PhosphorusCyclePOD {
+        +step(deltaTime: number, solarInput: number): void
+        -weathering(): void
+        -sedimentation(): void
+        -runoff(): void
+    }
+
+    class EarthPod {
+        -carbonCycle: CarbonCyclePOD
+        -waterCycle: WaterCyclePOD
+        -nitrogenCycle: NitrogenCyclePOD
+        -phosphorusCycle: PhosphorusCyclePOD
+        +step(deltaTime: number, solarInput: number): void
+        +verifyMassConservation(): boolean
+    }
+
+    class BlockchainBlockLedger {
+        +blockIndex: int
+        +blockHash: string
+        +previousHash: string
+        +merkleRoot: string
+        +solarForcingTotal: number
+        +entropyTotal: number
+        +validateLedgerIntegrity(): boolean
+    }
+
+    CyclePOD <|-- CarbonCyclePOD
+    CyclePOD <|-- WaterCyclePOD
+    CyclePOD <|-- NitrogenCyclePOD
+    CyclePOD <|-- PhosphorusCyclePOD
+
+    CyclePOD --> ReservoirMap : manages
+    CyclePOD ..> ThermodynamicState : wraps
+    EarthPod *-- CarbonCyclePOD
+    EarthPod *-- WaterCyclePOD
+    EarthPod *-- NitrogenCyclePOD
+    EarthPod *-- PhosphorusCyclePOD
+    EarthPod --> BlockchainBlockLedger : commits state
+}
+@enduml

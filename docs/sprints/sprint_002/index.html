@@ -1,469 +1,154 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-<meta charset="UTF-8" />
-<script type="importmap">
-  {
-    "imports": {
-      "h3-js": "https://esm.sh/h3-js"
-    }
-  }
-</script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Thermodynamic Web of Life - Sprint 002</title>
-
-<style>
-:root {
-  --bg: #02050a;
-  --panel: rgba(5, 14, 24, 0.91);
-  --panel-light: rgba(17, 35, 48, 0.9);
-  --text: #c8f5f2;
-  --muted: #7597a8;
-
-  --sun: #ffaa00;
-  --earth: #0088ff;
-  --flora: #00ff66;
-  --fauna: #ff3366;
-  --fungi: #c084fc;
-  --microbe: #64d8ff;
-  --human: #00e1ff;
-  --material: #d8c28f;
-  --water: #389cff;
-  --carbon: #aaaaaa;
-  --danger: #ff5370;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Courier New", monospace;
-}
-
-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  cursor: crosshair;
-}
-
-button,
-input,
-select {
-  font-family: inherit;
-}
-
-button {
-  cursor: pointer;
-  color: var(--text);
-  background: #102331;
-  border: 1px solid #315064;
-  border-radius: 5px;
-  padding: 7px 10px;
-}
-
-button:hover {
-  background: #18384c;
-  border-color: #00e1ff;
-}
-
-#topbar {
-  position: fixed;
-  z-index: 10;
-  top: 18px;
-  left: 18px;
-  width: min(700px, calc(100vw - 36px));
-  padding: 17px 20px;
-  background: var(--panel);
-  border: 1px solid #00e1ff38;
-  border-radius: 10px;
-  box-shadow: 0 0 35px #000;
-  backdrop-filter: blur(12px);
-}
-
-#topbar h1 {
-  color: #00ffe1;
-  font-size: 1.25rem;
-  letter-spacing: 1px;
-  margin-bottom: 5px;
-}
-
-#topbar h2 {
-  color: var(--sun);
-  font-size: 0.78rem;
-  margin-bottom: 12px;
-}
-
-#topbar p {
-  color: #9fc7d8;
-  font-size: 0.74rem;
-  line-height: 1.55;
-}
-
-.highlight {
-  color: white;
-  font-weight: bold;
-}
-
-.social-links {
-  margin-top: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 0.72rem;
-}
-
-.social-links a {
-  color: #00e1ff;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid #00e1ff38;
-  padding: 5px 10px;
-  border-radius: 5px;
-  background: rgba(0, 225, 255, 0.05);
-  transition: all 0.2s ease;
-}
-
-.social-links a:hover {
-  background: rgba(0, 225, 255, 0.2);
-  border-color: #00e1ff;
-  color: #ffffff;
-  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
-}
-
-#controls {
-  position: fixed;
-  z-index: 11;
-  left: 18px;
-  bottom: 18px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  width: min(880px, calc(100vw - 36px));
-  padding: 11px;
-  background: var(--panel);
-  border: 1px solid #00e1ff38;
-  border-radius: 9px;
-  backdrop-filter: blur(12px);
-}
-
-#search {
-  flex: 1;
-  min-width: 150px;
-  background: #07131d;
-  color: white;
-  border: 1px solid #315064;
-  border-radius: 5px;
-  padding: 8px 10px;
-  outline: none;
-}
-
-#search:focus {
-  border-color: var(--human);
-}
-
-.zoom-container,
-.debug-container {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: #9fc7d8;
-  background: #07131d;
-  border: 1px solid #315064;
-  border-radius: 5px;
-  padding: 5px 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.zoom-container input[type="range"] {
-  width: 75px;
-  cursor: pointer;
-  accent-color: #00e1ff;
-}
-
-.debug-container input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: var(--sun);
-}
-
-#inspector {
-  position: fixed;
-  z-index: 20;
-  top: 18px;
-  right: 18px;
-  width: min(390px, calc(100vw - 36px));
-  max-height: calc(100vh - 36px);
-  overflow-y: auto;
-  display: none;
-  background: var(--panel);
-  border: 1px solid #315064;
-  border-radius: 10px;
-  box-shadow: 0 0 40px #000;
-  backdrop-filter: blur(12px);
-}
-
-#inspector.open {
-  display: block;
-}
-
-.inspector-header {
-  position: relative;
-  padding: 16px;
-  border-bottom: 1px solid #315064;
-  background: rgba(255,255,255,0.04);
-}
-
-.close-x-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 4px 8px;
-}
-.close-x-btn:hover {
-  color: var(--text);
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
-}
-
-.inspector-body {
-  padding: 16px;
-  font-size: 0.76rem;
-  line-height: 1.6;
-}
-
-.inspector-body section {
-  margin-bottom: 14px;
-}
-
-.inspector-body h3 {
-  color: var(--human);
-  font-size: 0.82rem;
-  margin-bottom: 6px;
-  border-bottom: 1px dashed #315064;
-  padding-bottom: 3px;
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  color: var(--muted);
-}
-
-.stat-value {
-  color: var(--text);
-  font-weight: bold;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 2: Ecosystem Dynamics & Trophic Flow | Web of Life</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        forest: { 50: '#f0fdf4', 800: '#166534', 900: '#14532d' },
+                        earth: { 800: '#292524', 900: '#1c1917' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../src/styles/main.css">
 </head>
-<body>
-  <canvas id="canvas"></canvas>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+    <!-- Top Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="../sprint_001/index.html" class="text-slate-400 hover:text-white transition" title="Previous Sprint">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
+                <span class="bg-emerald-500/10 text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-500/20">Sprint 2</span>
+                <h1 class="text-lg font-bold tracking-tight">Ecosystem Dynamics & Trophic Flow</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="../../../index.html" class="text-sm text-slate-400 hover:text-white transition flex items-center gap-2">
+                    <i class="fa-solid fa-house"></i> Home
+                </a>
+                <a href="../sprint_003/index.html" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                    Next Sprint <i class="fa-solid fa-chevron-right text-xs"></i>
+                </a>
+            </div>
+        </div>
+    </header>
 
-  <div id="topbar">
-    <h1>THERMODYNAMIC WEB OF LIFE</h1>
-    <h2>Sprint 002: Earth System Pods &amp; Planetary Energy Flux</h2>
-    <p>
-      Simulating the coupled Earth system as a thermodynamic web of cascading energy and material cycles.
-      Click any node to inspect planetary energy balance, entropy generation rates, and subsystem interactions.
-    </p>
-    <div class="social-links">
-      <a href="01_RFC.html" target="_blank">📋 RFC</a>
-      <a href="02_METHODS.html" target="_blank">🔬 Methods</a>
-      <a href="https://github.com/web-of-life/web-of-life" target="_blank">⭐ GitHub</a>
-    </div>
-  </div>
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column: Controls & Stats -->
+        <div class="space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+                <h2 class="text-base font-semibold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-emerald-400"></i> Simulation Controls
+                </h2>
+                <div class="space-y-4">
+                    <button id="start-sim" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20">
+                        <i class="fa-solid fa-play"></i> Start Simulation
+                    </button>
+                    <button id="reset-sim" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2.5 px-4 rounded-lg transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate-right"></i> Reset Ecosystem
+                    </button>
+                </div>
+            </div>
 
-  <div id="controls">
-    <input type="text" id="search" placeholder="Search Earth pods &amp; energy fluxes..." />
-    <div class="zoom-container">
-      <span>Zoom</span>
-      <input type="range" id="zoomRange" min="0.5" max="3.0" step="0.1" value="1.0" />
-    </div>
-    <label class="debug-container">
-      <input type="checkbox" id="debugToggle" checked />
-      <span>Debug Flux</span>
-    </label>
-    <button id="pauseBtn">Pause</button>
-    <button id="resetBtn">Reset</button>
-  </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+                <h2 class="text-base font-semibold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-emerald-400"></i> Trophic Metrics
+                </h2>
+                <div id="metrics-panel" class="space-y-3 text-sm">
+                    <div class="flex justify-between items-center bg-slate-950/50 p-3 rounded-lg border border-slate-800/60">
+                        <span class="text-slate-400">Primary Producers:</span>
+                        <span id="metric-producers" class="font-bold text-emerald-400">100</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-950/50 p-3 rounded-lg border border-slate-800/60">
+                        <span class="text-slate-400">Primary Consumers:</span>
+                        <span id="metric-herbivores" class="font-bold text-blue-400">50</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-950/50 p-3 rounded-lg border border-slate-800/60">
+                        <span class="text-slate-400">Secondary Consumers:</span>
+                        <span id="metric-carnivores" class="font-bold text-amber-400">15</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  <div id="inspector">
-    <div class="inspector-header">
-      <h2 id="inspectorTitle">Node Inspector</h2>
-      <button class="close-x-btn" id="inspectorClose">&times;</button>
-    </div>
-    <div class="inspector-body" id="inspectorContent">
-      <p style="color: var(--muted)">Select a node in the planetary web to examine its thermodynamic properties.</p>
-    </div>
-  </div>
+        <!-- Right / Center Column: Simulation Canvas & Visualization -->
+        <div class="lg:col-span-2 space-y-6 flex flex-col">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg flex-1 flex flex-col min-h-[500px]">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-network-wired text-emerald-400"></i> Food Web Matrix
+                    </h2>
+                    <span id="sim-status" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Paused</span>
+                </div>
+                <div id="canvas-container" class="flex-1 bg-slate-950 rounded-lg border border-slate-800/80 relative flex items-center justify-center overflow-hidden min-h-[400px]">
+                    <div class="text-center text-slate-500 space-y-2 p-6">
+                        <i class="fa-solid fa-circle-nodes text-4xl mb-2 text-slate-600 animate-pulse"></i>
+                        <p class="text-sm font-medium">Interactive Ecosystem Canvas Ready</p>
+                        <p class="text-xs text-slate-600">Click 'Start Simulation' to initiate trophic flow calculations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
 
-  <script type="module">
-    import { EarthPOD } from '../../../src/earth_pod.ts';
-    import { ThermodynamicStructure } from '../../../src/thermodynamics/thermodynamic_structure.ts';
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/30 py-4 text-center text-xs text-slate-500">
+        Web of Life Project &bull; Sprint 2: Ecosystem Dynamics & Trophic Flow
+    </footer>
 
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    let width = canvas.width = window.innerWidth;
-    let height = canvas.height = window.innerHeight;
+    <!-- Sprint 2 Client Script -->
+    <script type="module">
+        // Basic initialization and UI binding for Sprint 2
+        document.addEventListener('DOMContentLoaded', () => {
+            const startBtn = document.getElementById('start-sim');
+            const resetBtn = document.getElementById('reset-sim');
+            const statusBadge = document.getElementById('sim-status');
+            
+            let isRunning = false;
 
-    window.addEventListener('resize', () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    });
+            if (startBtn) {
+                startBtn.addEventListener('click', () => {
+                    isRunning = !isRunning;
+                    if (isRunning) {
+                        startBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause Simulation';
+                        startBtn.classList.replace('bg-emerald-600', 'bg-amber-600');
+                        startBtn.classList.replace('hover:bg-emerald-500', 'hover:bg-amber-500');
+                        statusBadge.textContent = 'Running';
+                        statusBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                    } else {
+                        startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Simulation';
+                        startBtn.classList.replace('bg-amber-600', 'bg-emerald-600');
+                        startBtn.classList.replace('hover:bg-amber-500', 'hover:bg-emerald-500');
+                        statusBadge.textContent = 'Paused';
+                        statusBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20';
+                    }
+                });
+            }
 
-    const structure = new ThermodynamicStructure();
-    const earthPod = new EarthPOD({ id: 'core-gaia', name: 'Gaia Planetary System' });
-
-    let isPaused = false;
-    let debugFlux = true;
-    let zoom = 1.0;
-    let panX = 0;
-    let panY = 0;
-    let selectedNode = null;
-
-    // UI bindings
-    document.getElementById('pauseBtn').addEventListener('click', () => {
-      isPaused = !isPaused;
-      document.getElementById('pauseBtn').textContent = isPaused ? 'Resume' : 'Pause';
-    });
-
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      zoom = 1.0;
-      panX = 0;
-      panY = 0;
-      document.getElementById('zoomRange').value = '1.0';
-    });
-
-    document.getElementById('zoomRange').addEventListener('input', (e) => {
-      zoom = parseFloat(e.target.value);
-    });
-
-    document.getElementById('debugToggle').addEventListener('change', (e) => {
-      debugFlux = e.target.checked;
-    });
-
-    document.getElementById('inspectorClose').addEventListener('click', () => {
-      document.getElementById('inspector').classList.remove('open');
-      selectedNode = null;
-    });
-
-    // Simple interaction
-    canvas.addEventListener('click', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      // Select central pod on click
-      selectedNode = {
-        name: earthPod.config.name,
-        entropy: earthPod.entropyGenerationRate.toFixed(2),
-        temperature: earthPod.temperature.toFixed(1),
-        energyIn: earthPod.incomingFlux.toFixed(2),
-        energyOut: earthPod.outgoingFlux.toFixed(2)
-      };
-
-      document.getElementById('inspectorTitle').textContent = selectedNode.name;
-      document.getElementById('inspectorContent').innerHTML = `
-        <section>
-          <h3>Thermodynamic State</h3>
-          <div class="stat-row"><span class="stat-label">Temperature:</span><span class="stat-value">${selectedNode.temperature} K</span></div>
-          <div class="stat-row"><span class="stat-label">Entropy Generation:</span><span class="stat-value">${selectedNode.entropy} W/K</span></div>
-          <div class="stat-row"><span class="stat-label">Incoming Flux:</span><span class="stat-value">${selectedNode.energyIn} W</span></div>
-          <div class="stat-row"><span class="stat-label">Outgoing Flux:</span><span class="stat-value">${selectedNode.energyOut} W</span></div>
-        </section>
-        <section>
-          <h3>Subsystems &amp; Coupling</h3>
-          <p style="color: var(--muted)">Energy cascades efficiently across planetary boundaries, maintaining non-equilibrium steady state.</p>
-        </section>
-      `;
-      document.getElementById('inspector').classList.add('open');
-    });
-
-    // Animation Loop
-    function animate(timestamp) {
-      if (!isPaused) {
-        earthPod.update(0.016);
-      }
-
-      ctx.clearRect(0, 0, width, height);
-
-      ctx.save();
-      ctx.translate(width / 2 + panX, height / 2 + panY);
-      ctx.scale(zoom, zoom);
-
-      // Draw central Gaia pod
-      const radius = 80;
-      
-      // Outer glow
-      const grad = ctx.createRadialGradient(0, 0, radius * 0.5, 0, 0, radius * 1.8);
-      grad.addColorStop(0, 'rgba(0, 225, 255, 0.2)');
-      grad.addColorStop(1, 'rgba(0, 225, 255, 0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * 1.8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Core pod circle
-      ctx.fillStyle = '#071b2d';
-      ctx.strokeStyle = '#00e1ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Text inside pod
-      ctx.fillStyle = '#c8f5f2';
-      ctx.font = 'bold 12px "Courier New", monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('EARTH POD', 0, -10);
-
-      ctx.fillStyle = '#ffaa00';
-      ctx.font = '10px "Courier New", monospace';
-      ctx.fillText(`${earthPod.temperature.toFixed(1)} K`, 0, 10);
-
-      if (debugFlux) {
-        // Draw orbital energy flux rings
-        ctx.strokeStyle = 'rgba(255, 170, 0, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.arc(0, 0, radius + 35, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      ctx.restore();
-
-      requestAnimationFrame(animate);
-    }
-
-    requestAnimationFrame(animate);
-  </script>
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    isRunning = false;
+                    if (startBtn) {
+                        startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Simulation';
+                        startBtn.classList.replace('bg-amber-600', 'bg-emerald-600');
+                        startBtn.classList.replace('hover:bg-amber-500', 'hover:bg-emerald-500');
+                    }
+                    statusBadge.textContent = 'Reset';
+                    statusBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20';
+                });
+            }
+        });
+    </script>
 </body>
 </html>

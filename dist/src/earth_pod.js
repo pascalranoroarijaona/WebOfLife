@@ -1,115 +1,15 @@
-import { AbstractThermodynamicStructure } from './thermodynamics/thermodynamic_structure.js';
-import { ThermodynamicMonad } from './thermodynamics/types.js';
-export var EntropyState;
-(function (EntropyState) {
-    EntropyState["ACCUMULATING"] = "accumulating";
-    EntropyState["STEADY"] = "steady";
-    EntropyState["DEGRADING"] = "degrading";
-    EntropyState["COLLAPSED"] = "collapsed";
-})(EntropyState || (EntropyState = {}));
-export class Stock {
-    substance;
-    quantity;
-    maxCapacity;
-    unit;
-    constructor(substance, quantity, maxCapacity, unit = "kg_equivalent_carbon") {
-        this.substance = substance;
-        this.quantity = quantity;
-        this.maxCapacity = maxCapacity;
-        this.unit = unit;
-    }
-    utilization() {
-        if (!this.maxCapacity)
-            return 0;
-        return this.quantity / this.maxCapacity;
-    }
-}
-export class ThermodynamicStructure extends AbstractThermodynamicStructure {
-    name;
-    stocks = new Map();
-    inboundFlows = [];
-    outboundFlows = [];
-    entropyState = EntropyState.STEADY;
-    tickCreated = 0;
-    parent = null;
-    children = [];
-    constructor(name = "unnamed", id) {
-        super(id ?? crypto.randomUUID(), 298.15, 1000.0, 298.15, 298.15);
-        this.name = name;
-    }
-    get id() {
-        return this._id;
-    }
-    computeInternalEntropyGeneration() {
-        return Math.abs(this._internalEnergy * 1e-6);
-    }
-    importFreeEnergyJoules(joules, qualityFactor = 1.0) {
-        if (joules < 0 || qualityFactor < 0 || qualityFactor > 1) {
-            throw new Error("Invalid free energy parameters: energy and quality factor must be non-negative, quality <= 1.");
-        }
-        this._internalEnergy += joules;
-        const importedExergy = joules * qualityFactor;
-        this._exergy = Math.max(0, this._exergy + importedExergy);
-        const estimatedC_v = 1000;
-        this._temperature += joules / (this._mass * estimatedC_v);
-        this.updateExergy();
-    }
-    updateExergy() {
-        this._exergy = Math.max(0, this._internalEnergy * 0.1);
-    }
-    exportEntropyJoulesPerKelvin(joulesPerKelvin) {
-        if (joulesPerKelvin < 0) {
-            throw new Error("Entropy export quantity cannot be negative.");
-        }
-        this._entropy = Math.max(0, this._entropy - joulesPerKelvin);
-        this.updateExergy();
-    }
-    maintainFarFromEquilibriumSeconds(deltaTimeSeconds) {
-        if (deltaTimeSeconds <= 0)
-            return;
-        const internalEntropyGenRate = this.computeInternalEntropyGeneration();
-        const validEntropyGenRate = Math.max(0, internalEntropyGenRate);
-        this.validateSecondLaw(validEntropyGenRate);
-        // Integrate via ThermodynamicMonad compliance
-        const monad = ThermodynamicMonad.of(this.getStateVector())
-            .transform(validEntropyGenRate, deltaTimeSeconds);
-        const valResult = monad.validate();
-        const stateVec = monad.getStateVector();
-        this._entropy = stateVec.system?.entropy ?? stateVec.internalEnergy / Math.max(1, stateVec.temperature);
-        this._exergy = stateVec.system?.exergy ?? stateVec.internalEnergy * 0.1;
-        this.lastEntropyGenerationRate = stateVec.entropyMetrics.sGenRate;
-    }
-    addStock(substance, quantity, maxCapacity) {
-        this.stocks.set(substance, new Stock(substance, quantity, maxCapacity));
-    }
-    netFlow(substance) {
-        const inflow = this.inboundFlows
-            .filter((f) => f.substance === substance)
-            .reduce((sum, f) => sum + f.rate, 0);
-        const outflow = this.outboundFlows
-            .filter((f) => f.substance === substance)
-            .reduce((sum, f) => sum + f.rate, 0);
-        return inflow - outflow;
-    }
-    addChild(child) {
-        child.parent = this;
-        this.children.push(child);
-    }
-    totalDescendantBiomass() {
-        const own = this.stocks.get("biomass")?.quantity ?? 0;
-        return own + this.children.reduce((sum, c) => sum + c.totalDescendantBiomass(), 0);
-    }
-    tick(tickNum) {
-        const imported = this.importFreeEnergy(tickNum);
-        const exported = this.exportEntropy(tickNum);
-        this.entropyState = this.maintainFarFromEquilibrium(tickNum);
-        this.maintainFarFromEquilibriumSeconds(1.0);
-        return { imported, exported, state: this.entropyState };
-    }
-    toString() {
-        return `<${this.constructor.name} '${this.name}' state=${this.entropyState}>`;
-    }
-}
+// File: src/earth_pod.ts
+import { ThermodynamicStructure, EntropyState, Stock } from './thermodynamics/thermodynamic_structure.js';
+import { CarbonCycle } from './cycles/carbon.js';
+import { WaterCycle } from './cycles/water.js';
+import { NitrogenCycle } from './cycles/nitrogen.js';
+import { PhosphorusCycle } from './cycles/phosphorus.js';
+// Backward-compatibility aliases for Sprint 005 tests expecting *POD classes
+export { CarbonCycle as CarbonCyclePOD };
+export { WaterCycle as WaterCyclePOD };
+export { NitrogenCycle as NitrogenCyclePOD };
+export { PhosphorusCycle as PhosphorusCyclePOD };
+export { EntropyState, Stock };
 export class CyclePOD extends ThermodynamicStructure {
     reservoirs;
     transferRates;
@@ -120,6 +20,13 @@ export class CyclePOD extends ThermodynamicStructure {
         for (const [resName, qty] of Object.entries(reservoirs)) {
             this.addStock(resName, qty);
         }
+    }
+    getStocks() {
+        const res = {};
+        for (const [key, stock] of this.stocks.entries()) {
+            res[key] = stock.quantity;
+        }
+        return res;
     }
     importFreeEnergy(_tick) {
         const total = Object.values(this.transferRates).reduce((a, b) => a + b, 0);
@@ -153,9 +60,9 @@ export class CyclePOD extends ThermodynamicStructure {
         const maxImbalance = values.length ? Math.max(...values) : 0;
         return totalTransfer ? maxImbalance / totalTransfer : 0;
     }
-    transfer(sourceReservoir, targetReservoir) {
+    transfer(sourceReservoir, targetReservoir, customRate) {
         const route = `${sourceReservoir}->${targetReservoir}`;
-        const rate = this.transferRates[route] ?? 0;
+        const rate = customRate ?? this.transferRates[route] ?? 0;
         const srcStock = this.stocks.get(sourceReservoir);
         const tgtStock = this.stocks.get(targetReservoir);
         if (srcStock)
@@ -390,6 +297,11 @@ export class EarthPOD extends ThermodynamicStructure {
     cycles;
     biomes = [];
     solarInputWatts = 1.74e17;
+    // Dedicated biogeochemical cycle instances
+    carbonCycle = new CarbonCycle();
+    waterCycle = new WaterCycle();
+    nitrogenCycle = new NitrogenCycle();
+    phosphorusCycle = new PhosphorusCycle();
     constructor() {
         super("Earth");
         this.spheres = [ATMOSPHERE, HYDROSPHERE, LITHOSPHERE, BIOSPHERE];
@@ -423,7 +335,14 @@ export class EarthPOD extends ThermodynamicStructure {
         this.biomes.push(biome);
         this.addChild(biome);
     }
+    step(dt, solarFlux) {
+        this.carbonCycle.step(dt, solarFlux);
+        this.waterCycle.step(dt, solarFlux);
+        this.nitrogenCycle.step(dt, solarFlux);
+        this.phosphorusCycle.step(dt, solarFlux);
+    }
     fullTick(tickNum) {
+        this.step(1.0, this.solarInputWatts);
         const result = {
             earth: this.tick(tickNum),
             cycles: {},

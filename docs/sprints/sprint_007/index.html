@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web of Life - Sprint 7: Biogeochemical CyclePOD Instances</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121824;
+            --bg-card: rgba(18, 24, 36, 0.85);
+            --border-color: rgba(76, 175, 80, 0.3);
+            --accent-green: #4caf50;
+            --accent-blue: #2196f3;
+            --accent-amber: #ff9800;
+            --accent-red: #f44336;
+            --accent-cyan: #00bcd4;
+            --text-main: #e0e0e0;
+            --text-muted: #8a99ad;
+            --font-mono: "Fira Code", "Courier New", Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        #topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
+            animation: pulse-glow 4s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
+            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+        }
+
+        h1 { 
+            color: var(--accent-green); 
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        #controls {
+            background: rgba(18, 24, 36, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 25px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 90;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, #388e3c, #66bb6a);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #1565c0, #2196f3);
+        }
+        button.secondary:hover {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            background: var(--bg-secondary);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        #main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 320px 1fr 360px;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1200px) {
+            #main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            color: var(--accent-cyan);
+            border-bottom: 1px solid rgba(0, 188, 212, 0.2);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .metric-box {
+            background: rgba(10, 14, 23, 0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            color: var(--accent-green);
+            margin-top: 4px;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: radial-gradient(circle at center, #122218 0%, #080e17 70%);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .pod-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pod-item {
+            background: rgba(10, 14, 23, 0.7);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pod-info h3 {
+            font-size: 0.95rem;
+            color: var(--accent-amber);
+        }
+
+        .pod-info p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .pod-status {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(76, 175, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .terminal {
+            background: #05070a;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+            height: 150px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-entry {
+            opacity: 0.85;
+        }
+        .log-entry.warn { color: var(--accent-amber); }
+        .log-entry.error { color: var(--accent-red); }
+
+        footer {
+            text-align: center;
+            padding: 15px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <div class="brand-container">
+            <div class="brand-logo"></div>
+            <div>
+                <h1>Web of Life</h1>
+                <div class="subtitle">Sprint 7: Biogeochemical CyclePOD Instances</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="01_RFC.md" target="_blank" style="text-decoration: none;"><button class="secondary">RFC 007</button></a>
+            <a href="02_METHODS.md" target="_blank" style="text-decoration: none;"><button class="secondary">Methods</button></a>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-toggle">Start Simulation</button>
+        <button id="btn-step" class="secondary">Step Tick</button>
+        <button id="btn-reset" class="secondary" style="background: linear-gradient(135deg, #d32f2f, #f44336);">Reset Pods</button>
+        
+        <div class="control-group">
+            <label for="speed-select">Simulation Speed:</label>
+            <select id="speed-select">
+                <option value="1">1x (Normal)</option>
+                <option value="5">5x (Fast)</option>
+                <option value="10">10x (Hyper)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="flux-slider">Global Flux Rate:</label>
+            <input type="range" id="flux-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+            <span id="flux-val">1.0x</span>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <!-- Left Sidebar: Cycle Metrics -->
+        <div class="card">
+            <h2>Cycle Metrics</h2>
+            <div class="metric-grid">
+                <div class="metric-box">
+                    <div class="metric-label">Carbon Pool</div>
+                    <div class="metric-value" id="val-carbon">1,000 Gt</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Nitrogen Pool</div>
+                    <div class="metric-value" id="val-nitrogen">500 Mt</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Phosphorus</div>
+                    <div class="metric-value" id="val-phosphorus">120 Mt</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Water Flux</div>
+                    <div class="metric-value" id="val-water">45,000 km³</div>
+                </div>
+            </div>
+
+            <h2>Thermodynamic State</h2>
+            <div class="metric-grid">
+                <div class="metric-box">
+                    <div class="metric-label">Entropy Rate</div>
+                    <div class="metric-value" id="val-entropy" style="color: var(--accent-amber);">14.2 J/K</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Exergy Efficiency</div>
+                    <div class="metric-value" id="val-exergy" style="color: var(--accent-cyan);">68.4%</div>
+                </div>
+            </div>
+
+            <h2>Activity Log</h2>
+            <div class="terminal" id="terminal-log">
+                <div class="log-entry">[00:00:00] Initialized Biogeochemical CyclePOD Instances.</div>
+                <div class="log-entry">[00:00:00] Carbon, Nitrogen, Phosphorus, and Water cycles loaded.</div>
+            </div>
+        </div>
+
+        <!-- Center: Interactive Simulation Canvas -->
+        <div class="card" style="flex: 1;">
+            <h2>Biosphere Flow Visualizer <span id="tick-counter" style="font-size:0.8rem; font-family:var(--font-mono); color:var(--text-muted);">Tick: 0</span></h2>
+            <div id="canvas-container">
+                <canvas id="sim-canvas" width="800" height="500"></canvas>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: CyclePOD Instances -->
+        <div class="card">
+            <h2>CyclePOD Instances</h2>
+            <div class="pod-grid">
+                <div class="pod-item">
+                    <div class="pod-info">
+                        <h3>CarbonPOD</h3>
+                        <p>ID: pod-c-07</p>
+                    </div>
+                    <div class="pod-status" id="status-carbon">ACTIVE</div>
+                </div>
+                <div class="pod-item">
+                    <div class="pod-info">
+                        <h3>NitrogenPOD</h3>
+                        <p>ID: pod-n-07</p>
+                    </div>
+                    <div class="pod-status" id="status-nitrogen">ACTIVE</div>
+                </div>
+                <div class="pod-item">
+                    <div class="pod-info">
+                        <h3>PhosphorusPOD</h3>
+                        <p>ID: pod-p-07</p>
+                    </div>
+                    <div class="pod-status" id="status-phosphorus">ACTIVE</div>
+                </div>
+                <div class="pod-item">
+                    <div class="pod-info">
+                        <h3>WaterPOD</h3>
+                        <p>ID: pod-h2o-07</p>
+                    </div>
+                    <div class="pod-status" id="status-water">ACTIVE</div>
+                </div>
+            </div>
+
+            <h2>Gaia Telemetry</h2>
+            <div class="metric-box" style="margin-top: 5px;">
+                <div class="metric-label">Homeostasis Index</div>
+                <div class="metric-value" id="val-homeostasis">0.942 (Stable)</div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Web of Life Project &bull; Sprint 7: Biogeochemical CyclePOD Instances &bull; Gaia Simulation Engine
+    </footer>
+
+    <script>
+        // Interactive simulation frontend logic for Sprint 7
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        const toggleBtn = document.getElementById('btn-toggle');
+        const stepBtn = document.getElementById('btn-step');
+        const resetBtn = document.getElementById('btn-reset');
+        const speedSelect = document.getElementById('speed-select');
+        const fluxSlider = document.getElementById('flux-slider');
+        const fluxVal = document.getElementById('flux-val');
+        const tickCounter = document.getElementById('tick-counter');
+        const terminalLog = document.getElementById('terminal-log');
+
+        const valCarbon = document.getElementById('val-carbon');
+        const valNitrogen = document.getElementById('val-nitrogen');
+        const valPhosphorus = document.getElementById('val-phosphorus');
+        const valWater = document.getElementById('val-water');
+        const valEntropy = document.getElementById('val-entropy');
+        const valExergy = document.getElementById('val-exergy');
+        const valHomeostasis = document.getElementById('val-homeostasis');
+
+        let isRunning = false;
+        let tick = 0;
+        let speed = 1;
+        let fluxMultiplier = 1.0;
+
+        let simulationState = {
+            carbon: 1000.0,
+            nitrogen: 500.0,
+            phosphorus: 120.0,
+            water: 45000.0,
+            entropy: 14.2,
+            exergy: 68.4,
+            homeostasis: 0.942
+        };
+
+        function logMessage(msg, type = '') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timeStr = new Date().toTimeString().split(' ')[0];
+            entry.textContent = `[${timeStr}] ${msg}`;
+            terminalLog.appendChild(entry);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+        }
+
+        fluxSlider.addEventListener('input', (e) => {
+            fluxMultiplier = parseFloat(e.target.value);
+            fluxVal.textContent = fluxMultiplier.toFixed(1) + 'x';
+            logMessage(`Global flux rate updated to ${fluxMultiplier.toFixed(1)}x`);
+        });
+
+        speedSelect.addEventListener('change', (e) => {
+            speed = parseInt(e.target.value);
+        });
+
+        function updateMetricsDisplay() {
+            valCarbon.textContent = simulationState.carbon.toFixed(1) + ' Gt';
+            valNitrogen.textContent = simulationState.nitrogen.toFixed(1) + ' Mt';
+            valPhosphorus.textContent = simulationState.phosphorus.toFixed(1) + ' Mt';
+            valWater.textContent = simulationState.water.toLocaleString() + ' km³';
+            valEntropy.textContent = simulationState.entropy.toFixed(1) + ' J/K';
+            valExergy.textContent = simulationState.exergy.toFixed(1) + '%';
+            valHomeostasis.textContent = simulationState.homeostasis.toFixed(3) + ' (Stable)';
+            tickCounter.textContent = `Tick: ${tick}`;
+        }
+
+        function stepSimulation() {
+            tick++;
+            // Simulate natural fluctuation governed by flux multiplier
+            simulationState.carbon += (Math.sin(tick * 0.1) * 2.5) * fluxMultiplier;
+            simulationState.nitrogen += (Math.cos(tick * 0.08) * 1.2) * fluxMultiplier;
+            simulationState.phosphorus += (Math.sin(tick * 0.05) * 0.5) * fluxMultiplier;
+            simulationState.water += (Math.cos(tick * 0.12) * 50) * fluxMultiplier;
+            
+            simulationState.entropy = Math.max(5, 14.2 + Math.sin(tick * 0.05) * 2);
+            simulationState.exergy = Math.min(95, Math.max(40, 68.4 + Math.cos(tick * 0.06) * 5));
+            simulationState.homeostasis = Math.min(1.0, Math.max(0.8, 0.942 + Math.sin(tick * 0.03) * 0.03));
+
+            updateMetricsDisplay();
+            drawCanvas();
+        }
+
+        // Particle nodes for visualization
+        const nodes = [
+            { x: 200, y: 150, radius: 28, label: 'CarbonPOD', color: '#4caf50' },
+            { x: 600, y: 150, radius: 26, label: 'NitrogenPOD', color: '#2196f3' },
+            { x: 200, y: 350, radius: 24, label: 'PhosphorusPOD', color: '#ff9800' },
+            { x: 600, y: 350, radius: 30, label: 'WaterPOD', color: '#00bcd4' },
+            { x: 400, y: 250, radius: 35, label: 'Gaia Core', color: '#e0e0e0' }
+        ];
+
+        function drawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw connections
+            ctx.strokeStyle = 'rgba(76, 175, 80, 0.25)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    ctx.beginPath();
+                    ctx.moveTo(nodes[i].x, nodes[i].y);
+                    ctx.lineTo(nodes[j].x, nodes[j].y);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw nodes
+            nodes.forEach((node, idx) => {
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.radius + Math.sin(tick * 0.1 + idx) * 3, 0, Math.PI * 2);
+                ctx.fillStyle = node.color;
+                ctx.globalAlpha = 0.85;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+
+                // Label
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px "Fira Code", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(node.label, node.x, node.y + node.radius + 18);
+            });
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            if (isRunning) {
+                toggleBtn.textContent = 'Pause Simulation';
+                toggleBtn.style.background = 'linear-gradient(135deg, #e65100, #ff9800)';
+                logMessage('Simulation started.');
+            } else {
+                toggleBtn.textContent = 'Start Simulation';
+                toggleBtn.style.background = 'linear-gradient(135deg, #2e7d32, #4caf50)';
+                logMessage('Simulation paused.');
+            }
+        });
+
+        stepBtn.addEventListener('click', () => {
+            stepSimulation();
+            logMessage('Manual tick step executed.');
+        });
+
+        resetBtn.addEventListener('click', () => {
+            tick = 0;
+            simulationState = {
+                carbon: 1000.0,
+                nitrogen: 500.0,
+                phosphorus: 120.0,
+                water: 45000.0,
+                entropy: 14.2,
+                exergy: 68.4,
+                homeostasis: 0.942
+            };
+            updateMetricsDisplay();
+            drawCanvas();
+            logMessage('CyclePOD instances reset to baseline state.', 'warn');
+        });
+
+        // Main animation loop
+        let lastTime = 0;
+        function animate(timestamp) {
+            if (isRunning && timestamp - lastTime > (1000 / (10 * speed))) {
+                stepSimulation();
+                lastTime = timestamp;
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // Initial render
+        drawCanvas();
+        updateMetricsDisplay();
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

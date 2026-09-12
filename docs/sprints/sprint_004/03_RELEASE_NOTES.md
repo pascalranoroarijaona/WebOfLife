@@ -1,50 +1,44 @@
 <!-- Release Notes -->
-
-# Sprint 004 Release Notes: Metabolic Thermodynamics & Extended Trophic Cascades
+# Sprint 004 Release Notes: Thermodynamic State Vector Interface & Metabolic Extensions
 
 **Sprint:** 004  
-**Status:** Completed / Production Ready  
-**Applies To:** `web_of_life/ecosystem/`, `web_of_life/thermodynamics/`, `web_of_life/agents/`
+**Applies To:** `src/thermodynamics/`, `web_of_life/ecosystem/`, `web_of_life/agents/`, `docs/sprints/sprint_004/`  
+**Status:** Completed  
 
 ---
 
-## 1. Executive Summary
+## Executive Summary
 
-Sprint 004 marks a foundational milestone in the Web of Life simulation architecture by transitioning the engine from basic mass-balance token tracking to a **physically bounded thermodynamic engine**. Guided strictly by the First and Second Laws of Thermodynamics, this release introduces closed-loop matter conservation, solar radiation influx, unrecoverable thermal dissipation ($Q_{loss}$), and robust stoichiometric state machine transitions across all ecological tiers.
-
----
-
-## 2. Architectural & Backend Modifications
-
-### 2.1 Thermodynamic Engine & Laws Enforcement
-- **First Law Compliance (Mass Conservation):** Implemented strict closed-loop matter containers for all entities (Producers, Consumers, Decomposers, and Dead Biomass Pools). Carbon, Nitrogen, and Phosphorus (C:N:P) elemental stoichiometry is tracked rigorously, preventing internal mass creation or destruction.
-- **Second Law Compliance (Solar Input & Entropy):** Integrated Photosynthetically Active Radiation (PAR, $Q_{in}$) as the sole external energy source. All internal metabolic processes now generate unrecoverable thermal dissipation ($Q_{loss}$), driving ecosystem entropy strictly upward ($\frac{dQ_{loss}}{dt} \ge 0$).
-
-### 2.2 Class Hierarchy Extensions
-- Extended Sprint 003's base architecture (`Organism`, `Resource`, `Environment`) without breaking core contracts:
-  - **`Environment`**: Expanded to include `AtmosphericPool` (gas stocks: $CO_2, O_2, N_2$) and `SoilMatrix` (inorganic stocks: $N, P, H_2O$, dead biomass).
-  - **`Organism` (Abstract)**:
-    - *Producer*: Photosynthetic monads (`C3Plant`, `C4Plant`).
-    - *Consumer*: Heterotrophic monads (`Herbivore`, `Carnivore`, `Omnivore`).
-    - *Decomposer*: Saprotrophic monads (`BacterialCluster`, `FungalMycelium`).
-
-### 2.3 Interface Contracts
-- **`IThermodynamicSystem`**: Enforces methods for computing energy flux `(Energy_Stored, Energy_Dissipated_Heat)` and validating mass conservation invariants.
-- **`IMetabolicAgent`**: Subinterface defining deterministic contracts for matter ingestion (`ingest()`) and organic carbon respiration (`respire()`).
-
-### 2.4 Monad Stock Transitions & State Machine
-- Adopted composable, side-effect-free Monad pipelines for high-frequency simulation ticks:
-  - **Uptake / Fixation Pipeline**: Soil/Atmosphere Stocks $\rightarrow$ Producer Monad.
-  - **Ingestion & Detritus Routing**: Consumer Ingestion $\rightarrow$ Detritus Pool $\rightarrow$ Mineralization.
-- **State Transition Matrix Implemented**:
-  - `Alive` $\rightarrow$ `Dead` (Trigger: Energy $< 0$; converts 100% biomass to `DetritusPool`).
-  - `Alive` $\rightarrow$ `Reproducing` (Trigger: Mass $> \text{Capacity}$; splits biomass into Parent + Offspring).
-  - `Detritus` $\rightarrow$ `Mineralized` (Trigger: Decomposition Complete; releases $NH_4^+$, $PO_4^{3-}$, $CO_2$).
+Sprint 004 successfully transitions the Web of Life simulation engine from baseline token-tracking and mass-balance approximations to a **physically bounded thermodynamic engine**. Governed rigorously by the First and Second Laws of Thermodynamics, this release introduces strict type contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rates ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), boundary flux arrays, and deterministic monad-based stock transitions.
 
 ---
 
-## 3. Verification & Testing Suite
+## Key Features & Architectural Additions
 
-- **Mass-Balance Invariant Tests (`test_mass_conservation.py`)**: Asserts that $\sum \text{Initial Atoms} == \sum \text{Final Atoms} \pm \epsilon$ ($10^{-9}$) across every global simulation tick.
-- **Entropy Directionality Tests (`test_second_law.py`)**: Confirms that total system thermal energy ($Q_{loss}$) is strictly non-decreasing over time.
-- **Trophic Pyramid Stability Integration Tests (`test_trophic_cascade.py`)**: Validates that multi-tier biomass ratios maintain ecological stability adhering to the 10% rule across 3 trophic levels over 1,000 simulation steps.
+### 1. Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`)
+* **Strict Contracts:** Established strict TypeScript/Python interface definitions for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I}$), and boundary flux arrays.
+* **First Law Compliance (Matter Conservation):** Enforced closed-loop matter containers across all simulation entities (Producers, Consumers, Decomposers, Dead Biomass Pools). Carbon, Nitrogen, and Phosphorus atoms are strictly conserved through atomic mass delta validation ($\sum \text{Atoms}_{\text{initial}} == \sum \text{Atoms}_{\text{final}} \pm 10^{-9}$).
+* **Second Law Compliance (Solar Input & Dissipation):** Configured Photosynthetically Active Radiation ($Q_{in}$) as the sole external energy source, with all internal metabolic processes generating unrecoverable thermal dissipation ($Q_{loss}$) and ecosystem entropy growth.
+
+### 2. Incremental Class Hierarchy Extension
+* **Base Organism & Environment Structures:** Extended Sprint 003 base classes without breaking core interface contracts:
+  * `Environment`: Manages `AtmosphericPool` (gas stocks: $CO_2$, $O_2$, $N_2$) and `SoilMatrix` (inorganic stocks: $N$, $P$, $H_2O$, Dead Biomass).
+  * `Organism` (Abstract): Specialized into `Producer` (C3/C4 Plants), `Consumer` (Herbivore, Carnivore, Omnivore), and `Decomposer` (Bacterial Clusters, Fungal Mycelium).
+* **Interface Implementations:**
+  * `IThermodynamicSystem`: Standardizes energy flux calculations returning `(Energy_Stored, Energy_Dissipated_Heat)` tuples and mass conservation validations.
+  * `IMetabolicAgent`: Implements ingestion, egestion waste packets, and metabolic respiration conversions from organic carbon to $CO_2$ and thermal energy.
+
+### 3. Monad Stock Transitions & State Machine
+* **Composable Pipelines:** Implemented deterministic, side-effect-free monad pipelines for high-frequency simulation ticks governing nutrient uptake, photosynthesis, herbivory ingestion, and mineralization.
+* **State Transition Rules:**
+  * `Alive` $\rightarrow$ `Dead`: Triggered when internal energy drops below $0$; converts 100% biomass to `DetritusPool`.
+  * `Alive` $\rightarrow$ `Reproducing`: Triggered when biomass exceeds carrying capacity; splits mass cleanly into Parent and Offspring.
+  * `Detritus` $\rightarrow$ `Mineralized`: Completes decomposition loops to release inorganic $NH_4^+$, $PO_4^{3-}$, and $CO_2$.
+
+---
+
+## Verification & Testing Suite
+
+* **Mass-Balance Invariants:** Comprehensive unit tests asserting atomic mass conservation within simulation error bounds ($\epsilon = 10^{-9}$) across global ticks.
+* **Entropy Directionality Tests:** Automated verification confirming that total system thermal energy ($Q_{loss}$) remains strictly non-decreasing ($\frac{dQ_{loss}}{dt} \ge 0$).
+* **Trophic Pyramid Stability Integration:** Validated structural biomass ratios against the ecological 10% rule across three distinct trophic levels over a continuous 1,000-step simulation run.

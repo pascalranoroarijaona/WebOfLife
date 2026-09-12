@@ -1,0 +1,82 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "src.cycles" {
+  abstract class BaseCycle {
+    # reservoirs: Map<string, number>
+    # initialTotalMass: number
+    + {abstract} step(deltaSeconds: number, solarInput: number): void
+    + getStock(name: string): number
+    # transfer(from: string, to: string, amount: number): void
+    + calculateTotalMass(): number
+    + validateConservation(tolerance: number): boolean
+  }
+
+  class CarbonCycle {
+    + step(deltaSeconds: number, solarInput: number): void
+    - handlePhotosynthesis(solarInput: number): void
+    - handleRespiration(): void
+    - handleDissolution(): void
+  }
+
+  class WaterCycle {
+    + step(deltaSeconds: number, solarInput: number): void
+    - handleEvaporation(solarInput: number): void
+    - handlePrecipitation(): void
+    - handleRunoff(): void
+  }
+
+  class NitrogenCycle {
+    + step(deltaSeconds: number, solarInput: number): void
+    - handleFixation(): void
+    - handleAssimilation(): void
+    - handleDenitrification(): void
+  }
+
+  class PhosphorusCycle {
+    + step(deltaSeconds: number, solarInput: number): void
+    - handleWeathering(): void
+    - handleUptake(): void
+    - handleSedimentation(): void
+  }
+
+  BaseCycle <|-- CarbonCycle
+  BaseCycle <|-- WaterCycle
+  BaseCycle <|-- NitrogenCycle
+  BaseCycle <|-- PhosphorusCycle
+}
+
+package "src.thermodynamics" {
+  class ThermodynamicState {
+    + stateId: string
+    + totalEnergy: number
+    + entropyGeneration: number
+    + solarFluxInput: number
+  }
+}
+
+package "db.blockchain" {
+  class CycleBlock {
+    + blockId: string
+    + blockIndex: number
+    + previousHash: string
+    + blockHash: string
+    + merkleRoot: string
+    + nonce: number
+  }
+
+  class CycleTransaction {
+    + transactionId: string
+    + signature: string
+    + payloadHash: string
+    + verifySignature(): boolean
+  }
+
+  CycleBlock "1" *-- "*" CycleTransaction : contains
+}
+
+BaseCycle --> ThermodynamicState : governed by
+CycleTransaction --> BaseCycle : audits mass state
+@enduml

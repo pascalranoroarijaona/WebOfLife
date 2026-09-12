@@ -15,9 +15,26 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
   it('should execute ThermodynamicMonad transform and enforce Second Law (S_dot_gen >= 0)', () => {
     const initialState: ThermodynamicStateVector = {
       timestamp: 0,
+      T_0: 288.15,
       internalEnergy: 10000,
       totalMass: 500,
+      mass: 500,
       temperature: 300,
+      ambientTemperature: 288.15,
+      entropy: 33.33,
+      exergy: 1000,
+      boundaryHeatFlux: {},
+      boundaryFluxes: [],
+      massInventory: { carbon: 225 },
+      stocks: {
+        carbon: 225,
+        nitrogen: 20,
+        phosphorus: 2.5,
+        oxygen: 100,
+        water: 150,
+        energyStored: 10000,
+        qLoss: 0
+      },
       fluxes: {
         radiativeFlux: 50,
         convectiveFlux: 5,
@@ -26,6 +43,8 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
       },
       entropyMetrics: {
         sGenRate: 1.0,
+        exergyDestruction: 288.15 * 1.0,
+        cumulativeQLoss: 0,
         referenceTemperature: 288.15,
         exergyDestructionRate: 288.15 * 1.0,
       },
@@ -45,15 +64,33 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
 
     const monad = ThermodynamicMonad.of(initialState).transform(2.0, 5.0);
     const res = monad.getStateVector();
+    assert.ok(res.entropyMetrics);
     assert.strictEqual(res.entropyMetrics.sGenRate, 2.0);
   });
 
   it('should throw an error on Second Law violation in ThermodynamicMonad', () => {
     const initialState: ThermodynamicStateVector = {
       timestamp: 0,
+      T_0: 288.15,
       internalEnergy: 10000,
       totalMass: 500,
+      mass: 500,
       temperature: 300,
+      ambientTemperature: 288.15,
+      entropy: 33.33,
+      exergy: 1000,
+      boundaryHeatFlux: {},
+      boundaryFluxes: [],
+      massInventory: { carbon: 225 },
+      stocks: {
+        carbon: 225,
+        nitrogen: 20,
+        phosphorus: 2.5,
+        oxygen: 100,
+        water: 150,
+        energyStored: 10000,
+        qLoss: 0
+      },
       fluxes: {
         radiativeFlux: 50,
         convectiveFlux: 5,
@@ -62,6 +99,8 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
       },
       entropyMetrics: {
         sGenRate: 1.0,
+        exergyDestruction: 288.15 * 1.0,
+        cumulativeQLoss: 0,
         referenceTemperature: 288.15,
         exergyDestructionRate: 288.15 * 1.0,
       },
@@ -80,12 +119,13 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
     };
 
     assert.throws(() => {
-      // transform with negative entropy generation rate or invalid state creation
       const invalidState: ThermodynamicStateVector = {
         ...initialState,
         entropyMetrics: {
-          ...initialState.entropyMetrics,
           sGenRate: -0.5,
+          exergyDestruction: -288.15 * 0.5,
+          cumulativeQLoss: 0,
+          referenceTemperature: 288.15,
           exergyDestructionRate: -288.15 * 0.5,
         },
         entropyGenerationRate: -0.5,

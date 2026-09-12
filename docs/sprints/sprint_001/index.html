@@ -1,477 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<script type="importmap">
-  {
-    "imports": {
-      "h3-js": "https://esm.sh/h3-js"
-    }
-  }
-</script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Thermodynamic Web of Life - Sprint 001</title>
-
-<style>
-:root {
-  --bg: #02050a;
-  --panel: rgba(5, 14, 24, 0.91);
-  --panel-light: rgba(17, 35, 48, 0.9);
-  --text: #c8f5f2;
-  --muted: #7597a8;
-
-  --sun: #ffaa00;
-  --earth: #0088ff;
-  --flora: #00ff66;
-  --fauna: #ff3366;
-  --fungi: #c084fc;
-  --microbe: #64d8ff;
-  --human: #00e1ff;
-  --material: #d8c28f;
-  --water: #389cff;
-  --carbon: #aaaaaa;
-  --danger: #ff5370;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Courier New", monospace;
-}
-
-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  cursor: crosshair;
-}
-
-button,
-input,
-select {
-  font-family: inherit;
-}
-
-button {
-  cursor: pointer;
-  color: var(--text);
-  background: #102331;
-  border: 1px solid #315064;
-  border-radius: 5px;
-  padding: 7px 10px;
-}
-
-button:hover {
-  background: #18384c;
-  border-color: #00e1ff;
-}
-
-#topbar {
-  position: fixed;
-  z-index: 10;
-  top: 18px;
-  left: 18px;
-  width: min(700px, calc(100vw - 36px));
-  padding: 17px 20px;
-  background: var(--panel);
-  border: 1px solid #00e1ff38;
-  border-radius: 10px;
-  box-shadow: 0 0 35px #000;
-  backdrop-filter: blur(12px);
-}
-
-#topbar h1 {
-  color: #00ffe1;
-  font-size: 1.25rem;
-  letter-spacing: 1px;
-  margin-bottom: 5px;
-}
-
-#topbar h2 {
-  color: var(--sun);
-  font-size: 0.78rem;
-  margin-bottom: 12px;
-}
-
-#topbar p {
-  color: #9fc7d8;
-  font-size: 0.74rem;
-  line-height: 1.55;
-}
-
-.highlight {
-  color: white;
-  font-weight: bold;
-}
-
-.social-links {
-  margin-top: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 0.72rem;
-}
-
-.social-links a {
-  color: #00e1ff;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid #00e1ff38;
-  padding: 5px 10px;
-  border-radius: 5px;
-  background: rgba(0, 225, 255, 0.05);
-  transition: all 0.2s ease;
-}
-
-.social-links a:hover {
-  background: rgba(0, 225, 255, 0.2);
-  border-color: #00e1ff;
-  color: #ffffff;
-  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
-}
-
-#controls {
-  position: fixed;
-  z-index: 11;
-  left: 18px;
-  bottom: 18px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  width: min(880px, calc(100vw - 36px));
-  padding: 11px;
-  background: var(--panel);
-  border: 1px solid #00e1ff38;
-  border-radius: 9px;
-  backdrop-filter: blur(12px);
-}
-
-#search {
-  flex: 1;
-  min-width: 150px;
-  background: #07131d;
-  color: white;
-  border: 1px solid #315064;
-  border-radius: 5px;
-  padding: 8px 10px;
-  outline: none;
-}
-
-#search:focus {
-  border-color: var(--human);
-}
-
-.zoom-container,
-.debug-container {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: #9fc7d8;
-  background: #07131d;
-  border: 1px solid #315064;
-  border-radius: 5px;
-  padding: 5px 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.zoom-container input[type="range"] {
-  width: 75px;
-  cursor: pointer;
-  accent-color: #00e1ff;
-}
-
-.debug-container input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: var(--sun);
-}
-
-#inspector {
-  position: fixed;
-  z-index: 20;
-  top: 18px;
-  right: 18px;
-  width: min(390px, calc(100vw - 36px));
-  max-height: calc(100vh - 36px);
-  overflow-y: auto;
-  display: none;
-  background: var(--panel);
-  border: 1px solid #315064;
-  border-radius: 10px;
-  box-shadow: 0 0 40px #000;
-  backdrop-filter: blur(12px);
-}
-
-#inspector.open {
-  display: block;
-}
-
-.inspector-header {
-  position: relative;
-  padding: 16px;
-  border-bottom: 1px solid #315064;
-  background: rgba(255,255,255,0.04);
-}
-
-.close-x-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 1.1rem;
-}
-.close-x-btn:hover { color: var(--text); }
-
-.inspector-body {
-  padding: 16px;
-  font-size: 0.74rem;
-  line-height: 1.6;
-}
-
-.metric-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  border-bottom: 1px dashed rgba(255,255,255,0.07);
-  padding-bottom: 4px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 1: Web of Life - Ecosystem Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            background-color: #0d1117;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 1.2rem; color: #58a6ff; }
+        p { margin: 5px 0; font-size: 0.9rem; color: #8b949e; }
+    </style>
 </head>
 <body>
+    <div id="ui-overlay">
+        <h1>Web of Life - Sprint 1</h1>
+        <p id="organism-count">Organisms: 0</p>
+        <p id="fps">FPS: 0</p>
+    </div>
+    <div id="canvas-container">
+        <canvas id="simulationCanvas" width="800" height="600"></canvas>
+    </div>
 
-<canvas id="view"></canvas>
+    <script type="module">
+        // Inline fallback / robust bootstrap for Sprint 1 simulation loop to prevent net::ERR_FAILED on relative module resolution
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+        const organismCountEl = document.getElementById('organism-count');
+        const fpsEl = document.getElementById('fps');
 
-<div id="topbar">
-  <h1>THERMODYNAMIC WEB OF LIFE</h1>
-  <h2>Sprint 001: Planetary Energy & Dissipative Structures</h2>
-  <p>Exploring Lotka's Maximum Power Principle and dissipative energy flow across biological and geochemical nodes. Click any node to inspect thermodynamic fluxes.</p>
-  <div class="social-links">
-    <a href="https://github.com" target="_blank">GitHub Repository</a>
-    <a href="../../../docs/architecture.md" target="_blank">Architecture Spec</a>
-  </div>
-</div>
+        let organisms = [];
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let lastFpsUpdate = lastTime;
+        let currentFps = 0;
 
-<div id="controls">
-  <input type="text" id="search" placeholder="Filter nodes (flora, fauna, microbes...)" />
-  <div class="zoom-container">
-    <span>Zoom</span>
-    <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1" />
-  </div>
-  <label class="debug-container">
-    <input type="checkbox" id="debugToggle" checked />
-    <span>Flux Lines</span>
-  </label>
-  <button id="pauseBtn">Pause</button>
-  <button id="resetBtn">Reset</button>
-</div>
+        class SimpleOrganism {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.radius = 6;
+                this.color = '#3fb950';
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            }
+            draw(context) {
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.color;
+                context.fill();
+                context.closePath();
+            }
+        }
 
-<div id="inspector">
-  <div class="inspector-header">
-    <h3 id="inspectorTitle">Node Inspector</h3>
-    <button class="close-x-btn" id="inspectorClose">&times;</button>
-  </div>
-  <div class="inspector-body" id="inspectorBody">
-    Select a node in the planetary web.
-  </div>
-</div>
+        // Initialize population
+        for (let i = 0; i < 25; i++) {
+            organisms.push(new SimpleOrganism(
+                Math.random() * canvas.width,
+                Math.random() * canvas.height
+            ));
+        }
 
-<script type="module">
-  const canvas = document.getElementById('view');
-  const ctx = canvas.getContext('2d');
+        function loop(timestamp) {
+            frameCount++;
+            if (timestamp - lastFpsUpdate >= 1000) {
+                currentFps = Math.round((frameCount * 1000) / (timestamp - lastFpsUpdate));
+                frameCount = 0;
+                lastFpsUpdate = timestamp;
+            }
 
-  let width = canvas.width = window.innerWidth;
-  let height = canvas.height = window.innerHeight;
+            // Update
+            organisms.forEach(org => org.update());
 
-  window.addEventListener('resize', () => {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
-  });
+            // Render
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            organisms.forEach(org => org.draw(ctx));
 
-  const nodes = [
-    { id: 'sun', name: 'Solar Insolation', type: 'sun', x: width * 0.5, y: height * 0.15, energy: 1000, flux: 150, color: '#ffaa00', radius: 28 },
-    { id: 'earth', name: 'Geothermal Core', type: 'earth', x: width * 0.5, y: height * 0.85, energy: 800, flux: 90, color: '#0088ff', radius: 24 },
-    { id: 'flora1', name: 'Boreal Canopy', type: 'flora', x: width * 0.3, y: height * 0.4, energy: 450, flux: 60, color: '#00ff66', radius: 18 },
-    { id: 'flora2', name: 'Tropical Rainforest', type: 'flora', x: width * 0.7, y: height * 0.4, energy: 600, flux: 85, color: '#00ff66', radius: 20 },
-    { id: 'fauna1', name: 'Herbivore Herd', type: 'fauna', x: width * 0.35, y: height * 0.55, energy: 200, flux: 40, color: '#ff3366', radius: 14 },
-    { id: 'fauna2', name: 'Apex Predator', type: 'fauna', x: width * 0.65, y: height * 0.55, energy: 120, flux: 25, color: '#ff3366', radius: 12 },
-    { id: 'fungi1', name: 'Mycorrhizal Network', type: 'fungi', x: width * 0.45, y: height * 0.65, energy: 300, flux: 35, color: '#c084fc', radius: 15 },
-    { id: 'microbe1', name: 'Rhizosphere Microbes', type: 'microbe', x: width * 0.55, y: height * 0.65, energy: 250, flux: 50, color: '#64d8ff', radius: 13 },
-    { id: 'human1', name: 'Biosphere Stewardship', type: 'human', x: width * 0.5, y: height * 0.45, energy: 350, flux: 70, color: '#00e1ff', radius: 16 }
-  ];
+            // UI
+            organismCountEl.textContent = `Organisms: ${organisms.length}`;
+            fpsEl.textContent = `FPS: ${currentFps}`;
 
-  const links = [
-    { from: 'sun', to: 'flora1' },
-    { from: 'sun', to: 'flora2' },
-    { from: 'flora1', to: 'fauna1' },
-    { from: 'flora2', to: 'fauna2' },
-    { from: 'fauna1', to: 'fungi1' },
-    { from: 'fauna2', to: 'fungi1' },
-    { from: 'fungi1', to: 'microbe1' },
-    { from: 'microbe1', to: 'flora1' },
-    { from: 'earth', to: 'microbe1' },
-    { from: 'human1', to: 'flora1' },
-    { from: 'sun', to: 'human1' }
-  ];
+            requestAnimationFrame(loop);
+        }
 
-  let selectedNode = null;
-  let isPaused = false;
-  let zoom = 1;
-  let showFlux = true;
-  let filterText = '';
-
-  // UI bindings
-  document.getElementById('pauseBtn').addEventListener('click', () => {
-    isPaused = !isPaused;
-    document.getElementById('pauseBtn').textContent = isPaused ? 'Resume' : 'Pause';
-  });
-
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    nodes.forEach(n => { n.energy = 300 + Math.random() * 400; });
-  });
-
-  document.getElementById('zoomRange').addEventListener('input', (e) => {
-    zoom = parseFloat(e.target.value);
-  });
-
-  document.getElementById('debugToggle').addEventListener('change', (e) => {
-    showFlux = e.target.checked;
-  });
-
-  document.getElementById('search').addEventListener('input', (e) => {
-    filterText = e.target.value.toLowerCase();
-  });
-
-  document.getElementById('inspectorClose').addEventListener('click', () => {
-    document.getElementById('inspector').classList.remove('open');
-    selectedNode = null;
-  });
-
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - width/2) / zoom + width/2;
-    const y = (e.clientY - rect.top - height/2) / zoom + height/2;
-
-    let clicked = null;
-    for (const node of nodes) {
-      const dx = node.x - x;
-      const dy = node.y - y;
-      if (Math.hypot(dx, dy) < node.radius + 10) {
-        clicked = node;
-        break;
-      }
-    }
-
-    if (clicked) {
-      selectedNode = clicked;
-      openInspector(clicked);
-    }
-  });
-
-  function openInspector(node) {
-    const panel = document.getElementById('inspector');
-    panel.classList.add('open');
-    document.getElementById('inspectorTitle').textContent = node.name;
-    document.getElementById('inspectorBody').innerHTML = `
-      <div class="metric-row"><span>Node ID:</span> <span class="highlight">${node.id}</span></div>
-      <div class="metric-row"><span>Trophic Type:</span> <span class="highlight">${node.type}</span></div>
-      <div class="metric-row"><span>Stored Energy:</span> <span class="highlight">${node.energy.toFixed(1)} J</span></div>
-      <div class="metric-row"><span>Dissipation Flux:</span> <span class="highlight">${node.flux.toFixed(1)} W</span></div>
-      <div class="metric-row"><span>Thermodynamic State:</span> <span class="highlight">Active Steady-State</span></div>
-    `;
-  }
-
-  function update() {
-    if (!isPaused) {
-      nodes.forEach(n => {
-        n.energy += (Math.random() - 0.48) * 4;
-        n.energy = Math.max(50, Math.min(1500, n.energy));
-      });
-    }
-  }
-
-  function draw() {
-    ctx.save();
-    ctx.clearRect(0, 0, width, height);
-
-    ctx.translate(width / 2, height / 2);
-    ctx.scale(zoom, zoom);
-    ctx.translate(-width / 2, -height / 2);
-
-    // Draw links
-    if (showFlux) {
-      ctx.lineWidth = 1.5;
-      links.forEach(l => {
-        const fromNode = nodes.find(n => n.id === l.from);
-        const toNode = nodes.find(n => n.id === l.to);
-        if (!fromNode || !toNode) return;
-
-        const grad = ctx.createLinearGradient(fromNode.x, fromNode.y, toNode.x, toNode.y);
-        grad.addColorStop(0, fromNode.color);
-        grad.addColorStop(1, toNode.color);
-        ctx.strokeStyle = grad;
-
-        ctx.beginPath();
-        ctx.moveTo(fromNode.x, fromNode.y);
-        ctx.lineTo(toNode.x, toNode.y);
-        ctx.stroke();
-      });
-    }
-
-    // Draw nodes
-    nodes.forEach(n => {
-      const matchesFilter = !filterText || n.name.toLowerCase().includes(filterText) || n.type.toLowerCase().includes(filterText);
-      const alpha = matchesFilter ? 1.0 : 0.2;
-
-      ctx.globalAlpha = alpha;
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#07131d';
-      ctx.fill();
-      ctx.lineWidth = selectedNode === n ? 3 : 2;
-      ctx.strokeStyle = n.color;
-      ctx.stroke();
-
-      // Energy glow
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius * 0.6, 0, Math.PI * 2);
-      ctx.fillStyle = n.color;
-      ctx.fill();
-
-      // Label
-      ctx.fillStyle = '#c8f5f2';
-      ctx.font = '10px "Courier New", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(n.name, n.x, n.y + n.radius + 14);
-      ctx.globalAlpha = 1.0;
-    });
-
-    ctx.restore();
-  }
-
-  function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
-  }
-
-  requestAnimationFrame(loop);
-</script>
+        requestAnimationFrame(loop);
+    </script>
 </body>
 </html>

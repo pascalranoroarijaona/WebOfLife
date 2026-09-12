@@ -1,0 +1,67 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{\textbf{Biogeochemical CyclePOD Instances in the Web of Life Simulation Engine: Thermodynamic Mass Conservation Across Planetary Reservoirs}}
+\author{Lead Scientific Communications \& Academic Outreach Agent \\ \textbf{Web of Life Research Group} \\ \url{https://github.com/pascalranoroarijaona/WebOfLife}}
+\date{October 2023}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We present the architectural and thermodynamic implementation of Sprint 006 within the \textbf{Web of Life (Gaia)} simulation framework. This sprint introduces dedicated biogeochemical CyclePOD instances for Carbon, Water, Nitrogen, and Phosphorus (\texttt{src/cycles/}), establishing explicit stock reservoirs and transfer rate calculations. Grounded in the First Law of Thermodynamics, our framework guarantees closed-loop mass conservation ($\sum \Delta S = 0$) across planetary subsystems (atmosphere, hydrosphere, lithosphere, and biosphere) while tracking exergy dissipation and entropy production driven by solar radiative forcing.
+\end{abstract}
+
+\section{Introduction and Thermodynamic Foundations}
+Planetary ecosystems function as complex, dissipative thermodynamic systems operating far from thermodynamic equilibrium. To simulate planetary-scale homeostasis realistically, computational models must reconcile biological adaptation with macroscopic biogeochemical mass balance. Sprint 006 establishes the core cycling infrastructure for the \textbf{Web of Life} engine, bridging thermodynamic free energy dissipation with elemental mass conservation.
+
+\subsection{Mass Conservation Invariant}
+Every CyclePOD instance manages a discrete set of stock reservoirs $S_i$. The time evolution of each reservoir mass is dictated by incoming and outgoing transfer fluxes $F_{i \to j}$ per time step $\Delta t$:
+\begin{equation}
+\frac{dS_i}{dt} = \sum_{j} F_{j \to i} - \sum_{k} F_{i \to k}
+\end{equation}
+The global system invariant enforces strict mass conservation across the entire cycle:
+\begin{equation}
+\frac{d}{dt} \sum_{i} S_i = 0 \quad (\text{except explicit external stellar inputs/outputs})
+\end{equation}
+
+\section{Concrete CyclePOD Architecture}
+
+\subsection{Carbon Cycle (\texttt{src/cycles/carbon.ts})}
+The carbon cycle models the exchange of carbon across atmospheric, oceanic, biospheric, and lithospheric reservoirs. Key fluxes include solar-driven photosynthesis ($F_{\text{atm} \to \text{bio}}$), terrestrial respiration ($F_{\text{bio} \to \text{atm}}$), Henry's Law ocean-gas exchange ($F_{\text{atm} \rightleftharpoons \text{ocean}}$), and geological weathering/burial ($F_{\text{litho} \rightleftharpoons \text{ocean}}$).
+
+\subsection{Water Cycle (\texttt{src/cycles/water.ts})}
+The hydrological cycle manages planetary fluid distribution across oceans, atmospheric vapor, ice caps, and terrestrial groundwater. Evaporation and melting fluxes scale directly with incoming solar irradiance ($\Phi_{\text{solar}}$), while runoff and precipitation close the hydrological loop.
+
+\subsection{Nitrogen Cycle (\texttt{src/cycles/nitrogen.ts})}
+Governs the transformation of inert atmospheric $N_2$ into bioavailable forms ($NH_4^+$ and $NO_3^-$) via biological fixation and microbial nitrification, balancing assimilation by the biosphere against anaerobic denitrification.
+
+\subsection{Phosphorus Cycle (\texttt{src/cycles/phosphorus.ts})}
+Simulates sedimentary phosphorus dynamics through apatite weathering, soil-phosphate plant uptake, aquatic runoff, and marine sedimentation, establishing the primary long-term bottleneck for primary productivity.
+
+\section{Orchestration via EarthPOD}
+The central \textbf{EarthPOD} class (\texttt{src/earth\_pod.ts}) orchestrates all four cycle modules during the global simulation loop:
+\begin{equation}
+\text{EarthPOD}.\text{step}(\Delta t, \Phi_{\text{solar}}) \implies \big\{ \text{Carbon, Water, Nitrogen, Phosphorus} \big\}.\text{step}(\Delta t, \Phi_{\text{solar}})
+\end{equation}
+
+\section{Verification and Invariant Enforcement}
+Unit tests (\texttt{tests/sprint\_006.test.ts}) verify mass conservation across 1,000 simulation steps under variable solar inputs. Any floating-point divergence exceeding tolerance:
+\begin{equation}
+\left| \sum S_i(t) - \sum S_i(0) \right| < 1.0 \times 10^{-12}
+\end{equation}
+triggers a thermodynamic exception, halting execution to preserve physical validity.
+
+\section{Conclusion}
+Sprint 006 provides a robust, thermodynamically sound biogeochemical foundation for the Web of Life engine. Future sprints will couple these cycles directly with emergent metabolic networks and evolutionary POD dynamics.
+
+\bigskip
+\noindent\textbf{Repository Reference:} \url{https://github.com/pascalranoroarijaona/WebOfLife}
+
+\end{document}

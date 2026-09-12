@@ -1,0 +1,129 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 004: Metabolic Thermodynamics & Extended Trophic Cascades
+
+package "web_of_life.thermodynamics" {
+    interface IThermodynamicSystem {
+        + compute_energy_flux(dt: float): Tuple<float, float>
+        + enforce_mass_conservation(): void
+    }
+
+    interface IMetabolicAgent {
+        + ingest(resource_packet: Map<string, float>): Map<string, float>
+        + respire(metabolic_rate: float): float
+    }
+
+    class ThermodynamicStateVector {
+        + entropy_generation_rate: float
+        + exergy_destruction_rate: float
+        + temperature_ambient: float
+        + heat_loss_q_loss: float
+        + energy_stored: float
+        + boundary_flux_array: float[]
+    }
+}
+
+package "web_of_life.ecosystem" {
+    abstract class Entity {
+        + entity_id: UUID
+        + simulation_id: UUID
+        + get_mass_vector(): Map<string, float>
+    }
+
+    class Environment {
+        + atmospheric_pool_id: UUID
+        + soil_matrix_id: UUID
+    }
+
+    class AtmosphericPool {
+        + co2_stock: float
+        + o2_stock: float
+        + n2_stock: float
+    }
+
+    class SoilMatrix {
+        + inorganic_n: float
+        + inorganic_p: float
+        + h2o_stock: float
+        + dead_biomass_pool: float
+    }
+
+    abstract class Organism {
+        + species_name: string
+        + current_state: LifeState
+        + biomass_capacity: float
+        + metabolic_efficiency: float
+    }
+
+    package "Producers" {
+        class Producer {
+            + photosynthesizing: boolean
+        }
+        class C3Plant
+        class C4Plant
+    }
+
+    package "Consumers" {
+        class Consumer {
+            + ingestion_rate: float
+        }
+        class Herbivore
+        class Carnivore
+        class Omnivore
+    }
+
+    package "Decomposers" {
+        class Decomposer {
+            + mineralization_rate: float
+        }
+        class BacterialCluster
+        class FungalMycelium
+    }
+}
+
+package "web_of_life.ledger" {
+    class ThermodynamicTransactionBlock {
+        + block_index: int
+        + source_entity_id: UUID
+        + target_entity_id: UUID
+        + flow_type: string
+        + delta_carbon: float
+        + delta_nitrogen: float
+        + delta_phosphorus: float
+        + entropy_delta: float
+        + signature: string
+        + previous_hash: string
+        + current_hash: string
+    }
+}
+
+-- Relationships & Inheritances --
+IThermodynamicSystem <|.. Entity
+IMetabolicAgent <|.. Organism
+
+Entity <|-- Environment
+Entity <|-- Organism
+
+Environment *-- AtmosphericPool
+Environment *-- SoilMatrix
+
+Organism <|-- Producer
+Organism <|-- Consumer
+Organism <|-- Decomposer
+
+Producer <|-- C3Plant
+Producer <|-- C4Plant
+
+Consumer <|-- Herbivore
+Consumer <|-- Carnivore
+Consumer <|-- Omnivore
+
+Decomposer <|-- BacterialCluster
+Decomposer <|-- FungalMycelium
+
+Organism --> ThermodynamicStateVector : tracks
+ThermodynamicTransactionBlock --> Entity : logs transfers
+@enduml

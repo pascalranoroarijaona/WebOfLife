@@ -1,0 +1,89 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Web of Life (Gaia) - Sprint 006 Architecture" {
+
+    interface ICyclePOD {
+        + name: string
+        + getStocks(): ReadonlyMap<string, number>
+        + step(deltaSeconds: number, solarFlux: number): void
+        + validateMassBalance(initialTotal: number): boolean
+    }
+
+    class Reservoir {
+        + name: string
+        + mass: number
+        + capacity?: number
+    }
+
+    class FluxRate {
+        + from: string
+        + to: string
+        + rate: number
+    }
+
+    class CarbonCycle {
+        - reservoirs: Map<string, Reservoir>
+        + step(deltaSeconds: number, solarFlux: number): void
+        + getStocks(): ReadonlyMap<string, number>
+        + validateMassBalance(initialTotal: number): boolean
+    }
+
+    class WaterCycle {
+        - reservoirs: Map<string, Reservoir>
+        + step(deltaSeconds: number, solarFlux: number): void
+        + getStocks(): ReadonlyMap<string, number>
+        + validateMassBalance(initialTotal: number): boolean
+    }
+
+    class NitrogenCycle {
+        - reservoirs: Map<string, Reservoir>
+        + step(deltaSeconds: number, solarFlux: number): void
+        + getStocks(): ReadonlyMap<string, number>
+        + validateMassBalance(initialTotal: number): boolean
+    }
+
+    class PhosphorusCycle {
+        - reservoirs: Map<string, Reservoir>
+        + step(deltaSeconds: number, solarFlux: number): void
+        + getStocks(): ReadonlyMap<string, number>
+        + validateMassBalance(initialTotal: number): boolean
+    }
+
+    class EarthPOD {
+        - carbon: CarbonCycle
+        - water: WaterCycle
+        - nitrogen: NitrogenCycle
+        - phosphorus: PhosphorusCycle
+        + step(dt: number, solarFlux: number): void
+    }
+
+    class ThermodynamicBlock {
+        + blockId: string
+        + previousHash: string
+        + blockHash: string
+        + totalMassDelta: number
+        + entropyProduction: number
+        + isValid(): boolean
+    }
+
+    ICyclePOD <|.. CarbonCycle
+    ICyclePOD <|.. WaterCycle
+    ICyclePOD <|.. NitrogenCycle
+    ICyclePOD <|.. PhosphorusCycle
+
+    CarbonCycle *-- Reservoir
+    WaterCycle *-- Reservoir
+    NitrogenCycle *-- Reservoir
+    PhosphorusCycle *-- Reservoir
+
+    EarthPOD --> CarbonCycle : orchestrates
+    EarthPOD --> WaterCycle : orchestrates
+    EarthPOD --> NitrogenCycle : orchestrates
+    EarthPOD --> PhosphorusCycle : orchestrates
+
+    EarthPOD ..> ThermodynamicBlock : anchors state
+}
+@enduml

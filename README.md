@@ -192,30 +192,30 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 18%
-SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation (\dot{S}_{\text{gen}}), exergy destruction rate (\dot{I} = T_0 \dot{S}_{\text{gen}}), and boundary flux arrays.
+Roadmap Completion: 4%
+SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
 
 ## Web of Life Master Backlog
 
 ### Phase 0 — Core Monad Engine & Spatial Foundations (In Progress)
 - [x] Abstract `ThermodynamicStructure` class hierarchy. (`src/thermodynamics/thermodynamic_structure.ts`, `src/earth_pod.ts`)
-- [x] Biogeochemical `CyclePOD` instances (Carbon, Water, Nitrogen, Phosphorus). (`src/cycles/carbon.ts`, `src/cycles/water.ts`, `src/cycles/nitrogen.ts`, `src/cycles/phosphorus.ts`) -> Note: Implemented inline within `src/earth_pod.ts` as verified by code inspection.
-- [x] Live Canvas 2D orbital/trophic renderer with interactive inspector. (`src/visualization/base_renderer.ts`, `src/visualization/orbital_renderer.ts`, `src/visualization/trophic_renderer.ts`, `src/visualization/inspector.ts`, `src/visualization/visualization_monad.ts`) -> Note: Implemented via launcher shell and UI views in `docs/index.html` and `index.html`.
-- [x] Executable monad methods and stock-and-flow ledger. (`src/earth_pod.ts`, `src/cycles/base.ts`) -> Note: Implemented in `src/earth_pod.ts`.
-- [x] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`). -> Note: Implemented in `src/earth_pod.ts`.
-- [x] Projection mapping and Geo View layout toggle in UI (`src/spatial/projection_mapping.ts`, `src/spatial/projection_helpers.ts`). -> Note: Implemented in docs/index.html and UI artifacts.
-- [x] Integration of Uber H3 spatial index for hexagonal global partitioning (`src/h3_spatial.ts`). -> Note: Implemented in core UI/simulation shell.
+- [x] Executable monad methods and stock-and-flow ledger. (`src/earth_pod.ts`, `src/cycles/base_cycle.ts`)
+- [x] Biogeochemical `CyclePOD` instances (Carbon, Water, Nitrogen, Phosphorus). (`src/cycles/carbon.ts`, `src/cycles/water.ts`, `src/cycles/nitrogen.ts`, `src/cycles/phosphorus.ts`)
 - [ ] Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
-
-### Phase 1 — Thermodynamic Physics, Conservation & H3 Spatial Topologies (Pending)
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
 - [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
 - [ ] Prigogine Minimum Entropy Production Monad (`src/thermodynamics/dissipative_stability.ts`): Create an analytic monad method that tracks temporal changes in internal entropy generation ($\frac{d\dot{S}_{\text{gen}}}{dt}$), evaluating whether regional subsystems are relaxing toward Prigogine’s minimum entropy production state or sliding toward bifurcation/collapse.
-- [ ] Non-Linear Albedo-Temperature Feedback Loops (`src/thermodynamics/albedo_feedback.ts`): Coupled cryospheric melting (ice-albedo feedback) and vegetation browning feedbacks from local surface temperature variations within H3 hexagonal indices.
+- [ ] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`).
 - [ ] Explicit H3 K-Ring Adjacency Matrix Builder (`src/spatial/h3_topology.ts`): Implement a sparse adjacency matrix generator that computes $k$-ring neighborhoods (where $k \in \{1, 2\}$) for any active set of H3 indices, mapping them to matrix row/column coordinates for gradient calculations across hexagonal boundaries.
 - [ ] Vectorized H3 Tensor Flux Router (`src/spatial/h3_tensor_routing.ts`): Build a tensor routing engine that executes sparse matrix multiplications ($\mathbf{J}_{\text{spatial}} = \mathbf{D} \cdot \nabla \mathbf{C}$) to simulate advection, diffusion, and runoff between adjacent hexagonal cells based on elevation and pressure gradients.
 - [ ] Adaptive H3 Mesh Refinement Heuristics (`src/spatial/h3_adaptive_mesh.ts`): Splitting and merging triggers where high thermodynamic gradients or ecological shocks automatically step up or step down H3 resolution levels.
+- [ ] Projection mapping and Geo View layout toggle in UI (`src/spatial/projection_mapping.ts`, `src/spatial/projection_helpers.ts`).
+- [ ] Integration of Uber H3 spatial index for hexagonal global partitioning (`src/h3_spatial.ts`).
+- [ ] Live Canvas 2D orbital/trophic renderer with interactive inspector. (`src/visualization/base_renderer.ts`, `src/visualization/orbital_renderer.ts`, `src/visualization/trophic_renderer.ts`, `src/visualization/inspector.ts`, `src/visualization/visualization_monad.ts`)
+
+### Phase 1 — Thermodynamic Physics, Conservation & H3 Spatial Topologies (Pending)
+- [ ] Non-Linear Albedo-Temperature Feedback Loops (`src/thermodynamics/albedo_feedback.ts`): Coupled cryospheric melting (ice-albedo feedback) and vegetation browning feedbacks from local surface temperature variations within H3 hexagonal indices.
 
 ### Phase 2 — Biosphere Stoichiometry, Mycorrhizae & Trophic Networks (Pending)
 - [ ] Stoichiometric Homeostasis & Elemental Coupling Configuration (`src/biosphere/stoichiometric_types.ts`): Define fixed Redfield stoichiometry data structures ($C:N:P = 106:16:1$) and homeostatic elasticity parameters.
