@@ -1,0 +1,108 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 011: Thermodynamic State Vector Architecture
+
+package "src.thermodynamics" {
+    
+    class "STANDARD_AMBIENT_TEMPERATURE_K" as ConstTemp {
+        +value: number = 288.15
+    }
+
+    interface ThermalFluxVector {
+        +solarInbound: number
+        +thermalOutbound: number
+        +sensibleHeatFlux: number
+    }
+
+    interface MassFluxVector {
+        +massInflowRate: number
+        +massOutflowRate: number
+        +specificEnthalpyIn: number
+        +specificEnthalpyOut: number
+        +specificEntropyIn: number
+        +specificEntropyOut: number
+    }
+
+    interface IThermodynamicStateVector {
+        +timestamp: number
+        +internalEnergy: number
+        +systemEntropy: number
+        +entropyGenerationRate: number
+        +exergyDestructionRate: number
+        +thermalFluxes: ThermalFluxVector
+        +massFluxes: MassFluxVector
+        +referenceTemperature: number
+    }
+
+    interface IThermodynamicValidator {
+        +validateState(state: IThermodynamicStateVector): boolean
+        +assertSecondLaw(entropyGenRate: number): void
+    }
+
+    class ThermodynamicStateMonad {
+        -state: IThermodynamicStateVector
+        -constructor(state: IThermodynamicStateVector)
+        +{static} of(initialState: IThermodynamicStateVector): ThermodynamicStateMonad
+        +map(transitionFn: Function): ThermodynamicStateMonad
+        +getState(): IThermodynamicStateVector
+    }
+}
+
+package "Database & Blockchain Schema" {
+    entity "thermodynamic_state_vectors" as DBStateVector {
+        * id : UUID <<PK>>
+        --
+        * timestamp : BIGINT
+        * pod_id : UUID
+        * internal_energy : NUMERIC
+        * system_entropy : NUMERIC
+        * entropy_generation_rate : NUMERIC {>= 0}
+        * exergy_destruction_rate : NUMERIC {>= 0}
+        * reference_temperature : NUMERIC
+    }
+
+    entity "thermal_flux_vectors" as DBTFlux {
+        * state_vector_id : UUID <<PK, FK>>
+        --
+        * solar_inbound : NUMERIC
+        * thermal_outbound : NUMERIC
+        * sensible_heat_flux : NUMERIC
+    }
+
+    entity "mass_flux_vectors" as DBMFlux {
+        * state_vector_id : UUID <<PK, FK>>
+        --
+        * mass_inflow_rate : NUMERIC
+        * mass_outflow_rate : NUMERIC
+        * specific_enthalpy_in : NUMERIC
+        * specific_enthalpy_out : NUMERIC
+        * specific_entropy_in : NUMERIC
+        * specific_entropy_out : NUMERIC
+    }
+
+    entity "thermodynamic_monad_ledger" as DBLedger {
+        * transaction_id : UUID <<PK>>
+        --
+        * pod_id : UUID
+        previous_state_id : UUID <<FK>>
+        next_state_id : UUID <<FK>>
+        * transition_timestamp : BIGINT
+        * blockchain_tx_signature : VARCHAR <<UNIQUE>>
+        * validator_node_id : VARCHAR
+        * is_valid : BOOLEAN
+    }
+}
+
+-- Relationships
+IThermodynamicStateVector *-- ThermalFluxVector : contains
+IThermodynamicStateVector *-- MassFluxVector : contains
+ThermodynamicStateMonad --> IThermodynamicStateVector : wraps/manages
+IThermodynamicValidator ..> IThermodynamicStateVector : validates
+
+DBStateVector ||--o{ DBTFlux : has
+DBStateVector ||--o{ DBMFlux : has
+DBLedger }--o{ DBStateVector : transitions
+
+@enduml

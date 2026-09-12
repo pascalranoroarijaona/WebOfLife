@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web of Life - Sprint 012: Thermodynamic State Vector Interface</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121824;
+            --bg-card: rgba(18, 24, 36, 0.85);
+            --border-color: rgba(76, 175, 80, 0.3);
+            --accent-green: #4caf50;
+            --accent-blue: #2196f3;
+            --accent-amber: #ff9800;
+            --accent-red: #f44336;
+            --accent-cyan: #00bcd4;
+            --text-main: #e0e0e0;
+            --text-muted: #8a99ad;
+            --font-mono: "Fira Code", "Courier New", Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        #topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
+            animation: pulse-glow 4s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
+            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+        }
+
+        h1 { 
+            color: var(--accent-green); 
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        #controls {
+            background: rgba(18, 24, 36, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 25px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 90;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, #388e3c, #66bb6a);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #1565c0, #2196f3);
+        }
+        button.secondary:hover {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            background: #1a2232;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        #main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 350px 1fr 380px;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1200px) {
+            #main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .metric-card {
+            background: rgba(10, 14, 23, 0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+        }
+
+        #canvas-container {
+            position: relative;
+            flex: 1;
+            min-height: 400px;
+            background: #05070c;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .log-container {
+            background: #05070c;
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            height: 180px;
+            overflow-y: auto;
+            color: #a8b2d1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-entry {
+            border-left: 2px solid var(--accent-green);
+            padding-left: 6px;
+        }
+
+        .log-entry.warning { border-left-color: var(--accent-amber); }
+        .log-entry.error { border-left-color: var(--accent-red); }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <div class="brand-container">
+            <div class="brand-logo"></div>
+            <div>
+                <h1>Web of Life</h1>
+                <div class="subtitle">Sprint 012: Thermodynamic State Vector Interface</div>
+            </div>
+        </div>
+        <div class="control-group">
+            <span>Simulation Time: <strong id="sim-time" style="color:var(--accent-green)">0.00</strong> Yrs</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-start">Start Simulation</button>
+        <button id="btn-pause" class="secondary">Pause</button>
+        <button id="btn-step" class="secondary">Step Vector</button>
+        <div class="control-group">
+            <label for="speed-select">Speed:</label>
+            <select id="speed-select">
+                <option value="1">1x</option>
+                <option value="5" selected>5x</option>
+                <option value="10">10x</option>
+                <option value="50">50x</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="entropy-slider">Dissipation Rate:</label>
+            <input type="range" id="entropy-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+            <span id="entropy-val">1.0</span>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <!-- Left Panel: Thermodynamic State Vectors -->
+        <div class="panel">
+            <div class="panel-title">
+                <span>State Vectors</span>
+                <span style="font-size:0.75rem; color:var(--text-muted)">H, S, Exergy</span>
+            </div>
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <span class="metric-label">Enthalpy (H)</span>
+                    <span class="metric-value" id="val-enthalpy">4.12e22 J</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Entropy (S)</span>
+                    <span class="metric-value" id="val-entropy">1.85e18 J/K</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Exergy ($B$)</span>
+                    <span class="metric-value" id="val-exergy">2.45e21 J</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Dissipation</span>
+                    <span class="metric-value" id="val-dissipation">1.24e16 W</span>
+                </div>
+            </div>
+
+            <div class="panel-title" style="margin-top: 10px;">
+                <span>Ecosystem Cycles</span>
+            </div>
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <span class="metric-label">Carbon Pool</span>
+                    <span class="metric-value" id="val-carbon">820 Gt</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Nitrogen Pool</span>
+                    <span class="metric-value" id="val-nitrogen">450 Gt</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Phosphorus</span>
+                    <span class="metric-value" id="val-phosphorus">3.2 Gt</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Hydrosphere</span>
+                    <span class="metric-value" id="val-water">1.4e9 km³</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel: Visualization Canvas -->
+        <div class="panel" style="flex: 1;">
+            <div class="panel-title">
+                <span>Thermodynamic Phase Space & Vector Field</span>
+                <span style="font-size:0.75rem; font-family:var(--font-mono); color:var(--accent-cyan);">ACTIVE</span>
+            </div>
+            <div id="canvas-container">
+                <canvas id="sim-canvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Right Panel: Telemetry & Logs -->
+        <div class="panel">
+            <div class="panel-title">
+                <span>System Telemetry</span>
+            </div>
+            <div class="metric-grid" style="grid-template-columns: 1fr;">
+                <div class="metric-card">
+                    <span class="metric-label">Homeostasis Index</span>
+                    <span class="metric-value" id="val-homeostasis">0.942</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Bifurcation Distance</span>
+                    <span class="metric-value" id="val-bifurcation">0.318</span>
+                </div>
+            </div>
+
+            <div class="panel-title" style="margin-top: 10px;">
+                <span>Event Log</span>
+            </div>
+            <div class="log-container" id="log-box">
+                <div class="log-entry">[0.00s] Thermodynamic State Vector Interface initialized.</div>
+                <div class="log-entry">[0.00s] Phase space manifold stable. Ready for vector stepping.</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { EarthPOD } from '../../../src/earth_pod.js';
+
+        const pod = new EarthPOD();
+        let running = false;
+        let speed = 5;
+        let simTime = 0;
+
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const timeEl = document.getElementById('sim-time');
+        const enthalpyEl = document.getElementById('val-enthalpy');
+        const entropyEl = document.getElementById('val-entropy');
+        const exergyEl = document.getElementById('val-exergy');
+        const dissipationEl = document.getElementById('val-dissipation');
+        const carbonEl = document.getElementById('val-carbon');
+        const nitrogenEl = document.getElementById('val-nitrogen');
+        const phosphorusEl = document.getElementById('val-phosphorus');
+        const waterEl = document.getElementById('val-water');
+        const homeostasisEl = document.getElementById('val-homeostasis');
+        const bifurcationEl = document.getElementById('val-bifurcation');
+        const logBox = document.getElementById('log-box');
+
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            div.textContent = `[${simTime.toFixed(2)}s] ${msg}`;
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function updateUI(state) {
+            timeEl.textContent = simTime.toFixed(2);
+            if (state) {
+                if (state.thermodynamics) {
+                    enthalpyEl.textContent = (state.thermodynamics.enthalpy || 4.12e22).toExponential(2) + ' J';
+                    entropyEl.textContent = (state.thermodynamics.entropy || 1.85e18).toExponential(2) + ' J/K';
+                    exergyEl.textContent = (state.thermodynamics.exergy || 2.45e21).toExponential(2) + ' J';
+                    dissipationEl.textContent = (state.thermodynamics.dissipationRate || 1.24e16).toExponential(2) + ' W';
+                }
+                if (state.homeostasis !== undefined) homeostasisEl.textContent = state.homeostasis.toFixed(3);
+                if (state.bifurcationDistance !== undefined) bifurcationEl.textContent = state.bifurcationDistance.toFixed(3);
+            }
+        }
+
+        function renderCanvas() {
+            ctx.fillStyle = '#05070c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Phase Space Manifold Grid
+            ctx.strokeStyle = 'rgba(76, 175, 80, 0.1)';
+            ctx.lineWidth = 1;
+            const step = 40;
+            for (let x = 0; x < canvas.width; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw Thermodynamic Attractor Orbit
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = Math.min(cx, cy) * 0.6;
+
+            ctx.strokeStyle = 'rgba(33, 150, 243, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Draw State Vector Particle
+            const angle = simTime * 0.5;
+            const px = cx + Math.cos(angle) * radius * (1 + 0.1 * Math.sin(simTime * 2));
+            const py = cy + Math.sin(angle * 1.3) * radius * (1 + 0.1 * Math.cos(simTime * 1.5));
+
+            ctx.fillStyle = '#4caf50';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#4caf50';
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Draw Vector Line from Center
+            ctx.strokeStyle = 'rgba(0, 188, 212, 0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(px, py);
+            ctx.stroke();
+        }
+
+        function loop() {
+            if (running) {
+                simTime += 0.05 * speed;
+                pod.step(0.05 * speed);
+                updateUI(pod.getState());
+            }
+            renderCanvas();
+            requestAnimationFrame(loop);
+        }
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            running = true;
+            log('Simulation started.');
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            running = false;
+            log('Simulation paused.', 'warning');
+        });
+
+        document.getElementById('btn-step').addEventListener('click', () => {
+            simTime += 0.1;
+            pod.step(0.1);
+            updateUI(pod.getState());
+            log('Stepped thermodynamic vector by 0.1s.');
+        });
+
+        document.getElementById('speed-select').addEventListener('change', (e) => {
+            speed = parseFloat(e.target.value);
+            log(`Simulation speed set to ${speed}x.`);
+        });
+
+        const entropySlider = document.getElementById('entropy-slider');
+        const entropyVal = document.getElementById('entropy-val');
+        entropySlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            entropyVal.textContent = val;
+            if (pod.thermodynamics && typeof pod.thermodynamics.setDissipationRate === 'function') {
+                pod.thermodynamics.setDissipationRate(parseFloat(val));
+            }
+        });
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>

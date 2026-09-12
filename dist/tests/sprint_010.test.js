@@ -11,9 +11,14 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             systemTemperature: 288.15,
             internalEnergy: 1e12,
             totalEntropy: 3.47e9,
+            entropy: 3.47e9,
+            referenceTemperature: 288.15,
             entropyGenerationRate: 0,
             exergyDestructionRate: 0,
             boundaryFluxes: {
+                heatFluxes: new Map(),
+                radiativeNet: 0,
+                massFluxes: new Map(),
                 solarRadiationIn: 0,
                 thermalRadiationOut: 0,
                 sensibleHeatFlux: 0,
@@ -22,6 +27,9 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             }
         };
         const fluxes = {
+            heatFluxes: new Map(),
+            radiativeNet: 1e10,
+            massFluxes: new Map(),
             solarRadiationIn: 1.74e17,
             thermalRadiationOut: 1.73e17,
             sensibleHeatFlux: 1e11,
@@ -43,9 +51,14 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             systemTemperature: 288.15,
             internalEnergy: 1e12,
             totalEntropy: 3.47e9,
+            entropy: 3.47e9,
+            referenceTemperature: 288.15,
             entropyGenerationRate: 0,
             exergyDestructionRate: 0,
             boundaryFluxes: {
+                heatFluxes: new Map(),
+                radiativeNet: 0,
+                massFluxes: new Map(),
                 solarRadiationIn: 0,
                 thermalRadiationOut: 0,
                 sensibleHeatFlux: 0,
@@ -54,6 +67,9 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             }
         };
         const fluxes = {
+            heatFluxes: new Map(),
+            radiativeNet: 0,
+            massFluxes: new Map(),
             solarRadiationIn: 0,
             thermalRadiationOut: 0,
             sensibleHeatFlux: 0,
@@ -71,9 +87,14 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             systemTemperature: 288.15,
             internalEnergy: 1e12,
             totalEntropy: 3.47e9,
+            entropy: 3.47e9,
+            referenceTemperature: 288.15,
             entropyGenerationRate: -15.0, // Invalid!
             exergyDestructionRate: -4322.25,
             boundaryFluxes: {
+                heatFluxes: new Map(),
+                radiativeNet: 0,
+                massFluxes: new Map(),
                 solarRadiationIn: 1e15,
                 thermalRadiationOut: 2e15,
                 sensibleHeatFlux: 0,
@@ -89,7 +110,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
         const { earth } = bootstrapMegaPod();
         const stateVector = earth.getStateVector();
         assert.ok(stateVector);
-        assert.ok(stateVector.ambientTemperature > 0);
+        assert.ok((stateVector.ambientTemperature ?? 0) > 0);
         assert.ok(stateVector.entropyGenerationRate >= 0);
         assert.strictEqual(earth.verifySecondLaw(), true);
     });

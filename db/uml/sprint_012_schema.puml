@@ -1,0 +1,103 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F9F9F9
+skinparam classBorderColor #333333
+
+title Web of Life - Sprint 012: Thermodynamic State Vector & Monad Architecture
+
+package "src.thermodynamics" {
+    
+    interface IBoundaryFluxVector {
+        + heatFluxes: Map<string, number>
+        + radiativeNet: number
+        + massFluxes: Map<string, number>
+    }
+
+    interface IThermodynamicStateVector {
+        + internalEnergy: number
+        + entropy: number
+        + referenceTemperature: number
+        + entropyGenerationRate: number
+        + exergyDestructionRate: number
+        + boundaryFluxes: IBoundaryFluxVector
+    }
+
+    interface IThermodynamicSystem {
+        + getStateVector(): IThermodynamicStateVector
+        + stepThermodynamics(dt: number): void
+        + validateSecondLaw(): boolean
+    }
+
+    class ThermodynamicMonad<T> {
+        - stock: T
+        - stateVector: IThermodynamicStateVector
+        + {static} unit<T>(stock: T, initialVector: IThermodynamicStateVector): ThermodynamicMonad<T>
+        + bind<U>(transform: (s: T, v: IThermodynamicStateVector) => [U, IThermodynamicStateVector]): ThermodynamicMonad<U>
+        + extract(): { stock: T; state: IThermodynamicStateVector }
+    }
+
+    class ThermodynamicStructure {
+        # stateVector: IThermodynamicStateVector
+        + getStateVector(): IThermodynamicStateVector
+        + stepThermodynamics(dt: number): void
+        + validateSecondLaw(): boolean
+        # computeEntropyGeneration(dt: number): number
+    }
+}
+
+package "Database Schemas (SQL)" {
+    class thermodynamic_state_vectors {
+        + id: UUID
+        + pod_id: VARCHAR
+        + internal_energy: NUMERIC
+        + entropy: NUMERIC
+        + reference_temperature: NUMERIC
+        + entropy_generation_rate: NUMERIC
+        + exergy_destruction_rate: NUMERIC
+        + recorded_at: TIMESTAMPTZ
+        + simulation_tick: BIGINT
+    }
+
+    class boundary_flux_vectors {
+        + id: UUID
+        + state_vector_id: UUID
+        + boundary_segment_id: VARCHAR
+        + heat_flux_watts: NUMERIC
+        + radiative_net_watts: NUMERIC
+        + mass_flux_kg_s: NUMERIC
+    }
+
+    class thermodynamic_monad_transitions {
+        + id: UUID
+        + pod_id: VARCHAR
+        + previous_state_id: UUID
+        + next_state_id: UUID
+        + stock_payload: JSONB
+        + second_law_verified: BOOLEAN
+        + created_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_ledger_blocks {
+        + block_index: BIGINT
+        + block_hash: VARCHAR
+        + previous_hash: VARCHAR
+        + merkle_root: VARCHAR
+        + transition_id: UUID
+        + total_exergy_destruction: NUMERIC
+        + miner_node_id: VARCHAR
+        + nonce: BIGINT
+        + timestamp: TIMESTAMPTZ
+    }
+}
+
+IThermodynamicStateVector *-- IBoundaryFluxVector : contains
+IThermodynamicSystem <|.. ThermodynamicStructure
+ThermodynamicMonad --> IThermodynamicStateVector : manages state
+ThermodynamicStructure ..|> IThermodynamicSystem : implements
+
+thermodynamic_state_vectors "1" o-- "*" boundary_flux_vectors : has fluxes
+thermodynamic_monad_transitions --> thermodynamic_state_vectors : references prev/next
+thermodynamic_ledger_blocks --> thermodynamic_monad_transitions : secures
+
+@enduml

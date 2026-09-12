@@ -15,6 +15,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
         internalEnergy: 1e9,
         totalEntropy: 5e6,
         T_0: 288.15,
+        referenceTemperature: 288.15,
         entropy: 5e6,
         solarInputWatts: 1000,
         planetaryEmissionWatts: 950,
@@ -22,6 +23,9 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
         exergyDestructionRate: 288.15 * 150.0,
         boundaryHeatFlux: boundaryFlux,
         boundaryFluxes: {
+            heatFluxes: new Map(),
+            radiativeNet: 50,
+            massFluxes: new Map(),
             solarRadiationIn: 1000,
             thermalRadiationOut: 950,
             sensibleHeatFlux: 25,
@@ -49,7 +53,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
                 value: val + 10,
                 vector: {
                     ...vec,
-                    timestamp: vec.timestamp + 1,
+                    timestamp: (vec.timestamp ?? 0) + 1,
                     entropyGenerationRate: newSGen,
                     exergyDestructionRate: t0 * newSGen
                 }

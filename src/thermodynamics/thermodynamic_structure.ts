@@ -1,39 +1,47 @@
-// File: src/thermodynamics/thermodynamic_structure.ts
-import { EntropyState, Stock, Flow, ThermodynamicStateVector, BoundaryFluxVector, IThermodynamicSystem, evaluateThermodynamicState, assertSecondLaw } from './types.js';
+/**
+ * Thermodynamic Structure and Base Implementations (Sprint 012 & Retro-Compatibility)
+ * Provides foundational base classes for the Web of Life thermodynamic nodes.
+ */
+import { IThermodynamicSystem, IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad } from './types.js';
 
-export { EntropyState };
-export type { Stock, Flow };
+export { advanceThermodynamicState, ThermodynamicStateMonad };
+
+export enum EntropyState {
+  STEADY = "STEADY",
+  ACCUMULATING = "ACCUMULATING",
+  DEGRADING = "DEGRADING",
+  COLLAPSED = "COLLAPSED"
+}
+
+export interface Stock {
+  name: string;
+  quantity: number;
+  capacity?: number;
+  utilization(): number;
+}
+
+export interface Flow {
+  sourceId: string;
+  targetId: string;
+  substance: string;
+  rate: number;
+  flowType: string;
+}
 
 export class ThermodynamicStructure implements IThermodynamicSystem {
   public id: string;
   public stocks: Map<string, Stock> = new Map();
   public children: ThermodynamicStructure[] = [];
   public parent: ThermodynamicStructure | null = null;
-  public energyJoules: number = 0;
-  public entropyJoulesPerKelvin: number = 0;
   public entropyState: EntropyState = EntropyState.STEADY;
   public tickCreated: number = 0;
   
-  protected _currentStateVector: ThermodynamicStateVector;
+  protected internalEnergyJoules: number = 1e6;
+  protected entropyJoulesPerKelvin: number = 1e3;
+  protected freeEnergyJoules: number = 5e5;
 
   constructor(public name: string) {
     this.id = `${name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 9)}`;
-    this._currentStateVector = {
-      timestamp: 0,
-      ambientTemperature: 288.15,
-      systemTemperature: 288.15,
-      internalEnergy: 1e6,
-      totalEntropy: 3470.4,
-      entropyGenerationRate: 10.0,
-      exergyDestructionRate: 2881.5,
-      boundaryFluxes: {
-        solarRadiationIn: 1.74e17,
-        thermalRadiationOut: 1.73e17,
-        sensibleHeatFlux: 1e11,
-        latentHeatFlux: 1e11,
-        netMassEnthalpyFlux: 0
-      }
-    };
   }
 
   public addStock(name: string, quantity: number, capacity?: number): Stock {
@@ -41,9 +49,7 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
       name,
       quantity,
       capacity,
-      utilization() {
-        return capacity ? quantity / capacity : 0;
-      },
+      utilization: () => (capacity ? quantity / capacity : 0)
     };
     this.stocks.set(name, stock);
     return stock;
@@ -54,64 +60,173 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
     this.children.push(child);
   }
 
-  public importFreeEnergyJoules(joules: number, efficiency: number = 1.0): void {
-    this.energyJoules += joules * efficiency;
+  public importFreeEnergyJoules(joules: number, efficiency: number = 0.9): void {
+    this.freeEnergyJoules += joules * efficiency;
+    this.internalEnergyJoules += joules;
   }
 
-  public exportEntropyJoulesPerKelvin(jPerK: number): void {
-    this.entropyJoulesPerKelvin += jPerK;
+  public exportEntropyJoulesPerKelvin(deltaS: number): void {
+    this.entropyJoulesPerKelvin += deltaS;
+  }
+
+  public getStateVector(): IThermodynamicStateVector {
+    const T0 = STANDARD_AMBIENT_TEMPERATURE_K;
+    const dotSGen = 10.0;
+    return {
+      timestamp: this.tickCreated,
+      internalEnergy: this.internalEnergyJoules,
+      entropy: this.entropyJoulesPerKelvin,
+      referenceTemperature: T0,
+      ambientTemperature: T0,
+      T_0: T0,
+      entropyGenerationRate: dotSGen,
+      exergyDestructionRate: T0 * dotSGen,
+      boundaryFluxes: {
+        heatFluxes: new Map(),
+        radiativeNet: 0,
+        massFluxes: new Map()
+      },
+      thermalFluxes: {
+        solarInbound: 1.74e17,
+        thermalOutbound: 1.74e17 * 0.99,
+        sensibleHeatFlux: 1e8
+      },
+      massFluxes: {
+        massInflowRate: 0,
+        massOutflowRate: 0,
+        specificEnthalpyIn: 0,
+        specificEnthalpyOut: 0,
+        specificEntropyIn: 0,
+        specificEntropyOut: 0
+      },
+      validateSecondLaw: () => dotSGen >= 0
+    };
+  }
+
+  public stepThermodynamics(dt: number): void {
+    this.internalEnergyJoules += 0.1 * dt;
+    if (!this.validateSecondLaw()) {
+      throw new Error(`Second Law Violation in ${this.name}: Negative entropy generation rate.`);
+    }
+  }
+
+  public validateSecondLaw(): boolean {
+    const vec = this.getStateVector();
+    return vec.entropyGenerationRate >= 0 && vec.exergyDestructionRate >= 0;
+  }
+
+  public tick(tickNum: number): EntropyState {
+    this.tickCreated = tickNum;
+    this.stepThermodynamics(1.0);
+    return this.entropyState;
   }
 
   public totalDescendantBiomass(): number {
     let sum = 0;
     for (const stock of this.stocks.values()) {
-      if (stock.name === "biomass" || stock.name.includes("biomass")) {
-        sum += stock.quantity;
-      }
+      if (stock.name === "biomass") sum += stock.quantity;
     }
     for (const child of this.children) {
       sum += child.totalDescendantBiomass();
     }
     return sum;
   }
+}
 
-  public tick(tickNum: number): ThermodynamicStateVector {
-    this.tickCreated = tickNum;
-    const dt = 1.0;
-    const internalEnergy = Math.max(1e3, this.energyJoules + 1e6);
-    const systemTemp = 288.15;
-    const ambientTemp = 288.15;
-    
-    const fluxes: BoundaryFluxVector = {
-      solarRadiationIn: 1.74e17,
-      thermalRadiationOut: 1.73e17,
-      sensibleHeatFlux: 1e10,
-      latentHeatFlux: 1e10,
-      netMassEnthalpyFlux: 0
-    };
+export function applyThermalFlux(
+  stock: any,
+  state: IThermodynamicStateVector,
+  qNet: number,
+  boundaryTemp: number,
+  dt: number
+): [any, IThermodynamicStateVector] {
+  const T0 = state.referenceTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const dU = qNet * dt;
+  const newInternalEnergy = state.internalEnergy + dU;
 
-    this._currentStateVector = evaluateThermodynamicState(
-      this._currentStateVector,
-      internalEnergy,
-      systemTemp,
-      ambientTemp,
-      fluxes,
-      dt
-    );
+  const entropyTransfer = qNet / boundaryTemp;
+  const sysTemp = T0;
+  const dotSGen = Math.abs(qNet) * Math.max(0, (1 / boundaryTemp - 1 / sysTemp));
+  const dotI = T0 * dotSGen;
 
-    assertSecondLaw(this._currentStateVector);
-    return this._currentStateVector;
+  const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
+  const dEntropy = (entropyTransfer + dotSGen) * dt;
+  const newEntropy = currentEntropy + dEntropy;
+
+  const updatedState: IThermodynamicStateVector = {
+    ...state,
+    internalEnergy: newInternalEnergy,
+    entropy: newEntropy,
+    entropyGenerationRate: dotSGen,
+    exergyDestructionRate: dotI,
+    boundaryFluxes: {
+      ...state.boundaryFluxes,
+      heatFluxes: state.boundaryFluxes?.heatFluxes ?? new Map(),
+      massFluxes: state.boundaryFluxes?.massFluxes ?? new Map(),
+      radiativeNet: qNet
+    },
+    validateSecondLaw: () => dotSGen >= 0
+  };
+
+  const updatedStock = {
+    ...stock,
+    temperature: sysTemp,
+    thermalEnergy: newInternalEnergy
+  };
+
+  return [updatedStock, updatedState];
+}
+
+export function applyMassTransport(
+  stock: any,
+  state: IThermodynamicStateVector,
+  massFluxes: Map<string, number>,
+  specificEnthalpy: number,
+  specificEntropy: number,
+  dt: number
+): [any, IThermodynamicStateVector] {
+  let totalMassRate = 0;
+  if (massFluxes instanceof Map) {
+    massFluxes.forEach((flux) => {
+      totalMassRate += flux;
+    });
+  } else if (massFluxes && typeof massFluxes === 'object') {
+    Object.values(massFluxes).forEach((flux: any) => {
+      totalMassRate += Number(flux) || 0;
+    });
   }
 
-  public getStateVector(): ThermodynamicStateVector {
-    return this._currentStateVector;
-  }
+  const T0 = state.referenceTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const energyFlux = totalMassRate * specificEnthalpy;
+  const dU = energyFlux * dt;
+  const entropyTransportRate = totalMassRate * specificEntropy;
+  
+  const dotSGen = Math.abs(totalMassRate * specificEntropy * 0.05);
+  const dotI = T0 * dotSGen;
 
-  public computeEntropyGeneration(dt: number): number {
-    return this._currentStateVector.entropyGenerationRate * dt;
-  }
+  const newInternalEnergy = state.internalEnergy + dU;
+  const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
+  const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
 
-  public verifySecondLaw(): boolean {
-    return assertSecondLaw(this._currentStateVector);
-  }
+  const updatedState: IThermodynamicStateVector = {
+    ...state,
+    internalEnergy: newInternalEnergy,
+    entropy: newEntropy,
+    entropyGenerationRate: dotSGen,
+    exergyDestructionRate: dotI,
+    boundaryFluxes: {
+      ...state.boundaryFluxes,
+      heatFluxes: state.boundaryFluxes?.heatFluxes ?? new Map(),
+      radiativeNet: state.boundaryFluxes?.radiativeNet ?? 0,
+      massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : new Map()
+    },
+    validateSecondLaw: () => dotSGen >= 0
+  };
+
+  const updatedStock = {
+    ...stock,
+    totalMass: (stock.totalMass ?? 0) + totalMassRate * dt
+  };
+
+  return [updatedStock, updatedState];
 }

@@ -1,0 +1,100 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FFFFFF
+
+title Web of Life - Sprint 010: Thermodynamic State Vector & Exergy Architecture
+
+package "src.thermodynamics" {
+    interface BoundaryFluxVector {
+        +solarRadiationIn: number
+        +thermalRadiationOut: number
+        +sensibleHeatFlux: number
+        +latentHeatFlux: number
+        +netMassEnthalpyFlux: number
+    }
+
+    interface ThermodynamicStateVector {
+        +timestamp: number
+        +ambientTemperature: number
+        +systemTemperature: number
+        +internalEnergy: number
+        +totalEntropy: number
+        +entropyGenerationRate: number
+        +exergyDestructionRate: number
+        +boundaryFluxes: BoundaryFluxVector
+    }
+
+    interface IThermodynamicSystem {
+        +getStateVector(): ThermodynamicStateVector
+        +computeEntropyGeneration(dt: number): number
+        +verifySecondLaw(): boolean
+    }
+
+    class ThermodynamicStructure {
+        -stateVector: ThermodynamicStateVector
+        +getStateVector(): ThermodynamicStateVector
+        +computeEntropyGeneration(dt: number): number
+        +verifySecondLaw(): boolean
+        +updateFluxes(fluxes: BoundaryFluxVector): void
+    }
+
+    IThermodynamicSystem <|.. ThermodynamicStructure
+    ThermodynamicStateVector *-- BoundaryFluxVector
+    ThermodynamicStructure --> ThermodynamicStateVector : manages
+}
+
+package "src" {
+    class EarthPod {
+        -podId: string
+        -thermoSystem: IThermodynamicSystem
+        +tick(dt: number): void
+        +auditThermodynamics(): boolean
+    }
+
+    EarthPod --> IThermodynamicSystem : encapsulates
+}
+
+package "Database Schema" {
+    class earth_pods {
+        +pod_id: VARCHAR(64)
+        +name: VARCHAR(255)
+        +status: VARCHAR(32)
+    }
+
+    class thermodynamic_states {
+        +state_id: BIGSERIAL
+        +pod_id: VARCHAR(64)
+        +timestamp: DOUBLE PRECISION
+        +ambient_temperature: DOUBLE PRECISION
+        +system_temperature: DOUBLE PRECISION
+        +internal_energy: DOUBLE PRECISION
+        +total_entropy: DOUBLE PRECISION
+        +entropy_generation_rate: DOUBLE PRECISION
+        +exergy_destruction_rate: DOUBLE PRECISION
+    }
+
+    class boundary_flux_vectors {
+        +flux_id: BIGSERIAL
+        +state_id: BIGINT
+        +solar_radiation_in: DOUBLE PRECISION
+        +thermal_radiation_out: DOUBLE PRECISION
+        +sensible_heat_flux: DOUBLE PRECISION
+        +latent_heat_flux: DOUBLE PRECISION
+        +net_mass_enthalpy_flux: DOUBLE PRECISION
+    }
+
+    class thermodynamic_blocks {
+        +block_id: BIGSERIAL
+        +pod_id: VARCHAR(64)
+        +previous_hash: VARCHAR(64)
+        +current_hash: VARCHAR(64)
+        +second_law_verified: BOOLEAN
+    }
+
+    earth_pods ||--o{ thermodynamic_states : records
+    thermodynamic_states ||--|| boundary_flux_vectors : contains
+    earth_pods ||--o{ thermodynamic_blocks : chains
+    thermodynamic_states ||--o{ thermodynamic_blocks : secures
+}
+
+@enduml

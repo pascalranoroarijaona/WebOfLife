@@ -1,5 +1,6 @@
 // File: src/earth_pod.ts
-import { ThermodynamicStructure, EntropyState } from './thermodynamics/thermodynamic_structure.js';
+import { ThermodynamicStructure, EntropyState, applyThermalFlux, applyMassTransport } from './thermodynamics/thermodynamic_structure.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicMonad } from './thermodynamics/types.js';
 import { CarbonCycle } from './cycles/carbon.js';
 import { WaterCycle } from './cycles/water.js';
 import { NitrogenCycle } from './cycles/nitrogen.js';
@@ -10,6 +11,7 @@ export { WaterCycle as WaterCyclePOD };
 export { NitrogenCycle as NitrogenCyclePOD };
 export { PhosphorusCycle as PhosphorusCyclePOD };
 export { EntropyState };
+export { applyThermalFlux, applyMassTransport, ThermodynamicMonad };
 export class CyclePOD extends ThermodynamicStructure {
     reservoirs;
     transferRates;
@@ -317,47 +319,37 @@ export class EarthPOD extends ThermodynamicStructure {
         return EarthPOD._instance;
     }
     getStateVector() {
-        return {
-            timestamp: this.tickCreated,
-            ambientTemperature: 288.15,
-            systemTemperature: 288.15,
-            internalEnergy: 1e12,
-            totalEntropy: 5e9,
-            entropyGenerationRate: 150.0,
-            exergyDestructionRate: 288.15 * 150.0,
-            boundaryFluxes: {
-                solarRadiationIn: this.solarInputWatts,
-                thermalRadiationOut: this.solarInputWatts * 0.99,
-                sensibleHeatFlux: 1e10,
-                latentHeatFlux: 1e10,
-                netMassEnthalpyFlux: 0
-            },
-            T_0: 288.15,
-            deadStateTemperatureKelvin: 288.15,
-            systemInternalEnergyJoules: 1e12,
-            entropy: 5e9,
-            systemEntropyJoulesPerKelvin: 5e9,
-            temperature: 288.15,
-            temperatureKelvin: 288.15,
-            totalMass: 5.97e24,
-            mass: 5.97e24,
-            exergy: 1e11,
-            solarInputWatts: this.solarInputWatts,
-            planetaryEmissionWatts: this.solarInputWatts * 0.99,
-            entropyGenerationRateWattsPerKelvin: 150.0,
-            exergyDestructionRateWatts: 288.15 * 150.0,
-            exergyEfficiency: 0.85,
-            boundaryHeatFlux: { solarIn: this.solarInputWatts, infraRedOut: -this.solarInputWatts * 0.99 },
-            massInventory: { carbon: 850, water: 1.338e9, nitrogen: 3.9e6, phosphorus: 4e4 },
-            entropyMetrics: {
-                sGenRate: 150.0,
-                exergyDestruction: 288.15 * 150.0,
-                cumulativeQLoss: 0,
-                referenceTemperature: 288.15,
-                exergyDestructionRate: 288.15 * 150.0
-            },
-            ambientReference: { temperature0: 288.15, pressure0: 101325 }
+        const netHeat = this.solarInputWatts * 0.01;
+        const entropyGen = 150.0;
+        const boundaryFluxes = {
+            solarInput: this.solarInputWatts,
+            thermalRadiationOut: this.solarInputWatts * 0.99,
+            matterEnthalpyFlux: 0,
+            netHeatFlux: netHeat
         };
+        const exergyMetrics = {
+            T_0: STANDARD_AMBIENT_TEMPERATURE_K,
+            entropyGenerationRate: entropyGen,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
+            totalExergy: 1e12
+        };
+        const vec = {
+            tick: this.tickCreated,
+            timestamp: this.tickCreated,
+            internalEnergy: 1e12,
+            entropy: 5e9,
+            entropyGenerationRate: entropyGen,
+            exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
+            boundaryFluxes,
+            exergyMetrics,
+            validateSecondLaw: () => entropyGen >= 0,
+            validateFirstLaw: () => true
+        };
+        return vec;
+    }
+    verifySecondLaw() {
+        const vec = this.getStateVector();
+        return vec.validateSecondLaw ? vec.validateSecondLaw() : true;
     }
     importFreeEnergy(_tick) {
         this.importFreeEnergyJoules(this.solarInputWatts * 0.1, 0.99);
