@@ -55,10 +55,15 @@ export interface IThermodynamicBoundaryFlux {
   latentHeatFlux?: number;
   netMassFlux?: number;
   netHeatFlux?: number;
+  stockKey?: string;
+  rateIn?: number;
+  rateOut?: number;
+  sourceType?: string;
 }
 
 export type IBoundaryFlux = IThermodynamicBoundaryFlux;
 export type BoundaryFlux = IThermodynamicBoundaryFlux;
+export type ThermodynamicFlux = IThermodynamicBoundaryFlux;
 
 export interface IBoundaryFluxArray {
   solarRadiationIn: number;
@@ -229,7 +234,7 @@ export interface ValidationResult {
   universeEntropyChange?: number;
   timestamp?: number;
   maxTolerance?: number;
-  discrepancies?: Map<string, DiscrepancyRecord>;
+  discrepancies?: Map<string, DiscrepancyRecord> | Record<string, number>;
   isOk?: () => boolean;
   isErr?: () => boolean;
 }
@@ -339,7 +344,7 @@ export class ThermodynamicStateMonad<T> implements IThermodynamicMonad<T> {
     const res = fn(state);
     const sGen = (res as any)?.entropyGenerationRate ?? (res as any)?.entropyGenerationRateWattsPerKelvin ?? 0;
     if (sGen < -1e-9) {
-      throw new Error('Second Law Violation: Negative entropy generation rate.');
+      throw new ThermodynamicViolationError('Second Law Violation: Negative entropy generation rate.');
     }
     return res;
   }
@@ -368,7 +373,7 @@ export class ThermodynamicStateMonad<T> implements IThermodynamicMonad<T> {
 
     const sGen = nextVec?.entropyGenerationRate ?? nextVec?.entropyGenerationRateWattsPerKelvin ?? 0;
     if (sGen < -1e-9) {
-      throw new Error('Second Law Violation: Negative entropy generation rate.');
+      throw new ThermodynamicViolationError('Second Law Violation: Negative entropy generation rate.');
     }
 
     const t0 = nextVec?.T_0 ?? nextVec?.deadStateTemperatureKelvin ?? nextVec?.ambientReferenceTemp ?? STANDARD_AMBIENT_TEMPERATURE_K;
@@ -389,7 +394,7 @@ export class ThermodynamicStateMonad<T> implements IThermodynamicMonad<T> {
     const nextVec = fn(this.stateVector, fluxes);
     const sGen = nextVec?.entropyGenerationRate ?? 0;
     if (sGen < -1e-9) {
-      throw new Error('Second Law Violation: Negative entropy generation rate.');
+      throw new ThermodynamicViolationError('Second Law Violation: Negative entropy generation rate.');
     }
     return new ThermodynamicStateMonad(this.value, nextVec);
   }
@@ -401,7 +406,7 @@ export class ThermodynamicStateMonad<T> implements IThermodynamicMonad<T> {
   public validateSecondLaw(): boolean {
     const sGen = this.stateVector.entropyGenerationRate ?? this.stateVector.entropyGenerationRateWattsPerKelvin ?? 0;
     if (sGen < -1e-9) {
-      throw new Error('Second Law Violation: Negative entropy generation rate.');
+      throw new ThermodynamicViolationError('Second Law Violation: Negative entropy generation rate.');
     }
     return true;
   }
@@ -444,6 +449,13 @@ export class ThermodynamicViolationError extends Error {
   constructor(message: string) {
     super(`[Thermodynamic Violation]: ${message}`);
     this.name = 'ThermodynamicViolationError';
+  }
+}
+
+export class ThermodynamicViolationException extends ThermodynamicViolationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ThermodynamicViolationException';
   }
 }
 
@@ -493,7 +505,7 @@ export abstract class BaseThermodynamicProcessMonad {
   public transit(state: IThermodynamicStateVector, dt: number): IThermodynamicStateVector {
     const deriv = this.evaluate(state, dt);
     if (deriv.entropyGenerationRate < -1e-9) {
-      throw new Error(`Second Law Violation: S_gen_dot (${deriv.entropyGenerationRate}) < 0`);
+      throw new ThermodynamicViolationError(`Second Law Violation: S_gen_dot (${deriv.entropyGenerationRate}) < 0`);
     }
     const T0 = state.ambientReferenceTemp ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     const nextEnergy = (state.internalEnergy ?? state.energy ?? 0) + deriv.dInternalEnergy * dt;
@@ -530,7 +542,7 @@ export function evaluateThermodynamicState(
   const netHeat = (fluxes.solarRadiationIn ?? 0) - (fluxes.longwaveRadiationOut ?? 0);
   const sGen = Math.abs(netHeat / (systemTemp || T0)) * 0.01 + 5.0;
   if (sGen < -1e-9) {
-    throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
+    throw new ThermodynamicViolationError('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
   }
   const currentEntropy = state.entropy ?? state.totalEntropy ?? 0;
   const dEntropy = (netHeat / systemTemp) * dt;
@@ -557,7 +569,7 @@ export function evaluateThermodynamicState(
 export function assertSecondLaw(state: IThermodynamicStateVector): boolean {
   const sGen = state.entropyGenerationRate ?? 0;
   if (sGen < -1e-9) {
-    throw new Error('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
+    throw new ThermodynamicViolationError('CRITICAL THERMODYNAMIC VIOLATION: Negative entropy generation rate.');
   }
   return true;
 }
@@ -569,7 +581,7 @@ export function advanceThermodynamicState(
   dt: number
 ): IThermodynamicStateVector {
   if (entropyGenRate < -1e-9) {
-    throw new Error('Second Law Violation: Negative entropy generation rate.');
+    throw new ThermodynamicViolationError('Second Law Violation: Negative entropy generation rate.');
   }
   const T0 = state.ambientReferenceTemp ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
   const currentEnergy = state.internalEnergy ?? state.energy ?? 1e6;

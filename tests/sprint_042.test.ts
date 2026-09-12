@@ -4,8 +4,8 @@ import { assertNonNegativeEntropy, ThermodynamicStateLike } from '../src/thermod
 
 describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion Utility', () => {
   it('should return success for valid zero or positive entropy states', () => {
-    const validZeroState: ThermodynamicStateLike = { entropy: 0, energy: 100, temperature: 300 };
-    const validPosState: ThermodynamicStateLike = { entropy: 1542.5, energy: 5000, temperature: 298.15 };
+    const validZeroState: ThermodynamicStateLike = { entropy: 0, energy: 100, internalEnergy: 100, temperature: 300 };
+    const validPosState: ThermodynamicStateLike = { entropy: 1542.5, energy: 5000, internalEnergy: 5000, temperature: 298.15 };
 
     const resZero = assertNonNegativeEntropy(validZeroState);
     assert.strictEqual(resZero.success, true);
@@ -21,7 +21,7 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
   });
 
   it('should return failure for negative entropy states', () => {
-    const negativeState: ThermodynamicStateLike = { entropy: -10.5, energy: 1000 };
+    const negativeState: ThermodynamicStateLike = { entropy: -10.5, energy: 1000, internalEnergy: 1000, temperature: 300 };
     const res = assertNonNegativeEntropy(negativeState);
 
     assert.strictEqual(res.success, false);
@@ -32,8 +32,8 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
   });
 
   it('should intercept malformed or non-numeric entropy states gracefully', () => {
-    const missingNumberState = { entropy: NaN, energy: 500 } as unknown as ThermodynamicStateLike;
-    const invalidTypeState = { entropy: "not-a-number" as unknown as number, energy: 200 };
+    const missingNumberState = { entropy: NaN, energy: 500, internalEnergy: 500, temperature: 300 } as unknown as ThermodynamicStateLike;
+    const invalidTypeState = { entropy: "not-a-number" as unknown as number, energy: 200, internalEnergy: 200, temperature: 300 };
 
     const resNaN = assertNonNegativeEntropy(missingNumberState);
     assert.strictEqual(resNaN.success, false);

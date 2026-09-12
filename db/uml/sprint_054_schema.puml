@@ -1,0 +1,98 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam backgroundcolor #FFFFFF
+
+title Sprint 054: Thermodynamic State Vector Stock Conservation Asserter & Blockchain Schema
+
+package "src.thermodynamics" {
+  class StateVector {
+    +vectorId: string
+    +timestamp: number
+    +stocks: Map<string, number>
+    +totalEntropy: number
+    +getStock(key: string): number
+    +clone(): StateVector
+  }
+
+  class ThermodynamicFlux {
+    +fluxId: string
+    +stockKey: string
+    +influxRate: number
+    +outfluxRate: number
+    +fluxSource: string
+    +getNetFlux(deltaTime: number): number
+  }
+
+  class ConservationRule {
+    +stockKey: string
+    +tolerance: number
+  }
+
+  class ValidationResult {
+    +isValid: boolean
+    +firstLawSatisfied: boolean
+    +secondLawSatisfied: boolean
+    +residuals: Map<string, number>
+    +violations: string[]
+  }
+
+  class StateValidator {
+    -rules: Map<string, number>
+    +constructor(defaultTolerance: number)
+    +registerRule(stockKey: string, tolerance: number): void
+    +validateStockConservation(previousState: StateVector, currentState: StateVector, boundaryFluxes: ThermodynamicFlux[], deltaTime: number): ValidationResult
+    -enforceFirstLaw(deltaStock: number, netFlux: number, tolerance: number): boolean
+    -enforceSecondLaw(currentState: StateVector, previousState: StateVector, fluxes: ThermodynamicFlux[]): boolean
+  }
+}
+
+package "Database & Blockchain Persistence" {
+  class ThermodynamicStateVectorTable {
+    +vector_id: UUID
+    +timestamp: Timestamp
+    +earth_pod_id: UUID
+    +stocks: JSONB
+    +total_entropy: Float
+  }
+
+  class ThermodynamicBoundaryFluxTable {
+    +flux_id: UUID
+    +timestamp: Timestamp
+    +earth_pod_id: UUID
+    +stock_key: String
+    +influx_rate: Float
+    +outflux_rate: Float
+  }
+
+  class ConservationValidationAuditTable {
+    +audit_id: UUID
+    +timestamp: Timestamp
+    +is_valid: Boolean
+    +first_law_satisfied: Boolean
+    +second_law_satisfied: Boolean
+    +max_residual: Float
+    +blockchain_tx_hash: String
+  }
+
+  class ThermodynamicBlockchainBlockTable {
+    +block_index: Long
+    +block_hash: String
+    +previous_hash: String
+    +merkle_root: String
+    +validator_signature: String
+  }
+}
+
+-- Relationships & Dependencies
+StateValidator --> StateVector : inspects >
+StateValidator --> ThermodynamicFlux : evaluates >
+StateValidator ..> ValidationResult : produces >
+StateValidator o-- ConservationRule : configures >
+
+ThermodynamicStateVectorTable "1" -- "*" ConservationValidationAuditTable : references previous/current
+ConservationValidationAuditTable "1" -- "1" ThermodynamicBlockchainBlockTable : anchors to chain
+ThermodynamicBoundaryFluxTable "*" -- "1" ThermodynamicStateVectorTable : bounds
+
+@enduml

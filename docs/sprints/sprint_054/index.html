@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 054: Web of Life - Thermodynamic State Vector Stock Conservation Asserter</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+    <!-- Topbar Navigation -->
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/55 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl animate-pulse">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sprint 054</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Vector Stock Conservation Asserter Active (60 FPS Draw Loop & Canvas Engine)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/30 p-6 flex flex-col gap-6 overflow-y-auto z-20">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-emerald-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-emerald-400">64</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sprint-telemetry" class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Sprint 054 Telemetry</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Conservation Delta:</span>
+                        <span id="metric-conservation-delta" class="font-mono text-emerald-400">0.0000</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Total Stock Energy:</span>
+                        <span id="metric-total-energy" class="font-mono text-cyan-400">1000.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Assert Status:</span>
+                        <span id="metric-assert-status" class="font-mono text-emerald-400">VERIFIED</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Visualization Viewport -->
+        <div id="canvas-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <canvas id="view-canvas" class="absolute inset-0 w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+            
+            <!-- Floating Overlay Badge -->
+            <div class="absolute top-4 right-4 bg-slate-900/80 backdrop-blur border border-slate-800 px-4 py-2 rounded-lg text-xs font-mono text-slate-300 pointer-events-none shadow-xl flex items-center space-x-3">
+                <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="text-slate-400">State Vector Stock Asserter</span>
+                </span>
+            </div>
+        </div>
+    </main>
+
+    <!-- Client-side Application Script -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // DOM elements
+        const canvas = document.getElementById('view-canvas');
+        const metricEntities = document.getElementById('metric-entities');
+        const metricFps = document.getElementById('metric-fps');
+        const metricGen = document.getElementById('metric-gen');
+        const metricConservationDelta = document.getElementById('metric-conservation-delta');
+        const metricTotalEnergy = document.getElementById('metric-total-energy');
+        const metricAssertStatus = document.getElementById('metric-assert-status');
+        const btnStart = document.getElementById('btn-start');
+        const btnPause = document.getElementById('btn-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        let isRunning = true;
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 60;
+        let generation = 1;
+        let totalStockEnergy = 1000.0;
+        let conservationDelta = 0.0;
+
+        // Three.js Scene Setup
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020617, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        camera.position.set(0, 30, 50);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+        dirLight.position.set(20, 40, 20);
+        scene.add(dirLight);
+
+        // Grid helper & nodes
+        const gridHelper = new THREE.GridHelper(80, 40, 0x059669, 0x1e293b);
+        gridHelper.position.y = -5;
+        scene.add(gridHelper);
+
+        const nodeGroup = new THREE.Group();
+        scene.add(nodeGroup);
+
+        const nodeCount = 64;
+        const nodes = [];
+        const sphereGeo = new THREE.SphereGeometry(0.8, 16, 16);
+
+        for (let i = 0; i < nodeCount; i++) {
+            const mat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(Math.random() * 0.3 + 0.3, 0.8, 0.6),
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            const mesh = new THREE.Mesh(sphereGeo, mat);
+            
+            const angle = (i / nodeCount) * Math.PI * 2;
+            const radius = 15 + Math.sin(i * 0.5) * 5;
+            mesh.position.set(Math.cos(angle) * radius, (Math.random() - 0.5) * 10, Math.sin(angle) * radius);
+            
+            nodeGroup.add(mesh);
+            nodes.push({
+                mesh,
+                basePos: mesh.position.clone(),
+                energy: 15.625, // 1000 / 64
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        // Event listeners
+        btnStart.addEventListener('click', () => {
+            isRunning = true;
+            statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+            statusText.textContent = "State Vector Stock Conservation Asserter Active";
+        });
+
+        btnPause.addEventListener('click', () => {
+            isRunning = false;
+            statusDot.className = "w-2 h-2 rounded-full bg-amber-500";
+            statusText.textContent = "Simulation Paused";
+        });
+
+        btnReset.addEventListener('click', () => {
+            generation = 1;
+            totalStockEnergy = 1000.0;
+            conservationDelta = 0.0;
+            nodes.forEach(n => {
+                n.energy = 15.625;
+            });
+            metricGen.textContent = generation;
+        });
+
+        window.addEventListener('resize', () => {
+            if (!canvas) return;
+            const width = canvas.parentElement.clientWidth;
+            const height = canvas.parentElement.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Animation Loop
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            // FPS Calculation
+            frameCount++;
+            if (time - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (time - lastTime));
+                metricFps.textContent = fps;
+                frameCount = 0;
+                lastTime = time;
+            }
+
+            if (isRunning) {
+                const dt = 0.016;
+                totalStockEnergy = 0;
+
+                nodes.forEach((n, idx) => {
+                    n.phase += dt * 2;
+                    n.mesh.position.y = n.basePos.y + Math.sin(n.phase) * 3;
+                    
+                    // Small fluctuation simulating thermodynamic exchange
+                    const flux = Math.sin(n.phase * 1.5) * 0.001;
+                    n.energy = Math.max(1.0, n.energy + flux);
+                    totalStockEnergy += n.energy;
+                });
+
+                // Conservation assertion delta relative to 1000.0 baseline
+                conservationDelta = totalStockEnergy - 1000.0;
+                
+                if (Math.abs(conservationDelta) > 5.0) {
+                    // Rebalance to strictly conserve stock vector invariant
+                    const scaleFactor = 1000.0 / totalStockEnergy;
+                    nodes.forEach(n => { n.energy *= scaleFactor; });
+                    totalStockEnergy = 1000.0;
+                    conservationDelta = 0.0;
+                }
+
+                metricTotalEnergy.textContent = totalStockEnergy.toFixed(2);
+                metricConservationDelta.textContent = conservationDelta.toExponential(4);
+                
+                if (Math.abs(conservationDelta) < 0.01) {
+                    metricAssertStatus.textContent = "VERIFIED (INVARIANT OK)";
+                    metricAssertStatus.className = "font-mono text-emerald-400";
+                } else {
+                    metricAssertStatus.textContent = "REBALANCING";
+                    metricAssertStatus.className = "font-mono text-amber-400";
+                }
+
+                if (Math.random() < 0.005) {
+                    generation++;
+                    metricGen.textContent = generation;
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

@@ -1,73 +1,68 @@
--- Web of Life: Sprint 053 Schema Additions
--- Thermodynamic State Vector Stock Conservation Asserter & Ledger Transactions
+-- ============================================================================
+-- Web of Life Database Schema: Sprint 054 Extension
+-- Thermodynamic State Vector Stock Conservation Asserter & Ledger Integration
+-- ============================================================================
 
--- Table: thermodynamic_state_snapshots
--- Captures system-wide or compartment inventory stock vectors per simulation tick.
-CREATE TABLE IF NOT EXISTS thermodynamic_state_snapshots (
-    snapshot_id VARCHAR(64) PRIMARY KEY,
-    pod_id VARCHAR(64) NOT NULL,
-    timestamp BIGINT NOT NULL,
-    delta_t DOUBLE PRECISION NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Enable TimescaleDB extension if not already present
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- 1. Thermodynamic State Vectors Table (Time-series hypertable)
+CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
+    vector_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMPTZ NOT NULL,
+    earth_pod_id UUID NOT NULL,
+    stocks JSONB NOT NULL, -- Key-value map of element stocks (C, N, P, H2O, Energy)
+    total_entropy DOUBLE PRECISION NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Table: inventory_stocks
--- Records individual chemical species or thermodynamic stocks within a state snapshot.
-CREATE TABLE IF NOT EXISTS inventory_stocks (
-    id SERIAL PRIMARY KEY,
-    snapshot_id VARCHAR(64) REFERENCES thermodynamic_state_snapshots(snapshot_id) ON DELETE CASCADE,
-    species_name VARCHAR(64) NOT NULL,
-    mass_value DOUBLE PRECISION NOT NULL,
-    unit VARCHAR(16) DEFAULT 'mol'
+-- Convert to TimescaleDB hypertable for optimal time-series query performance
+SELECT create_hypertable('thermodynamic_state_vectors', 'timestamp', if_not_exists => TRUE);
+
+-- 2. Boundary Fluxes Table (Tracks energetic and mass inputs/outputs per interval)
+CREATE TABLE IF NOT EXISTS thermodynamic_boundary_fluxes (
+    flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMPTZ NOT NULL,
+    earth_pod_id UUID NOT NULL,
+    stock_key VARCHAR(64) NOT NULL,
+    influx_rate DOUBLE PRECISION NOT NULL,
+    outflux_rate DOUBLE PRECISION NOT NULL,
+    flux_source VARCHAR(128) NOT NULL, -- e.g., 'SOLAR_RADIATION', 'DEEP_VENT', 'RADIOGENIC'
+    delta_time DOUBLE PRECISION NOT NULL
 );
 
--- Table: boundary_flux_records
--- Tracks integrated incoming and outgoing fluxes for species across compartment boundaries during dt.
-CREATE TABLE IF NOT EXISTS boundary_flux_records (
-    id SERIAL PRIMARY KEY,
-    snapshot_id VARCHAR(64) REFERENCES thermodynamic_state_snapshots(snapshot_id) ON DELETE CASCADE,
-    species_name VARCHAR(64) NOT NULL,
-    inflow_rate DOUBLE PRECISION NOT NULL,
-    outflow_rate DOUBLE PRECISION NOT NULL,
-    net_flux DOUBLE PRECISION NOT NULL
-);
+SELECT create_hypertable('thermodynamic_boundary_fluxes', 'timestamp', if_not_exists => TRUE);
 
--- Table: conservation_validation_results
--- Stores audit results from StateValidator checking delta S against boundary fluxes within tolerance epsilon.
-CREATE TABLE IF NOT EXISTS conservation_validation_results (
-    validation_id SERIAL PRIMARY KEY,
-    snapshot_id VARCHAR(64) REFERENCES thermodynamic_state_snapshots(snapshot_id) ON DELETE CASCADE,
+-- 3. Conservation Validation Audit Ledger (Records StateValidator assertions)
+CREATE TABLE IF NOT EXISTS conservation_validation_audits (
+    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMPTZ NOT NULL,
+    earth_pod_id UUID NOT NULL,
+    previous_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
+    current_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
     is_valid BOOLEAN NOT NULL,
-    max_tolerance DOUBLE PRECISION NOT NULL,
-    max_error_observed DOUBLE PRECISION NOT NULL,
-    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    first_law_satisfied BOOLEAN NOT NULL,
+    second_law_satisfied BOOLEAN NOT NULL,
+    max_residual DOUBLE PRECISION NOT NULL,
+    violation_details JSONB DEFAULT NULL,
+    blockchain_tx_hash VARCHAR(64) UNIQUE
 );
 
--- Table: conservation_discrepancies
--- Itemizes specific species mass discrepancies when conservation bounds are breached.
-CREATE TABLE IF NOT EXISTS conservation_discrepancies (
-    id SERIAL PRIMARY KEY,
-    validation_id INTEGER REFERENCES conservation_validation_results(validation_id) ON DELETE CASCADE,
-    species_name VARCHAR(64) NOT NULL,
-    expected_delta DOUBLE PRECISION NOT NULL,
-    actual_delta DOUBLE PRECISION NOT NULL,
-    error_magnitude DOUBLE PRECISION NOT NULL
-);
+SELECT create_hypertable('conservation_validation_audits', 'timestamp', if_not_exists => TRUE);
 
--- Table: thermodynamic_blockchain_blocks
--- Immutable ledger recording state vector hashes and thermodynamic conservation proofs.
+-- 4. Thermodynamic Blockchain Ledger (Immutable audit trail for thermodynamic proofs)
 CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
-    block_index BIGINT PRIMARY KEY,
+    block_index BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    block_hash VARCHAR(64) NOT NULL UNIQUE,
     previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL,
-    state_snapshot_id VARCHAR(64) REFERENCES thermodynamic_state_snapshots(snapshot_id),
-    entropy_generation_rate DOUBLE PRECISION NOT NULL,
-    conservation_verified BOOLEAN NOT NULL,
-    nonce BIGINT NOT NULL,
-    mined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    merkle_root VARCHAR(64) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    validator_signature VARCHAR(128) NOT NULL,
+    audit_id UUID REFERENCES conservation_validation_audits(audit_id)
 );
 
--- Indexes for time-series and validation analytics
-CREATE INDEX IF NOT EXISTS idx_thermo_snapshots_pod_time ON thermodynamic_state_snapshots(pod_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_conservation_results_valid ON conservation_validation_results(is_valid);
-CREATE INDEX IF NOT EXISTS idx_blockchain_hash ON thermodynamic_blockchain_blocks(current_hash);
+-- Indexes for performance and referential lookups
+CREATE INDEX IF NOT EXISTS idx_state_vectors_pod_time ON thermodynamic_state_vectors(earth_pod_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_boundary_fluxes_pod_time ON thermodynamic_boundary_fluxes(earth_pod_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_conservation_audits_valid ON conservation_validation_audits(is_valid) WHERE is_valid = FALSE;
+CREATE INDEX IF NOT EXISTS idx_blockchain_hash ON thermodynamic_blockchain_blocks(block_hash);

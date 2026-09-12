@@ -108,7 +108,7 @@ describe('Sprint 031: Thermodynamic State Vector Validation & Monad Methods', ()
   });
 
   it('should reject First Law violations when stock delta does not match solar input', () => {
-    const validator = new StateValidator({ strictMode: true });
+    const validator = new StateValidator(1e-5);
     const prior: ThermodynamicStateVector = {
       timestamp: 0,
       internalEnergy: 1e6,

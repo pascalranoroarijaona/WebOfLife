@@ -84,7 +84,7 @@ describe('Sprint 052: Thermodynamic State Vector Stock Conservation Asserter', (
         ]);
         const validator = new StateValidator(1e-5);
         const reports = validator.validateStockConservation(preState, postState, boundaryFluxes, 1.0);
-        const carbonReport = reports.find(r => r.element === 'Carbon');
+        const carbonReport = reports.find((r) => r.element === 'Carbon');
         assert.ok(carbonReport);
         assert.strictEqual(carbonReport?.isValid, true);
         assert.strictEqual(carbonReport?.expectedDelta, 2.0);
