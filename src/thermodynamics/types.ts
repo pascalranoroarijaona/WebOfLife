@@ -7,6 +7,16 @@ export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 
 export type ElementType = 'carbon' | 'nitrogen' | 'phosphorus' | 'water' | 'oxygen' | 'energy' | 'qLoss' | string;
 
+export interface ElementTolerances {
+  carbon?: number;
+  nitrogen?: number;
+  phosphorus?: number;
+  water?: number;
+  oxygen?: number;
+  energy?: number;
+  [key: string]: number | undefined;
+}
+
 export interface ThermodynamicToleranceConfig {
   getDefaultTolerance?: () => number;
   getElementTolerance?: (key: string) => number;
@@ -214,7 +224,7 @@ export interface IThermodynamicStateVector {
   getEntropyGenerationRate?: () => number;
   getVectorMetrics?: () => Record<string, any>;
   getKeys?: () => string[];
-  getStock?: (k: string) => number;
+  getStock?: (k?: string) => any;
   getEntropy?: () => number;
   getValues?: () => Record<string, number>;
   getAllStocks?: () => Map<string, number>;
@@ -313,6 +323,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public systemEntropy: number;
   public stocks: Record<string, number> | Map<string, number>;
   public massInventory: Record<string, number>;
+  public elementalStocks: Record<string, number>;
   public entropyGenerationRate: number;
   public entropyGenerationRateWattsPerKelvin: number;
   public entropyGeneratorRate: number;
@@ -323,7 +334,6 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
   public thermalFluxes: Record<string, number>;
   public massFluxes: Record<string, number>;
   public exergyMetrics: IExergyMetrics;
-  public elementalStocks?: any;
   public specificEntropy?: number;
   public specificEnthalpy?: number;
   public specificExergy?: number;
@@ -337,7 +347,7 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     let unwrappedInit: any = init;
     if (init instanceof Map) {
       unwrappedInit = { stocks: Object.fromEntries(init) };
-    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init) && !('inventory' in init)) {
+    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init) && !('inventory' in init) && !('elementalStocks' in init)) {
       unwrappedInit = { stocks: init };
     } else if (init && typeof init === 'object' && 'inventory' in init && !('stocks' in init)) {
       unwrappedInit = { ...init, stocks: (init as any).inventory };
@@ -362,9 +372,11 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     this.solarInputWatts = unwrappedInit?.solarInputWatts ?? this.solarInput;
     this.entropy = unwrappedInit?.entropy ?? unwrappedInit?.systemEntropy ?? 1e3;
     this.systemEntropy = unwrappedInit?.systemEntropy ?? this.entropy;
-    this.stocks = unwrappedInit?.stocks ?? unwrappedInit?.massInventory ?? { carbon: 850, water: 1338000000 };
-    this.massInventory = unwrappedInit?.massInventory ?? this.stocks;
-    this.elementalStocks = unwrappedInit?.elementalStocks ?? this.stocks;
+    
+    const rawStocks = unwrappedInit?.stocks ?? unwrappedInit?.massInventory ?? unwrappedInit?.elementalStocks ?? { carbon: 850, water: 1338000000 };
+    this.stocks = rawStocks;
+    this.massInventory = unwrappedInit?.massInventory ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
+    this.elementalStocks = unwrappedInit?.elementalStocks ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
     
     const sGen = unwrappedInit?.entropyGenerationRate ?? unwrappedInit?.entropyGenerationRateWattsPerKelvin ?? unwrappedInit?.entropyGeneratorRate ?? 10.0;
     if (sGen !== undefined && sGen < -1e-9) {
@@ -492,7 +504,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     return Object.keys(s);
   }
 
-  public getStock(k: string): number {
+  public getStock(k?: string): any {
+    if (k === undefined) {
+      return this.stocks instanceof Map ? Object.fromEntries(this.stocks) : { ...this.stocks };
+    }
     if (this.stocks instanceof Map) return this.stocks.get(k) ?? 0;
     return (this.stocks as any)[k] ?? 0;
   }
@@ -515,6 +530,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
 
   public getInventoryMap(): Record<string, number> {
     return this.getValues();
+  }
+
+  public getInventory(k: string): number {
+    return this.getStock(k);
   }
 
   public getTotalMass(): number {
@@ -676,7 +695,7 @@ export class ElementalStocks {
 
 export type Result<T, E = string> = 
   | { success: true; value: T; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string }
-  | { success: false; error: E | any; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string; invalidValue?: any };
+  | { success: false; error: E | any; isOk: () => boolean; isErr: () => boolean; errorValue?: E; code?: string; invalidValue?: any; violatorValue?: any; violatingValue?: any; path?: string; timestamp?: number };
 
 export function ok<T, E = string>(value: T): Result<T, E> {
   return { success: true, value, isOk: () => true, isErr: () => false };
@@ -739,20 +758,29 @@ export type ValidationFailure = {
 };
 
 export type DiscrepancyResult = {
-  stockId: string;
-  actualDelta: number;
-  expectedDelta: number;
-  absoluteDifference: number;
-  isWithinTolerance: boolean;
+  element?: string;
+  expected?: number;
+  actual?: number;
+  absoluteDifference?: number;
+  tolerance?: number;
+  exceeded?: boolean;
+  stockId?: string;
+  actualDelta?: number;
+  expectedDelta?: number;
+  isWithinTolerance?: boolean;
   error?: number;
+  delta?: number;
+  [key: string]: any;
 };
+
+export type DiscrepancyDetail = DiscrepancyResult;
 
 export type ValidationResult = {
   isValid: boolean;
   valid: boolean;
   errors?: ValidationFailure[];
   violations?: string[];
-  discrepancies?: Map<string, any> | Record<string, any>;
+  discrepancies?: Map<string, any> | Record<string, any> | DiscrepancyResult[];
   maxTolerance?: number;
   maxDelta?: number;
   maxToleranceExceeded?: boolean;
@@ -775,6 +803,9 @@ export type ValidationReport = {
   isValid: boolean;
   maxDiscrepancy: number;
   discrepancies: DiscrepancyResult[] | Map<string, any> | Record<string, any>;
+  totalAbsoluteDiscrepancy?: number;
+  isMassConserved?: boolean;
+  records?: any[];
 };
 
 export type DiscrepancyReport = {

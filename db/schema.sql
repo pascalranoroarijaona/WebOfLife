@@ -1,48 +1,40 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger Definitions
--- Sprint 065: Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper
+-- Web of Life: Thermodynamic Blockchain & Relational Schema
+-- Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator Core
 -- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Drop existing experimental constraints if upgrading
+DROP TABLE IF EXISTS state_discrepancy_audit_ledger CASCADE;
+DROP TABLE IF EXISTS thermodynamic_state_vectors CASCADE;
 
--- 1. Thermodynamic State Vectors Table
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id UUID NOT NULL,
-    carbon_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
-    nitrogen_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
-    phosphorus_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
-    water_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
-    energy_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- Core Thermodynamic State Vectors Table
+CREATE TABLE thermodynamic_state_vectors (
+    vector_id VARCHAR(64) PRIMARY KEY,
+    entity_id VARCHAR(64) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    carbon_inventory NUMERIC(18, 8) NOT NULL,
+    nitrogen_inventory NUMERIC(18, 8) NOT NULL,
+    phosphorus_inventory NUMERIC(18, 8) NOT NULL,
+    water_inventory NUMERIC(18, 8) NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- 2. Thermodynamic State Validations Ledger (Sprint 065)
-CREATE TABLE IF NOT EXISTS state_validations_ledger (
-    validation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    expected_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
-    actual_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+-- Audit Ledger for State Vector Inventory Discrepancy Evaluations (Sprint 066)
+CREATE TABLE state_discrepancy_audit_ledger (
+    audit_id SERIAL PRIMARY KEY,
+    block_height BIGINT NOT NULL,
+    transaction_hash VARCHAR(64) UNIQUE NOT NULL,
+    expected_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
+    actual_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
     is_valid BOOLEAN NOT NULL,
-    max_delta NUMERIC(18, 6) NOT NULL,
-    discrepancy_details JSONB NOT NULL,
-    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    evaluation_payload JSONB NOT NULL, -- Stores full DiscrepancyResult array structure
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Monad Stock Transitions & Blockchain Transactions
-CREATE TABLE IF NOT EXISTS monad_stock_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_index BIGINT NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL,
-    validator_id UUID REFERENCES state_validations_ledger(validation_id),
-    flow_type VARCHAR(64) NOT NULL,
-    payload JSONB NOT NULL,
-    signature VARCHAR(128) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- Indexes for time-series optimization and rapid ledger validation
+CREATE INDEX idx_state_vectors_entity_time ON thermodynamic_state_vectors(entity_id, timestamp DESC);
+CREATE INDEX idx_discrepancy_ledger_valid ON state_discrepancy_audit_ledger(is_valid);
+CREATE INDEX idx_discrepancy_ledger_block ON state_discrepancy_audit_ledger(block_height DESC);
 
--- Indexes for performance & auditing
-CREATE INDEX IF NOT EXISTS idx_state_vectors_entity ON thermodynamic_state_vectors(entity_id);
-CREATE INDEX IF NOT EXISTS idx_validations_is_valid ON state_validations_ledger(is_valid);
-CREATE INDEX IF NOT EXISTS idx_monad_tx_block ON monad_stock_transactions(block_index);
-CREATE INDEX IF NOT EXISTS idx_monad_tx_hash ON monad_stock_transactions(current_hash);
+-- Blockchain Transaction Integration for Thermodynamic Conservation Proofs
+COMMENT ON TABLE state_discrepancy_audit_ledger IS 'Sprint 066: Cryptographic proof ledger storing StateValidator evaluation outputs enforcing First & Second Thermodynamic Laws.';

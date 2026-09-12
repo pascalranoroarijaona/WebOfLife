@@ -30,7 +30,7 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
     totalEntropy: 2e5,
     stocks: {},
     exergy: 5e6,
-    elementalStocks: [1000, 200, 50, 10000],
+    elementalStocks: { c: 1000, n: 200, p: 50, w: 10000 },
     boundaryFluxes: initialBoundaryFluxes,
     entropyGenerationRate: 0,
     exergyDestructionRate: 0
@@ -78,13 +78,15 @@ describe('Sprint 018: Thermodynamic State Vector & Nonequilibrium Exergy Account
     const dt = 5.0;
     const nextState = process.step(initialState, initialBoundaryFluxes, dt);
 
-    const initialStocks = initialState.elementalStocks as number[] ?? [0, 0, 0, 0];
-    const nextStocks = nextState.elementalStocks as number[] ?? [0, 0, 0, 0];
+    const initialStocks = initialState.elementalStocks as any ?? {};
+    const nextStocks = nextState.elementalStocks as any ?? {};
     const mRates = initialBoundaryFluxes.massFluxRates ?? [0, 0, 0, 0];
 
-    for (let i = 0; i < 4; i++) {
-      const expectedStock = (initialStocks[i] ?? 0) + (Number(mRates[i]) ?? 0) * dt;
-      assert.strictEqual(nextStocks[i], expectedStock);
+    const keys = Object.keys(initialStocks);
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const expectedStock = (initialStocks[k] ?? 0) + (Number(mRates[i]) ?? 0) * dt;
+      assert.strictEqual(nextStocks[k], expectedStock);
     }
   });
 });

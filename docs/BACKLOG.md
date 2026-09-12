@@ -129,3 +129,5 @@ SPRINT_GOAL: Thermodynamic State Vector Inventory Discrepancy Evaluator Core Hel
 - [ ] Deterministic State Consensus Function (`src/ledger/poew_validator.ts`): Write a deterministic consensus function that ingests transactional state deltas and validates both First Law mass conservation ($\sum \Delta \text{Stock} = 0 \pm 10^{-6}$) and Second Law non-negative entropy generation ($\dot{S}_{\text{gen}} \ge 0$).
 - [ ] Vortex Block Generator & Hasher (`src/ledger/block_generator.ts`): Group validated transactions into a `ThermodynamicBlock`, hashing the entire Earth state vector combined with the previous block's hash to ensure temporal immutability.
 - [ ] SQLite Append-Only Immutable Ledger (`db/schema.sql`, `src/ledger/sqlite_ledger.ts`): Persist the validated blocks into a local SQLite database, creating a permanent, auditable cryptographic history of the planetary simulation.
+
+<!-- BACKLOG_END -->

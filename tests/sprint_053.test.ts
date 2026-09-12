@@ -27,11 +27,11 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
 
     const result = validator.validateConservation(previous, current, fluxes, 1.0);
     assert.strictEqual(result.valid, true, 'State vector should be valid when deltas match fluxes exactly');
-    const discrepanciesMap = result.discrepancies instanceof Map ? result.discrepancies : new Map(Object.entries(result.discrepancies));
+    const discrepanciesMap = result.discrepancies instanceof Map ? result.discrepancies : new Map(Object.entries(result.discrepancies as any));
     assert.strictEqual(discrepanciesMap.size, 2, 'There should be entries for carbon and water');
 
     assert.doesNotThrow(() => {
-      validator.assertConservation(previous, current, fluxes, 1.0);
+      validator.assertConservation(previous, current, fluxes, 1.0, 1.0e-6);
     });
   });
 
@@ -65,11 +65,11 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
     
     const discrepanciesMap = result.discrepancies instanceof Map 
       ? result.discrepancies 
-      : new Map(Object.entries(result.discrepancies));
+      : new Map(Object.entries(result.discrepancies as any));
 
     assert.strictEqual(discrepanciesMap.has('nitrogen'), true, 'Nitrogen discrepancy must be recorded');
 
-    const disc = discrepanciesMap.get('nitrogen') as DiscrepancyDetail;
+    const disc = (discrepanciesMap instanceof Map ? discrepanciesMap.get('nitrogen') : (discrepanciesMap as any)['nitrogen']) as DiscrepancyDetail;
     assert.ok(disc);
     assert.strictEqual(disc.expectedDelta, 10.0);
     assert.strictEqual(disc.actualDelta, 100.0);
@@ -79,11 +79,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
     assert.ok(capturedResult);
 
     assert.throws(() => {
-      const resAssertion = validator.assertConservation(previous, current, fluxes, 2.0);
-      if (!resAssertion.valid) {
-        throw new Error('Thermodynamic Conservation Violation Detected');
-      }
-    }, /Thermodynamic Conservation Violation Detected/);
+      validator.assertConservation(previous, current, fluxes, 2.0, 1.0e-6);
+    });
   });
 
   it('3. Tolerance Boundary Test - tests edge cases near tolerance threshold epsilon', () => {

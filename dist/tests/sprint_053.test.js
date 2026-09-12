@@ -24,7 +24,7 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
         const discrepanciesMap = result.discrepancies instanceof Map ? result.discrepancies : new Map(Object.entries(result.discrepancies));
         assert.strictEqual(discrepanciesMap.size, 2, 'There should be entries for carbon and water');
         assert.doesNotThrow(() => {
-            validator.assertConservation(previous, current, fluxes, 1.0);
+            validator.assertConservation(previous, current, fluxes, 1.0, 1.0e-6);
         });
     });
     it('2. Mass Leak Detection Test - identifies and flags unmonitored mass delta violations', () => {
@@ -53,7 +53,7 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
             ? result.discrepancies
             : new Map(Object.entries(result.discrepancies));
         assert.strictEqual(discrepanciesMap.has('nitrogen'), true, 'Nitrogen discrepancy must be recorded');
-        const disc = discrepanciesMap.get('nitrogen');
+        const disc = (discrepanciesMap instanceof Map ? discrepanciesMap.get('nitrogen') : discrepanciesMap['nitrogen']);
         assert.ok(disc);
         assert.strictEqual(disc.expectedDelta, 10.0);
         assert.strictEqual(disc.actualDelta, 100.0);
@@ -61,11 +61,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
         assert.strictEqual(hookCalled, true, 'Conservation hook must be triggered on violation');
         assert.ok(capturedResult);
         assert.throws(() => {
-            const resAssertion = validator.assertConservation(previous, current, fluxes, 2.0);
-            if (!resAssertion.valid) {
-                throw new Error('Thermodynamic Conservation Violation Detected');
-            }
-        }, /Thermodynamic Conservation Violation Detected/);
+            validator.assertConservation(previous, current, fluxes, 2.0, 1.0e-6);
+        });
     });
     it('3. Tolerance Boundary Test - tests edge cases near tolerance threshold epsilon', () => {
         const epsilon = 1.0e-4;

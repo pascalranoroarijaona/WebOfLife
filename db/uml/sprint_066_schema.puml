@@ -1,0 +1,70 @@
+@startuml
+skinparam classAttributeIconSize 0
+title Web of Life - Sprint 066: Thermodynamic State Vector Discrepancy Evaluator
+
+package "src.thermodynamics" {
+  
+  interface ElementTolerances {
+    + carbon: number
+    + nitrogen: number
+    + phosphorus: number
+    + water: number
+    + [key: string]: number
+  }
+
+  class DiscrepancyDetail {
+    + element: string
+    + expected: number
+    + actual: number
+    + absoluteDifference: number
+    + tolerance: number
+    + exceeded: boolean
+  }
+
+  interface DiscrepancyResult {
+    + isValid: boolean
+    + discrepancies: DiscrepancyDetail[]
+  }
+
+  class StateVector {
+    - carbon: number
+    - nitrogen: number
+    - phosphorus: number
+    - water: number
+    + getInventory(element: string): number
+  }
+
+  class StateValidator {
+    {static} + evaluateDiscrepancy(expected: StateVector, actual: StateVector, tolerances: ElementTolerances): DiscrepancyResult
+  }
+}
+
+package "Database Schema" {
+  class thermodynamic_state_vectors {
+    + vector_id: VARCHAR(64) {PK}
+    + entity_id: VARCHAR(64)
+    + timestamp: TIMESTAMPTZ
+    + carbon_inventory: NUMERIC
+    + nitrogen_inventory: NUMERIC
+    + phosphorus_inventory: NUMERIC
+    + water_inventory: NUMERIC
+  }
+
+  class state_discrepancy_audit_ledger {
+    + audit_id: SERIAL {PK}
+    + block_height: BIGINT
+    + transaction_hash: VARCHAR(64)
+    + expected_vector_id: VARCHAR(64) {FK}
+    + actual_vector_id: VARCHAR(64) {FK}
+    + is_valid: BOOLEAN
+    + evaluation_payload: JSONB
+  }
+}
+
+StateValidator ..> StateVector : inspects
+StateValidator ..> ElementTolerances : uses limits
+StateValidator ..> DiscrepancyResult : produces
+DiscrepancyResult *-- DiscrepancyDetail
+thermodynamic_state_vectors "2" <-- state_discrepancy_audit_ledger : validates expected/actual
+
+@enduml

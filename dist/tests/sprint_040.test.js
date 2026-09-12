@@ -24,7 +24,7 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
             const err = result.error;
             assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_DETECTED');
             assert.strictEqual(err.violatingValue, -50.2);
-            assert.ok(err.path.includes('totalEntropy'));
+            assert.ok(err.path?.includes('totalEntropy'));
         }
     });
     it('should recursively inspect nested objects for negative entropy indicators', () => {
@@ -41,7 +41,7 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
             const err = result.error;
             assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_DETECTED');
             assert.strictEqual(err.violatingValue, -0.05);
-            assert.ok(err.path.includes('entropyGenerationRate'));
+            assert.ok(err.path?.includes('entropyGenerationRate'));
         }
     });
     it('should pass validation for zero or positive entropy metrics', () => {

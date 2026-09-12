@@ -1,5 +1,5 @@
 /**
- * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Sprint 46 & Retro-Compatibility)
+ * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Retro-Compatible)
  */
 import { ThermodynamicStateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator } from './state_validator.js';

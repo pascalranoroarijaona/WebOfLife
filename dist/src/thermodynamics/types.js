@@ -100,6 +100,7 @@ export class ThermodynamicStateVector {
     systemEntropy;
     stocks;
     massInventory;
+    elementalStocks;
     entropyGenerationRate;
     entropyGenerationRateWattsPerKelvin;
     entropyGeneratorRate;
@@ -110,7 +111,6 @@ export class ThermodynamicStateVector {
     thermalFluxes;
     massFluxes;
     exergyMetrics;
-    elementalStocks;
     specificEntropy;
     specificEnthalpy;
     specificExergy;
@@ -123,7 +123,7 @@ export class ThermodynamicStateVector {
         if (init instanceof Map) {
             unwrappedInit = { stocks: Object.fromEntries(init) };
         }
-        else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init) && !('inventory' in init)) {
+        else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init) && !('inventory' in init) && !('elementalStocks' in init)) {
             unwrappedInit = { stocks: init };
         }
         else if (init && typeof init === 'object' && 'inventory' in init && !('stocks' in init)) {
@@ -148,9 +148,10 @@ export class ThermodynamicStateVector {
         this.solarInputWatts = unwrappedInit?.solarInputWatts ?? this.solarInput;
         this.entropy = unwrappedInit?.entropy ?? unwrappedInit?.systemEntropy ?? 1e3;
         this.systemEntropy = unwrappedInit?.systemEntropy ?? this.entropy;
-        this.stocks = unwrappedInit?.stocks ?? unwrappedInit?.massInventory ?? { carbon: 850, water: 1338000000 };
-        this.massInventory = unwrappedInit?.massInventory ?? this.stocks;
-        this.elementalStocks = unwrappedInit?.elementalStocks ?? this.stocks;
+        const rawStocks = unwrappedInit?.stocks ?? unwrappedInit?.massInventory ?? unwrappedInit?.elementalStocks ?? { carbon: 850, water: 1338000000 };
+        this.stocks = rawStocks;
+        this.massInventory = unwrappedInit?.massInventory ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
+        this.elementalStocks = unwrappedInit?.elementalStocks ?? (rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks);
         const sGen = unwrappedInit?.entropyGenerationRate ?? unwrappedInit?.entropyGenerationRateWattsPerKelvin ?? unwrappedInit?.entropyGeneratorRate ?? 10.0;
         if (sGen !== undefined && sGen < -1e-9) {
             throw new Error("Second Law Violation");
@@ -267,6 +268,9 @@ export class ThermodynamicStateVector {
         return Object.keys(s);
     }
     getStock(k) {
+        if (k === undefined) {
+            return this.stocks instanceof Map ? Object.fromEntries(this.stocks) : { ...this.stocks };
+        }
         if (this.stocks instanceof Map)
             return this.stocks.get(k) ?? 0;
         return this.stocks[k] ?? 0;
@@ -285,6 +289,9 @@ export class ThermodynamicStateVector {
     }
     getInventoryMap() {
         return this.getValues();
+    }
+    getInventory(k) {
+        return this.getStock(k);
     }
     getTotalMass() {
         const vals = Object.values(this.getValues());
