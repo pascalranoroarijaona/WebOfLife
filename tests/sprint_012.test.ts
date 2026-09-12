@@ -29,9 +29,9 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
         sensibleHeatFlux: 0,
         latentHeatFlux: 0,
         netMassFlux: 0,
-        heatFluxes: new Map(),
+        heatFluxes: [],
         radiativeNet: 100,
-        massFluxes: new Map()
+        massFluxes: []
       }
     };
 
@@ -64,9 +64,9 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
         sensibleHeatFlux: 0,
         latentHeatFlux: 0,
         netMassFlux: 0,
-        heatFluxes: new Map(),
+        heatFluxes: [],
         radiativeNet: 0,
-        massFluxes: new Map()
+        massFluxes: []
       }
     };
 
@@ -96,9 +96,9 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
         sensibleHeatFlux: 0,
         latentHeatFlux: 0,
         netMassFlux: 0,
-        heatFluxes: new Map(),
+        heatFluxes: [],
         radiativeNet: 0,
-        massFluxes: new Map()
+        massFluxes: []
       }
     };
 

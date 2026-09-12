@@ -23,21 +23,19 @@ export class CarbonCycle extends BaseCycle {
   }
 
   public step(dt: number, solarFlux: number): void {
-    const flux: BoundaryFlux = {
+    const boundaryFlux: BoundaryFlux = {
+      netHeatFlux: solarFlux * 1e-4,
+      netMassFlux: 1.2,
+      solarIncoming: solarFlux,
+      terrestrialOutgoing: solarFlux * 0.99,
       heatFluxes: [solarFlux * 1e-4],
       boundaryTemperatures: [298.15],
       massFluxes: [1.2],
       specificEnthalpies: [500],
-      specificEntropies: [2.1],
-      fluxId: "carbon_solar_flux",
-      species: "co2",
-      massFlowRate: 1.2,
-      specificEnthalpy: 500,
-      specificEntropy: 2.1,
-      heatTransferRate: solarFlux * 1e-4,
-      boundaryTemperature: 298.15
+      specificEntropies: [2.1]
     };
-    this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
+    const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-4 * dt, (solarFlux * 1e-4 / 298.15) * dt, dt);
+    this.stateVector = 'state' in res ? res.state : res;
   }
 }
 

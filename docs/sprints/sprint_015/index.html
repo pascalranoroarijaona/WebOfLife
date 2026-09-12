@@ -3,561 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web of Life - Sprint 014: Thermodynamic State Vector Interface</title>
-    <style>
-        :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #121824;
-            --bg-card: rgba(18, 24, 36, 0.85);
-            --border-color: rgba(76, 175, 80, 0.3);
-            --accent-green: #4caf50;
-            --accent-blue: #2196f3;
-            --accent-amber: #ff9800;
-            --accent-red: #f44336;
-            --accent-cyan: #00bcd4;
-            --text-main: #e0e0e0;
-            --text-muted: #8a99ad;
-            --font-mono: "Fira Code", "Courier New", Courier, monospace;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-        }
-
-        #topbar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-        }
-
-        .brand-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .brand-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
-            border: 2px solid var(--accent-green);
-            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
-            animation: pulse-glow 4s infinite alternate;
-        }
-
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
-            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
-        }
-
-        h1 { 
-            color: var(--accent-green); 
-            font-size: 1.4rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .subtitle {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-        }
-
-        #controls {
-            background: rgba(18, 24, 36, 0.95);
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px 25px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 90;
-        }
-
-        button {
-            background: linear-gradient(135deg, #2e7d32, #4caf50);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        button:hover { 
-            background: linear-gradient(135deg, #388e3c, #66bb6a);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.secondary {
-            background: linear-gradient(135deg, #1565c0, #2196f3);
-        }
-        button.secondary:hover {
-            background: linear-gradient(135deg, #1976d2, #42a5f5);
-            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
-        }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        select, input[type="range"] {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-        }
-
-        input[type="range"] {
-            accent-color: var(--accent-green);
-            cursor: pointer;
-        }
-
-        #main-layout {
-            display: grid;
-            grid-template-columns: 320px 1fr 350px;
-            flex: 1;
-            height: calc(100vh - 120px);
-            overflow: hidden;
-        }
-
-        @media (max-width: 1200px) {
-            #main-layout {
-                grid-template-columns: 1fr;
-                height: auto;
-                overflow-y: auto;
-            }
-        }
-
-        .panel {
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .panel:last-child {
-            border-right: none;
-            border-left: 1px solid var(--border-color);
-        }
-
-        .panel-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--accent-cyan);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0, 188, 212, 0.05);
-        }
-
-        .panel-body {
-            padding: 20px;
-            overflow-y: auto;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .metric-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
-        .metric-title {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 8px;
-        }
-
-        .metric-value {
-            font-family: var(--font-mono);
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--accent-green);
-        }
-
-        .metric-sub {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        #canvas-container {
-            position: relative;
-            background: radial-gradient(circle at center, #111e2e 0%, #070a12 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            flex: 1;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .vector-matrix {
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            background: #060910;
-            border: 1px solid var(--border-color);
-            padding: 12px;
-            border-radius: 6px;
-            line-height: 1.6;
-            color: var(--accent-cyan);
-        }
-
-        .log-stream {
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            background: #04060a;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 12px;
-            height: 200px;
-            overflow-y: auto;
-            color: #4caf50;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .log-entry {
-            border-left: 2px solid var(--accent-green);
-            padding-left: 8px;
-            white-space: pre-wrap;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-family: var(--font-mono);
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .status-optimal { background: rgba(76,175,80,0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
-        .status-warning { background: rgba(255,152,0,0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
-        .status-critical { background: rgba(244,67,54,0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
-    </style>
+    <title>Sprint 015: Web of Life - Advanced Client-Side Debugger & Simulation</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
-<body>
-    <div id="topbar">
-        <div class="brand-container">
-            <div class="brand-logo"></div>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 shadow-md flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-emerald-600 rounded-lg text-white">
+                <i data-lucide="activity" class="w-6 h-6"></i>
+            </div>
             <div>
-                <h1>Web of Life</h1>
-                <div class="subtitle">Sprint 014: Thermodynamic State Vector Interface</div>
+                <h1 class="text-xl font-bold tracking-wide">Web of Life <span class="text-xs px-2 py-0.5 bg-emerald-900 text-emerald-300 rounded-full border border-emerald-700">Sprint 015</span></h1>
+                <p class="text-xs text-slate-400">Client-Side Console Debugger & Ecosystem Simulation</p>
             </div>
         </div>
-        <div>
-            <span id="system-status" class="status-badge status-optimal">Equilibrium Stable</span>
+        <div class="flex items-center space-x-3">
+            <span id="system-status" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+                <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                System Nominal
+            </span>
         </div>
-    </div>
+    </header>
 
-    <div id="controls">
-        <button id="btn-step">Advance State (1h)</button>
-        <button id="btn-sim" class="secondary">Toggle Autoplay</button>
-        <button id="btn-reset">Reset Vector</button>
+    <!-- Main Content Grid -->
+    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">
         
-        <div class="control-group">
-            <label for="solar-flux">Solar Flux:</label>
-            <input type="range" id="solar-flux" min="500" max="1800" value="1361" step="10">
-            <span id="val-solar">1361 W/m²</span>
-        </div>
-
-        <div class="control-group">
-            <label for="entropy-mode">State Mode:</label>
-            <select id="entropy-mode">
-                <option value="balanced">Homeostatic Baseline</option>
-                <option value="dissipative">High Dissipation (Far-from-Equilibrium)</option>
-                <option value="degraded">Near-Thermal Death</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="main-layout">
-        <!-- Left Panel: Thermodynamic State Vectors -->
-        <div class="panel">
-            <div class="panel-header">
-                <span>State Vectors ($V_{th}$)</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Prigogine Tensors</span>
+        <!-- Simulation Viewport -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <i data-lucide="globe" class="w-5 h-5 text-emerald-400"></i>
+                    Ecosystem Viewport
+                </h2>
+                <div class="flex gap-2">
+                    <button id="btn-start" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg transition shadow">Start</button>
+                    <button id="btn-pause" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition border border-slate-700">Pause</button>
+                </div>
             </div>
-            <div class="panel-body">
-                <div class="metric-card">
-                    <div class="metric-title">Entropy Generation Rate ($\dot{S}_{gen}$)</div>
-                    <div class="metric-value" id="metric-sgen">0.000</div>
-                    <div class="metric-sub">W / (m²·K)</div>
-                </div>
-
-                <div class="metric-card">
-                    <div class="metric-title">Exergy Efficiency ($\eta_{ex}$)</div>
-                    <div class="metric-value" id="metric-exergy">0.00%</div>
-                    <div class="metric-sub">Useful thermodynamic work ratio</div>
-                </div>
-
-                <div class="metric-card">
-                    <div class="metric-title">Vector Representation</div>
-                    <div class="vector-matrix" id="vector-matrix-display">
-                        [ 1.000, 310.15, 0.420, 1361.0 ]
-                    </div>
-                </div>
+            <div id="canvas-container" class="flex-1 w-full h-[400px] bg-slate-950 rounded-lg border border-slate-800 relative overflow-hidden flex items-center justify-center">
+                <div id="loading-indicator" class="text-slate-500 text-sm animate-pulse">Initializing Three.js Simulation...</div>
             </div>
         </div>
 
-        <!-- Center Panel: Visualization Canvas -->
-        <div id="canvas-container">
-            <canvas id="thermo-canvas"></canvas>
-        </div>
-
-        <!-- Right Panel: Flux Telemetry & Logs -->
-        <div class="panel">
-            <div class="panel-header">
-                <span>System Telemetry</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Realtime Feed</span>
+        <!-- Console & Debugger Panel -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <i data-lucide="terminal" class="w-5 h-5 text-emerald-400"></i>
+                    Console Debugger
+                </h2>
+                <button id="btn-clear" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 bg-slate-800 rounded border border-slate-700">Clear</button>
             </div>
-            <div class="panel-body">
-                <div class="metric-card">
-                    <div class="metric-title">Dissipation Potential</div>
-                    <div class="metric-value" id="metric-dissipation">42.8 kJ</div>
-                    <div class="metric-sub">Active thermal gradient</div>
-                </div>
-
-                <div class="metric-title">Telemetry Event Log</div>
-                <div class="log-stream" id="log-stream">
-                    <div class="log-entry">[00:00:01] Thermodynamic state vector initialized.</div>
-                    <div class="log-entry">[00:00:01] Prigogine minimum entropy production tracking active.</div>
-                </div>
+            <div id="console-output" class="flex-1 w-full h-[350px] bg-slate-950 rounded-lg border border-slate-800 p-3 font-mono text-xs overflow-y-auto space-y-1 text-slate-300">
+                <div class="text-emerald-400">[System] Console debugger initialized successfully.</div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <input id="console-input" type="text" placeholder="Enter debug command..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                <button id="btn-send" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg transition">Send</button>
             </div>
         </div>
-    </div>
 
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        Web of Life Ecosystem Simulation &copy; 2025 | Sprint 015 Production Build
+    </footer>
+
+    <!-- Client-Side Initialization Script -->
     <script>
-        // Sprint 014 Client-Side Thermodynamic Vector Simulation Engine
-        const canvas = document.getElementById('thermo-canvas');
-        const ctx = canvas.getContext('2d');
-
-        function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        let state = {
-            time: 0,
-            solarFlux: 1361,
-            temperature: 288.15, // Kelvin
-            entropyGen: 1.245,
-            exergyEfficiency: 34.2,
-            dissipation: 45.6,
-            vector: [1.0, 288.15, 0.342, 1361.0],
-            isPlaying: false,
-            mode: 'balanced'
-        };
-
-        const logs = document.getElementById('log-stream');
-        function addLog(msg) {
-            const timeStr = new Date().toTimeString().split(' ')[0];
-            const div = document.createElement('div');
-            div.className = 'log-entry';
-            div.textContent = `[${timeStr}] ${msg}`;
-            logs.appendChild(div);
-            logs.scrollTop = logs.scrollHeight;
-        }
-
-        // Controls binding
-        const solarSlider = document.getElementById('solar-flux');
-        const valSolar = document.getElementById('val-solar');
-        const entropyMode = document.getElementById('entropy-mode');
-        const btnStep = document.getElementById('btn-step');
-        const btnSim = document.getElementById('btn-sim');
-        const btnReset = document.getElementById('btn-reset');
-
-        solarSlider.addEventListener('input', (e) => {
-            state.solarFlux = parseFloat(e.target.value);
-            valSolar.textContent = `${state.solarFlux} W/m²`;
-            updateMetrics();
-        });
-
-        entropyMode.addEventListener('change', (e) => {
-            state.mode = e.target.value;
-            if (state.mode === 'balanced') {
-                state.solarFlux = 1361;
-                state.temperature = 288.15;
-            } else if (state.mode === 'dissipative') {
-                state.solarFlux = 1750;
-                state.temperature = 310.0;
-            } else if (state.mode === 'degraded') {
-                state.solarFlux = 600;
-                state.temperature = 250.0;
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Lucide icons safely
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
             }
-            solarSlider.value = state.solarFlux;
-            valSolar.textContent = `${state.solarFlux} W/m²`;
-            addLog(`Entropy mode switched to: ${state.mode}`);
-            updateMetrics();
-        });
 
-        function updateMetrics() {
-            // Thermodynamic calculations
-            const fluxRatio = state.solarFlux / 1361.0;
-            state.entropyGen = (1.2 * fluxRatio * (state.temperature / 288.15)).toFixed(3);
-            state.exergyEfficiency = (35.0 * (1.0 - Math.abs(fluxRatio - 1.0) * 0.5)).toFixed(2);
-            state.dissipation = (state.solarFlux * 0.033).toFixed(1);
+            // Console Logger utility
+            const consoleOutput = document.getElementById('console-output');
+            function logMessage(msg, type = 'info') {
+                if (!consoleOutput) return;
+                const div = document.createElement('div');
+                div.className = type === 'error' ? 'text-red-400' : (type === 'warn' ? 'text-yellow-400' : 'text-slate-300');
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                consoleOutput.appendChild(div);
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+
+            // Command input handling
+            const consoleInput = document.getElementById('console-input');
+            const btnSend = document.getElementById('btn-send');
+            const btnClear = document.getElementById('btn-clear');
+
+            if (btnSend && consoleInput) {
+                btnSend.addEventListener('click', () => {
+                    const val = consoleInput.value.trim();
+                    if (!val) return;
+                    logMessage(`> ${val}`);
+                    if (val === 'help') {
+                        logMessage('Available commands: help, status, clear, simulate-error');
+                    } else if (val === 'status') {
+                        logMessage('System status: Nominal. Simulation active.');
+                    } else if (val === 'clear') {
+                        consoleOutput.innerHTML = '';
+                    } else if (val === 'simulate-error') {
+                        logMessage('Simulated network/fetch error triggered.', 'error');
+                    } else {
+                        logMessage(`Unknown command: ${val}. Type 'help' for options.`, 'warn');
+                    }
+                    consoleInput.value = '';
+                });
+            }
+
+            if (btnClear && consoleOutput) {
+                btnClear.addEventListener('click', () => {
+                    consoleOutput.innerHTML = '';
+                });
+            }
+
+            // Initialize Three.js Viewport Safely
+            const container = document.getElementById('canvas-container');
+            const loadingIndicator = document.getElementById('loading-indicator');
             
-            state.vector = [
-                parseFloat(fluxRatio.toFixed(3)),
-                parseFloat(state.temperature.toFixed(2)),
-                parseFloat((state.exergyEfficiency / 100).toFixed(3)),
-                state.solarFlux
-            ];
+            if (typeof THREE !== 'undefined' && container) {
+                try {
+                    const scene = new THREE.Scene();
+                    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+                    const renderer = new THREE.WebGLRenderer({ antialias: true });
+                    
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    container.innerHTML = '';
+                    container.appendChild(renderer.domElement);
 
-            document.getElementById('metric-sgen').textContent = state.entropyGen;
-            document.getElementById('metric-exergy').textContent = `${state.exergyEfficiency}%`;
-            document.getElementById('metric-dissipation').textContent = `${state.dissipation} kJ`;
-            document.getElementById('vector-matrix-display').textContent = 
-                `[\n  Flux Ratio:    ${state.vector[0]},\n  Temp (K):      ${state.vector[1]},\n  Exergy Eff:    ${state.vector[2]},\n  Solar In (W):  ${state.vector[3]}\n]`;
-        }
+                    // Add a simple rotating cube to verify rendering
+                    const geometry = new THREE.BoxGeometry(2, 2, 2);
+                    const material = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true });
+                    const cube = new THREE.Mesh(geometry, material);
+                    scene.add(cube);
 
-        // Render thermodynamic phase space on canvas
-        let angle = 0;
-        function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-            const radius = Math.min(cx, cy) * 0.65;
+                    camera.position.z = 5;
 
-            // Draw Prigogine thermodynamic spiral / attractor phase space
-            ctx.save();
-            ctx.translate(cx, cy);
+                    let animationFrameId;
+                    function animate() {
+                        animationFrameId = requestAnimationFrame(animate);
+                        cube.rotation.x += 0.01;
+                        cube.rotation.y += 0.01;
+                        renderer.render(scene, camera);
+                    }
+                    animate();
 
-            // Draw background rings
-            for (let i = 1; i <= 4; i++) {
-                ctx.beginPath();
-                ctx.arc(0, 0, (radius / 4) * i, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(76, 175, 80, 0.15)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                    logMessage('Three.js viewport rendered successfully.');
+
+                    // Handle Start/Pause buttons
+                    const btnStart = document.getElementById('btn-start');
+                    const btnPause = document.getElementById('btn-pause');
+
+                    if (btnStart) {
+                        btnStart.addEventListener('click', () => {
+                            logMessage('Simulation started.');
+                        });
+                    }
+                    if (btnPause) {
+                        btnPause.addEventListener('click', () => {
+                            logMessage('Simulation paused.');
+                        });
+                    }
+
+                } catch (e) {
+                    if (loadingIndicator) loadingIndicator.textContent = 'Failed to initialize 3D viewport.';
+                    logMessage(`Viewport Error: ${e.message}`, 'error');
+                }
+            } else {
+                if (loadingIndicator) loadingIndicator.textContent = 'Three.js CDN failed to load.';
+                logMessage('Three.js library is not available.', 'error');
             }
-
-            // Draw thermodynamic state vector trajectory
-            ctx.beginPath();
-            for (let i = 0; i < 200; i++) {
-                const t = i * 0.1 - angle;
-                const r = radius * (0.3 + 0.5 * Math.sin(t * 0.5 + state.vector[0]));
-                const x = r * Math.cos(t);
-                const y = r * Math.sin(t);
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.strokeStyle = '#00bcd4';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Draw active state node
-            const activeR = radius * 0.7;
-            const ax = activeR * Math.cos(angle);
-            const ay = activeR * Math.sin(angle);
-            
-            ctx.beginPath();
-            ctx.arc(ax, ay, 8, 0, Math.PI * 2);
-            ctx.fillStyle = '#4caf50';
-            ctx.shadowColor = '#4caf50';
-            ctx.shadowBlur = 15;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-
-            // Draw vector arrow from center to active node
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(ax, ay);
-            ctx.strokeStyle = 'rgba(76, 175, 80, 0.4)';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 4]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            ctx.restore();
-
-            if (state.isPlaying) {
-                angle += 0.02;
-            }
-            requestAnimationFrame(render);
-        }
-
-        btnStep.addEventListener('click', () => {
-            angle += 0.2;
-            state.time += 1;
-            addLog(`Advanced thermodynamic state vector by +1h (t=${state.time})`);
-            updateMetrics();
         });
-
-        btnSim.addEventListener('click', () => {
-            state.isPlaying = !state.isPlaying;
-            btnSim.textContent = state.isPlaying ? 'Pause Autoplay' : 'Toggle Autoplay';
-            addLog(`Autoplay simulation: ${state.isPlaying ? 'STARTED' : 'PAUSED'}`);
-        });
-
-        btnReset.addEventListener('click', () => {
-            state.solarFlux = 1361;
-            state.temperature = 288.15;
-            solarSlider.value = 1361;
-            valSolar.textContent = '1361 W/m²';
-            entropyMode.value = 'balanced';
-            angle = 0;
-            addLog('Thermodynamic state vector reset to baseline equilibrium.');
-            updateMetrics();
-        });
-
-        updateMetrics();
-        render();
     </script>
 </body>
 </html>

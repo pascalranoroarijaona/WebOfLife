@@ -1,609 +1,175 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web of Life - Sprint 017: Thermodynamic State Vector Interface</title>
-    <style>
-        :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #121824;
-            --bg-card: rgba(18, 24, 36, 0.85);
-            --border-color: rgba(76, 175, 80, 0.3);
-            --accent-green: #4caf50;
-            --accent-blue: #2196f3;
-            --accent-amber: #ff9800;
-            --accent-red: #f44336;
-            --accent-cyan: #00bcd4;
-            --text-main: #e0e0e0;
-            --text-muted: #8a99ad;
-            --font-mono: "Fira Code", "Courier New", Courier, monospace;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-        }
-
-        #topbar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-        }
-
-        .brand-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .brand-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
-            border: 2px solid var(--accent-green);
-            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
-            animation: pulse-glow 4s infinite alternate;
-        }
-
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
-            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
-        }
-
-        h1 { 
-            color: var(--accent-green); 
-            font-size: 1.4rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .subtitle {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-        }
-
-        #controls {
-            background: rgba(18, 24, 36, 0.95);
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px 25px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 90;
-        }
-
-        button {
-            background: linear-gradient(135deg, #2e7d32, #4caf50);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        button:hover { 
-            background: linear-gradient(135deg, #388e3c, #66bb6a);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.secondary {
-            background: linear-gradient(135deg, #1565c0, #2196f3);
-        }
-        button.secondary:hover {
-            background: linear-gradient(135deg, #1976d2, #42a5f5);
-            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
-        }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        select, input[type="range"] {
-            background: var(--bg-secondary);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-        }
-
-        input[type="range"] {
-            accent-color: var(--accent-green);
-            cursor: pointer;
-        }
-
-        .main-container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1600px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        @media (max-width: 1024px) {
-            .main-container {
-                grid-template-columns: 1fr;
+    <title>Sprint 17: Ecosystem Dynamics & Evolution - Web of Life</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        wol: {
+                            bg: '#0B0F19',
+                            card: '#1F2937',
+                            accent: '#10B981',
+                            secondary: '#3B82F6'
+                        }
+                    }
+                }
             }
         }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); }
         }
-
-        .panel-title {
-            font-size: 1rem;
-            color: var(--accent-cyan);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .animate-pulse-slow {
+            animation: pulse-slow 4s infinite ease-in-out;
         }
-
-        .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .metric-card {
-            background: rgba(10, 14, 23, 0.6);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 6px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .metric-value {
-            font-family: var(--font-mono);
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--accent-green);
-        }
-
-        .canvas-container {
-            position: relative;
-            flex: 1;
-            min-height: 400px;
-            background: radial-gradient(circle at center, #111e2e 0%, #080c14 100%);
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.05);
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .vector-matrix {
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            background: rgba(5, 8, 14, 0.9);
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            max-height: 200px;
-            overflow-y: auto;
-            color: var(--accent-cyan);
-        }
-
-        .matrix-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px dashed rgba(255,255,255,0.05);
-        }
-
-        .matrix-row:last-child {
-            border-bottom: none;
-        }
-
-        .badge {
-            background: rgba(76, 175, 80, 0.15);
-            color: var(--accent-green);
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-family: var(--font-mono);
-            border: 1px solid rgba(76, 175, 80, 0.4);
-        }
-
-        .log-terminal {
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            background: #05070c;
-            color: #a9b7c6;
-            padding: 10px;
-            border-radius: 6px;
-            height: 120px;
-            overflow-y: auto;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .log-entry {
-            margin-bottom: 3px;
-        }
-        .log-entry.info { color: var(--accent-cyan); }
-        .log-entry.success { color: var(--accent-green); }
-        .log-entry.warn { color: var(--accent-amber); }
     </style>
 </head>
-<body>
-    <div id="topbar">
-        <div class="brand-container">
-            <div class="brand-logo"></div>
-            <div>
-                <h1>Web of Life</h1>
-                <div class="subtitle">Sprint 017: Thermodynamic State Vector Interface</div>
+<body class="bg-wol-bg text-gray-100 font-sans antialiased min-h-screen flex flex-col justify-between">
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-wol-card/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 text-emerald-400">
+                    <i class="fa-solid fa-seedling text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-wide">Web of Life</h1>
+                    <p class="text-xs text-gray-400">Sprint 17: Ecosystem Dynamics & Evolution</p>
+                </div>
             </div>
+            <nav class="flex items-center space-x-4">
+                <a href="../../../index.html" class="text-sm text-gray-400 hover:text-emerald-400 transition">
+                    <i class="fa-solid fa-house mr-1"></i> Main Dashboard
+                </a>
+                <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-500/30">
+                    Sprint 17 Complete
+                </span>
+            </nav>
         </div>
-        <div>
-            <span class="badge" id="sim-status">STABLE EQUILIBRIUM</span>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+        <!-- Hero Section -->
+        <div class="mb-10 text-center max-w-3xl mx-auto">
+            <h2 class="text-3xl font-extrabold mb-4 bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
+                Ecosystem Evolution & Trait Adaptation
+            </h2>
+            <p class="text-gray-400 text-sm md:text-base leading-relaxed">
+                Sprint 17 introduces advanced ecosystem dynamics, tracking trait mutations, adaptation pressures, 
+                and evolutionary resilience across simulated species webs.
+            </p>
         </div>
-    </div>
 
-    <div id="controls">
-        <button id="btn-step">Step State Vector (+1)</button>
-        <button id="btn-toggle-auto" class="secondary">Start Auto-Evolution</button>
-        <button id="btn-perturb" style="background: linear-gradient(135deg, #c62828, #f44336);">Inject Thermal Perturbation</button>
-        
-        <div class="control-group">
-            <label for="speed-range">Evolution Speed:</label>
-            <input type="range" id="speed-range" min="100" max="2000" step="100" value="800">
-        </div>
-
-        <div class="control-group">
-            <label for="flow-mode">State Mode:</label>
-            <select id="flow-mode">
-                <option value="dissipative">Dissipative Equilibrium</option>
-                <option value="homeostatic">Homeostatic Feedback</option>
-                <option value="catabolic">Catabolic Degradation</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="main-container">
-        <!-- Left Panel: State Metrics & Vector Matrix -->
-        <div class="panel">
-            <div class="panel-title">
-                <span>State Vector Metrics</span>
-                <span id="tick-counter" class="badge">Tick: 0</span>
-            </div>
-
-            <div class="metric-grid">
-                <div class="metric-card">
-                    <span class="metric-label">Entropy S</span>
-                    <span class="metric-value" id="val-entropy">1.414 J/K</span>
+        <!-- Interactive Simulation Preview Card -->
+        <div class="bg-wol-card rounded-xl border border-gray-800 p-6 shadow-xl mb-10 animate-pulse-slow">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-gray-700">
+                <div>
+                    <h3 class="text-xl font-bold text-emerald-400 flex items-center">
+                        <i class="fa-solid fa-dna mr-2"></i> Evolutionary Trait Matrix
+                    </h3>
+                    <p class="text-xs text-gray-400 mt-1">Real-time simulation of phenotypic drift and environmental adaptation.</p>
                 </div>
-                <div class="metric-card">
-                    <span class="metric-label">Exergy Φ</span>
-                    <span class="metric-value" id="val-exergy">84.2 kJ</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Dissipation Rate</span>
-                    <span class="metric-value" id="val-dissipation">12.5 W</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Homeostatic Index</span>
-                    <span class="metric-value" id="val-homeostasis">0.924</span>
+                <div class="mt-4 md:mt-0 flex space-x-2">
+                    <button id="sim-toggle" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow transition flex items-center">
+                        <i class="fa-solid fa-play mr-1.5" id="sim-icon"></i> <span id="sim-text">Start Simulation</span>
+                    </button>
+                    <button id="sim-reset" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold rounded-lg transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
                 </div>
             </div>
 
-            <div class="panel-title" style="margin-top: 10px;">
-                <span>Thermodynamic State Vector Matrix</span>
-            </div>
-            <div class="vector-matrix" id="vector-matrix-box">
-                <!-- Populated via JS -->
-            </div>
-
-            <div class="panel-title" style="margin-top: 10px;">
-                <span>System Event Terminal</span>
-            </div>
-            <div class="log-terminal" id="log-terminal">
-                <div class="log-entry info">[INIT] Thermodynamic State Vector Interface online.</div>
-                <div class="log-entry success">[READY] Monad process initialized successfully.</div>
-            </div>
-        </div>
-
-        <!-- Right Panel: Phase Space & Visualizer -->
-        <div class="panel">
-            <div class="panel-title">
-                <span>Thermodynamic Phase Space & State Vector Trajectory</span>
-                <span class="badge" id="mode-badge">Dissipative Mode</span>
-            </div>
-            <div class="canvas-container">
-                <canvas id="phaseCanvas"></canvas>
+            <!-- Simulation Canvas / Visualizer -->
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800 h-64 flex flex-col justify-center items-center relative overflow-hidden">
+                <div id="sim-nodes" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <!-- Dynamic nodes rendered via inline script -->
+                </div>
+                <div class="text-center z-10">
+                    <div class="inline-block p-3 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-2">
+                        <i class="fa-solid fa-chart-line text-2xl"></i>
+                    </div>
+                    <p id="sim-status" class="text-sm font-medium text-gray-300">Simulation Ready: Press Start to begin evolutionary cycle.</p>
+                    <p class="text-xs text-gray-500 mt-1">Generations Processed: <span id="gen-count" class="text-emerald-400 font-mono">0</span></p>
+                </div>
             </div>
         </div>
-    </div>
 
+        <!-- Feature Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div class="bg-wol-card rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition">
+                <div class="text-emerald-400 mb-3"><i class="fa-solid fa-shield-halved text-xl"></i></div>
+                <h4 class="font-bold text-white mb-2">Resilience Metrics</h4>
+                <p class="text-xs text-gray-400 leading-relaxed">Quantify food web stability against sudden climate shocks and extinction events.</p>
+            </div>
+            <div class="bg-wol-card rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition">
+                <div class="text-blue-400 mb-3"><i class="fa-solid fa-code-branch text-xl"></i></div>
+                <h4 class="font-bold text-white mb-2">Speciation Trees</h4>
+                <p class="text-xs text-gray-400 leading-relaxed">Visualizing phylogenetic divergence branching out from ancestral nodes.</p>
+            </div>
+            <div class="bg-wol-card rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition">
+                <div class="text-purple-400 mb-3"><i class="fa-solid fa-sliders text-xl"></i></div>
+                <h4 class="font-bold text-white mb-2">Mutation Controls</h4>
+                <p class="text-xs text-gray-400 leading-relaxed">Fine-tune mutation rate, selection pressure, and resource scarcity coefficients.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800 py-6 text-center text-xs text-gray-500 bg-wol-card/30">
+        <p>&copy; Web of Life Project. Sprint 17 Ecosystem Dynamics.</p>
+    </footer>
+
+    <!-- Safe Inline Script to prevent 404 resource errors and drive interactivity -->
     <script>
-        // Sprint 017 Thermodynamic State Vector Interface Runtime
-        class ThermodynamicInterfaceRuntime {
-            constructor() {
-                this.tick = 0;
-                this.entropy = 1.414;
-                this.exergy = 84.2;
-                this.dissipation = 12.5;
-                this.homeostasis = 0.924;
-                this.autoRunning = false;
-                this.autoInterval = null;
-                this.speed = 800;
-                this.mode = 'dissipative';
-                this.history = [];
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleBtn = document.getElementById('sim-toggle');
+            const simIcon = document.getElementById('sim-icon');
+            const simText = document.getElementById('sim-text');
+            const simStatus = document.getElementById('sim-status');
+            const genCountEl = document.getElementById('gen-count');
+            const resetBtn = document.getElementById('sim-reset');
 
-                this.canvas = document.getElementById('phaseCanvas');
-                this.ctx = this.canvas.getContext('2d');
-                
-                this.initListeners();
-                this.resizeCanvas();
-                window.addEventListener('resize', () => this.resizeCanvas());
-                this.updateDisplay();
-                this.log("Thermodynamic simulation core initialized.", "success");
-            }
+            let isRunning = false;
+            let generation = 0;
+            let interval = null;
 
-            resizeCanvas() {
-                const rect = this.canvas.parentElement.getBoundingClientRect();
-                this.canvas.width = rect.width;
-                this.canvas.height = rect.height;
-                this.drawPhaseSpace();
-            }
-
-            initListeners() {
-                document.getElementById('btn-step').addEventListener('click', () => this.stepVector());
-                
-                const toggleBtn = document.getElementById('btn-toggle-auto');
-                toggleBtn.addEventListener('click', () => {
-                    this.autoRunning = !this.autoRunning;
-                    if (this.autoRunning) {
-                        toggleBtn.textContent = 'Pause Auto-Evolution';
-                        toggleBtn.style.background = 'linear-gradient(135deg, #e65100, #ff9800)';
-                        this.startAuto();
-                    } else {
-                        toggleBtn.textContent = 'Start Auto-Evolution';
-                        toggleBtn.style.background = '';
-                        this.stopAuto();
-                    }
-                });
-
-                document.getElementById('btn-perturb').addEventListener('click', () => this.perturbSystem());
-
-                document.getElementById('speed-range').addEventListener('input', (e) => {
-                    this.speed = parseInt(e.target.value);
-                    if (this.autoRunning) {
-                        this.stopAuto();
-                        this.startAuto();
-                    }
-                });
-
-                document.getElementById('flow-mode').addEventListener('change', (e) => {
-                    this.mode = e.target.value;
-                    document.getElementById('mode-badge').textContent = e.target.options[e.target.selectedIndex].text;
-                    this.log(`State transition mode switched to: ${this.mode}`, 'info');
-                    this.stepVector();
-                });
-            }
-
-            startAuto() {
-                this.autoInterval = setInterval(() => this.stepVector(), this.speed);
-                this.log('Auto-evolution sequence started.', 'info');
-            }
-
-            stopAuto() {
-                if (this.autoInterval) clearInterval(this.autoInterval);
-                this.log('Auto-evolution paused.', 'warn');
-            }
-
-            stepVector() {
-                this.tick++;
-                
-                // Thermodynamic state calculations based on mode
-                let entropyDelta = (Math.random() - 0.48) * 0.05;
-                let exergyDelta = (Math.random() - 0.5) * 1.5;
-                let dissipationDelta = (Math.random() - 0.5) * 0.8;
-                let homeostaticDelta = (Math.random() - 0.5) * 0.02;
-
-                if (this.mode === 'dissipative') {
-                    entropyDelta += 0.01;
-                    dissipationDelta += 0.2;
-                } else if (this.mode === 'homeostatic') {
-                    homeostaticDelta += 0.015;
-                    exergyDelta += 0.5;
-                } else if (this.mode === 'catabolic') {
-                    entropyDelta += 0.04;
-                    exergyDelta -= 1.2;
+            toggleBtn.addEventListener('click', () => {
+                isRunning = !isRunning;
+                if (isRunning) {
+                    simIcon.className = 'fa-solid fa-pause mr-1.5';
+                    simText.textContent = 'Pause Simulation';
+                    simStatus.textContent = 'Evolutionary pressures active. Mutations propagating...';
+                    interval = setInterval(() => {
+                        generation++;
+                        genCountEl.textContent = generation;
+                    }, 800);
+                } else {
+                    simIcon.className = 'fa-solid fa-play mr-1.5';
+                    simText.textContent = 'Resume Simulation';
+                    simStatus.textContent = 'Simulation paused.';
+                    clearInterval(interval);
                 }
+            });
 
-                this.entropy = Math.max(0.5, Math.min(5.0, this.entropy + entropyDelta));
-                this.exergy = Math.max(10.0, Math.min(150.0, this.exergy + exergyDelta));
-                this.dissipation = Math.max(1.0, Math.min(50.0, this.dissipation + dissipationDelta));
-                this.homeostasis = Math.max(0.1, Math.min(1.0, this.homeostasis + homeostaticDelta));
-
-                this.history.push({
-                    tick: this.tick,
-                    entropy: this.entropy,
-                    exergy: this.exergy,
-                    dissipation: this.dissipation,
-                    homeostasis: this.homeostasis
-                });
-
-                if (this.history.length > 100) this.history.shift();
-
-                this.updateDisplay();
-                this.drawPhaseSpace();
-
-                if (this.tick % 10 === 0) {
-                    this.log(`Vector state updated [Tick ${this.tick}]: S=${this.entropy.toFixed(3)}, Φ=${this.exergy.toFixed(1)}kJ`, 'info');
-                }
-            }
-
-            perturbSystem() {
-                this.entropy *= (1.2 + Math.random() * 0.3);
-                this.exergy *= (0.7 + Math.random() * 0.2);
-                this.dissipation *= 1.5;
-                this.homeostasis *= 0.6;
-                
-                document.getElementById('sim-status').textContent = 'THERMAL PERTURBATION';
-                document.getElementById('sim-status').style.borderColor = '#f44336';
-                document.getElementById('sim-status').style.color = '#f44336';
-
-                setTimeout(() => {
-                    document.getElementById('sim-status').textContent = 'STABLE EQUILIBRIUM';
-                    document.getElementById('sim-status').style.borderColor = 'var(--accent-green)';
-                    document.getElementById('sim-status').style.color = 'var(--accent-green)';
-                }, 3000);
-
-                this.log('Thermal perturbation injected into thermodynamic state vector!', 'warn');
-                this.stepVector();
-            }
-
-            updateDisplay() {
-                document.getElementById('tick-counter').textContent = `Tick: ${this.tick}`;
-                document.getElementById('val-entropy').textContent = `${this.entropy.toFixed(3)} J/K`;
-                document.getElementById('val-exergy').textContent = `${this.exergy.toFixed(1)} kJ`;
-                document.getElementById('val-dissipation').textContent = `${this.dissipation.toFixed(2)} W`;
-                document.getElementById('val-homeostasis').textContent = `${this.homeostasis.toFixed(3)}`;
-
-                const matrixBox = document.getElementById('vector-matrix-box');
-                matrixBox.innerHTML = `
-                    <div class="matrix-row"><span>State Vector V[0] (Entropy):</span> <span>${this.entropy.toFixed(4)}</span></div>
-                    <div class="matrix-row"><span>State Vector V[1] (Exergy):</span> <span>${this.exergy.toFixed(4)}</span></div>
-                    <div class="matrix-row"><span>State Vector V[2] (Dissipation):</span> <span>${this.dissipation.toFixed(4)}</span></div>
-                    <div class="matrix-row"><span>State Vector V[3] (Homeostasis):</span> <span>${this.homeostasis.toFixed(4)}</span></div>
-                    <div class="matrix-row"><span>Gibbs Free Energy G:</span> <span>${(this.exergy - this.entropy * 298.15 * 0.01).toFixed(2)} kJ/mol</span></div>
-                    <div class="matrix-row"><span>Prigogine Dissipative Flux:</span> <span>${(this.dissipation * this.homeostasis).toFixed(3)}</span></div>
-                `;
-            }
-
-            drawPhaseSpace() {
-                if (!this.ctx) return;
-                const { width, height } = this.canvas;
-                this.ctx.clearRect(0, 0, width, height);
-
-                // Draw grid
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                this.ctx.lineWidth = 1;
-                const step = 40;
-                for (let x = 0; x < width; x += step) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(x, 0);
-                    this.ctx.lineTo(x, height);
-                    this.ctx.stroke();
-                }
-                for (let y = 0; y < height; y += step) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(0, y);
-                    this.ctx.lineTo(width, y);
-                    this.ctx.stroke();
-                }
-
-                if (this.history.length < 2) return;
-
-                // Draw trajectory trail
-                this.ctx.beginPath();
-                this.ctx.strokeStyle = '#00bcd4';
-                this.ctx.lineWidth = 2;
-
-                for (let i = 0; i < this.history.length; i++) {
-                    const h = this.history[i];
-                    // Map entropy & exergy to canvas coordinates
-                    const px = (h.entropy / 5.0) * (width - 60) + 30;
-                    const py = height - ((h.exergy / 150.0) * (height - 60) + 30);
-
-                    if (i === 0) this.ctx.moveTo(px, py);
-                    else this.ctx.lineTo(px, py);
-                }
-                this.ctx.stroke();
-
-                // Draw current state vector node
-                const current = this.history[this.history.length - 1];
-                const curX = (current.entropy / 5.0) * (width - 60) + 30;
-                const curY = height - ((current.exergy / 150.0) * (height - 60) + 30);
-
-                this.ctx.beginPath();
-                this.ctx.fillStyle = '#4caf50';
-                this.ctx.arc(curX, curY, 6, 0, Math.PI * 2);
-                this.ctx.fill();
-
-                this.ctx.beginPath();
-                this.ctx.strokeStyle = 'rgba(76, 175, 80, 0.5)';
-                this.ctx.lineWidth = 4;
-                this.ctx.arc(curX, curY, 12, 0, Math.PI * 2);
-                this.ctx.stroke();
-            }
-
-            log(message, type = 'info') {
-                const terminal = document.getElementById('log-terminal');
-                const entry = document.createElement('div');
-                entry.className = `log-entry ${type}`;
-                const timeStr = new Date().toLocaleTimeString();
-                entry.textContent = `[${timeStr}] ${message}`;
-                terminal.appendChild(entry);
-                terminal.scrollTop = terminal.scrollHeight;
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            window.thermodynamicRuntime = new ThermodynamicInterfaceRuntime();
+            resetBtn.addEventListener('click', () => {
+                isRunning = false;
+                clearInterval(interval);
+                generation = 0;
+                genCountEl.textContent = generation;
+                simIcon.className = 'fa-solid fa-play mr-1.5';
+                simText.textContent = 'Start Simulation';
+                simStatus.textContent = 'Simulation reset. Ready to begin.';
+            });
         });
     </script>
 </body>

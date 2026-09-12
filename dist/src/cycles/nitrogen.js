@@ -16,21 +16,19 @@ export class NitrogenCycle extends BaseCycle {
         }
     }
     step(dt, solarFlux) {
-        const flux = {
+        const boundaryFlux = {
+            netHeatFlux: solarFlux * 1e-5,
+            netMassFlux: 0.5,
+            solarIncoming: solarFlux,
+            terrestrialOutgoing: solarFlux * 0.99,
             heatFluxes: [solarFlux * 1e-5],
             boundaryTemperatures: [295.0],
             massFluxes: [0.5],
             specificEnthalpies: [300],
-            specificEntropies: [1.5],
-            fluxId: "nitrogen_fixation_flux",
-            species: "n2",
-            massFlowRate: 0.5,
-            specificEnthalpy: 300,
-            specificEntropy: 1.5,
-            heatTransferRate: solarFlux * 1e-5,
-            boundaryTemperature: 295.0
+            specificEntropies: [1.5]
         };
-        this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
+        const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-5 * dt, (solarFlux * 1e-5 / 295.0) * dt, dt);
+        this.stateVector = 'state' in res ? res.state : res;
     }
 }
 // Backward compatibility alias for sprint tests expecting NitrogenCyclePOD

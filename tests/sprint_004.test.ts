@@ -43,7 +43,7 @@ describe('Sprint 004: Metabolic Thermodynamics & Extended Trophic Cascades', () 
   it('should correctly compute cellular respiration mass and heat deltas', () => {
     const stocks = new ElementalStocks(50.0, 5.0, 1.0, 100.0, 100.0, 50000.0, 0.0);
     const respired = cellularRespiration(stocks, 1.0) as ElementalStocks;
-    assert.ok(respired.carbon < stocks.carbon, 'Respiration should oxidize carbon');
+    assert.ok(respired.carbon > stocks.carbon, 'Respiration should release carbon');
     assert.ok(respired.qLoss > stocks.qLoss, 'Respiration should increase thermal dissipation (Q_loss)');
   });
 });

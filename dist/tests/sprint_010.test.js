@@ -24,9 +24,9 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
                 sensibleHeatFlux: 0,
                 latentHeatFlux: 0,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 0,
-                massFluxes: new Map(),
+                massFluxes: [],
                 netMassEnthalpyFlux: 0
             }
         };
@@ -36,17 +36,17 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             sensibleHeatFlux: 1e11,
             latentHeatFlux: 5e10,
             netMassFlux: 0,
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiativeNet: 1e10,
-            massFluxes: new Map(),
+            massFluxes: [],
             netMassEnthalpyFlux: 0,
             radiationFlux: {
                 solarIncoming: 1.74e17,
                 terrestrialOutgoing: 1.73e17
             },
             workRate: 0,
-            specificEnthalpies: new Map(),
-            specificEntropies: new Map()
+            specificEnthalpies: [],
+            specificEntropies: []
         };
         const newState = evaluateThermodynamicState(prevState, 1.0001e12, // slightly increased internal energy
         288.15, 288.15, fluxes, 1.0);
@@ -76,9 +76,9 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
                 sensibleHeatFlux: 0,
                 latentHeatFlux: 0,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 0,
-                massFluxes: new Map(),
+                massFluxes: [],
                 netMassEnthalpyFlux: 0
             }
         };
@@ -88,17 +88,17 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
             sensibleHeatFlux: 0,
             latentHeatFlux: 0,
             netMassFlux: 0,
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiativeNet: 0,
-            massFluxes: new Map(),
+            massFluxes: [],
             netMassEnthalpyFlux: 0,
             radiationFlux: {
                 solarIncoming: 0,
                 terrestrialOutgoing: 0
             },
             workRate: 0,
-            specificEnthalpies: new Map(),
-            specificEntropies: new Map()
+            specificEnthalpies: [],
+            specificEntropies: []
         };
         const newState = evaluateThermodynamicState(prevState, 1e12, 288.15, 288.15, fluxes, 1.0);
         assert.ok((newState.entropyGenerationRate ?? 0) >= 0);
@@ -124,9 +124,9 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
                 sensibleHeatFlux: 0,
                 latentHeatFlux: 0,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 0,
-                massFluxes: new Map(),
+                massFluxes: [],
                 netMassEnthalpyFlux: 0
             }
         };

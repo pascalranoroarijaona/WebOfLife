@@ -28,14 +28,14 @@ class TestThermalSystem extends BaseThermodynamicSystem {
 }
 
 describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcement', () => {
-  const defaultBoundaryFluxes: BoundaryFluxArray = {
+  const defaultBoundaryFluxes: IBoundaryFluxArray = {
     solarRadiationIn: 1.74e17,
     longwaveRadiationOut: 1.74e17 * 0.99,
     sensibleHeatFlux: 1e8,
     latentHeatFlux: 2e8,
     netMassFlux: 0.0,
-    heatFluxes: new Map(),
-    massFluxes: new Map()
+    heatFluxes: [],
+    massFluxes: []
   };
 
   const initialState: ThermodynamicStateVector = {
@@ -69,12 +69,12 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
   });
 
   it('should wrap thermodynamic state transitions in ThermodynamicStateMonad successfully', () => {
-    const monad = ThermodynamicStateMonad.unit(initialState);
+    const monad = ThermodynamicStateMonad.of(initialState);
 
-    const nextMonad = monad.map((s) => ({
+    const nextMonad = monad.map((s: any) => ({
       ...s,
       timestamp: (s.timestamp ?? 0) + 1,
-      internalEnergy: s.internalEnergy + 1000
+      internalEnergy: (s.internalEnergy ?? 1e15) + 1000
     }));
 
     const resultingState = nextMonad.getState();

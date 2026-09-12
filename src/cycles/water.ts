@@ -20,21 +20,19 @@ export class WaterCycle extends BaseCycle {
   }
 
   public step(dt: number, solarFlux: number): void {
-    const flux: BoundaryFlux = {
+    const boundaryFlux: BoundaryFlux = {
+      netHeatFlux: solarFlux * 1e-3,
+      netMassFlux: 15.0,
+      solarIncoming: solarFlux,
+      terrestrialOutgoing: solarFlux * 0.99,
       heatFluxes: [solarFlux * 1e-3],
       boundaryTemperatures: [300.0],
       massFluxes: [15.0],
       specificEnthalpies: [2260000],
-      specificEntropies: [600],
-      fluxId: "water_evaporation_flux",
-      species: "h2o",
-      massFlowRate: 15.0,
-      specificEnthalpy: 2260000,
-      specificEntropy: 600,
-      heatTransferRate: solarFlux * 1e-3,
-      boundaryTemperature: 300.0
+      specificEntropies: [600]
     };
-    this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
+    const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-3 * dt, (solarFlux * 1e-3 / 300.0) * dt, dt);
+    this.stateVector = 'state' in res ? res.state : res;
   }
 }
 

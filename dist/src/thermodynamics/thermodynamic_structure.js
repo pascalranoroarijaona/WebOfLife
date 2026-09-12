@@ -1,10 +1,10 @@
 /**
- * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
+ * Thermodynamic Structure and Base Implementations (Sprint 021 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad } from './types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, advanceThermodynamicState } from './types.js';
 import { executeThermodynamicStep } from './thermodynamic_monad_process.js';
-export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep };
+export { ThermodynamicStateMonad, executeThermodynamicStep, advanceThermodynamicState };
 export var EntropyState;
 (function (EntropyState) {
     EntropyState["STEADY"] = "STEADY";
@@ -57,9 +57,9 @@ export class ThermodynamicStructure {
             sensibleHeatFlux: 1e8,
             latentHeatFlux: 1e8,
             netMassFlux: 0,
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiativeNet: 0,
-            massFluxes: new Map()
+            massFluxes: []
         };
         return {
             timestamp: this.tickCreated,
@@ -94,15 +94,15 @@ export class ThermodynamicStructure {
     }
     getBoundaryFluxes() {
         return {
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiationFlux: {
                 solarIncoming: 1.74e17,
                 terrestrialOutgoing: 1.74e17 * 0.99
             },
             workRate: 0,
-            massFluxes: new Map(),
-            specificEnthalpies: new Map(),
-            specificEntropies: new Map(),
+            massFluxes: [],
+            specificEnthalpies: [],
+            specificEntropies: [],
             solarRadiationIn: 1.74e17,
             longwaveRadiationOut: 1.74e17 * 0.99,
             sensibleHeatFlux: 1e8,
@@ -162,7 +162,7 @@ export class BaseThermodynamicSystem {
         return {
             entropyGenerationRate: sGen,
             exergyDestructionRate: iDest,
-            exergyEfficiency: this.calculateExergyEfficiency(),
+            exergeticEfficiency: this.calculateExergyEfficiency(),
             isSecondLawValid: sGen >= -1e-9
         };
     }
@@ -170,7 +170,7 @@ export class BaseThermodynamicSystem {
 export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
     const T0 = state.referenceTemperature ?? state.T_0 ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
     const dU = qNet * dt;
-    const newInternalEnergy = state.internalEnergy + dU;
+    const newInternalEnergy = (state.internalEnergy ?? 1e6) + dU;
     const entropyTransfer = qNet / boundaryTemp;
     const sysTemp = T0;
     const dotSGen = Math.abs(qNet) * Math.max(0, (1 / boundaryTemp - 1 / sysTemp));
@@ -181,14 +181,16 @@ export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
     const bFluxes = state.boundaryFluxes;
     const isArr = Array.isArray(bFluxes);
     const bfRecord = !isArr && bFluxes ? bFluxes : {
-        heatFluxes: new Map(),
-        massFluxes: new Map(),
+        heatFluxes: [],
+        massFluxes: [],
         solarRadiationIn: 0,
         longwaveRadiationOut: 0,
         sensibleHeatFlux: 0,
         latentHeatFlux: 0,
         netMassFlux: 0
     };
+    const heatFluxesArr = Array.isArray(bfRecord.heatFluxes) ? bfRecord.heatFluxes : [];
+    const massFluxesArr = Array.isArray(bfRecord.massFluxes) ? bfRecord.massFluxes : [];
     const solarRad = bfRecord.solarRadiationIn ?? 0;
     const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
     const sensible = bfRecord.sensibleHeatFlux ?? 0;
@@ -196,6 +198,8 @@ export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
     const netMass = bfRecord.netMassFlux ?? 0;
     const boundaryFluxes = {
         ...bfRecord,
+        heatFluxes: heatFluxesArr,
+        massFluxes: massFluxesArr,
         radiativeNet: qNet,
         solarRadiationIn: solarRad,
         longwaveRadiationOut: longwaveOut,
@@ -226,9 +230,14 @@ export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
 }
 export function applyMassTransport(stock, state, massFluxes, specificEnthalpy, specificEntropy, dt) {
     let totalMassRate = 0;
-    if (massFluxes instanceof Map) {
+    if (Array.isArray(massFluxes)) {
         massFluxes.forEach((flux) => {
-            totalMassRate += flux;
+            totalMassRate += Number(flux) || 0;
+        });
+    }
+    else if (massFluxes instanceof Map) {
+        massFluxes.forEach((flux) => {
+            totalMassRate += Number(flux) || 0;
         });
     }
     else if (massFluxes && typeof massFluxes === 'object') {
@@ -242,27 +251,31 @@ export function applyMassTransport(stock, state, massFluxes, specificEnthalpy, s
     const entropyTransportRate = totalMassRate * specificEntropy;
     const dotSGen = Math.abs(totalMassRate * specificEntropy * 0.05);
     const dotI = T0 * dotSGen;
-    const newInternalEnergy = state.internalEnergy + dU;
+    const newInternalEnergy = (state.internalEnergy ?? 1e6) + dU;
     const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
     const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
     const bFluxes = state.boundaryFluxes;
     const isArr = Array.isArray(bFluxes);
     const bfRecord = !isArr && bFluxes ? bFluxes : {
-        heatFluxes: new Map(),
-        massFluxes: new Map(),
+        heatFluxes: [],
+        massFluxes: [],
         solarRadiationIn: 0,
         longwaveRadiationOut: 0,
         sensibleHeatFlux: 0,
         latentHeatFlux: 0,
         netMassFlux: 0
     };
+    const heatFluxesArr = Array.isArray(bfRecord.heatFluxes) ? bfRecord.heatFluxes : [];
     const radiative = bfRecord.radiativeNet ?? 0;
     const solarRad = bfRecord.solarRadiationIn ?? 0;
     const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
     const sensible = bfRecord.sensibleHeatFlux ?? 0;
     const latent = bfRecord.latentHeatFlux ?? 0;
+    const massFluxArr = [];
     const boundaryFluxes = {
         ...bfRecord,
+        heatFluxes: heatFluxesArr,
+        massFluxes: massFluxArr,
         radiativeNet: radiative,
         solarRadiationIn: solarRad,
         longwaveRadiationOut: longwaveOut,

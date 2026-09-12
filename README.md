@@ -206,7 +206,7 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 6%
-SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
+SPRINT_GOAL: Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
 
 ## Web of Life Master Backlog
 
@@ -214,7 +214,9 @@ SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`
 - [x] Abstract `ThermodynamicStructure` class hierarchy. (`src/thermodynamics/thermodynamic_structure.ts`, `src/earth_pod.ts`)
 - [x] Executable monad methods and stock-and-flow ledger. (`src/earth_pod.ts`, `src/cycles/base_cycle.ts`)
 - [x] Biogeochemical `CyclePOD` instances (Carbon, Water, Nitrogen, Phosphorus). (`src/cycles/carbon.ts`, `src/cycles/water.ts`, `src/cycles/nitrogen.ts`, `src/cycles/phosphorus.ts`)
-- [ ] Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
+- [ ] Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux array structures.
+- [ ] Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
+- [ ] Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper functions that assert required property existence and non-negative entropy fields prior to monad step executions.
 - [ ] First-Law Conservation Enforcer Integration (`src/thermodynamics/conservation_validator.ts`): Bind the conservation validator directly to the main time-stepping loop in `src/earth_pod.ts` to assert $\Delta \text{Stock}_i = \sum \text{Inflows} - \sum \text{Outflows} \pm \epsilon$ at every tick, halting execution if mass/energy imbalances exceed $10^{-6}$.
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
 - [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
@@ -236,6 +238,7 @@ SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`
 - [ ] Elemental Stoichiometric Fixed-Ratio Bounds (`src/biosphere/stoichiometric_cycling.ts`): Implement nutrient limitation bottlenecks on net primary productivity (NPP) based on available inorganic stocks.
 - [ ] Autotroph Carbon Overflow & Exudation Routines (`src/biosphere/carbon_overflow.ts`): Code carbon overflow respiration and DOC exudation routines for autotroph monads when nitrogen or phosphorus drops below strict stoichiometric thresholds.
 - [ ] Liebig's Law Multi-Factor Limiting Function (`src/biosphere/liebig_constraints.ts`): Code a multiplicative multiplier function: $\mu = \min\left(\frac{N}{K_N + N}, \frac{P}{K_P + P}, \frac{I}{K_I + I}, \frac{W}{K_W + W}\right)$ governing NPP across H3 cells.
+- [ ] Mycorrhizal Fungal Network Contracts (`src/biosphere/mycorrhizal_types.ts`): Define fungal mycelial network contracts, including hyphal carbon storage stocks, phosphorus/nitrogen mineral transport capacity, and osmotic exchange rates.
 - [ ] Subterranean Mycorrhizal Token Exchange Protocol (`src/biosphere/mycorrhizal_network.ts`): Create a `MycorrhizalNetworkMonad` class extending `ThermodynamicStructure` acting as a localized token broker between `GeoBiomePOD` root zones and fungal mycelial pools.
 - [ ] Mycorrhizal Nutrient Spatial Diffusion (`src/biosphere/mycorrhizal_diffusion.ts`): Add spatial diffusion methods allowing mycorrhizal networks to shuttle nutrients across adjacent H3 hexagonal nodes based on osmotic and concentration gradients.
 - [ ] Holling Type II Functional Response Calculator (`src/biosphere/food_web/holling_response.ts`): Map predator-prey consumption rates to handling times and resource densities.

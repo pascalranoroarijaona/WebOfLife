@@ -22,9 +22,9 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
                 sensibleHeatFlux: 0,
                 latentHeatFlux: 0,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 100,
-                massFluxes: new Map()
+                massFluxes: []
             }
         };
         const stock = { temperature: 288.15, thermalEnergy: 1e6 };
@@ -53,9 +53,9 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
                 sensibleHeatFlux: 0,
                 latentHeatFlux: 0,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 0,
-                massFluxes: new Map()
+                massFluxes: []
             }
         };
         const stock = { temperature: 288.15, thermalEnergy: 1e6 };
@@ -82,9 +82,9 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
                 sensibleHeatFlux: 0,
                 latentHeatFlux: 0,
                 netMassFlux: 0,
-                heatFluxes: new Map(),
+                heatFluxes: [],
                 radiativeNet: 0,
-                massFluxes: new Map()
+                massFluxes: []
             }
         };
         const bioStock = { totalMass: 5000 };

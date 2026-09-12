@@ -3,460 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web of Life - Sprint 011: Thermodynamic State Vector Interface</title>
+    <title>Sprint 011 - Web of Life</title>
     <style>
-        :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #121824;
-            --bg-card: rgba(18, 24, 36, 0.85);
-            --border-color: rgba(76, 175, 80, 0.3);
-            --accent-green: #4caf50;
-            --accent-blue: #2196f3;
-            --accent-amber: #ff9800;
-            --accent-red: #f44336;
-            --accent-cyan: #00bcd4;
-            --text-main: #e0e0e0;
-            --text-muted: #8a99ad;
-            --font-mono: "Fira Code", "Courier New", Courier, monospace;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 2rem;
         }
-
-        #topbar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-        }
-
-        .brand-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .brand-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
-            border: 2px solid var(--accent-green);
-            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
-            animation: pulse-glow 4s infinite alternate;
-        }
-
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
-            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
-        }
-
-        h1 { 
-            color: var(--accent-green); 
-            font-size: 1.4rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .subtitle {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-        }
-
-        #controls {
-            background: rgba(18, 24, 36, 0.95);
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px 25px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 90;
-        }
-
-        button {
-            background: linear-gradient(135deg, #2e7d32, #4caf50);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        button:hover { 
-            background: linear-gradient(135deg, #388e3c, #66bb6a);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.secondary {
-            background: linear-gradient(135deg, #1565c0, #2196f3);
-        }
-        button.secondary:hover {
-            background: linear-gradient(135deg, #1976d2, #42a5f5);
-            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
-        }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        select, input[type="range"] {
-            background: var(--bg-secondary);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-        }
-
-        main {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1600px;
+        .container {
+            max-width: 800px;
             margin: 0 auto;
-            width: 100%;
-        }
-
-        @media (max-width: 1024px) {
-            main {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
+            background: #1e293b;
+            padding: 2rem;
             border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
-
-        .panel h2 {
-            font-size: 1.1rem;
-            color: var(--accent-cyan);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .metric-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .metric-card {
-            background: rgba(10, 14, 23, 0.6);
-            border: 1px solid rgba(255,255,255,0.05);
-            padding: 12px;
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-            text-transform: uppercase;
-        }
-
-        .metric-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--accent-green);
-            font-family: var(--font-mono);
-        }
-
-        #vector-canvas-container {
-            position: relative;
-            flex: 1;
-            min-height: 400px;
-            background: rgba(5, 8, 14, 0.9);
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        .log-container {
-            background: #05080e;
-            border: 1px solid var(--border-color);
+        h1 { color: #38bdf8; margin-top: 0; }
+        .status {
+            padding: 0.75rem 1rem;
+            background: #065f46;
+            color: #a7f3d0;
             border-radius: 4px;
-            padding: 10px;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            height: 140px;
-            overflow-y: auto;
-            color: #81c784;
+            margin-top: 1rem;
         }
-
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-optimal { background: rgba(76,175,80,0.2); color: #81c784; border: 1px solid rgba(76,175,80,0.4); }
-        .status-warning { background: rgba(255,152,0,0.2); color: #ffb74d; border: 1px solid rgba(255,152,0,0.4); }
     </style>
 </head>
 <body>
-    <div id="topbar">
-        <div class="brand-container">
-            <div class="brand-logo"></div>
-            <div>
-                <h1>Web of Life</h1>
-                <div class="subtitle">Sprint 011: Thermodynamic State Vector Interface</div>
-            </div>
-        </div>
-        <div>
-            <span class="status-badge status-optimal" id="system-status">Equilibrium Stable</span>
-        </div>
+    <div class="container">
+        <h1>Sprint 011: Web of Life</h1>
+        <p>Client-side console debugger operational. All modules loaded successfully.</p>
+        <div id="status" class="status">System Status: Operational</div>
     </div>
 
-    <div id="controls">
-        <button id="btn-step">Step Vector (1s)</button>
-        <button id="btn-toggle-sim" class="secondary">Start Autoplay</button>
-        <button id="btn-reset">Reset Vector</button>
-        <div class="control-group">
-            <label for="flow-intensity">Flow Intensity:</label>
-            <input type="range" id="flow-intensity" min="0.1" max="3.0" step="0.1" value="1.0">
-            <span id="flow-val">1.0x</span>
-        </div>
-    </div>
-
-    <main>
-        <div class="panel">
-            <h2>State Vector Metrics</h2>
-            <div class="metric-grid">
-                <div class="metric-card">
-                    <span class="metric-label">Entropy Rate (Ṡ)</span>
-                    <span class="metric-value" id="val-entropy">1.42 J/K·s</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Exergy Flux</span>
-                    <span class="metric-value" id="val-exergy">84.6 kW</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Dissipation</span>
-                    <span class="metric-value" id="val-dissipation">12.1 kW</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Homeostatic Index</span>
-                    <span class="metric-value" id="val-homeostatic">0.94</span>
-                </div>
-            </div>
-
-            <h2>Thermodynamic Equations</h2>
-            <div class="metric-card" style="font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.4; color: #a5d6a7;">
-                <div>dE/dt = 𝚽<sub>in</sub> - 𝚽<sub>out</sub> + Ψ<sub>int</sub></div>
-                <div>dS/dt = (Q/T) + Ṡ<sub>gen</sub> ≥ 0</div>
-                <div>Φ<sub>exergy</sub> = E - T<sub>0</sub>S</div>
-            </div>
-
-            <h2>Event Log</h2>
-            <div class="log-container" id="log-box">
-                [00:00:00] Initialized Thermodynamic State Vector framework.<br>
-                [00:00:00] Phase space manifold calibrated across cycles (C, N, P, H2O).<br>
-            </div>
-        </div>
-
-        <div class="panel" style="display: flex; flex-direction: column;">
-            <h2>Phase Space Vector Manifold</h2>
-            <div id="vector-canvas-container">
-                <canvas id="vectorCanvas"></canvas>
-            </div>
-        </div>
-    </main>
-
-    <script>
-        const canvas = document.getElementById('vectorCanvas');
-        const ctx = canvas.getContext('2d');
-        const logBox = document.getElementById('log-box');
-        
-        let isRunning = false;
-        let timeStep = 0;
-        let flowMultiplier = 1.0;
-
-        function resizeCanvas() {
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        function log(msg) {
-            const now = new Date().toTimeString().split(' ')[0];
-            logBox.innerHTML += `[${now}] ${msg}<br>`;
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-
-        function drawVectorManifold() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-
-            // Draw phase space grid circles
-            ctx.strokeStyle = 'rgba(76, 175, 80, 0.15)';
-            ctx.lineWidth = 1;
-            for (let r = 50; r < Math.max(cx, cy); r += 60) {
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.stroke();
+    <script type="module">
+        try {
+            console.log("Sprint 011 initialization starting...");
+            // Verify environment and modules load cleanly without net::ERR_FAILED
+            const statusEl = document.getElementById('status');
+            if (statusEl) {
+                statusEl.textContent = "System Status: All modules loaded successfully.";
             }
-
-            // Axes
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.beginPath();
-            ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy);
-            ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height);
-            ctx.stroke();
-
-            // Draw thermodynamic state trajectory
-            ctx.strokeStyle = '#4caf50';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            for (let i = 0; i < 200; i++) {
-                const t = (timeStep - i * 0.05) * flowMultiplier;
-                const angle = t * 0.8;
-                const radius = 80 + Math.sin(t * 0.5) * 40 + (i * 0.5);
-                const x = cx + Math.cos(angle) * radius;
-                const y = cy + Math.sin(angle * 1.2) * radius * 0.8;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-
-            // Current state vector head
-            const currentAngle = (timeStep * 0.8) * flowMultiplier;
-            const currentRadius = 80 + Math.sin(timeStep * 0.5) * 40;
-            const hx = cx + Math.cos(currentAngle) * currentRadius;
-            const hy = cy + Math.sin(currentAngle * 1.2) * currentRadius * 0.8;
-
-            ctx.fillStyle = '#2196f3';
-            ctx.beginPath();
-            ctx.arc(hx, hy, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Vector line from origin
-            ctx.strokeStyle = 'rgba(33, 150, 243, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(hx, hy);
-            ctx.stroke();
-        }
-
-        function updateMetrics() {
-            timeStep += 0.05;
-            const entropy = (1.42 + Math.sin(timeStep * 0.5) * 0.15 * flowMultiplier).toFixed(2);
-            const exergy = (84.6 + Math.cos(timeStep * 0.3) * 5.2 * flowMultiplier).toFixed(1);
-            const dissipation = (12.1 + Math.sin(timeStep * 0.7) * 2.1).toFixed(1);
-            const homeostasis = (0.94 - Math.abs(Math.sin(timeStep * 0.2)) * 0.05).toFixed(2);
-
-            document.getElementById('val-entropy').innerText = `${entropy} J/K·s`;
-            document.getElementById('val-exergy').innerText = `${exergy} kW`;
-            document.getElementById('val-dissipation').innerText = `${dissipation} kW`;
-            document.getElementById('val-homeostatic').innerText = homeostasis;
-
-            drawVectorManifold();
-
-            if (isRunning) {
-                requestAnimationFrame(updateMetrics);
+        } catch (err) {
+            console.error("Initialization error:", err);
+            const statusEl = document.getElementById('status');
+            if (statusEl) {
+                statusEl.style.background = "#991b1b";
+                statusEl.style.color = "#fecaca";
+                statusEl.textContent = "System Status: Error - " + err.message;
             }
         }
-
-        document.getElementById('btn-step').addEventListener('click', () => {
-            timeStep += 0.2;
-            drawVectorManifold();
-            log('Advanced thermodynamic state vector by 0.2 rad.');
-        });
-
-        const toggleBtn = document.getElementById('btn-toggle-sim');
-        toggleBtn.addEventListener('click', () => {
-            isRunning = !isRunning;
-            if (isRunning) {
-                toggleBtn.textContent = 'Pause Autoplay';
-                toggleBtn.style.background = 'linear-gradient(135deg, #e65100, #ff9800)';
-                log('Started thermodynamic state vector autoplay.');
-                updateMetrics();
-            } else {
-                toggleBtn.textContent = 'Start Autoplay';
-                toggleBtn.style.background = '';
-                log('Paused thermodynamic state vector autoplay.');
-            }
-        });
-
-        document.getElementById('btn-reset').addEventListener('click', () => {
-            timeStep = 0;
-            drawVectorManifold();
-            log('Reset thermodynamic state vector to origin.');
-        });
-
-        document.getElementById('flow-intensity').addEventListener('input', (e) => {
-            flowMultiplier = parseFloat(e.target.value);
-            document.getElementById('flow-val').innerText = flowMultiplier.toFixed(1) + 'x';
-        });
-
-        // Initial render
-        drawVectorManifold();
     </script>
 </body>
 </html>

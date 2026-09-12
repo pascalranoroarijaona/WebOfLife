@@ -23,8 +23,8 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
         sensibleHeatFlux: 1e8,
         latentHeatFlux: 2e8,
         netMassFlux: 0.0,
-        heatFluxes: new Map(),
-        massFluxes: new Map()
+        heatFluxes: [],
+        massFluxes: []
     };
     const initialState = {
         timestamp: 0,
@@ -52,11 +52,11 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
         assert.strictEqual(metrics.exergyDestructionRate, STANDARD_AMBIENT_TEMPERATURE_K * metrics.entropyGenerationRate);
     });
     it('should wrap thermodynamic state transitions in ThermodynamicStateMonad successfully', () => {
-        const monad = ThermodynamicStateMonad.unit(initialState);
+        const monad = ThermodynamicStateMonad.of(initialState);
         const nextMonad = monad.map((s) => ({
             ...s,
             timestamp: (s.timestamp ?? 0) + 1,
-            internalEnergy: s.internalEnergy + 1000
+            internalEnergy: (s.internalEnergy ?? 1e15) + 1000
         }));
         const resultingState = nextMonad.getState();
         assert.strictEqual(resultingState.timestamp, 1);

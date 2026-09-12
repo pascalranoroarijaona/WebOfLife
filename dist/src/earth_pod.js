@@ -333,8 +333,8 @@ export class EarthPOD extends ThermodynamicStructure {
             thermalRadiationOut: this.solarInputWatts * 0.99,
             matterEnthalpyFlux: 0,
             netHeatFlux: netHeat,
-            heatFluxes: new Map(),
-            massFluxes: new Map()
+            heatFluxes: [],
+            massFluxes: []
         };
         const exergyMetrics = {
             T_0: STANDARD_AMBIENT_TEMPERATURE_K,

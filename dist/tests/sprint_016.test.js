@@ -19,12 +19,12 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             boundaryFluxes: []
         };
         const initialFluxes = {
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiationFlux: { solarIncoming: 1000, terrestrialOutgoing: 990 },
             workRate: 0,
-            massFluxes: new Map(),
-            specificEnthalpies: new Map(),
-            specificEntropies: new Map(),
+            massFluxes: [],
+            specificEnthalpies: [],
+            specificEntropies: [],
             solarRadiationIn: 1000,
             longwaveRadiationOut: 990,
             sensibleHeatFlux: 0,
@@ -51,12 +51,12 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             boundaryFluxes: []
         };
         const initialFluxes = {
-            heatFluxes: new Map(),
+            heatFluxes: [],
             radiationFlux: { solarIncoming: 174e15, terrestrialOutgoing: 173.5e15 },
             workRate: 0,
-            massFluxes: new Map(),
-            specificEnthalpies: new Map(),
-            specificEntropies: new Map(),
+            massFluxes: [],
+            specificEnthalpies: [],
+            specificEntropies: [],
             solarRadiationIn: 174e15,
             longwaveRadiationOut: 173.5e15,
             sensibleHeatFlux: 0,
@@ -66,14 +66,16 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
         const monad = ThermodynamicStateMonad.initialize(initialState, initialFluxes);
         const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f, 1.0)).getState();
         const T0 = extractedState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
-        const expectedI = T0 * extractedState.entropyGenerationRate;
-        assert.strictEqual(Math.abs(extractedState.exergyDestructionRate - expectedI) < 1e-5, true, `Exergy destruction rate (${extractedState.exergyDestructionRate}) must equal T_0 * \\dot{S}_{gen} (${expectedI})`);
+        const sGen = extractedState.entropyGenerationRate ?? 0;
+        const iDest = extractedState.exergyDestructionRate ?? 0;
+        const expectedI = T0 * sGen;
+        assert.strictEqual(Math.abs(iDest - expectedI) < 1e-5, true, `Exergy destruction rate (${iDest}) must equal T_0 * \\dot{S}_{gen} (${expectedI})`);
     });
     it('should successfully bootstrap mega pod and verify planetary thermodynamic compliance', () => {
         const { earth } = bootstrapMegaPod();
         const stateVec = earth.getStateVector();
         assert.strictEqual(earth.verifySecondLaw(), true, 'Earth planetary pod must satisfy Second Law');
-        assert.strictEqual(stateVec.entropyGenerationRate >= 0, true, 'Entropy generation rate must be non-negative');
+        assert.strictEqual((stateVec.entropyGenerationRate ?? 0) >= 0, true, 'Entropy generation rate must be non-negative');
         assert.strictEqual(stateVec.ambientTemperature, STANDARD_AMBIENT_TEMPERATURE_K);
     });
 });

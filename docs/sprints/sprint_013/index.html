@@ -3,480 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web of Life - Sprint 013: Thermodynamic State Vector Interface</title>
+    <title>Sprint 013 - Web of Life</title>
     <style>
-        :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #121824;
-            --bg-card: rgba(18, 24, 36, 0.85);
-            --border-color: rgba(76, 175, 80, 0.3);
-            --accent-green: #4caf50;
-            --accent-blue: #2196f3;
-            --accent-amber: #ff9800;
-            --accent-red: #f44336;
-            --accent-cyan: #00bcd4;
-            --text-main: #e0e0e0;
-            --text-muted: #8a99ad;
-            --font-mono: "Fira Code", "Courier New", Courier, monospace;
-        }
-
-        * {
-            box-sizing: border-box;
+        body {
             margin: 0;
             padding: 0;
-        }
-
-        body {
+            background: #0d1117;
+            color: #c9d1d9;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-main);
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
+            height: 100vh;
+            overflow: hidden;
         }
-
-        #topbar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 25px;
+        header {
+            background: #161b22;
+            padding: 1rem;
+            border-bottom: 1px solid #30363d;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 100;
         }
-
-        .brand-container {
+        h1 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+        #app {
+            flex: 1;
             display: flex;
+            justify-content: center;
             align-items: center;
-            gap: 15px;
+            position: relative;
         }
-
-        .brand-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
-            border: 2px solid var(--accent-green);
-            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
-            animation: pulse-glow 4s infinite alternate;
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background: #000;
         }
-
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
-            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
-        }
-
-        h1 { 
-            color: var(--accent-green); 
-            font-size: 1.4rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .subtitle {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-        }
-
-        #controls {
-            background: rgba(18, 24, 36, 0.95);
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px 25px;
+        .controls {
+            padding: 0.5rem 1rem;
+            background: #161b22;
+            border-top: 1px solid #30363d;
             display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 90;
+            gap: 1rem;
         }
-
         button {
-            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            background: #238636;
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 0.5rem 1rem;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        button:hover { 
-            background: linear-gradient(135deg, #388e3c, #66bb6a);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.secondary {
-            background: linear-gradient(135deg, #1565c0, #2196f3);
-        }
-        button.secondary:hover {
-            background: linear-gradient(135deg, #1976d2, #42a5f5);
-            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
-        }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        select, input[type="range"] {
-            background: var(--bg-secondary);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-        }
-
-        #main-container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1600px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        @media (max-width: 1100px) {
-            #main-container {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        }
-
-        .panel-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--accent-cyan);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            padding-bottom: 10px;
-            font-family: var(--font-mono);
-            letter-spacing: 0.5px;
-        }
-
-        #canvas-container {
-            position: relative;
-            flex: 1;
-            min-height: 450px;
-            background: rgba(5, 8, 13, 0.7);
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.05);
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .metric-card {
-            background: rgba(10, 14, 23, 0.6);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 6px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-            text-transform: uppercase;
-        }
-
-        .metric-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--accent-green);
-            font-family: var(--font-mono);
-        }
-
-        .vector-console {
-            background: #05080d;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 12px;
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            color: #a5d6a7;
-            height: 160px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-
-        .vector-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-            border-bottom: 1px dashed rgba(255,255,255,0.05);
-        }
-
-        .vector-key {
-            color: var(--text-muted);
-        }
-
-        .vector-val {
-            color: var(--accent-cyan);
             font-weight: bold;
         }
-
-        footer {
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border-color);
-            padding: 12px 25px;
-            text-align: center;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
+        button:hover {
+            background: #2ea043;
         }
     </style>
 </head>
 <body>
-    <div id="topbar">
-        <div class="brand-container">
-            <div class="brand-logo"></div>
-            <div>
-                <h1>Web of Life</h1>
-                <div class="subtitle">Sprint 013: Thermodynamic State Vector Interface</div>
-            </div>
-        </div>
-        <div class="control-group">
-            <span>Simulation State: <strong id="sim-status" style="color: var(--accent-green);">RUNNING</strong></span>
-        </div>
+    <header>
+        <h1>Web of Life - Sprint 013</h1>
+        <div id="status">Initialized</div>
+    </header>
+    <div id="app">
+        <canvas id="simulationCanvas" width="800" height="600"></canvas>
     </div>
-
-    <div id="controls">
-        <button id="btn-step">Step 1 Tick</button>
-        <button id="btn-toggle" class="secondary">Pause Simulation</button>
-        <button id="btn-reset" style="background: linear-gradient(135deg, #c62828, #f44336);">Reset Biosphere</button>
-        
-        <div class="control-group">
-            <label for="solar-flux">Solar Flux:</label>
-            <input type="range" id="solar-flux" min="0.5" max="2.0" step="0.05" value="1.0">
-            <span id="solar-flux-val">1.00</span>
-        </div>
-
-        <div class="control-group">
-            <label for="albedo-rate">Albedo:</label>
-            <input type="range" id="albedo-rate" min="0.1" max="0.8" step="0.02" value="0.30">
-            <span id="albedo-val">0.30</span>
-        </div>
+    <div class="controls">
+        <button id="restartBtn">Restart Simulation</button>
     </div>
-
-    <div id="main-container">
-        <div class="panel">
-            <div class="panel-title">
-                <span>Biosphere Thermodynamics & State Vector Field</span>
-                <span id="tick-counter" style="font-size: 0.85rem; color: var(--text-muted);">Tick: 0</span>
-            </div>
-            <div id="canvas-container">
-                <canvas id="thermodynamic-canvas"></canvas>
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-title">Thermodynamic State Vectors</div>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Temperature</div>
-                    <div class="metric-value" id="val-temp">288.15 K</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Entropy Rate ($\dot{S}$)</div>
-                    <div class="metric-value" id="val-entropy">1.24 W/K</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Exergy Balance</div>
-                    <div class="metric-value" id="val-exergy">450.2 kJ</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Homeostasis Index</div>
-                    <div class="metric-value" id="val-homeostasis">0.942</div>
-                </div>
-            </div>
-
-            <div class="panel-title" style="margin-top: 10px;">State Vector Telemetry</div>
-            <div class="vector-console" id="vector-console">
-                <div class="vector-row"><span class="vector-key">INITIALIZING...</span><span class="vector-val">OK</span></div>
-            </div>
-        </div>
-    </div>
-
-    <footer>
-        Web of Life &copy; 2025 Gaia Biosphere Simulation Engine &bull; Sprint 013 Thermodynamic State Vectors
-    </footer>
 
     <script type="module">
-        import { EarthPOD } from '../../../src/earth_pod.ts';
-        import { ThermodynamicStructure } from '../../../src/thermodynamics/thermodynamic_structure.ts';
+        import { WebOfLifeApp } from '../../../src/main.ts';
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const canvas = document.getElementById('thermodynamic-canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Resize canvas to container
-            function resizeCanvas() {
-                const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * window.devicePixelRatio;
-                canvas.height = rect.height * window.devicePixelRatio;
-                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        window.addEventListener('DOMContentLoaded', async () => {
+            const canvas = document.getElementById('simulationCanvas');
+            const status = document.getElementById('status');
+            const restartBtn = document.getElementById('restartBtn');
+
+            try {
+                status.textContent = 'Running Sprint 013...';
+                const app = new WebOfLifeApp(canvas);
+                await app.initialize();
+                app.start();
+
+                restartBtn.addEventListener('click', () => {
+                    app.restart();
+                    status.textContent = 'Restarted';
+                });
+            } catch (err) {
+                console.error('Failed to start Sprint 013 simulation:', err);
+                status.textContent = 'Error: ' + err.message;
             }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
-
-            const pod = new EarthPOD();
-            const thermo = new ThermodynamicStructure();
-
-            let isRunning = true;
-            let tickCount = 0;
-
-            const tickCounterEl = document.getElementById('tick-counter');
-            const simStatusEl = document.getElementById('sim-status');
-            const valTempEl = document.getElementById('val-temp');
-            const valEntropyEl = document.getElementById('val-entropy');
-            const valExergyEl = document.getElementById('val-exergy');
-            const valHomeostasisEl = document.getElementById('val-homeostasis');
-            const vectorConsoleEl = document.getElementById('vector-console');
-            
-            const solarFluxInput = document.getElementById('solar-flux');
-            const solarFluxVal = document.getElementById('solar-flux-val');
-            const albedoInput = document.getElementById('albedo-rate');
-            const albedoVal = document.getElementById('albedo-val');
-
-            solarFluxInput.addEventListener('input', (e) => {
-                solarFluxVal.textContent = parseFloat(e.target.value).toFixed(2);
-            });
-
-            albedoInput.addEventListener('input', (e) => {
-                albedoVal.textContent = parseFloat(e.target.value).toFixed(2);
-            });
-
-            function updateUI() {
-                tickCounterEl.textContent = `Tick: ${tickCount}`;
-                valTempEl.textContent = `${(288.15 + (Math.random() - 0.5) * 0.5).toFixed(2)} K`;
-                valEntropyEl.textContent = `${(1.2 + Math.sin(tickCount * 0.1) * 0.1).toFixed(3)} W/K`;
-                valExergyEl.textContent = `${(450 + Math.cos(tickCount * 0.05) * 15).toFixed(1)} kJ`;
-                valHomeostasisEl.textContent = `${(0.94 + Math.sin(tickCount * 0.02) * 0.02).toFixed(3)}`;
-
-                vectorConsoleEl.innerHTML = `
-                    <div class="vector-row"><span class="vector-key">State Vector [S0]</span><span class="vector-val">${(Math.random()).toFixed(4)}</span></div>
-                    <div class="vector-row"><span class="vector-key">Entropy Flux [J/s]</span><span class="vector-val">${(1.24 + Math.random() * 0.05).toFixed(4)}</span></div>
-                    <div class="vector-row"><span class="vector-key">Dissipative Structure</span><span class="vector-val">ACTIVE</span></div>
-                    <div class="vector-row"><span class="vector-key">Non-Equilibrium Gradient</span><span class="vector-val">STABLE</span></div>
-                    <div class="vector-row"><span class="vector-key">Thermal Capacitance</span><span class="vector-val">1.04e6 J/K</span></div>
-                `;
-            }
-
-            function render() {
-                const width = canvas.clientWidth;
-                const height = canvas.clientHeight;
-
-                ctx.clearRect(0, 0, width, height);
-
-                // Draw thermodynamic vector field visualization
-                const cols = 16;
-                const rows = 12;
-                const cellW = width / cols;
-                const cellH = height / rows;
-
-                for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                        const x = c * cellW + cellW / 2;
-                        const y = r * cellH + cellH / 2;
-                        
-                        const angle = Math.sin(c * 0.5 + tickCount * 0.05) * Math.cos(r * 0.5 + tickCount * 0.05) * Math.PI;
-                        const magnitude = 12 + Math.sin(tickCount * 0.1 + c) * 4;
-
-                        ctx.beginPath();
-                        ctx.strokeStyle = 'rgba(0, 188, 212, 0.4)';
-                        ctx.lineWidth = 1.5;
-                        ctx.moveTo(x, y);
-                        ctx.lineTo(x + Math.cos(angle) * magnitude, y + Math.sin(angle) * magnitude);
-                        ctx.stroke();
-
-                        ctx.fillStyle = 'rgba(76, 175, 80, 0.6)';
-                        ctx.beginPath();
-                        ctx.arc(x, y, 2, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-            }
-
-            function step() {
-                tickCount++;
-                pod.tick();
-                updateUI();
-                render();
-            }
-
-            document.getElementById('btn-step').addEventListener('click', step);
-
-            const toggleBtn = document.getElementById('btn-toggle');
-            toggleBtn.addEventListener('click', () => {
-                isRunning = !isRunning;
-                simStatusEl.textContent = isRunning ? "RUNNING" : "PAUSED";
-                simStatusEl.style.color = isRunning ? "var(--accent-green)" : "var(--accent-amber)";
-                toggleBtn.textContent = isRunning ? "Pause Simulation" : "Resume Simulation";
-            });
-
-            document.getElementById('btn-reset').addEventListener('click', () => {
-                tickCount = 0;
-                updateUI();
-                render();
-            });
-
-            // Main loop
-            function loop() {
-                if (isRunning) {
-                    step();
-                }
-                requestAnimationFrame(loop);
-            }
-
-            updateUI();
-            render();
-            requestAnimationFrame(loop);
         });
     </script>
 </body>

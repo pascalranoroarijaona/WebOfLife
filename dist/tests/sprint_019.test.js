@@ -31,12 +31,12 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
         thermalRadiationFlux: -239.0,
         sensibleHeatFlux: 15.0,
         latentHeatFlux: 88.0,
-        massFluxes: new Map([['water', 1.2]]),
-        heatFluxes: new Map(),
+        massFluxes: [{ species: 'water', massFlowRate: 1.2, specificEnthalpy: 0, specificEntropy: 0 }],
+        heatFluxes: [],
         radiationFlux: { solarIncoming: 342.0, terrestrialOutgoing: 239.0 },
         workRate: 0,
-        specificEnthalpies: new Map(),
-        specificEntropies: new Map(),
+        specificEnthalpies: [],
+        specificEntropies: [],
         solarRadiationIn: 342.0,
         longwaveRadiationOut: 239.0,
         netMassFlux: 1.2
@@ -66,7 +66,7 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
         const expectedExergyDestruction = STANDARD_AMBIENT_TEMPERATURE_K * expectedEntropyGen;
         assert.strictEqual(nextState.entropyGenerationRate, expectedEntropyGen);
         assert.strictEqual(nextState.exergyDestructionRate, expectedExergyDestruction);
-        assert.strictEqual(nextState.internalEnergy, initialState.internalEnergy + 500);
+        assert.strictEqual(nextState.internalEnergy, (initialState.internalEnergy ?? 0) + 500);
     });
     it('Test 3: Solar-Only Energy Boundary & Mass Preservation', () => {
         const monad = new MockValidMonad();

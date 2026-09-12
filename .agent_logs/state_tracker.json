@@ -1,5 +1,5 @@
 {
-  "current_sprint": 21,
+  "current_sprint": 26,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -100,6 +100,31 @@
       "sprint": 20,
       "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux arrays.",
       "timestamp": "2026-09-12T10:00:54.969715+00:00"
+    },
+    {
+      "sprint": 21,
+      "goal": "Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux array structures.",
+      "timestamp": "2026-09-12T10:28:42.664969+00:00"
+    },
+    {
+      "sprint": 22,
+      "goal": "Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux array structures.",
+      "timestamp": "2026-09-12T10:34:15.037995+00:00"
+    },
+    {
+      "sprint": 23,
+      "goal": "Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux array structures.",
+      "timestamp": "2026-09-12T10:39:38.167368+00:00"
+    },
+    {
+      "sprint": 24,
+      "goal": "Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux array structures.",
+      "timestamp": "2026-09-12T10:45:11.085962+00:00"
+    },
+    {
+      "sprint": 25,
+      "goal": "Thermodynamic State Vector Interface Contracts (`src/thermodynamics/types.ts`): Formalize strict TypeScript interfaces for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux array structures.",
+      "timestamp": "2026-09-12T10:50:26.984840+00:00"
     }
   ]
 }

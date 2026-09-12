@@ -19,21 +19,19 @@ export class PhosphorusCycle extends BaseCycle {
   }
 
   public step(dt: number, solarFlux: number): void {
-    const flux: BoundaryFlux = {
+    const boundaryFlux: BoundaryFlux = {
+      netHeatFlux: solarFlux * 1e-6,
+      netMassFlux: 0.1,
+      solarIncoming: solarFlux,
+      terrestrialOutgoing: solarFlux * 0.99,
       heatFluxes: [solarFlux * 1e-6],
       boundaryTemperatures: [290.0],
       massFluxes: [0.1],
       specificEnthalpies: [150],
-      specificEntropies: [0.8],
-      fluxId: "phosphorus_weathering_flux",
-      species: "po4",
-      massFlowRate: 0.1,
-      specificEnthalpy: 150,
-      specificEntropy: 0.8,
-      heatTransferRate: solarFlux * 1e-6,
-      boundaryTemperature: 290.0
+      specificEntropies: [0.8]
     };
-    this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
+    const res = stepThermodynamicMonad(this.stateVector, boundaryFlux, solarFlux * 1e-6 * dt, (solarFlux * 1e-6 / 290.0) * dt, dt);
+    this.stateVector = 'state' in res ? res.state : res;
   }
 }
 

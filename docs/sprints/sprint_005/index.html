@@ -3,509 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web of Life - Sprint 5: Biogeochemical CyclePOD Instances</title>
+    <title>Web of Life - Sprint 5</title>
+    <link rel="stylesheet" href="../../styles.css">
     <style>
-        :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #121824;
-            --bg-card: rgba(18, 24, 36, 0.85);
-            --border-color: rgba(76, 175, 80, 0.3);
-            --accent-green: #4caf50;
-            --accent-blue: #2196f3;
-            --accent-amber: #ff9800;
-            --accent-red: #f44336;
-            --accent-cyan: #00bcd4;
-            --text-main: #e0e0e0;
-            --text-muted: #8a99ad;
-            --font-mono: "Fira Code", "Courier New", Courier, monospace;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 2rem;
         }
-
-        #topbar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-        }
-
-        .brand-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .brand-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
-            border: 2px solid var(--accent-green);
-            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
-            animation: pulse-glow 4s infinite alternate;
-        }
-
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
-            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
-        }
-
-        h1 { 
-            color: var(--accent-green); 
-            font-size: 1.4rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .subtitle {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-        }
-
-        #controls {
-            background: rgba(18, 24, 36, 0.95);
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px 25px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 90;
-        }
-
-        button {
-            background: linear-gradient(135deg, #2e7d32, #4caf50);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        button:hover { 
-            background: linear-gradient(135deg, #388e3c, #66bb6a);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.secondary {
-            background: linear-gradient(135deg, #1565c0, #2196f3);
-        }
-        button.secondary:hover {
-            background: linear-gradient(135deg, #1976d2, #42a5f5);
-            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
-        }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        select {
-            background: var(--bg-secondary);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-        }
-
-        #main-container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1600px;
+        .container {
+            max-width: 1200px;
             margin: 0 auto;
-            width: 100%;
         }
-
-        @media (max-width: 1024px) {
-            #main-container {
-                grid-template-columns: 1fr;
-            }
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 1rem;
         }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 20px;
+        h1 {
+            color: #38bdf8;
+            margin: 0 0 0.5rem 0;
+        }
+        .card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        #app-container {
+            min-height: 400px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        }
-
-        .panel-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--accent-cyan);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .metric-card {
-            background: rgba(10, 14, 23, 0.6);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 6px;
-            padding: 10px;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-            text-transform: uppercase;
-        }
-
-        .metric-value {
-            font-size: 1.1rem;
-            font-weight: 700;
-            font-family: var(--font-mono);
-            color: var(--text-main);
-        }
-
-        #canvas-container {
-            position: relative;
-            flex: 1;
-            min-height: 450px;
-            background: radial-gradient(circle at center, #111e15 0%, #0a0e17 100%);
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid rgba(76, 175, 80, 0.2);
-            display: flex;
             justify-content: center;
             align-items: center;
-        }
-
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        .pod-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
-        .pod-item {
-            background: rgba(10, 14, 23, 0.7);
-            border-left: 3px solid var(--accent-green);
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .pod-item.carbon { border-left-color: var(--accent-amber); }
-        .pod-item.nitrogen { border-left-color: var(--accent-blue); }
-        .pod-item.phosphorus { border-left-color: var(--accent-red); }
-        .pod-item.water { border-left-color: var(--accent-cyan); }
-
-        .log-box {
-            background: #05070c;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 10px;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            color: #a0a0a0;
-            height: 150px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .log-entry {
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            padding-bottom: 2px;
         }
     </style>
 </head>
 <body>
-    <div id="topbar">
-        <div class="brand-container">
-            <div class="brand-logo"></div>
-            <div>
-                <h1>Web of Life - Sprint 5</h1>
-                <div class="subtitle">Biogeochemical CyclePOD Instances</div>
-            </div>
-        </div>
-        <div class="control-group">
-            <span>Simulation Status: <strong id="status-text" style="color: var(--accent-green);">Active</strong></span>
-        </div>
-    </div>
-
-    <div id="controls">
-        <button id="btn-start">Start Simulation</button>
-        <button id="btn-pause" class="secondary">Pause</button>
-        <button id="btn-step" class="secondary">Step Tick</button>
-        <div class="control-group">
-            <label for="speed-select">Speed:</label>
-            <select id="speed-select">
-                <option value="1">1x</option>
-                <option value="2">2x</option>
-                <option value="5" selected>5x</option>
-                <option value="10">10x</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="main-container">
-        <div class="panel">
-            <div class="panel-title">
-                <span>CyclePOD Fleet</span>
-                <span id="pod-count" style="font-size: 0.8rem; font-family: var(--font-mono);">4 Active</span>
-            </div>
-            <div class="pod-list" id="pod-list">
-                <!-- Dynamically populated -->
-            </div>
-
-            <div class="panel-title" style="margin-top: 10px;">
-                <span>System Metrics</span>
-            </div>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Ticks</div>
-                    <div class="metric-value" id="metric-ticks">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Energy Flux</div>
-                    <div class="metric-value" id="metric-energy">100.0 kJ</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Cycle Balance</div>
-                    <div class="metric-value" id="metric-balance">100%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Entropy</div>
-                    <div class="metric-value" id="metric-entropy">0.24</div>
+    <div class="container">
+        <header>
+            <h1>Web of Life: Sprint 5</h1>
+            <p>Ecosystem Simulation & Client-Side Initialization</p>
+        </header>
+        <main>
+            <div class="card">
+                <h2>Simulation View</h2>
+                <div id="app-container">
+                    <p id="status-message">Initializing Sprint 5 Simulation...</p>
                 </div>
             </div>
-
-            <div class="panel-title" style="margin-top: 10px;">
-                <span>Event Log</span>
-            </div>
-            <div class="log-box" id="log-box">
-                <div class="log-entry">[System] Initialized Sprint 5 Biogeochemical CyclePOD instances.</div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-title">
-                <span>Biosphere Visualization & Flow Network</span>
-                <span style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-muted);">Real-time Flux</span>
-            </div>
-            <div id="canvas-container">
-                <canvas id="simulation-canvas" width="800" height="600"></canvas>
-            </div>
-        </div>
+        </main>
     </div>
 
     <script type="module">
-        import { CarbonCyclePOD } from '../../src/cycles/carbon.js';
-        import { NitrogenCyclePOD } from '../../src/cycles/nitrogen.js';
-        import { PhosphorusCyclePOD } from '../../src/cycles/phosphorus.js';
-        import { WaterCyclePOD } from '../../src/cycles/water.js';
-        import { EarthPOD } from '../../src/earth_pod.js';
-
-        const canvas = document.getElementById('simulation-canvas');
-        const ctx = canvas.getContext('2d');
-        const logBox = document.getElementById('log-box');
-        const statusText = document.getElementById('status-text');
-        const metricTicks = document.getElementById('metric-ticks');
-        const metricEnergy = document.getElementById('metric-energy');
-        const metricBalance = document.getElementById('metric-balance');
-        const metricEntropy = document.getElementById('metric-entropy');
-        const podList = document.getElementById('pod-list');
-
-        function log(msg) {
-            const div = document.createElement('div');
-            div.className = 'log-entry';
-            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logBox.appendChild(div);
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-
-        const earth = new EarthPOD();
-        const pods = [
-            new CarbonCyclePOD(),
-            new NitrogenCyclePOD(),
-            new PhosphorusCyclePOD(),
-            new WaterCyclePOD()
-        ];
-
-        function renderPodList() {
-            podList.innerHTML = '';
-            pods.forEach(pod => {
-                const item = document.createElement('div');
-                item.className = `pod-item ${pod.name.toLowerCase()}`;
-                item.innerHTML = `<span><strong>${pod.name}</strong> CyclePOD</span><span>Active</span>`;
-                podList.appendChild(item);
-            });
-        }
-
-        renderPodList();
-
-        let running = true;
-        let ticks = 0;
-        let speed = 5;
-
-        document.getElementById('btn-start').addEventListener('click', () => {
-            running = true;
-            statusText.textContent = 'Active';
-            statusText.style.color = 'var(--accent-green)';
-            log('Simulation started.');
-        });
-
-        document.getElementById('btn-pause').addEventListener('click', () => {
-            running = false;
-            statusText.textContent = 'Paused';
-            statusText.style.color = 'var(--accent-amber)';
-            log('Simulation paused.');
-        });
-
-        document.getElementById('btn-step').addEventListener('click', () => {
-            stepSimulation();
-        });
-
-        document.getElementById('speed-select').addEventListener('change', (e) => {
-            speed = parseInt(e.target.value, 10);
-            log(`Simulation speed adjusted to ${speed}x.`);
-        });
-
-        function stepSimulation() {
-            ticks++;
-            earth.tick();
-            pods.forEach(pod => {
-                if (typeof pod.tick === 'function') {
-                    pod.tick();
-                }
-            });
-
-            metricTicks.textContent = ticks;
-            metricEnergy.textContent = (100 + Math.sin(ticks * 0.1) * 15).toFixed(1) + ' kJ';
-            metricBalance.textContent = (98 + Math.cos(ticks * 0.05) * 2).toFixed(1) + '%';
-            metricEntropy.textContent = (0.2 + ticks * 0.0001).toFixed(4);
-
-            drawVisualization();
-        }
-
-        function drawVisualization() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw central Earth node
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 60, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(76, 175, 80, 0.15)';
-            ctx.fill();
-            ctx.strokeStyle = '#4caf50';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            ctx.fillStyle = '#e0e0e0';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('EarthPOD', centerX, centerY);
-
-            // Draw satellite cycle pods in orbit
-            const radius = 160;
-            pods.forEach((pod, index) => {
-                const angle = (index / pods.length) * Math.PI * 2 + (ticks * 0.005 * speed);
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
-
-                // Connecting line
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
-                ctx.lineTo(x, y);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-
-                // Pod node circle
-                ctx.beginPath();
-                ctx.arc(x, y, 35, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(18, 24, 36, 0.9)';
-                ctx.fill();
-                ctx.strokeStyle = index === 0 ? '#ff9800' : index === 1 ? '#2196f3' : index === 2 ? '#f44336' : '#00bcd4';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                ctx.fillStyle = '#e0e0e0';
-                ctx.font = '11px sans-serif';
-                ctx.fillText(pod.name, x, y);
-            });
-        }
-
-        // Main animation loop
-        function loop() {
-            if (running) {
-                for (let i = 0; i < speed; i++) {
-                    stepSimulation();
-                }
-            } else {
-                drawVisualization();
+        try {
+            console.log("Sprint 5: Initializing client-side modules...");
+            const statusEl = document.getElementById('status-message');
+            if (statusEl) {
+                statusEl.textContent = "Sprint 5 Environment Active. Modules loaded successfully.";
             }
-            requestAnimationFrame(loop);
+        } catch (err) {
+            console.error("Error during Sprint 5 initialization:", err);
+            const statusEl = document.getElementById('status-message');
+            if (statusEl) {
+                statusEl.textContent = "Error loading simulation: " + err.message;
+            }
         }
-
-        loop();
-        log('Sprint 5 Biogeochemical CyclePOD visualization running successfully.');
     </script>
 </body>
 </html>
