@@ -1,89 +1,52 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger Definitions
--- Sprint 026: Thermodynamic Equilibrium & Trophic Cascade Architecture
+-- Web of Life Database & Thermodynamic Blockchain Schema
+-- Sprint 027 Extension: Thermodynamic State Vector Baseline Structurer
 -- ============================================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic & Material Ledger Infrastructure
--- ----------------------------------------------------------------------------
-
+-- 1. Thermodynamic State Vectors Table
+-- Captures immutable snapshots of thermodynamic states matching IThermodynamicStateVector
 CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id UUID NOT NULL,
-    ambient_temperature NUMERIC(10, 4) NOT NULL DEFAULT 288.15, -- T_0 in Kelvin
-    internal_energy NUMERIC(18, 8) NOT NULL,                    -- Joules (E_sys)
-    entropy_generated NUMERIC(18, 8) NOT NULL DEFAULT 0.0,      -- Joules/Kelvin
-    solar_flux_in NUMERIC(18, 8) NOT NULL DEFAULT 0.0,          -- Watts
-    heat_dissipated NUMERIC(18, 8) NOT NULL DEFAULT 0.0,        -- Joules
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID,
+    temperature NUMERIC(10, 4) NOT NULL DEFAULT 288.15, -- Default T_0 = 288.15 K
+    solar_radiation NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
+    thermal_emission NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
+    latent_heat NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
+    sensible_heat NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
+    entropy NUMERIC(15, 6) NOT NULL DEFAULT 0.000000, -- J/K
+    timestamp BIGINT NOT NULL DEFAULT 0,
+    first_law_valid BOOLEAN NOT NULL DEFAULT TRUE,
+    second_law_valid BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS material_pools (
-    pool_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id UUID NOT NULL,
-    pool_type VARCHAR(50) NOT NULL, -- 'ATMOSPHERE', 'SOIL_MATRIX', 'BIOMASS', 'DETRITUS'
-    carbon_mass NUMERIC(18, 8) NOT NULL DEFAULT 0.0,            -- grams
-    nitrogen_mass NUMERIC(18, 8) NOT NULL DEFAULT 0.0,          -- grams
-    phosphorus_mass NUMERIC(18, 8) NOT NULL DEFAULT 0.0,        -- grams
-    water_mass NUMERIC(18, 8) NOT NULL DEFAULT 0.0,             -- grams
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 2. Thermodynamic Monad Stocks Table
+-- Models conserved matter/energy stocks associated with biogeochemical cycles
+CREATE TABLE IF NOT EXISTS thermodynamic_monad_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE,
+    cycle_type VARCHAR(32) NOT NULL, -- e.g., 'CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER'
+    stock_mass NUMERIC(18, 6) NOT NULL, -- kg or moles depending on cycle
+    potential_energy NUMERIC(18, 6) NOT NULL, -- Joules
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS trophic_monad_transactions (
+-- 3. Thermodynamic Stock Transactions (Ledger)
+-- Records stock transformations enforcing First (Conservation) & Second (Entropy >= 0) Laws
+CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
     transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_id UUID NOT NULL,
-    source_entity_id UUID,
-    target_entity_id UUID,
-    transaction_type VARCHAR(64) NOT NULL, -- 'PHOTOSYNTHESIS', 'INGESTION', 'RESPIRATION', 'EGESTION'
-    energy_transferred NUMERIC(18, 8) NOT NULL,                 -- Joules
-    carbon_transferred NUMERIC(18, 8) NOT NULL DEFAULT 0.0,     -- grams
-    entropy_delta NUMERIC(18, 8) NOT NULL,                      -- Joules/Kelvin
-    stoichiometry_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    source_stock_id UUID REFERENCES thermodynamic_monad_stocks(stock_id),
+    target_stock_id UUID REFERENCES thermodynamic_monad_stocks(stock_id),
+    delta_mass NUMERIC(18, 6) NOT NULL,
+    delta_energy NUMERIC(18, 6) NOT NULL,
+    entropy_generated NUMERIC(15, 6) NOT NULL CHECK (entropy_generated >= 0),
+    transaction_hash VARCHAR(64) NOT NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- ----------------------------------------------------------------------------
--- 2. Biotic & Abiotic Entity Hierarchies
--- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS entities (
-    entity_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    domain VARCHAR(32) NOT NULL,                                -- 'ABIOTIC', 'BIOTIC'
-    classification VARCHAR(64) NOT NULL,                        -- 'SOLAR_SOURCE', 'ATMOSPHERE', 'SOIL_MATRIX', 'C3_PLANT', 'HERBIVORE', etc.
-    name VARCHAR(128) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS organisms (
-    organism_id UUID PRIMARY KEY REFERENCES entities(entity_id) ON DELETE CASCADE,
-    biomass NUMERIC(18, 8) NOT NULL,                            -- grams
-    assimilation_efficiency NUMERIC(5, 4) NOT NULL DEFAULT 0.10,-- e.g., 0.10 for 10%
-    basal_metabolic_rate NUMERIC(18, 8) NOT NULL,               -- Watts
-    trophic_level INTEGER NOT NULL                              -- 1: Autotroph, 2: Herbivore, 3+: Carnivore
-);
-
--- ----------------------------------------------------------------------------
--- 3. Blockchain Ledger Integration for Energy Conservation Audits
--- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT GENERATED ALWAYS AS IDENTITY,
-    previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL,
-    total_system_energy NUMERIC(18, 8) NOT NULL,                -- Validating E_sys invariant
-    total_system_entropy NUMERIC(18, 8) NOT NULL,               -- Validating dS >= 0
-    solar_input_cumulative NUMERIC(18, 8) NOT NULL,
-    heat_dissipated_cumulative NUMERIC(18, 8) NOT NULL,
-    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Indexes for time-series performance and invariant auditing
-CREATE INDEX idx_thermodynamic_vectors_entity ON thermodynamic_state_vectors(entity_id, recorded_at DESC);
-CREATE INDEX idx_material_pools_entity ON material_pools(entity_id);
-CREATE INDEX idx_trophic_transactions_block ON trophic_monad_transactions(block_id);
-CREATE INDEX idx_blocks_height ON thermodynamic_blocks(block_height DESC);
+-- 4. Blockchain Blocks Table
+-- Anchors thermodynamic state vectors and transaction ledgers into cryptographic blocks
+CREATE INDEX IF NOT EXISTS idx_thermo_states_timestamp ON thermodynamic_state_vectors(timestamp);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_hash ON thermodynamic_stock_transactions(transaction_hash);

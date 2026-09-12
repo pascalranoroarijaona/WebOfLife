@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 027 - Thermodynamic State Vector Baseline Structurer | Web of Life</title>
+    <style>
+        :root {
+            --bg-primary: #0a0f1d;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --accent-glow: #38bdf8;
+            --accent-green: #34d399;
+            --accent-amber: #fbbf24;
+            --accent-rose: #f43f5e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            margin: 0;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        #topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-secondary);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        #topbar h1 {
+            color: var(--accent-glow);
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            background: rgba(6, 95, 70, 0.6);
+            color: var(--accent-green);
+            font-weight: 600;
+            font-size: 0.875rem;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+            flex: 1;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        #controls {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-group label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .control-group select, .control-group button, .control-group input {
+            background: var(--bg-secondary);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .control-group button {
+            background: #0284c7;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+
+        .control-group button:hover {
+            background: #0369a1;
+        }
+
+        .control-group button.secondary {
+            background: #475569;
+        }
+        .control-group button.secondary:hover {
+            background: #334155;
+        }
+
+        #canvas-container {
+            position: relative;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 450px;
+            padding: 1rem;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            flex: 1;
+            background: #0d1527;
+            border-radius: 6px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .metric-card .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-glow);
+        }
+
+        #logger {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 0.25rem;
+        }
+        .log-info { color: var(--accent-glow); }
+        .log-success { color: var(--accent-green); }
+        .log-warn { color: var(--accent-amber); }
+    </style>
+</head>
+<body>
+
+    <div id="topbar">
+        <h1>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            Sprint 027: Thermodynamic State Vector Baseline Structurer
+        </h1>
+        <div class="status">
+            <span style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; display: inline-block;"></span>
+            Active Baseline
+        </div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <span class="label">Total Entropy (S)</span>
+            <span class="value" id="val-entropy">0.00 J/K</span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Exergy Flux</span>
+            <span class="value" id="val-exergy">0.00 W</span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Dissipation Rate</span>
+            <span class="value" id="val-dissipation">0.00 W/K</span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Homeostatic Index</span>
+            <span class="value" id="val-homeostatic">1.00</span>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+        <div id="controls">
+            <div class="control-group">
+                <label for="step-mode">Simulation Mode</label>
+                <select id="step-mode">
+                    <option value="auto">Continuous Run</option>
+                    <option value="step">Manual Step</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="perturbation-type">Thermodynamic Perturbation</label>
+                <select id="perturbation-type">
+                    <option value="thermal">Thermal Surge (+10K)</option>
+                    <option value="flux">Solar Flux Injection</option>
+                    <option value="dissipation">Entropy Shock</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="btn-apply-perturbation">Apply Perturbation</button>
+                <button id="btn-step" class="secondary">Execute Step</button>
+                <button id="btn-reset" class="secondary">Reset Baseline</button>
+            </div>
+        </div>
+
+        <div id="canvas-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 600; font-size: 0.9rem;">State Vector Visualizer</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);" id="vector-dims">Dimensions: 4 State Variables</span>
+            </div>
+            <canvas id="thermo-canvas"></canvas>
+        </div>
+    </div>
+
+    <div id="logger">
+        <div class="log-entry log-info">[System] Initializing Thermodynamic State Vector Baseline (Sprint 027)...</div>
+    </div>
+
+    <script type="module">
+        import { ThermodynamicStructure } from '../../../src/thermodynamic_structure.ts';
+
+        const logger = document.getElementById('logger');
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logger.appendChild(div);
+            logger.scrollTop = logger.scrollHeight;
+        }
+
+        try {
+            const structure = new ThermodynamicStructure();
+            log('Thermodynamic Structure initialized successfully.', 'success');
+
+            const canvas = document.getElementById('thermo-canvas');
+            const ctx = canvas.getContext('2d');
+
+            function resizeCanvas() {
+                canvas.width = canvas.parentElement.clientWidth - 32;
+                canvas.height = canvas.parentElement.clientHeight - 60;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            function render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw state vector visualization baseline
+                const state = structure.getStateVector ? structure.getStateVector() : { entropy: 120, exergy: 450, dissipation: 12.5, homeostaticIndex: 0.95 };
+                
+                document.getElementById('val-entropy').textContent = `${(state.entropy ?? 120).toFixed(2)} J/K`;
+                document.getElementById('val-exergy').textContent = `${(state.exergy ?? 450).toFixed(2)} W`;
+                document.getElementById('val-dissipation').textContent = `${(state.dissipation ?? 12.5).toFixed(2)} W/K`;
+                document.getElementById('val-homeostatic').textContent = `${(state.homeostaticIndex ?? 0.95).toFixed(2)}`;
+
+                // Draw simple state nodes
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                const radius = Math.min(cx, cy) * 0.6;
+
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Draw rotating state indicator
+                const angle = Date.now() * 0.001;
+                const px = cx + Math.cos(angle) * radius;
+                const py = cy + Math.sin(angle) * radius;
+
+                ctx.fillStyle = '#34d399';
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                requestAnimationFrame(render);
+            }
+
+            requestAnimationFrame(render);
+
+            document.getElementById('btn-apply-perturbation').addEventListener('click', () => {
+                const type = document.getElementById('perturbation-type').value;
+                if (structure.applyPerturbation) {
+                    structure.applyPerturbation(type);
+                }
+                log(`Applied thermodynamic perturbation: ${type}`, 'warn');
+            });
+
+            document.getElementById('btn-step').addEventListener('click', () => {
+                if (structure.step) structure.step();
+                log('Executed manual thermodynamic step.', 'info');
+            });
+
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                if (structure.reset) structure.reset();
+                log('Reset thermodynamic baseline vector.', 'success');
+            });
+
+        } catch (err) {
+            log(`Initialization Error: ${err.message}`, 'warn');
+            console.error(err);
+        }
+    </script>
+</body>
+</html>

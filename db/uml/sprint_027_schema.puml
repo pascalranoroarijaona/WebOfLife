@@ -1,0 +1,86 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Thermodynamics State Vector (Sprint 027)" {
+  
+  interface FluxRecord {
+    +solarRadiation: number
+    +thermalEmission: number
+    +latentHeat: number
+    +sensibleHeat: number
+  }
+
+  interface ThermodynamicStateVectorOptions {
+    +temperature?: number
+    +fluxes?: Partial<FluxRecord>
+    +entropy?: number
+    +timestamp?: number
+  }
+
+  interface IThermodynamicStateVector {
+    +temperature: number
+    +fluxes: FluxRecord
+    +entropy: number
+    +timestamp: number
+    +clone(overrides?: ThermodynamicStateVectorOptions): IThermodynamicStateVector
+    +validateFirstLaw(): boolean
+    +validateSecondLaw(): boolean
+  }
+
+  class ThermodynamicStateVector {
+    +temperature: number
+    +fluxes: FluxRecord
+    +entropy: number
+    +timestamp: number
+    +constructor(options?: ThermodynamicStateVectorOptions)
+    +clone(overrides?: ThermodynamicStateVectorOptions): ThermodynamicStateVector
+    +validateFirstLaw(): boolean
+    +validateSecondLaw(): boolean
+  }
+
+  class "BuilderFunctions" as Builder {
+    +{static} createBaselineStateVector(overrides?: ThermodynamicStateVectorOptions): ThermodynamicStateVector
+  }
+}
+
+package "Database & Blockchain Ledger" {
+  class ThermodynamicStateVectorsTable {
+    +id: UUID
+    +temperature: NUMERIC
+    +solar_radiation: NUMERIC
+    +thermal_emission: NUMERIC
+    +latent_heat: NUMERIC
+    +sensible_heat: NUMERIC
+    +entropy: NUMERIC
+    +timestamp: BIGINT
+    +first_law_valid: BOOLEAN
+    +second_law_valid: BOOLEAN
+  }
+
+  class ThermodynamicMonadStocksTable {
+    +stock_id: UUID
+    +state_vector_id: UUID
+    +cycle_type: VARCHAR
+    +stock_mass: NUMERIC
+    +potential_energy: NUMERIC
+  }
+
+  class ThermodynamicStockTransactionsTable {
+    +transaction_id: UUID
+    +source_stock_id: UUID
+    +target_stock_id: UUID
+    +delta_mass: NUMERIC
+    +delta_energy: NUMERIC
+    +entropy_generated: NUMERIC
+    +transaction_hash: VARCHAR
+  }
+}
+
+IThermodynamicStateVector <|.. ThermodynamicStateVector
+ThermodynamicStateVector *-- FluxRecord
+ThermodynamicStateVectorOptions ..> FluxRecord
+Builder ..> ThermodynamicStateVector : instantiates
+ThermodynamicStateVectorsTable "1" o-- "*" ThermodynamicMonadStocksTable
+ThermodynamicMonadStocksTable "1" o-- "*" ThermodynamicStockTransactionsTable : source/target
+
+@enduml
