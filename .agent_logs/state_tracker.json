@@ -1,4 +1,20 @@
 {
-  "current_sprint": 1,
-  "completed_sprints": []
+  "current_sprint": 4,
+  "completed_sprints": [
+    {
+      "sprint": 1,
+      "goal": "Abstract ThermodynamicStructure class hierarchy & strict thermodynamic state interfaces (`src/thermodynamics/thermodynamic_structure.ts`, `src/thermodynamics/types.ts`): Establish base class enforcement of importFreeEnergy(t), exportEntropy(t), and maintainFarFromEquilibrium(t) alongside strict internal entropy generation and exergy destruction rate contracts.",
+      "timestamp": "2026-09-12T08:09:36.407593+00:00"
+    },
+    {
+      "sprint": 2,
+      "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation (\\dot{S}_{\\text{gen}}), exergy destruction rate (\\dot{I} = T_0 \\dot{S}_{\\text{gen}}), and boundary flux arrays.",
+      "timestamp": "2026-09-12T08:13:33.045876+00:00"
+    },
+    {
+      "sprint": 3,
+      "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation (\\dot{S}_{\\text{gen}}), exergy destruction rate (\\dot{I} = T_0 \\dot{S}_{\\text{gen}}), and boundary flux arrays.",
+      "timestamp": "2026-09-12T08:18:03.336791+00:00"
+    }
+  ]
 }

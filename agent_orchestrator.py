@@ -1265,7 +1265,7 @@ def execute_sprint_cycle() -> bool:
         {phys_ideas}
 
         CRITICAL AUDIT & GROOMING INSTRUCTION:
-        1. LOGIC-BASED AUDIT: Revert any `[x]` items to `[ ]` ONLY IF the described logic/feature is completely missing from the ACTUAL IMPLEMENTED SOURCE CODE. Do NOT uncheck an item just because a specific file path is missing, as long as the functionality was successfully implemented in another file.
+        1. STRICT EVIDENCE-BASED AUDIT: You must be highly skeptical. Change `[ ]` to `[x]` ONLY if you see the explicit, dedicated classes and math for that feature in the ACTUAL IMPLEMENTED SOURCE CODE. If an item is `[x]` but the explicit code is missing, REVERT it to `[ ]`. NEVER add subjective notes like "-> Note: Implemented inline". Keep items strictly as `- [ ]` or `- [x]`.
         2. GROOM: Integrate the Brainstormer proposals. Break down large human-added features into granular tasks.
         3. REPRIORITIZE: Re-order the `[ ]` list strictly top-to-bottom based on architectural dependency. Base monads, schemas, and math go first. UI and integrations go later.
         4. EVOLVE PHASES: Create, merge, or rename `### Phase N` headers if the roadmap organically shifts.

@@ -1,5 +1,5 @@
 import { AbstractThermodynamicStructure } from './thermodynamics/thermodynamic_structure.js';
-import { IThermodynamicState } from './thermodynamics/types.js';
+import { ThermodynamicStateVector, BoundaryFlux, ValidationResult, ThermodynamicMonad } from './thermodynamics/types.js';
 
 export enum EntropyState {
   ACCUMULATING = "accumulating",
@@ -46,30 +46,22 @@ export abstract class ThermodynamicStructure extends AbstractThermodynamicStruct
   }
 
   public get id(): string {
-    return this.state.id;
-  }
-
-  protected calculateInitialInternalEnergy(temp: number, mass: number): number {
-    return temp * mass * 1000; // J
-  }
-
-  protected calculateInitialEntropy(temp: number, mass: number): number {
-    return temp > 0 ? (temp * mass * 1000) / temp : 0; // J/K
+    return this._id;
   }
 
   protected computeInternalEntropyGeneration(): number {
-    return Math.abs(this.state.internalEnergy * 1e-6);
+    return Math.abs(this._internalEnergy * 1e-6);
   }
 
   public importFreeEnergyJoules(joules: number, qualityFactor: number = 1.0): void {
     if (joules < 0 || qualityFactor < 0 || qualityFactor > 1) {
       throw new Error("Invalid free energy parameters: energy and quality factor must be non-negative, quality <= 1.");
     }
-    this.state.internalEnergy += joules;
+    this._internalEnergy += joules;
     const importedExergy = joules * qualityFactor;
-    this.state.exergy = Math.max(0, this.state.exergy + importedExergy);
+    this._exergy = Math.max(0, this._exergy + importedExergy);
     const estimatedC_v = 1000;
-    this.state.temperature += joules / (this.state.mass * estimatedC_v);
+    this._temperature += joules / (this._mass * estimatedC_v);
     this.updateExergy();
   }
 
@@ -77,7 +69,7 @@ export abstract class ThermodynamicStructure extends AbstractThermodynamicStruct
     if (joulesPerKelvin < 0) {
       throw new Error("Entropy export quantity cannot be negative.");
     }
-    this.state.entropy = Math.max(0, this.state.entropy - joulesPerKelvin);
+    this._entropy = Math.max(0, this._entropy - joulesPerKelvin);
     this.updateExergy();
   }
 
@@ -85,12 +77,17 @@ export abstract class ThermodynamicStructure extends AbstractThermodynamicStruct
     if (deltaTimeSeconds <= 0) return;
     const internalEntropyGenRate = this.computeInternalEntropyGeneration();
     const validEntropyGenRate = Math.max(0, internalEntropyGenRate);
-    const dS = validEntropyGenRate * deltaTimeSeconds;
-    const dX_dest = this.ambientTemperature * validEntropyGenRate * deltaTimeSeconds;
+    this.validateSecondLaw(validEntropyGenRate);
 
-    this.state.entropy += dS;
-    this.state.exergy = Math.max(0, this.state.exergy - dX_dest);
-    this.updateExergy();
+    // Integrate via ThermodynamicMonad compliance
+    const monad = ThermodynamicMonad.of(this.getStateVector())
+      .transform(validEntropyGenRate, deltaTimeSeconds);
+    const valResult = monad.validate();
+
+    const stateVec = monad.getStateVector();
+    this._entropy = stateVec.system?.entropy ?? stateVec.internalEnergy / Math.max(1, stateVec.temperature);
+    this._exergy = stateVec.system?.exergy ?? stateVec.internalEnergy * 0.1;
+    this.lastEntropyGenerationRate = stateVec.entropyMetrics.sGenRate;
   }
 
   // Abstract overrides to bridge legacy signature with strict thermodynamic spec

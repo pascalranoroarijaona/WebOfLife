@@ -1,0 +1,511 @@
+import { AbstractThermodynamicStructure } from './thermodynamics/thermodynamic_structure.js';
+import { ThermodynamicMonad } from './thermodynamics/types.js';
+export var EntropyState;
+(function (EntropyState) {
+    EntropyState["ACCUMULATING"] = "accumulating";
+    EntropyState["STEADY"] = "steady";
+    EntropyState["DEGRADING"] = "degrading";
+    EntropyState["COLLAPSED"] = "collapsed";
+})(EntropyState || (EntropyState = {}));
+export class Stock {
+    substance;
+    quantity;
+    maxCapacity;
+    unit;
+    constructor(substance, quantity, maxCapacity, unit = "kg_equivalent_carbon") {
+        this.substance = substance;
+        this.quantity = quantity;
+        this.maxCapacity = maxCapacity;
+        this.unit = unit;
+    }
+    utilization() {
+        if (!this.maxCapacity)
+            return 0;
+        return this.quantity / this.maxCapacity;
+    }
+}
+export class ThermodynamicStructure extends AbstractThermodynamicStructure {
+    name;
+    stocks = new Map();
+    inboundFlows = [];
+    outboundFlows = [];
+    entropyState = EntropyState.STEADY;
+    tickCreated = 0;
+    parent = null;
+    children = [];
+    constructor(name = "unnamed", id) {
+        super(id ?? crypto.randomUUID(), 298.15, 1000.0, 298.15, 298.15);
+        this.name = name;
+    }
+    get id() {
+        return this._id;
+    }
+    computeInternalEntropyGeneration() {
+        return Math.abs(this._internalEnergy * 1e-6);
+    }
+    importFreeEnergyJoules(joules, qualityFactor = 1.0) {
+        if (joules < 0 || qualityFactor < 0 || qualityFactor > 1) {
+            throw new Error("Invalid free energy parameters: energy and quality factor must be non-negative, quality <= 1.");
+        }
+        this._internalEnergy += joules;
+        const importedExergy = joules * qualityFactor;
+        this._exergy = Math.max(0, this._exergy + importedExergy);
+        const estimatedC_v = 1000;
+        this._temperature += joules / (this._mass * estimatedC_v);
+        this.updateExergy();
+    }
+    updateExergy() {
+        this._exergy = Math.max(0, this._internalEnergy * 0.1);
+    }
+    exportEntropyJoulesPerKelvin(joulesPerKelvin) {
+        if (joulesPerKelvin < 0) {
+            throw new Error("Entropy export quantity cannot be negative.");
+        }
+        this._entropy = Math.max(0, this._entropy - joulesPerKelvin);
+        this.updateExergy();
+    }
+    maintainFarFromEquilibriumSeconds(deltaTimeSeconds) {
+        if (deltaTimeSeconds <= 0)
+            return;
+        const internalEntropyGenRate = this.computeInternalEntropyGeneration();
+        const validEntropyGenRate = Math.max(0, internalEntropyGenRate);
+        this.validateSecondLaw(validEntropyGenRate);
+        // Integrate via ThermodynamicMonad compliance
+        const monad = ThermodynamicMonad.of(this.getStateVector())
+            .transform(validEntropyGenRate, deltaTimeSeconds);
+        const valResult = monad.validate();
+        const stateVec = monad.getStateVector();
+        this._entropy = stateVec.system?.entropy ?? stateVec.internalEnergy / Math.max(1, stateVec.temperature);
+        this._exergy = stateVec.system?.exergy ?? stateVec.internalEnergy * 0.1;
+        this.lastEntropyGenerationRate = stateVec.entropyMetrics.sGenRate;
+    }
+    addStock(substance, quantity, maxCapacity) {
+        this.stocks.set(substance, new Stock(substance, quantity, maxCapacity));
+    }
+    netFlow(substance) {
+        const inflow = this.inboundFlows
+            .filter((f) => f.substance === substance)
+            .reduce((sum, f) => sum + f.rate, 0);
+        const outflow = this.outboundFlows
+            .filter((f) => f.substance === substance)
+            .reduce((sum, f) => sum + f.rate, 0);
+        return inflow - outflow;
+    }
+    addChild(child) {
+        child.parent = this;
+        this.children.push(child);
+    }
+    totalDescendantBiomass() {
+        const own = this.stocks.get("biomass")?.quantity ?? 0;
+        return own + this.children.reduce((sum, c) => sum + c.totalDescendantBiomass(), 0);
+    }
+    tick(tickNum) {
+        const imported = this.importFreeEnergy(tickNum);
+        const exported = this.exportEntropy(tickNum);
+        this.entropyState = this.maintainFarFromEquilibrium(tickNum);
+        this.maintainFarFromEquilibriumSeconds(1.0);
+        return { imported, exported, state: this.entropyState };
+    }
+    toString() {
+        return `<${this.constructor.name} '${this.name}' state=${this.entropyState}>`;
+    }
+}
+export class CyclePOD extends ThermodynamicStructure {
+    reservoirs;
+    transferRates;
+    constructor(name, reservoirs, transferRates) {
+        super(name);
+        this.reservoirs = reservoirs;
+        this.transferRates = transferRates;
+        for (const [resName, qty] of Object.entries(reservoirs)) {
+            this.addStock(resName, qty);
+        }
+    }
+    importFreeEnergy(_tick) {
+        const total = Object.values(this.transferRates).reduce((a, b) => a + b, 0);
+        const val = total * 0.01;
+        this.importFreeEnergyJoules(val * 1000, 0.9);
+        return val;
+    }
+    exportEntropy(_tick) {
+        const total = Object.values(this.transferRates).reduce((a, b) => a + b, 0);
+        const val = total * 0.008;
+        this.exportEntropyJoulesPerKelvin(val * 10);
+        return val;
+    }
+    maintainFarFromEquilibrium(_tick) {
+        const imbalance = this.computeReservoirImbalance();
+        if (imbalance < 0.02)
+            return EntropyState.STEADY;
+        if (imbalance < 0.15)
+            return EntropyState.ACCUMULATING;
+        return EntropyState.DEGRADING;
+    }
+    computeReservoirImbalance() {
+        const totalTransfer = Object.values(this.transferRates).reduce((a, b) => a + b, 0);
+        const net = {};
+        for (const [route, rate] of Object.entries(this.transferRates)) {
+            const [src, tgt] = route.split("->");
+            net[src] = (net[src] ?? 0) - rate;
+            net[tgt] = (net[tgt] ?? 0) + rate;
+        }
+        const values = Object.values(net).map(Math.abs);
+        const maxImbalance = values.length ? Math.max(...values) : 0;
+        return totalTransfer ? maxImbalance / totalTransfer : 0;
+    }
+    transfer(sourceReservoir, targetReservoir) {
+        const route = `${sourceReservoir}->${targetReservoir}`;
+        const rate = this.transferRates[route] ?? 0;
+        const srcStock = this.stocks.get(sourceReservoir);
+        const tgtStock = this.stocks.get(targetReservoir);
+        if (srcStock)
+            srcStock.quantity -= rate;
+        if (tgtStock)
+            tgtStock.quantity += rate;
+        return rate;
+    }
+}
+export const CARBON_CYCLE = new CyclePOD("Carbon Cycle", {
+    atmosphere: 850,
+    ocean_surface: 900,
+    ocean_deep: 37000,
+    biosphere_terrestrial: 550,
+    soil: 1500,
+    lithosphere_fossil: 100_000_000,
+}, {
+    "atmosphere->ocean_surface": 92,
+    "ocean_surface->atmosphere": 90,
+    "atmosphere->biosphere_terrestrial": 120,
+    "biosphere_terrestrial->atmosphere": 118,
+    "biosphere_terrestrial->soil": 60,
+    "soil->atmosphere": 58,
+    "lithosphere_fossil->atmosphere": 9.5,
+});
+export const NITROGEN_CYCLE = new CyclePOD("Nitrogen Cycle", {
+    atmosphere: 3_900_000,
+    soil: 100,
+    biosphere: 3.5,
+    ocean: 700
+}, {
+    "atmosphere->soil": 0.2,
+    "soil->biosphere": 1.2,
+    "biosphere->soil": 1.1,
+    "soil->atmosphere": 0.19,
+});
+export const PHOSPHORUS_CYCLE = new CyclePOD("Phosphorus Cycle", {
+    lithosphere_rock: 4e9,
+    soil: 200,
+    biosphere: 3,
+    ocean: 90000
+}, {
+    "lithosphere_rock->soil": 0.02,
+    "soil->biosphere": 1.0,
+    "biosphere->soil": 0.9,
+    "soil->ocean": 0.03,
+});
+export const WATER_CYCLE = new CyclePOD("Water Cycle", {
+    ocean: 1_338_000_000,
+    atmosphere: 12900,
+    ice: 24_064_000,
+    groundwater: 23_400_000,
+    surface_freshwater: 178_000,
+}, {
+    "ocean->atmosphere": 434_000,
+    "atmosphere->ocean": 398_000,
+    "atmosphere->surface_freshwater": 107_000,
+    "surface_freshwater->ocean": 40_000,
+    "surface_freshwater->atmosphere": 71_000,
+});
+export class SpherePOD extends ThermodynamicStructure {
+    involvedCycles;
+    constructor(name, involvedCycles) {
+        super(name);
+        this.involvedCycles = involvedCycles;
+    }
+    importFreeEnergy(tick) {
+        if (!this.involvedCycles.length)
+            return 0;
+        const sum = this.involvedCycles.reduce((s, c) => s + c.importFreeEnergy(tick), 0);
+        const avg = sum / this.involvedCycles.length;
+        this.importFreeEnergyJoules(avg * 100, 0.95);
+        return avg;
+    }
+    exportEntropy(tick) {
+        if (!this.involvedCycles.length)
+            return 0;
+        const sum = this.involvedCycles.reduce((s, c) => s + c.exportEntropy(tick), 0);
+        const avg = sum / this.involvedCycles.length;
+        this.exportEntropyJoulesPerKelvin(avg * 5);
+        return avg;
+    }
+    maintainFarFromEquilibrium(tick) {
+        const states = this.involvedCycles.map((c) => c.maintainFarFromEquilibrium(tick));
+        if (states.includes(EntropyState.DEGRADING))
+            return EntropyState.DEGRADING;
+        if (states.includes(EntropyState.ACCUMULATING))
+            return EntropyState.ACCUMULATING;
+        return EntropyState.STEADY;
+    }
+}
+export const ATMOSPHERE = new SpherePOD("Atmosphere", [CARBON_CYCLE, NITROGEN_CYCLE, WATER_CYCLE]);
+export const HYDROSPHERE = new SpherePOD("Hydrosphere", [WATER_CYCLE, PHOSPHORUS_CYCLE]);
+export const LITHOSPHERE = new SpherePOD("Lithosphere", [CARBON_CYCLE, PHOSPHORUS_CYCLE]);
+export const BIOSPHERE = new SpherePOD("Biosphere", [CARBON_CYCLE, NITROGEN_CYCLE, PHOSPHORUS_CYCLE, WATER_CYCLE]);
+export class BiomePOD extends ThermodynamicStructure {
+    sphere;
+    areaKm2;
+    species = [];
+    constructor(name, sphere, areaKm2) {
+        super(name);
+        this.sphere = sphere;
+        this.areaKm2 = areaKm2;
+    }
+    importFreeEnergy(tick) {
+        const val = this.species.reduce((s, sp) => s + sp.importFreeEnergy(tick), 0);
+        this.importFreeEnergyJoules(val * 50, 0.85);
+        return val;
+    }
+    exportEntropy(tick) {
+        const val = this.species.reduce((s, sp) => s + sp.exportEntropy(tick), 0);
+        this.exportEntropyJoulesPerKelvin(val * 4);
+        return val;
+    }
+    maintainFarFromEquilibrium(_tick) {
+        const biodiversityIndex = this.species.length / Math.max(1, this.tickCreated + 1);
+        if (biodiversityIndex < 0.1)
+            return EntropyState.DEGRADING;
+        return EntropyState.STEADY;
+    }
+    carryingCapacity() {
+        return this.areaKm2 * 1e5;
+    }
+    addSpecies(species) {
+        species.biome = this;
+        this.species.push(species);
+        this.addChild(species);
+    }
+}
+export class GeoBiomePOD extends BiomePOD {
+    boundingPolygon;
+    constructor(name, sphere, areaKm2, boundingPolygon) {
+        super(name, sphere, areaKm2);
+        this.boundingPolygon = boundingPolygon;
+    }
+}
+export class SpeciesPOD extends ThermodynamicStructure {
+    scientificName;
+    trophicLevel;
+    biome;
+    population;
+    iucnStatus;
+    methodsAvailable = [];
+    history = [];
+    constructor(name, scientificName, trophicLevel, biome, population, iucnStatus = "LC") {
+        super(name);
+        this.scientificName = scientificName;
+        this.trophicLevel = trophicLevel;
+        this.biome = biome;
+        this.population = population;
+        this.iucnStatus = iucnStatus;
+    }
+    importFreeEnergy(_tick) {
+        const val = this.trophicLevel === 1 ? this.population * 0.01 : this.population * this.netFlow("biomass") * 0.1;
+        this.importFreeEnergyJoules(val * 20, 0.8);
+        return val;
+    }
+    exportEntropy(_tick) {
+        const val = this.population * 0.008;
+        this.exportEntropyJoulesPerKelvin(val * 2);
+        return val;
+    }
+    maintainFarFromEquilibrium(_tick) {
+        if (this.iucnStatus === "CR" || this.iucnStatus === "EW")
+            return EntropyState.DEGRADING;
+        if (this.iucnStatus === "EX")
+            return EntropyState.COLLAPSED;
+        return EntropyState.STEADY;
+    }
+    executeMethod(methodName, target) {
+        if (!this.methodsAvailable.includes(methodName)) {
+            throw new Error(`${this.name} has no method ${methodName}`);
+        }
+        return `${this.name}.${methodName}() executed on ${target?.name ?? "environment"}`;
+    }
+    static applyPredatorPreyStep(prey, predator, params = {}) {
+        const { growthRate = 0.08, predationRate = 0.004, conversionEfficiency = 0.0025, deathRate = 0.08 } = params;
+        const carryingCapacity = prey.biome?.carryingCapacity() ?? 1000;
+        const preyPop = prey.population;
+        const predPop = predator.population;
+        prey.population = Math.max(2, preyPop + growthRate * preyPop * (1 - preyPop / carryingCapacity) - predationRate * preyPop * predPop);
+        predator.population = Math.max(2, predPop + conversionEfficiency * preyPop * predPop - deathRate * predPop);
+        prey.pushHistory();
+        predator.pushHistory();
+    }
+    pushHistory(maxLength = 80) {
+        this.history.push(this.population);
+        if (this.history.length > maxLength)
+            this.history.shift();
+    }
+}
+export function createIndividualMonad(monadId, wellbeingUnits, identityHash) {
+    return { monadId, wellbeingUnits, identityHash, resourceExtractionLog: [] };
+}
+export function extractResource(monad, source, substance, quantity) {
+    const flow = {
+        sourceId: source.id,
+        targetId: monad.monadId,
+        substance,
+        rate: quantity,
+        flowType: "resource_extraction",
+    };
+    monad.resourceExtractionLog.push(flow);
+    const stock = source.stocks.get(substance);
+    if (stock)
+        stock.quantity -= quantity;
+    return flow;
+}
+export class HumanNodePOD extends SpeciesPOD {
+    individualMonads = [];
+    constructor(biome, population) {
+        super("Homo sapiens", "Homo sapiens", 3, biome, population, "LC");
+        this.methodsAvailable = [
+            "extractResources",
+            "cultivate",
+            "domesticate",
+            "constructTechnology",
+            "coordinateWithOtherHumans",
+            "measureWellbeing",
+            "verifyInformation",
+            "proveThermodynamicWork",
+            "denominateInSolarUnits",
+        ];
+    }
+    totalWellbeingUnits() {
+        return this.individualMonads.reduce((s, m) => s + m.wellbeingUnits, 0);
+    }
+}
+export class EarthPOD extends ThermodynamicStructure {
+    static _instance = null;
+    spheres;
+    cycles;
+    biomes = [];
+    solarInputWatts = 1.74e17;
+    constructor() {
+        super("Earth");
+        this.spheres = [ATMOSPHERE, HYDROSPHERE, LITHOSPHERE, BIOSPHERE];
+        this.cycles = [CARBON_CYCLE, NITROGEN_CYCLE, PHOSPHORUS_CYCLE, WATER_CYCLE];
+    }
+    static getInstance() {
+        if (!EarthPOD._instance) {
+            EarthPOD._instance = new EarthPOD();
+        }
+        return EarthPOD._instance;
+    }
+    importFreeEnergy(_tick) {
+        this.importFreeEnergyJoules(this.solarInputWatts * 0.1, 0.99);
+        return this.solarInputWatts;
+    }
+    exportEntropy(_tick) {
+        const exportedVal = this.solarInputWatts * 0.997;
+        this.exportEntropyJoulesPerKelvin(exportedVal * 1e-12);
+        return exportedVal;
+    }
+    maintainFarFromEquilibrium(tick) {
+        const cycleStates = this.cycles.map((c) => c.maintainFarFromEquilibrium(tick));
+        const degradingCount = cycleStates.filter((s) => s === EntropyState.DEGRADING).length;
+        if (degradingCount >= 2)
+            return EntropyState.DEGRADING;
+        if (degradingCount === 1)
+            return EntropyState.ACCUMULATING;
+        return EntropyState.STEADY;
+    }
+    addBiome(biome) {
+        this.biomes.push(biome);
+        this.addChild(biome);
+    }
+    fullTick(tickNum) {
+        const result = {
+            earth: this.tick(tickNum),
+            cycles: {},
+            biomes: {},
+        };
+        for (const cycle of this.cycles) {
+            result.cycles[cycle.name] = cycle.tick(tickNum);
+        }
+        for (const biome of this.biomes) {
+            result.biomes[biome.name] = biome.tick(tickNum);
+            for (const species of biome.species) {
+                species.tick(tickNum);
+            }
+        }
+        return result;
+    }
+    globalEntropyReport() {
+        return {
+            earthState: this.entropyState,
+            cycles: Object.fromEntries(this.cycles.map((c) => [c.name, c.entropyState])),
+            spheres: Object.fromEntries(this.spheres.map((s) => [s.name, s.entropyState])),
+            totalBiomass: this.totalDescendantBiomass(),
+        };
+    }
+}
+export class StellarMonad extends ThermodynamicStructure {
+    constructor() {
+        super("Sun");
+        this.addStock("hydrogen", 1.5e30, 1.99e30);
+    }
+    importFreeEnergy(_tick) {
+        return 0;
+    }
+    exportEntropy(_tick) {
+        const val = 3.846e26;
+        this.exportEntropyJoulesPerKelvin(val * 1e-20);
+        return val;
+    }
+    maintainFarFromEquilibrium(_tick) {
+        const hydrogen = this.stocks.get("hydrogen");
+        if (!hydrogen)
+            return EntropyState.STEADY;
+        return hydrogen.utilization() > 0.05 ? EntropyState.STEADY : EntropyState.DEGRADING;
+    }
+}
+export function bootstrapMegaPod() {
+    const sun = new StellarMonad();
+    const earth = EarthPOD.getInstance();
+    const temperateForest = new GeoBiomePOD("Temperate Forest", BIOSPHERE, 1_000_000, [
+        { latitude: 45.0, longitude: -93.0 }
+    ]);
+    const ocean = new GeoBiomePOD("Ocean", HYDROSPHERE, 361_000_000, [
+        { latitude: 0.0, longitude: -160.0 }
+    ]);
+    const savanna = new GeoBiomePOD("Savanna", BIOSPHERE, 2_000_000, [
+        { latitude: -2.33, longitude: 34.83 }
+    ]);
+    const tundra = new GeoBiomePOD("Tundra", BIOSPHERE, 1_500_000, [
+        { latitude: 71.2, longitude: -156.8 }
+    ]);
+    const urban = new GeoBiomePOD("Urban Zone", BIOSPHERE, 100_000, [
+        { latitude: 40.71, longitude: -74.0 }
+    ]);
+    earth.addBiome(temperateForest);
+    earth.addBiome(ocean);
+    earth.addBiome(savanna);
+    earth.addBiome(tundra);
+    earth.addBiome(urban);
+    const flora = new SpeciesPOD("Flora", "Autotrophic assemblage", 1, temperateForest, 80);
+    const fauna = new SpeciesPOD("Fauna", "Heterotrophic assemblage", 2, temperateForest, 35);
+    const fungi = new SpeciesPOD("Fungi", "Decomposer assemblage", 0, temperateForest, 24);
+    const microbes = new SpeciesPOD("Microbes", "Microbial assemblage", 0, urban, 48);
+    const humans = new HumanNodePOD(urban, 18);
+    flora.addStock("biomass", 62);
+    fauna.addStock("biomass", 44);
+    fungi.addStock("biomass", 28);
+    microbes.addStock("biomass", 20);
+    humans.addStock("biomass", 30);
+    temperateForest.addSpecies(flora);
+    temperateForest.addSpecies(fauna);
+    temperateForest.addSpecies(fungi);
+    urban.addSpecies(microbes);
+    urban.addSpecies(humans);
+    return { sun, earth };
+}

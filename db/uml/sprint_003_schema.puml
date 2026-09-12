@@ -1,0 +1,57 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "Web of Life - Thermodynamic Architecture (Sprint 003)" {
+
+    class ControlVolume {
+        +id: UUID
+        +podName: string
+        +description: string
+        +createdAt: Timestamp
+    }
+
+    class ThermodynamicStateVector {
+        +id: UUID
+        +controlVolumeId: UUID
+        +timestamp: number
+        +internalEnergy: number
+        +totalMass: number
+        +temperature: number
+        +validateInvariants(): boolean
+    }
+
+    class BoundaryFluxArray {
+        +stateVectorId: UUID
+        +radiativeFlux: number
+        +convectiveFlux: number
+        +massEnthalpyFlux: number
+        +speciesMassFluxes: Record<string, number>
+    }
+
+    class EntropyMetrics {
+        +stateVectorId: UUID
+        +sGenRate: number
+        +referenceTemperature: number
+        +exergyDestructionRate: number
+        +verifySecondLaw(): boolean
+    }
+
+    class ThermodynamicBlock {
+        +blockIndex: number
+        +previousHash: string
+        +blockHash: string
+        +merkleRoot: string
+        +stateVectorId: UUID
+        +validatorSignature: string
+        +mintedAt: Timestamp
+    }
+
+    ControlVolume "1" *-- "0..*" ThermodynamicStateVector : tracks time-series >
+    ThermodynamicStateVector "1" o-- "1" BoundaryFluxArray : bounds >
+    ThermodynamicStateVector "1" o-- "1" EntropyMetrics : governs 2nd-law >
+    ThermodynamicStateVector "1" -- "1" ThermodynamicBlock : notarizes immutable state >
+}
+
+@enduml

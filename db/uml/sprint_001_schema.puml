@@ -1,0 +1,107 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F9F9F9
+skinparam classBorderColor #333333
+
+title Web of Life - Sprint 001: Thermodynamic Structure & Ledger Architecture
+
+package "TypeScript Domain Model (src/thermodynamics)" {
+    
+    interface ThermodynamicState {
+        +readonly internalEnergy: number
+        +readonly entropy: number
+        +readonly temperature: number
+        +readonly exergy: number
+        +readonly ambientTemperature: number
+    }
+
+    interface ThermodynamicFluxes {
+        +readonly freeEnergyImportRate: number
+        +readonly entropyExportRate: number
+        +readonly internalEntropyGenRate: number
+        +readonly exergyDestructionRate: number
+    }
+
+    abstract class ThermodynamicStructure {
+        # _internalEnergy: number
+        # _entropy: number
+        # _temperature: number
+        # _ambientTemperature: number
+        
+        + internalEnergy(): number
+        + entropy(): number
+        + temperature(): number
+        + ambientTemperature(): number
+        + exergy(): number
+        
+        {abstract} + importFreeEnergy(joules: number, dt: number): void
+        {abstract} + exportEntropy(entropyJoulesPerKelvin: number, dt: number): void
+        {abstract} + maintainFarFromEquilibrium(dt: number): void
+        {abstract} + getFluxes(): ThermodynamicFluxes
+        
+        # validateSecondLaw(entropyGenRate: number): void
+    }
+
+    ThermodynamicState <|.. ThermodynamicStructure
+    ThermodynamicStructure ..> ThermodynamicFluxes : produces >
+}
+
+package "Database & Blockchain Schema (db/schema.sql)" {
+    
+    class ThermodynamicStateRecord {
+        + state_id: UUID
+        + entity_id: UUID
+        + internal_energy: NUMERIC
+        + entropy: NUMERIC
+        + temperature: NUMERIC
+        + ambient_temperature: NUMERIC
+        + exergy: NUMERIC
+        + recorded_at: TIMESTAMP
+    }
+
+    class ThermodynamicFluxRecord {
+        + flux_id: UUID
+        + entity_id: UUID
+        + free_energy_import_rate: NUMERIC
+        + entropy_export_rate: NUMERIC
+        + internal_entropy_gen_rate: NUMERIC
+        + exergy_destruction_rate: NUMERIC
+        + measured_at: TIMESTAMP
+    }
+
+    class ThermodynamicBlock {
+        + block_id: UUID
+        + block_index: BIGINT
+        + previous_hash: VARCHAR
+        + merkle_root: VARCHAR
+        + solar_input_monad_stock: NUMERIC
+        + timestamp: TIMESTAMP
+        + block_signature: VARCHAR
+    }
+
+    class ThermodynamicTransaction {
+        + tx_id: UUID
+        + block_id: UUID
+        + source_entity_id: UUID
+        + target_entity_id: UUID
+        + energy_transferred_joules: NUMERIC
+        + entropy_change_jk: NUMERIC
+        + exergy_destroyed_joules: NUMERIC
+        + second_law_verified: BOOLEAN
+        + tx_timestamp: TIMESTAMP
+    }
+
+    ThermodynamicBlock "1" *-- "*" ThermodynamicTransaction : contains >
+}
+
+note right of ThermodynamicStructure
+  Enforces First & Second Laws:
+  - dU/dt = Q_in - W_out + sum(m_in * h_in) - sum(m_out * h_out)
+  - dS/dt = Q/T + sum(m_in * s_in) - sum(m_out * s_out) + S_gen
+  - S_gen >= 0 (Second Law Validation)
+  - Gouy-Stodola: Exergy Destruction = T_0 * S_gen
+end note
+
+@enduml

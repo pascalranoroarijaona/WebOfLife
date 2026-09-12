@@ -1,0 +1,150 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 002: Thermodynamic State Vector & Blockchain Ledger Architecture
+
+package "Thermodynamics Domain Model" {
+    
+    interface ThermodynamicVector {
+        + temperature: number
+        + pressure: number
+        + internalEnergy: number
+        + entropy: number
+        + exergy: number
+    }
+
+    interface BoundaryFlux {
+        + heatTransferRate: number
+        + boundaryTemperature: number
+        + massFlowRate: number
+        + specificEnthalpy: number
+        + specificEntropy: number
+    }
+
+    interface ThermodynamicStateVector {
+        + timestamp: number
+        + system: ThermodynamicVector
+        + ambientReference: object
+        + fluxes: BoundaryFlux[]
+        + entropyGenerationRate: number
+        + exergyDestructionRate: number
+    }
+
+    interface IThermodynamicSystem {
+        + getStateVector(): ThermodynamicStateVector
+        + applyBoundaryFlux(flux: BoundaryFlux): void
+        + computeEntropyGeneration(): number
+        + validateLaws(): ValidationResult
+    }
+
+    interface ValidationResult {
+        + isFirstLawSatisfied: boolean
+        + isSecondLawSatisfied: boolean
+        + energyResidual: number
+        + entropyResidual: number
+    }
+
+    class ThermodynamicStructure implements IThermodynamicSystem {
+        - stateVector: ThermodynamicStateVector
+        - ambientReference: AmbientReference
+        + getStateVector(): ThermodynamicStateVector
+        + applyBoundaryFlux(flux: BoundaryFlux): void
+        + computeEntropyGeneration(): number
+        + validateLaws(): ValidationResult
+    }
+
+    class EarthPod {
+        - id: UUID
+        - thermodynamicSystem: IThermodynamicSystem
+        - biomassStocks: Map<string, number>
+        + aggregateFluxes(): BoundaryFlux[]
+        + executeTickSimulation(): void
+    }
+
+    class ThermodynamicMonad {
+        - currentState: ThermodynamicStateVector
+        + map(fn: Function): ThermodynamicMonad
+        + flatMap(fn: Function): ThermodynamicMonad
+        + validateAndCommit(): ValidationResult
+    }
+}
+
+package "Database & Immutable Ledger Schema" {
+    
+    entity ambient_reference_state {
+        * id: UUID <<PK>>
+        --
+        simulation_tick: BIGINT
+        temperature_0: DOUBLE PRECISION
+        pressure_0: DOUBLE PRECISION
+        created_at: TIMESTAMP
+    }
+
+    entity thermodynamic_state_vectors {
+        * id: UUID <<PK>>
+        --
+        entity_id: UUID
+        timestamp: BIGINT
+        temperature: DOUBLE PRECISION
+        pressure: DOUBLE PRECISION
+        internal_energy: DOUBLE PRECISION
+        entropy: DOUBLE PRECISION
+        exergy: DOUBLE PRECISION
+        entropy_generation_rate: DOUBLE PRECISION
+        exergy_destruction_rate: DOUBLE PRECISION
+        created_at: TIMESTAMP
+    }
+
+    entity boundary_fluxes {
+        * id: UUID <<PK>>
+        --
+        * state_vector_id: UUID <<FK>>
+        heat_transfer_rate: DOUBLE PRECISION
+        boundary_temperature: DOUBLE PRECISION
+        mass_flow_rate: DOUBLE PRECISION
+        specific_enthalpy: DOUBLE PRECISION
+        specific_entropy: DOUBLE PRECISION
+        created_at: TIMESTAMP
+    }
+
+    entity thermodynamic_validations {
+        * id: UUID <<PK>>
+        --
+        * state_vector_id: UUID <<FK>>
+        is_first_law_satisfied: BOOLEAN
+        is_second_law_satisfied: BOOLEAN
+        energy_residual: DOUBLE PRECISION
+        entropy_residual: DOUBLE PRECISION
+        validated_at: TIMESTAMP
+    }
+
+    entity thermodynamic_blockchain_ledger {
+        * block_id: BIGSERIAL <<PK>>
+        --
+        previous_hash: VARCHAR(64)
+        merkle_root: VARCHAR(64)
+        simulation_tick: BIGINT
+        * state_vector_id: UUID <<FK>>
+        * validation_id: UUID <<FK>>
+        transaction_signature: VARCHAR(128)
+        block_hash: VARCHAR(64)
+        created_at: TIMESTAMP
+    }
+}
+
+-- Relationships
+ThermodynamicStateVector *-- ThermodynamicVector : contains system state
+ThermodynamicStateVector o-- BoundaryFlux : contains array
+IThermodynamicSystem ..> ThermodynamicStateVector : produces
+IThermodynamicSystem ..> ValidationResult : evaluates
+EarthPod --> IThermodynamicSystem : encapsulates
+ThermodynamicMonad --> ThermodynamicStateVector : wraps & transforms
+
+thermodynamic_state_vectors ||--o{ boundary_fluxes : "has multiple"
+thermodynamic_state_vectors ||--|| thermodynamic_validations : "audited by"
+thermodynamic_state_vectors ||--o{ thermodynamic_blockchain_ledger : "anchored in"
+thermodynamic_validations ||--o{ thermodynamic_blockchain_ledger : "secures block"
+
+@enduml
