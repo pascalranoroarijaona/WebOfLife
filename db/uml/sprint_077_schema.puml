@@ -1,0 +1,57 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class BaseMonadProcess {
+  # processId: String
+  # state: String
+  + execute(): void
+}
+
+class ThermodynamicMonadProcess {
+  - lawsFirstCompliance: Boolean
+  - lawsSecondCompliance: Boolean
+  + verifyEntropyProduction(): Float
+}
+
+class StateValidator {
+  + validateState(vector: StateVector): Boolean
+  + mapEvaluations(results: IStateEvaluationResult[]): Float[]
+  + accumulateMaxDiscrepancy(results: IStateEvaluationResult[]): Float
+}
+
+class StateVectorDiscrepancyAggregator {
+  - maxDiscrepancyThreshold: Float
+  + mapEvaluations(results: IStateEvaluationResult[]): Float[]
+  + accumulateMaxDiscrepancy(results: IStateEvaluationResult[]): Float
+}
+
+class StateVector {
+  + carbon: Float
+  + nitrogen: Float
+  + phosphorus: Float
+  + water: Float
+  + enthalpy: Float
+  + getMagnitude(): Float
+}
+
+interface IStateEvaluationResult {
+  + timestamp: Number
+  + expectedVector: IStateVector
+  + actualVector: IStateVector
+  + discrepancy: Number
+}
+
+interface IStateVectorAggregator {
+  + mapEvaluations(results: IStateEvaluationResult[]): Number[]
+  + accumulateMaxDiscrepancy(results: IStateEvaluationResult[]): Number
+}
+
+BaseMonadProcess <|-- ThermodynamicMonadProcess
+ThermodynamicMonadProcess <|-- StateValidator
+StateValidator <|-- StateVectorDiscrepancyAggregator
+StateVectorDiscrepancyAggregator ..|> IStateVectorAggregator
+StateEvaluationResult ..|> IStateEvaluationResult
+IStateEvaluationResult --> StateVector : expected / actual
+StateVectorDiscrepancyAggregator --> IStateEvaluationResult : processes
+
+@enduml
