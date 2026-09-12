@@ -1,69 +1,67 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger (Sprint 019)
--- Capturing Thermodynamic State Vectors, Boundary Fluxes, and Exergy Destruction
+-- Web of Life Database Schema & Thermodynamic Ledger Definitions
+-- Sprint 020 Integration: Thermodynamic State Vector & Second Law Compliance
 -- ============================================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Thermodynamic Boundary Flux Vectors
-CREATE TABLE IF NOT EXISTS boundary_flux_vectors (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    simulation_id UUID NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    solar_radiation_flux DOUBLE PRECISION NOT NULL,       -- W/m^2
-    thermal_radiation_flux DOUBLE PRECISION NOT NULL,      -- W/m^2
-    sensible_heat_flux DOUBLE PRECISION NOT NULL,          -- W/m^2
-    latent_heat_flux DOUBLE PRECISION NOT NULL,            -- W/m^2
-    mass_flux_map JSONB NOT NULL DEFAULT '{}'::jsonb,      -- Elemental & moisture mass transfer rates (kg/s or mol/s)
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 2. Thermodynamic State Vectors (Clausius-Duhem & Gouy-Stodola Compliance)
+-- 1. Thermodynamic State Vectors Table
+-- Captures time-series thermodynamic states for pods and planetary subsystems
 CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    simulation_id UUID NOT NULL,
-    flux_id UUID REFERENCES boundary_flux_vectors(flux_id),
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    internal_energy DOUBLE PRECISION NOT NULL,             -- Joules (J)
-    entropy DOUBLE PRECISION NOT NULL,                     -- Joules per Kelvin (J/K)
-    temperature DOUBLE PRECISION NOT NULL,                 -- Kelvin (K)
-    ambient_temperature DOUBLE PRECISION NOT NULL DEFAULT 288.15, -- T_0 (K)
-    entropy_generation_rate DOUBLE PRECISION NOT NULL CHECK (entropy_generation_rate >= 0), -- S_dot_gen >= 0 (W/K)
-    exergy_destruction_rate DOUBLE PRECISION NOT NULL,     -- I_dot = T_0 * S_dot_gen (W)
-    exergy DOUBLE PRECISION NOT NULL,                      -- Available work potential / availability (J)
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pod_id UUID NOT NULL,
+    internal_energy NUMERIC(38, 12) NOT NULL, -- Joules (J)
+    entropy NUMERIC(38, 12) NOT NULL, -- Joules per Kelvin (J/K)
+    reference_temperature NUMERIC(10, 4) NOT NULL DEFAULT 288.15, -- Kelvin (K)
+    entropy_generation_rate NUMERIC(38, 12) NOT NULL CHECK (entropy_generation_rate >= 0.0), -- W/K (Second Law Enforcement)
+    exergy_destruction_rate NUMERIC(38, 12) NOT NULL CHECK (exergy_destruction_rate >= 0.0), -- Watts (J/s)
+    timestamp BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Thermodynamic Process Monad Executions & Derivatives
-CREATE TABLE IF NOT EXISTS thermodynamic_process_monads (
-    monad_execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    state_id UUID REFERENCES thermodynamic_state_vectors(state_id),
-    process_id VARCHAR(255) NOT NULL,
-    dt DOUBLE PRECISION NOT NULL,                          -- Time step (s)
-    d_internal_energy DOUBLE PRECISION NOT NULL,
-    d_entropy DOUBLE PRECISION NOT NULL,
-    entropy_generation_rate DOUBLE PRECISION NOT NULL CHECK (entropy_generation_rate >= 0),
-    exergy_destruction_rate DOUBLE PRECISION NOT NULL,
-    mass_stock_deltas JSONB NOT NULL DEFAULT '{}'::jsonb,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 2. Thermodynamic Boundary Fluxes Table
+-- Records heat, mass, enthalpy, and entropy across system boundaries
+CREATE TABLE IF NOT EXISTS thermodynamic_boundary_fluxes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE,
+    heat_fluxes NUMERIC(38, 12)[] NOT NULL, -- Watts (J/s)
+    boundary_temperatures NUMERIC(10, 4)[] NOT NULL, -- Kelvin (K)
+    mass_fluxes NUMERIC(38, 12)[] NOT NULL, -- kg/s (C, N, P, H2O cycles)
+    specific_enthalpies NUMERIC(38, 12)[] NOT NULL, -- J/kg
+    specific_entropies NUMERIC(38, 12)[] NOT NULL, -- J/(kg·K)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Thermodynamic Blockchain Block Ledger & Transaction Signatures
-CREATE TABLE IF NOT EXISTS thermodynamic_ledger_blocks (
-    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_index BIGINT NOT NULL UNIQUE,
+-- 3. Biogeochemical Monad Stocks Table
+-- Tracks elemental stocks (Carbon, Nitrogen, Phosphorus, Water) bound to thermodynamics
+CREATE TABLE IF NOT EXISTS biogeochemical_monad_stocks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pod_id UUID NOT NULL,
+    element_type VARCHAR(16) NOT NULL CHECK (element_type IN ('CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER')),
+    mass_pool NUMERIC(38, 12) NOT NULL CHECK (mass_pool >= 0.0), -- kg
+    enthalpy NUMERIC(38, 12) NOT NULL, -- Joules
+    timestamp BIGINT NOT NULL,
+    CONSTRAINT unique_pod_element_time UNIQUE (pod_id, element_type, timestamp)
+);
+
+-- 4. Thermodynamic Blockchain Ledger Transactions
+-- Immutable record of thermodynamic and monad transitions secured cryptographically
+CREATE TABLE IF NOT EXISTS thermodynamic_ledger_transactions (
+    block_id BIGSERIAL PRIMARY KEY,
+    transaction_uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
     previous_hash VARCHAR(64) NOT NULL,
-    block_hash VARCHAR(64) NOT NULL,
     merkle_root VARCHAR(64) NOT NULL,
-    solar_forcing_total DOUBLE PRECISION NOT NULL,
-    system_exergy_efficiency DOUBLE PRECISION NOT NULL,    -- eta_exergy = 1 - (sum(I_dot * dt) / E_solar_in)
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id),
+    entropy_generation_rate NUMERIC(38, 12) NOT NULL,
+    exergy_destruction_rate NUMERIC(38, 12) NOT NULL,
+    solar_flux_input NUMERIC(38, 12) NOT NULL CHECK (solar_flux_input >= 0.0),
     validator_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    block_hash VARCHAR(64) NOT NULL,
+    timestamp BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexing for high-performance time-series querying
-CREATE INDEX IF NOT EXISTS idx_thermo_state_sim_time ON thermodynamic_state_vectors(simulation_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_sim_time ON boundary_flux_vectors(simulation_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_monad_exec_process ON thermodynamic_process_monads(process_id, executed_at DESC);
-CREATE INDEX IF NOT EXISTS idx_ledger_block_index ON thermodynamic_ledger_blocks(block_index DESC);
+-- Indexes for Time-Series Analysis & Validation
+CREATE INDEX IF NOT EXISTS idx_thermo_states_pod_time ON thermodynamic_state_vectors(pod_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_monad_stocks_element ON biogeochemical_monad_stocks(element_type, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_ledger_block_hash ON thermodynamic_ledger_transactions(block_hash);

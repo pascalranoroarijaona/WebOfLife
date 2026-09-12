@@ -23,9 +23,10 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
             ambientReferenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: 0.1,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 0.1,
+            exergy: 1e5,
             boundaryFluxes: []
         };
-        const monad = new MockMonadProcess(initialState);
+        const monad = new MockMonadProcess('mock_01', 'Mock Pod', initialState);
         const invalidState = {
             timestamp: 1,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -36,6 +37,7 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
             ambientReferenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: -1.5,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 1.5,
+            exergy: 1e5,
             boundaryFluxes: []
         };
         assert.throws(() => {
@@ -56,9 +58,10 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
             ambientReferenceTemperature: T0,
             entropyGenerationRate: sGen,
             exergyDestructionRate: expectedI,
+            exergy: 1e5,
             boundaryFluxes: []
         };
-        const monad = new MockMonadProcess(validState);
+        const monad = new MockMonadProcess('mock_02', 'Mock Pod 2', validState);
         assert.strictEqual(monad.getStateVector().exergyDestructionRate, 14.9075);
         assert.strictEqual(monad.validateSecondLaw(), true);
     });

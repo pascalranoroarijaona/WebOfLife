@@ -20,6 +20,11 @@ export class NitrogenCycle extends BaseCycle {
 
   public step(dt: number, solarFlux: number): void {
     const flux: BoundaryFlux = {
+      heatFluxes: [solarFlux * 1e-5],
+      boundaryTemperatures: [295.0],
+      massFluxes: [0.5],
+      specificEnthalpies: [300],
+      specificEntropies: [1.5],
       fluxId: "nitrogen_fixation_flux",
       species: "n2",
       massFlowRate: 0.5,

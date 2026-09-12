@@ -43,6 +43,7 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
       entropy: 50,
       entropyGenerationRate: 12.5,
       exergyDestructionRate: 0, // will be evaluated
+      exergy: 1e10,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       boundaryFluxes: []
     };
@@ -62,6 +63,7 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
       entropy: 100,
       entropyGenerationRate: 2.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 2.0,
+      exergy: 1e10,
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       boundaryFluxes: [
         {

@@ -15,6 +15,7 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
     entropy: 5e9,
     entropyGenerationRate: 100.0,
     exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 100.0,
+    exergy: 1e10,
     boundaryFluxes: {
       solarRadiationIn: 0,
       longwaveRadiationOut: 0,
@@ -80,6 +81,7 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
         entropy: 1e3,
         entropyGenerationRate: -5.0,
         exergyDestructionRate: 0,
+        exergy: 1e10,
         boundaryFluxes: [],
         validateSecondLaw: () => false
       }));

@@ -21,6 +21,11 @@ export class CarbonCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const flux = {
+            heatFluxes: [solarFlux * 1e-4],
+            boundaryTemperatures: [298.15],
+            massFluxes: [1.2],
+            specificEnthalpies: [500],
+            specificEntropies: [2.1],
             fluxId: "carbon_solar_flux",
             species: "co2",
             massFlowRate: 1.2,

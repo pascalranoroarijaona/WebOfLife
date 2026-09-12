@@ -14,6 +14,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: 10.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10.0,
+            exergy: 1e10,
             timestamp: 0,
             boundaryFluxes: {
                 solarRadiationIn: 0,
@@ -44,6 +45,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: -5.0, // Invalid
             exergyDestructionRate: -5.0 * STANDARD_AMBIENT_TEMPERATURE_K,
+            exergy: 1e10,
             timestamp: 0,
             boundaryFluxes: {
                 solarRadiationIn: 0,
@@ -72,6 +74,7 @@ describe('Sprint 012: Thermodynamic State Vector & Monadic Invariants', () => {
             referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: 5.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
+            exergy: 1e10,
             timestamp: 0,
             boundaryFluxes: {
                 solarRadiationIn: 0,

@@ -31,11 +31,21 @@ describe('Sprint 019: Thermodynamic State Vector Interface & Exergy Tracking', (
         thermalRadiationFlux: -239.0,
         sensibleHeatFlux: 15.0,
         latentHeatFlux: 88.0,
-        massFluxes: new Map([['water', 1.2]])
+        massFluxes: new Map([['water', 1.2]]),
+        heatFluxes: new Map(),
+        radiationFlux: { solarIncoming: 342.0, terrestrialOutgoing: 239.0 },
+        workRate: 0,
+        specificEnthalpies: new Map(),
+        specificEntropies: new Map(),
+        solarRadiationIn: 342.0,
+        longwaveRadiationOut: 239.0,
+        netMassFlux: 1.2
     };
     const initialState = {
+        timestamp: 0,
         internalEnergy: 1e10,
         entropy: 1e6,
+        totalEntropy: 1e6,
         temperature: 290.0,
         ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
         entropyGenerationRate: 0.0,

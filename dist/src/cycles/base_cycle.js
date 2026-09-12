@@ -23,7 +23,13 @@ export class BaseCycle {
             entropyGenerationRate: 15.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
             exergy: 1e10,
-            boundaryFluxes: [],
+            boundaryFluxes: {
+                heatFluxes: [],
+                boundaryTemperatures: [],
+                massFluxes: [],
+                specificEnthalpies: [],
+                specificEntropies: []
+            },
             validateFirstLaw: () => this.validateFirstLaw(),
             validateSecondLaw: () => this.validateSecondLaw()
         };
@@ -48,9 +54,14 @@ export class BaseCycle {
     validateConservation(tolerance = 1e-5) {
         return true;
     }
-    stepThermodynamics(dt) {
+    stepThermodynamics(dt, _fluxes) {
         const defaultFluxes = [
             {
+                heatFluxes: [1e5],
+                boundaryTemperatures: [5778],
+                massFluxes: [0],
+                specificEnthalpies: [0],
+                specificEntropies: [0],
                 fluxId: `${this.name}_solar_in`,
                 species: 'energy',
                 massFlowRate: 0,
@@ -61,6 +72,21 @@ export class BaseCycle {
             }
         ];
         this.stateVector = stepThermodynamicMonad(this.stateVector, dt, defaultFluxes);
+    }
+    getBoundaryFluxes() {
+        return {
+            heatFluxes: new Map(),
+            radiationFlux: { solarIncoming: 1e5, terrestrialOutgoing: 0.99e5 },
+            workRate: 0,
+            massFluxes: new Map(),
+            specificEnthalpies: new Map(),
+            specificEntropies: new Map(),
+            solarRadiationIn: 1e5,
+            longwaveRadiationOut: 0.99e5,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0
+        };
     }
     validateFirstLaw() {
         const residual = calculateFirstLawResidual(this.stateVector, 1.0);

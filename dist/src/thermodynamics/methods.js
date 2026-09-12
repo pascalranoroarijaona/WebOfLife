@@ -5,12 +5,28 @@
 import { STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
 function getFluxRecord(boundaryFluxes) {
     if (Array.isArray(boundaryFluxes)) {
-        return (boundaryFluxes[0] ?? {});
+        return (boundaryFluxes[0] ?? {
+            heatFluxes: new Map(),
+            massFluxes: new Map(),
+            solarRadiationIn: 0,
+            longwaveRadiationOut: 0,
+            sensibleHeatFlux: 0,
+            latentHeatFlux: 0,
+            netMassFlux: 0
+        });
     }
     if (boundaryFluxes) {
         return boundaryFluxes;
     }
-    return {};
+    return {
+        heatFluxes: new Map(),
+        massFluxes: new Map(),
+        solarRadiationIn: 0,
+        longwaveRadiationOut: 0,
+        sensibleHeatFlux: 0,
+        latentHeatFlux: 0,
+        netMassFlux: 0
+    };
 }
 /**
  * Computes the First Law energy balance residual (Energy In - Energy Out - Accumulation).
@@ -29,7 +45,7 @@ export function calculateFirstLawResidual(state, dt) {
     }
     else if (state.boundaryFluxes) {
         const bf = getFluxRecord(state.boundaryFluxes);
-        netHeatTransfer = bf.radiativeNet ?? bf.netHeatFlux ?? bf.solarRadiationIn ?? bf.solarIn ?? 0;
+        netHeatTransfer = bf.radiativeNet ?? bf.netHeatFlux ?? bf.solarRadiationIn ?? bf.solarInput ?? 0;
         netEnthalpyFlux = bf.matterEnthalpyFlux ?? 0;
     }
     const energyAccumulation = state.internalEnergy ?? 0;
@@ -74,10 +90,10 @@ export function stepThermodynamicMonad(state, dt, newFluxes) {
         ? [...newFluxes]
         : [newFluxes];
     for (const flux of fluxArray) {
-        const hRate = flux.heatTransferRate ?? flux.heatFluxWatts ?? 0;
+        const hRate = flux.heatTransferRate ?? flux.heatFluxWatts ?? (Array.isArray(flux.heatFluxes) ? flux.heatFluxes[0] : 0) ?? 0;
         const mRate = flux.massFlowRate ?? flux.massFlowRateKgPerSec ?? 0;
         const enth = flux.specificEnthalpy ?? flux.specificEnthalpyJoulesPerKg ?? 0;
-        const bTemp = flux.boundaryTemperature ?? flux.boundaryTemperatureKelvin ?? state.temperature ?? T0;
+        const bTemp = flux.boundaryTemperature ?? flux.boundaryTemperatureKelvin ?? (Array.isArray(flux.boundaryTemperatures) ? flux.boundaryTemperatures[0] : 0) ?? state.temperature ?? T0;
         const specEnt = flux.specificEntropy ?? flux.specificEntropyJoulesPerKgKelvin ?? 0;
         addedEnergy += (hRate + mRate * enth) * dt;
         addedEntropy += ((hRate / (bTemp || T0)) + mRate * specEnt) * dt;

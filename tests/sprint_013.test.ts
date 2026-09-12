@@ -50,6 +50,7 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
       entropy: 1e6,
       entropyGenerationRate: entropyGen,
       exergyDestructionRate: exergyDestruction,
+      exergy: 1e10,
       boundaryFluxes,
       validateSecondLaw: () => true
     });
@@ -93,6 +94,7 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
       entropy: 1e6,
       entropyGenerationRate: 10,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10,
+      exergy: 1e10,
       boundaryFluxes,
       validateSecondLaw: () => true,
       validateFirstLaw: () => true

@@ -39,6 +39,14 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
       referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 10,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10,
+      exergy: 1e5,
+      boundaryFluxes: {
+        heatFluxes: [],
+        boundaryTemperatures: [],
+        massFluxes: [],
+        specificEnthalpies: [],
+        specificEntropies: []
+      },
       boundaryFlux: {
         heatFluxes: [],
         boundaryTemperatures: [],
@@ -70,6 +78,14 @@ describe('Sprint 20: Thermodynamic State Vector & Monad Integration (RFC 020)', 
       referenceTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       entropyGenerationRate: 5.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 5.0,
+      exergy: 1e5,
+      boundaryFluxes: {
+        heatFluxes: [100],
+        boundaryTemperatures: [500],
+        massFluxes: [],
+        specificEnthalpies: [],
+        specificEntropies: []
+      },
       boundaryFlux: {
         heatFluxes: [100],
         boundaryTemperatures: [500],

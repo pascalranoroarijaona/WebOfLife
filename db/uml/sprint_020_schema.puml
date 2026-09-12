@@ -1,0 +1,69 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+
+title Web of Life - Sprint 020: Thermodynamic State Vector & Monad Architecture
+
+class ThermodynamicStructure {
+    + structureId: string
+    + getEnergyState(): number
+    + getEntropyState(): number
+}
+
+class MonadProcessablePod {
+    + podId: string
+    + executeMonadCycle(dt: number): void
+    + conserveMass(): boolean
+}
+
+class ThermodynamicStateVector {
+    + internalEnergy: number
+    + entropy: number
+    + referenceTemperature: number
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+    + boundaryFlux: ThermodynamicBoundaryFlux
+    + timestamp: number
+}
+
+class ThermodynamicBoundaryFlux {
+    + heatFluxes: number[]
+    + boundaryTemperatures: number[]
+    + massFluxes: number[]
+    + specificEnthalpies: number[]
+    + specificEntropies: number[]
+}
+
+class ThermodynamicValidator {
+    + validateFirstLaw(prev: ThermodynamicStateVector, curr: ThermodynamicStateVector, dt: number): boolean
+    + validateSecondLaw(state: ThermodynamicStateVector): boolean
+}
+
+class BiogeochemicalMonadStock {
+    + elementId: string
+    + elementType: string
+    + massPool: number
+    + enthalpy: number
+    + updateStock(deltaMass: number): void
+}
+
+class ThermodynamicLedgerTransaction {
+    + blockId: long
+    + transactionUuid: string
+    + previousHash: string
+    + merkleRoot: string
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+    + blockHash: string
+    + signTransaction(): string
+}
+
+ThermodynamicStructure <|-- MonadProcessablePod : extends / composes
+MonadProcessablePod *-- ThermodynamicStateVector : instantiates
+ThermodynamicStateVector *-- ThermodynamicBoundaryFlux : contains
+ThermodynamicValidator ..> ThermodynamicStateVector : validates
+MonadProcessablePod --> BiogeochemicalMonadStock : manages cycles
+ThermodynamicStateVector --> ThermodynamicLedgerTransaction : anchors to blockchain
+
+@enduml

@@ -17,6 +17,11 @@ export class PhosphorusCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const flux = {
+            heatFluxes: [solarFlux * 1e-6],
+            boundaryTemperatures: [290.0],
+            massFluxes: [0.1],
+            specificEnthalpies: [150],
+            specificEntropies: [0.8],
             fluxId: "phosphorus_weathering_flux",
             species: "po4",
             massFlowRate: 0.1,

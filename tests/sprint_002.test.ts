@@ -16,6 +16,7 @@ describe('Sprint 002: Thermodynamic State Vector & State Validation Tests', () =
       ambientReferenceTemp: 288.15,
       entropyGenerationRate: 10.0,
       exergyDestructionRate: 2881.5,
+      exergy: 1e10,
       referenceTemperature: 288.15,
       boundaryFluxes: {
         solarRadiationIn: 1000,

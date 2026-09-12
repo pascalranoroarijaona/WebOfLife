@@ -17,6 +17,7 @@ describe('Sprint 003: Thermodynamic Monad Tests', () => {
       referenceTemperature: 288.15,
       entropyGenerationRate: 1.0,
       exergyDestructionRate: 288.15,
+      exergy: 1e10,
       boundaryFluxes: {
         solarRadiationIn: 0,
         longwaveRadiationOut: 0,

@@ -18,6 +18,11 @@ export class WaterCycle extends BaseCycle {
     }
     step(dt, solarFlux) {
         const flux = {
+            heatFluxes: [solarFlux * 1e-3],
+            boundaryTemperatures: [300.0],
+            massFluxes: [15.0],
+            specificEnthalpies: [2260000],
+            specificEntropies: [600],
             fluxId: "water_evaporation_flux",
             species: "h2o",
             massFlowRate: 15.0,

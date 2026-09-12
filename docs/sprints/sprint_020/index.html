@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web of Life - Sprint 020: Thermodynamic State Vector & Exergy Accounting</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121824;
+            --bg-card: rgba(18, 24, 36, 0.85);
+            --border-color: rgba(76, 175, 80, 0.3);
+            --accent-green: #4caf50;
+            --accent-blue: #2196f3;
+            --accent-amber: #ff9800;
+            --accent-red: #f44336;
+            --accent-cyan: #00bcd4;
+            --text-main: #e0e0e0;
+            --text-muted: #8a99ad;
+            --font-mono: "Fira Code", "Courier New", Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        #topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
+            animation: pulse-glow 4s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
+            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+        }
+
+        h1 { 
+            color: var(--accent-green); 
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        #controls {
+            background: rgba(18, 24, 36, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 25px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 90;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, #388e3c, #66bb6a);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #1565c0, #2196f3);
+        }
+        button.secondary:hover {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+        }
+
+        #main-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr 360px;
+            gap: 20px;
+            padding: 20px;
+            flex: 1;
+            height: calc(100vh - 130px);
+            overflow: hidden;
+        }
+
+        @media(max-width: 1200px) {
+            #main-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow: visible;
+            }
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow-y: auto;
+        }
+
+        .panel h2 {
+            font-size: 1.05rem;
+            color: var(--accent-cyan);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-card {
+            background: rgba(10, 14, 23, 0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-family: var(--font-mono);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .metric-value.green { color: var(--accent-green); }
+        .metric-value.blue { color: var(--accent-blue); }
+        .metric-value.amber { color: var(--accent-amber); }
+        .metric-value.cyan { color: var(--accent-cyan); }
+
+        #canvas-container {
+            position: relative;
+            flex: 1;
+            background: #05070c;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .log-box {
+            background: #05070c;
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            height: 140px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-entry {
+            border-left: 2px solid var(--accent-green);
+            padding-left: 6px;
+        }
+        .log-entry.warn { border-left-color: var(--accent-amber); }
+        .log-entry.error { border-left-color: var(--accent-red); }
+
+        .tab-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .tab-btn {
+            background: rgba(255,255,255,0.05);
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <div class="brand-container">
+            <div class="brand-logo"></div>
+            <div>
+                <h1>Web of Life</h1>
+                <div class="subtitle">Sprint 020: Thermodynamic State Vector & Exergy Accounting</div>
+            </div>
+        </div>
+        <div class="control-group">
+            <span>Status: <strong id="sim-status" style="color: var(--accent-green);">Ready</strong></span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-start">Start Simulation</button>
+        <button id="btn-pause" class="secondary">Pause</button>
+        <button id="btn-step" class="secondary">Step Vector</button>
+        <button id="btn-reset" class="secondary" style="background: linear-gradient(135deg, #c62828, #f44336);">Reset</button>
+        
+        <div class="control-group">
+            <label for="speed-range">Speed:</label>
+            <input type="range" id="speed-range" min="1" max="10" value="1">
+            <span id="speed-val">1x</span>
+        </div>
+
+        <div class="control-group">
+            <label for="solar-input">Solar Flux:</label>
+            <input type="range" id="solar-input" min="500" max="2000" step="50" value="1361">
+            <span id="solar-val">1361 W/m²</span>
+        </div>
+    </div>
+
+    <div id="main-layout">
+        <!-- Left Panel: Thermodynamic State Vector -->
+        <div class="panel">
+            <h2>State Vector (Γ)</h2>
+            <div class="metric-card">
+                <span class="metric-label">Enthalpy (H)</span>
+                <span class="metric-value green" id="metric-enthalpy">0.00 MJ</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Entropy (S)</span>
+                <span class="metric-value amber" id="metric-entropy">0.00 kJ/K</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Gibbs Free Energy (G)</span>
+                <span class="metric-value blue" id="metric-gibbs">0.00 MJ</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Exergy Balance (Ex)</span>
+                <span class="metric-value cyan" id="metric-exergy">0.00 MJ</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Dissipation Rate (Φ)</span>
+                <span class="metric-value" id="metric-dissipation">0.00 W/m²</span>
+            </div>
+        </div>
+
+        <!-- Center Panel: Visualization -->
+        <div class="panel" style="padding: 10px; display: flex; flex-direction: column;">
+            <h2>Phase Space & Thermodynamic Fluxes</h2>
+            <div id="canvas-container">
+                <canvas id="sim-canvas" width="800" height="600"></canvas>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="tab-btn active" data-tab="exergy">Exergy Flow</button>
+                <button class="tab-btn" data-tab="entropy">Entropy Production</button>
+                <button class="tab-btn" data-tab="phase">Phase Space (H-S)</button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Exergy Accounting & Logs -->
+        <div class="panel">
+            <h2>Exergy Ledger</h2>
+            <div class="metric-card">
+                <span class="metric-label">Incoming Solar Exergy</span>
+                <span class="metric-value green" id="metric-solar-ex">1250.4 MJ/s</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Biotic Destruction Rate</span>
+                <span class="metric-value amber" id="metric-destruction">842.1 MJ/s</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Stored Exergy (Biosphere)</span>
+                <span class="metric-value blue" id="metric-stored">45,210 MJ</span>
+            </div>
+
+            <h2>Telemetry Log</h2>
+            <div class="log-box" id="log-box">
+                <div class="log-entry">[00:00:01] System initialized. Thermodynamic structure loaded.</div>
+                <div class="log-entry">[00:00:01] Baseline state vector evaluated: Γ = [H: 1.4e6, S: 4.2e3, G: -2.1e5].</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { ThermodynamicStructure } from '../../src/thermodynamic_structure.js';
+
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        const logBox = document.getElementById('log-box');
+
+        const thermo = new ThermodynamicStructure();
+        let running = false;
+        let speed = 1;
+        let solarFlux = 1361;
+        let timeStep = 0;
+        let activeTab = 'exergy';
+
+        function addLog(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toTimeString().split(' ')[0];
+            entry.textContent = `[${time}] ${msg}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function updateMetrics() {
+            const state = thermo.getStateVector();
+            document.getElementById('metric-enthalpy').textContent = (state.enthalpy / 1e6).toFixed(2) + ' MJ';
+            document.getElementById('metric-entropy').textContent = (state.entropy / 1e3).toFixed(2) + ' kJ/K';
+            document.getElementById('metric-gibbs').textContent = (state.gibbs / 1e6).toFixed(2) + ' MJ';
+            document.getElementById('metric-exergy').textContent = (state.exergy / 1e6).toFixed(2) + ' MJ';
+            document.getElementById('metric-dissipation').textContent = state.dissipation.toFixed(2) + ' W/m²';
+            
+            document.getElementById('metric-solar-ex').textContent = (solarFlux * 0.92).toFixed(1) + ' MJ/s';
+            document.getElementById('metric-destruction').textContent = (state.dissipation * 0.65).toFixed(1) + ' MJ/s';
+            document.getElementById('metric-stored').textContent = (state.exergy * 35).toLocaleString() + ' MJ';
+        }
+
+        function draw() {
+            ctx.fillStyle = '#05070c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            if (activeTab === 'exergy') {
+                // Draw Exergy Flow Diagram
+                ctx.strokeStyle = '#4caf50';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(50, h/2);
+                ctx.lineTo(w/3, h/2);
+                ctx.stroke();
+
+                ctx.fillStyle = '#4caf50';
+                ctx.font = '12px Fira Code';
+                ctx.fillText('Solar Exergy In', 50, h/2 - 15);
+
+                // Biosphere node
+                ctx.fillStyle = 'rgba(33, 150, 243, 0.2)';
+                ctx.strokeStyle = '#2196f3';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(w/2, h/2, 60, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#e0e0e0';
+                ctx.textAlign = 'center';
+                ctx.fillText('Biosphere Exergy', w/2, h/2 - 5);
+                ctx.fillText('Pool', w/2, h/2 + 15);
+                ctx.textAlign = 'left';
+
+                // Heat dissipation out
+                ctx.strokeStyle = '#f44336';
+                ctx.beginPath();
+                ctx.moveTo(2*w/3, h/2);
+                ctx.lineTo(w - 50, h/2);
+                ctx.stroke();
+
+                ctx.fillStyle = '#f44336';
+                ctx.fillText('Entropy Dissipation Out', 2*w/3, h/2 - 15);
+
+            } else if (activeTab === 'entropy') {
+                // Draw Entropy Production over time
+                ctx.strokeStyle = '#ff9800';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let x = 50; x < w - 50; x++) {
+                    const y = h - 100 - Math.sin((x + timeStep * 5) * 0.02) * 50 - (x - 50) * 0.1;
+                    if (x === 50) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                ctx.fillStyle = '#8a99ad';
+                ctx.font = '12px Fira Code';
+                ctx.fillText('Entropy Production Rate (dSi/dt)', 50, 40);
+
+            } else {
+                // Phase space H vs S
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(50, h - 50); ctx.lineTo(w - 50, h - 50);
+                ctx.moveTo(50, h - 50); ctx.lineTo(50, 50);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#00bcd4';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let t = 0; t < timeStep; t += 2) {
+                    const px = 50 + (t % (w - 100));
+                    const py = h - 50 - Math.sin(t * 0.05) * 100 - t * 0.05;
+                    if (t === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+
+                ctx.fillStyle = '#00bcd4';
+                ctx.fillText('Phase Space Trajectory: Enthalpy (H) vs Entropy (S)', 50, 40);
+            }
+        }
+
+        function loop() {
+            if (running) {
+                timeStep += speed;
+                thermo.step(solarFlux, speed);
+                updateMetrics();
+                draw();
+            }
+            requestAnimationFrame(loop);
+        }
+
+        // Event Listeners
+        document.getElementById('btn-start').addEventListener('click', () => {
+            running = true;
+            document.getElementById('sim-status').textContent = 'Running';
+            document.getElementById('sim-status').style.color = 'var(--accent-green)';
+            addLog('Simulation started.');
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            running = false;
+            document.getElementById('sim-status').textContent = 'Paused';
+            document.getElementById('sim-status').style.color = 'var(--accent-amber)';
+            addLog('Simulation paused.', 'warn');
+        });
+
+        document.getElementById('btn-step').addEventListener('click', () => {
+            timeStep += 1;
+            thermo.step(solarFlux, 1);
+            updateMetrics();
+            draw();
+            addLog('Stepped thermodynamic state vector.');
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            running = false;
+            timeStep = 0;
+            thermo.reset();
+            document.getElementById('sim-status').textContent = 'Reset';
+            document.getElementById('sim-status').style.color = 'var(--text-muted)';
+            updateMetrics();
+            draw();
+            addLog('Simulation reset to baseline.', 'warn');
+        });
+
+        document.getElementById('speed-range').addEventListener('input', (e) => {
+            speed = parseInt(e.target.value);
+            document.getElementById('speed-val').textContent = speed + 'x';
+        });
+
+        document.getElementById('solar-input').addEventListener('input', (e) => {
+            solarFlux = parseFloat(e.target.value);
+            document.getElementById('solar-val').textContent = solarFlux + ' W/m²';
+            thermo.setSolarFlux(solarFlux);
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeTab = e.target.getAttribute('data-tab');
+                draw();
+            });
+        });
+
+        // Initial setup
+        updateMetrics();
+        draw();
+    </script>
+</body>
+</html>

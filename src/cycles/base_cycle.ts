@@ -1,7 +1,7 @@
 /**
  * @fileoverview Base Cycle extending IThermodynamicModel (Sprint 015 & Retro-Compatibility)
  */
-import { IThermodynamicModel, IThermodynamicStateVector, ThermodynamicStateVector, BoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K } from '../thermodynamics/types.js';
+import { IThermodynamicModel, IThermodynamicStateVector, ThermodynamicStateVector, BoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K, BoundaryFluxVector } from '../thermodynamics/types.js';
 import { calculateFirstLawResidual, evaluateSecondLaw, stepThermodynamicMonad } from '../thermodynamics/methods.js';
 
 export { stepThermodynamicMonad };
@@ -24,7 +24,13 @@ export abstract class BaseCycle implements IThermodynamicModel {
       entropyGenerationRate: 15.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
       exergy: 1e10,
-      boundaryFluxes: [],
+      boundaryFluxes: {
+        heatFluxes: [],
+        boundaryTemperatures: [],
+        massFluxes: [],
+        specificEnthalpies: [],
+        specificEntropies: []
+      },
       validateFirstLaw: () => this.validateFirstLaw(),
       validateSecondLaw: () => this.validateSecondLaw()
     };
@@ -55,9 +61,14 @@ export abstract class BaseCycle implements IThermodynamicModel {
     return true;
   }
 
-  public stepThermodynamics(dt: number): void {
+  public stepThermodynamics(dt: number, _fluxes?: BoundaryFluxVector): void {
     const defaultFluxes: BoundaryFlux[] = [
       {
+        heatFluxes: [1e5],
+        boundaryTemperatures: [5778],
+        massFluxes: [0],
+        specificEnthalpies: [0],
+        specificEntropies: [0],
         fluxId: `${this.name}_solar_in`,
         species: 'energy',
         massFlowRate: 0,
@@ -68,6 +79,22 @@ export abstract class BaseCycle implements IThermodynamicModel {
       }
     ];
     this.stateVector = stepThermodynamicMonad(this.stateVector, dt, defaultFluxes);
+  }
+
+  public getBoundaryFluxes(): BoundaryFluxVector {
+    return {
+      heatFluxes: new Map(),
+      radiationFlux: { solarIncoming: 1e5, terrestrialOutgoing: 0.99e5 },
+      workRate: 0,
+      massFluxes: new Map(),
+      specificEnthalpies: new Map(),
+      specificEntropies: new Map(),
+      solarRadiationIn: 1e5,
+      longwaveRadiationOut: 0.99e5,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0
+    };
   }
 
   public validateFirstLaw(): boolean {

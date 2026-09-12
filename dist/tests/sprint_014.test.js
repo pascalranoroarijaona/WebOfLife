@@ -36,6 +36,7 @@ describe('Sprint 014: Thermodynamic State Vector Interface & Second Law Enforcem
         ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
         entropyGenerationRate: 12.5,
         exergyDestructionRate: 12.5 * STANDARD_AMBIENT_TEMPERATURE_K,
+        exergy: 1e10,
         boundaryFluxes: defaultBoundaryFluxes
     };
     it('should enforce Second Law ($\dot{S}_{\text{gen}} \ge 0$) in metrics', () => {

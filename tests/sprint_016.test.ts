@@ -26,7 +26,12 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
       workRate: 0,
       massFluxes: new Map(),
       specificEnthalpies: new Map(),
-      specificEntropies: new Map()
+      specificEntropies: new Map(),
+      solarRadiationIn: 1000,
+      longwaveRadiationOut: 990,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0
     };
 
     const monad = ThermodynamicStateMonad.initialize(initialState, initialFluxes);
@@ -57,7 +62,12 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
       workRate: 0,
       massFluxes: new Map(),
       specificEnthalpies: new Map(),
-      specificEntropies: new Map()
+      specificEntropies: new Map(),
+      solarRadiationIn: 174e15,
+      longwaveRadiationOut: 173.5e15,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0
     };
 
     const monad = ThermodynamicStateMonad.initialize(initialState, initialFluxes);

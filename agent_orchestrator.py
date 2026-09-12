@@ -443,6 +443,26 @@ def get_current_sprint_num() -> int:
     state = load_json_file(STATE_FILE, lambda: {"current_sprint": 1, "completed_sprints": []})
     return state.get("current_sprint", 1)
 
+def get_recent_sprint_history(n: int = 5) -> str:
+    """Récupère l'historique des derniers sprints pour donner du contexte au Product Manager."""
+    state = load_json_file(STATE_FILE, lambda: {"current_sprint": 1, "completed_sprints": []})
+    sprints = state.get("completed_sprints", [])
+    if not sprints:
+        return "Aucun sprint précédent."
+    history = []
+    for s in sprints[-n:]:
+        history.append(f"Sprint {s.get('sprint')}: {s.get('goal')}")
+    return "\n".join(history)
+
+def is_sprint_stuck(threshold: int = 4) -> bool:
+    """Vérifie si les 'threshold' derniers sprints ont eu exactement le même objectif (boucle infinie)."""
+    state = load_json_file(STATE_FILE, lambda: {"current_sprint": 1, "completed_sprints": []})
+    sprints = state.get("completed_sprints", [])
+    if len(sprints) < threshold:
+        return False
+    last_goal = sprints[-1].get("goal", "").strip()
+    return all(s.get("goal", "").strip() == last_goal for s in sprints[-threshold:])
+
 def increment_sprint_num(sprint_goal: str) -> None:
     state = load_json_file(STATE_FILE, lambda: {"current_sprint": 1, "completed_sprints": []})
     state["completed_sprints"].append({
@@ -1240,6 +1260,20 @@ def execute_sprint_cycle() -> bool:
                 src_context += f"\n// File: {rel_p}\n" + f.read_text(encoding="utf-8") + "\n"
 
         file_tree_summary = get_repository_summary()
+        
+        # Détection de boucle et préparation du contexte d'urgence
+        recent_history = get_recent_sprint_history(5)
+        stuck_warning = ""
+        if is_sprint_stuck(threshold=4):
+            print("   ⚠️ [Alerte] Boucle détectée ! Le PM va être forcé de fragmenter la tâche en cours.")
+            stuck_warning = """
+        🚨 URGENT: STUCK SPRINT LOOP DETECTED 🚨
+        The team has attempted to implement the exact same Sprint Goal for the last 4+ sprints. The feature is either too complex, structurally blocked, or repeatedly failing the audit.
+        YOU MUST:
+        1. REWRITE the stuck feature in the backlog to break it down into 3 to 4 MUCH SMALLER, highly specific, granular sub-tasks.
+        2. DO NOT select the same large feature again.
+        3. Select the absolute simplest, most foundational new sub-task as the NEW SPRINT_GOAL.
+        """
 
         pm_prompt = f"""
         MASTER ROADMAP (README.md):
@@ -1247,6 +1281,9 @@ def execute_sprint_cycle() -> bool:
 
         CURRENT BACKLOG TO AUDIT (docs/BACKLOG.md):
         {backlog_content}
+
+        RECENT SPRINT HISTORY:
+        {recent_history}
 
         ACTUAL REPOSITORY FILE TREE:
         {file_tree_summary}
@@ -1265,11 +1302,13 @@ def execute_sprint_cycle() -> bool:
         {phys_ideas}
 
         CRITICAL AUDIT & GROOMING INSTRUCTION:
-        1. STRICT EVIDENCE-BASED AUDIT: You must be highly skeptical. Change `[ ]` to `[x]` ONLY if you see the explicit, dedicated classes and math for that feature in the ACTUAL IMPLEMENTED SOURCE CODE. If an item is `[x]` but the explicit code is missing, REVERT it to `[ ]`. NEVER add subjective notes like "-> Note: Implemented inline". Keep items strictly as `- [ ]` or `- [x]`.
-        2. GROOM: Integrate the Brainstormer proposals. Break down large human-added features into granular tasks.
-        3. REPRIORITIZE: Re-order the `[ ]` list strictly top-to-bottom based on architectural dependency. Base monads, schemas, and math go first. UI and integrations go later.
-        4. EVOLVE PHASES: Create, merge, or rename `### Phase N` headers if the roadmap organically shifts.
-        5. SPRINT GOAL: Select the absolute top `[ ]` item from the highest active phase.
+        {stuck_warning}
+        1. LOGIC-BASED AUDIT: Revert any `[x]` items to `[ ]` ONLY IF the described logic/feature is completely missing from the ACTUAL IMPLEMENTED SOURCE CODE. Do NOT uncheck an item just because a specific file path is missing, as long as the functionality was successfully implemented in another file.
+        2. STRICT EVIDENCE-BASED AUDIT: You must be highly skeptical. Change `[ ]` to `[x]` ONLY if you see the explicit, dedicated classes and math for that feature in the ACTUAL IMPLEMENTED SOURCE CODE. If an item is `[x]` but the explicit code is missing, REVERT it to `[ ]`. NEVER add subjective notes like "-> Note: Implemented inline". Keep items strictly as `- [ ]` or `- [x]`.
+        3. GROOM: Integrate the Brainstormer proposals. Break down large human-added features into granular tasks.
+        4. REPRIORITIZE: Re-order the `[ ]` list strictly top-to-bottom based on architectural dependency. Base monads, schemas, and math go first. UI and integrations go later.
+        5. EVOLVE PHASES: Create, merge, or rename `### Phase N` headers if the roadmap organically shifts.
+        6. SPRINT GOAL: Select the absolute top `[ ]` item from the highest active phase.
         """
         pm_response = call_agent("PRODUCT_MANAGER", pm_prompt)
         apply_multifile_response(pm_response, fallback_filename="docs/BACKLOG.md")

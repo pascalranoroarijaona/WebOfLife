@@ -18,7 +18,7 @@ import {
 } from './thermodynamics/types.js';
 import { executeThermodynamicStep } from './thermodynamics/thermodynamic_monad_process.js';
 
-export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, ThermodynamicMetrics };
+export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, ThermodynamicMetrics, IThermodynamicBoundaryFlux };
 
 export enum EntropyState {
   STEADY = "STEADY",
@@ -237,7 +237,15 @@ export function applyThermalFlux(
 
   const bFluxes = state.boundaryFluxes;
   const isArr = Array.isArray(bFluxes);
-  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : {};
+  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : ({
+    heatFluxes: new Map(),
+    massFluxes: new Map(),
+    solarRadiationIn: 0,
+    longwaveRadiationOut: 0,
+    sensibleHeatFlux: 0,
+    latentHeatFlux: 0,
+    netMassFlux: 0
+  } as IBoundaryFluxArray);
 
   const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
   const massFluxesMap = bfRecord.massFluxes ?? new Map();
@@ -248,10 +256,10 @@ export function applyThermalFlux(
   const netMass = bfRecord.netMassFlux ?? 0;
 
   const boundaryFluxes: IBoundaryFluxArray = {
+    ...bfRecord,
     heatFluxes: heatFluxesMap,
     massFluxes: massFluxesMap,
     radiativeNet: qNet,
-    ...bfRecord,
     solarRadiationIn: solarRad,
     longwaveRadiationOut: longwaveOut,
     sensibleHeatFlux: sensible,
@@ -316,7 +324,15 @@ export function applyMassTransport(
 
   const bFluxes = state.boundaryFluxes;
   const isArr = Array.isArray(bFluxes);
-  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : {};
+  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : ({
+    heatFluxes: new Map(),
+    massFluxes: new Map(),
+    solarRadiationIn: 0,
+    longwaveRadiationOut: 0,
+    sensibleHeatFlux: 0,
+    latentHeatFlux: 0,
+    netMassFlux: 0
+  } as IBoundaryFluxArray);
 
   const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
   const radiative = bfRecord.radiativeNet ?? 0;
@@ -325,11 +341,13 @@ export function applyMassTransport(
   const sensible = bfRecord.sensibleHeatFlux ?? 0;
   const latent = bfRecord.latentHeatFlux ?? 0;
 
+  const massFluxesMap = massFluxes instanceof Map ? new Map(massFluxes) : (massFluxes ?? new Map());
+
   const boundaryFluxes: IBoundaryFluxArray = {
-    heatFluxes: heatFluxesMap,
-    radiativeNet: radiative,
-    massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : (massFluxes ?? new Map()),
     ...bfRecord,
+    heatFluxes: heatFluxesMap,
+    massFluxes: massFluxesMap,
+    radiativeNet: radiative,
     solarRadiationIn: solarRad,
     longwaveRadiationOut: longwaveOut,
     sensibleHeatFlux: sensible,

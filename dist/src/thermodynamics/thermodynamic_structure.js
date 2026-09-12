@@ -2,9 +2,9 @@
  * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad, BoundaryFluxArray } from './types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad } from './types.js';
 import { executeThermodynamicStep } from './thermodynamic_monad_process.js';
-export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray };
+export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep };
 export var EntropyState;
 (function (EntropyState) {
     EntropyState["STEADY"] = "STEADY";
@@ -180,19 +180,23 @@ export function applyThermalFlux(stock, state, qNet, boundaryTemp, dt) {
     const newEntropy = currentEntropy + dEntropy;
     const bFluxes = state.boundaryFluxes;
     const isArr = Array.isArray(bFluxes);
-    const bfRecord = !isArr && bFluxes ? bFluxes : {};
-    const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
-    const massFluxesMap = bfRecord.massFluxes ?? new Map();
+    const bfRecord = !isArr && bFluxes ? bFluxes : {
+        heatFluxes: new Map(),
+        massFluxes: new Map(),
+        solarRadiationIn: 0,
+        longwaveRadiationOut: 0,
+        sensibleHeatFlux: 0,
+        latentHeatFlux: 0,
+        netMassFlux: 0
+    };
     const solarRad = bfRecord.solarRadiationIn ?? 0;
     const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
     const sensible = bfRecord.sensibleHeatFlux ?? 0;
     const latent = bfRecord.latentHeatFlux ?? 0;
     const netMass = bfRecord.netMassFlux ?? 0;
     const boundaryFluxes = {
-        heatFluxes: heatFluxesMap,
-        massFluxes: massFluxesMap,
-        radiativeNet: qNet,
         ...bfRecord,
+        radiativeNet: qNet,
         solarRadiationIn: solarRad,
         longwaveRadiationOut: longwaveOut,
         sensibleHeatFlux: sensible,
@@ -243,18 +247,23 @@ export function applyMassTransport(stock, state, massFluxes, specificEnthalpy, s
     const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
     const bFluxes = state.boundaryFluxes;
     const isArr = Array.isArray(bFluxes);
-    const bfRecord = !isArr && bFluxes ? bFluxes : {};
-    const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
+    const bfRecord = !isArr && bFluxes ? bFluxes : {
+        heatFluxes: new Map(),
+        massFluxes: new Map(),
+        solarRadiationIn: 0,
+        longwaveRadiationOut: 0,
+        sensibleHeatFlux: 0,
+        latentHeatFlux: 0,
+        netMassFlux: 0
+    };
     const radiative = bfRecord.radiativeNet ?? 0;
     const solarRad = bfRecord.solarRadiationIn ?? 0;
     const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
     const sensible = bfRecord.sensibleHeatFlux ?? 0;
     const latent = bfRecord.latentHeatFlux ?? 0;
     const boundaryFluxes = {
-        heatFluxes: heatFluxesMap,
-        radiativeNet: radiative,
-        massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : (massFluxes ?? new Map()),
         ...bfRecord,
+        radiativeNet: radiative,
         solarRadiationIn: solarRad,
         longwaveRadiationOut: longwaveOut,
         sensibleHeatFlux: sensible,

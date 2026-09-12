@@ -18,6 +18,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
       referenceTemperature: 288.15,
       entropyGenerationRate: 0,
       exergyDestructionRate: 0,
+      exergy: 1e10,
       boundaryFluxes: {
         solarRadiationIn: 0,
         longwaveRadiationOut: 0,
@@ -80,6 +81,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
       referenceTemperature: 288.15,
       entropyGenerationRate: 0,
       exergyDestructionRate: 0,
+      exergy: 1e10,
       boundaryFluxes: {
         solarRadiationIn: 0,
         longwaveRadiationOut: 0,
@@ -138,6 +140,7 @@ describe('Sprint 010: Thermodynamic State Vector Interface & Second Law Validati
       referenceTemperature: 288.15,
       entropyGenerationRate: -15.0, // Invalid!
       exergyDestructionRate: -4322.25,
+      exergy: 1e10,
       boundaryFluxes: {
         solarRadiationIn: 1e15,
         longwaveRadiationOut: 2e15,
