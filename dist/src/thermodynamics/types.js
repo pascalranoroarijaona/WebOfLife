@@ -4,6 +4,12 @@
  * exergy metrics, non-negative entropy validations, and historical aliases.
  */
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
+export function ok(value) {
+    return { success: true, value, isOk: () => true, isErr: () => false };
+}
+export function err(error) {
+    return { success: false, error, errorValue: error, isOk: () => false, isErr: () => true };
+}
 export class ThermodynamicStateMonad {
     state;
     value;
@@ -250,11 +256,11 @@ export function executeThermodynamicTransition(state, transitionFn) {
     try {
         const nextState = transitionFn(state);
         if ((nextState.entropy < 0) || (nextState.entropyGenerationRate < 0) || (nextState.temperature <= 0)) {
-            return { isOk: () => false, isErr: () => true, error: new ThermodynamicEntropyViolationError(nextState) };
+            return { isOk: () => false, isErr: () => true, error: new ThermodynamicEntropyViolationError(nextState), value: undefined };
         }
-        return { isOk: () => true, isErr: () => false, value: nextState };
+        return { isOk: () => true, isErr: () => false, value: nextState, error: undefined };
     }
     catch (err) {
-        return { isOk: () => false, isErr: () => true, error: err };
+        return { isOk: () => false, isErr: () => true, error: err, value: undefined };
     }
 }

@@ -44,8 +44,9 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
     const result = StateValidator.assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
     if (result.isErr()) {
-      assert.ok(result.error instanceof ThermodynamicEntropyViolationError);
-      assert.strictEqual(result.error.name, 'ThermodynamicEntropyViolationError');
+      const err = (result as any).errorValue ?? (result as any).error;
+      assert.ok(err instanceof ThermodynamicEntropyViolationError);
+      assert.strictEqual(err.name, 'ThermodynamicEntropyViolationError');
     }
   });
 

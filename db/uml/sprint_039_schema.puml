@@ -1,0 +1,62 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+
+package "src.thermodynamics" {
+  
+  interface "Result<T, E>" as Result {
+    +success: boolean
+    +value?: T
+    +error?: E
+  }
+
+  class ThermodynamicStateVector {
+    -entropy: number
+    -internalEnergy: number
+    -temperature: number
+    -pressure: number
+    +getEntropy(): number
+    +getInternalEnergy(): number
+  }
+
+  class StateValidator {
+    +{static} assertNonNegativeEntropy(state: ThermodynamicStateVector | Record<string, any>): Result<any, string>
+  }
+}
+
+package "Database Ledger" {
+  class ThermodynamicStateTable {
+    +state_id: UUID
+    +entity_id: UUID
+    +entropy_value: NUMERIC
+    +internal_energy: NUMERIC
+    +validation_status: VARCHAR
+    +recorded_at: TIMESTAMP
+  }
+
+  class MonadExecutionLedgerTable {
+    +execution_id: UUID
+    +utility_name: VARCHAR
+    +input_payload: JSONB
+    +is_success: BOOLEAN
+    +error_reason: TEXT
+    +executed_at: TIMESTAMP
+  }
+
+  class ThermodynamicBlockTable {
+    +block_id: UUID
+    +block_height: BIGINT
+    +previous_hash: VARCHAR
+    +current_hash: VARCHAR
+    +entropy_change_rate: NUMERIC
+    +created_at: TIMESTAMP
+  }
+}
+
+StateValidator ..> Result : creates / returns
+StateValidator --> ThermodynamicStateVector : inspects
+ThermodynamicStateVector --> ThermodynamicStateTable : persists to
+StateValidator --> MonadExecutionLedgerTable : logs execution
+ThermodynamicBlockTable --> ThermodynamicStateTable : references state vector
+
+@enduml

@@ -5,10 +5,12 @@ class MockThermodynamicState {
     entropy;
     entropyGenerationRate;
     energy;
-    constructor(entropy, entropyGenerationRate, energy) {
+    temperature;
+    constructor(entropy, entropyGenerationRate, energy, temperature = 288.15) {
         this.entropy = entropy;
         this.entropyGenerationRate = entropyGenerationRate;
         this.energy = energy;
+        this.temperature = temperature;
     }
     getEntropy() {
         return this.entropy;
@@ -25,7 +27,10 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
         const validState = new MockThermodynamicState(1500.5, 12.3, 100000);
         assert.strictEqual(StateValidator.validateEntropy(validState), true);
         assert.doesNotThrow(() => {
-            StateValidator.assertNonNegativeEntropy(validState);
+            const res = StateValidator.assertNonNegativeEntropy(validState);
+            if (res.isErr && res.isErr()) {
+                throw new ThermodynamicConstraintViolationError('Negative entropy');
+            }
         });
     });
     it('should detect and reject states with negative entropy (violating S >= 0)', () => {
@@ -34,7 +39,8 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
         assert.throws(() => {
             const res = StateValidator.assertNonNegativeEntropy(invalidState);
             if (res.isErr && res.isErr()) {
-                throw new ThermodynamicConstraintViolationError('Negative entropy');
+                const err = res.errorValue ?? res.error;
+                throw new ThermodynamicConstraintViolationError(err?.message ?? 'Negative entropy');
             }
         }, ThermodynamicConstraintViolationError);
     });
@@ -44,14 +50,18 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
         assert.throws(() => {
             const res = StateValidator.assertNonNegativeEntropy(invalidState);
             if (res.isErr && res.isErr()) {
-                throw new ThermodynamicConstraintViolationError('Negative entropy generation rate');
+                const err = res.errorValue ?? res.error;
+                throw new ThermodynamicConstraintViolationError(err?.message ?? 'Negative entropy generation rate');
             }
         }, ThermodynamicConstraintViolationError);
     });
     it('should integrate correctly with thermodynamic monad processes', () => {
         const validState = new MockThermodynamicState(300.0, 1.0, 50000);
         assert.doesNotThrow(() => {
-            StateValidator.assertNonNegativeEntropy(validState);
+            const res = StateValidator.assertNonNegativeEntropy(validState);
+            if (res.isErr && res.isErr()) {
+                throw new ThermodynamicConstraintViolationError('Invalid');
+            }
         });
     });
 });

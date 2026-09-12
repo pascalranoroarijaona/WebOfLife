@@ -67,8 +67,8 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         const result = validator.validate(invalidEntropyState);
         assert.strictEqual(result.isValid, false);
-        assert.ok((result.violations ?? []).some(v => v.includes('Entropy') && v.includes('negative')));
-        assert.throws(() => validator.assertValid(invalidEntropyState), /Thermodynamic State Validation Failed/);
+        assert.ok((result.violations ?? []).some((v: any) => v.includes('Entropy') && v.includes('negative')));
+        assert.throws(() => validator.assertValid(invalidEntropyState), /State validation failed/);
     });
 
     it('3. States with negative entropy generation rates (S_gen < 0) are rejected', () => {
@@ -97,8 +97,8 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         const result = validator.validate(invalidGenState);
         assert.strictEqual(result.isValid, false);
-        assert.ok((result.violations ?? []).some(v => v.includes('Entropy generation rate')));
-        assert.throws(() => validator.assertValid(invalidGenState), /Thermodynamic State Validation Failed/);
+        assert.ok((result.violations ?? []).some((v: any) => v.includes('Dissipation rate') || v.includes('Entropy generation')));
+        assert.throws(() => validator.assertValid(invalidGenState), /State validation failed/);
     });
 
     it('4. Integration with EarthPod thermal and matter balance loops via ThermodynamicMonadProcess', () => {
@@ -106,7 +106,7 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
         const initialState = earth.getStateVector();
         const monadProcess = new ThermodynamicMonadProcess();
 
-        const transformedState = monadProcess.bind(initialState, (state) => ({
+        const transformedState = monadProcess.bind(initialState, (state: IThermodynamicStateVector) => ({
             ...state,
             entropy: state.entropy + 10,
             entropyGenerationRate: 25.0
@@ -116,10 +116,10 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         // Verify failure throwing in monad bind
         assert.throws(() => {
-            monadProcess.bind(initialState, (state) => ({
+            monadProcess.bind(initialState, (state: IThermodynamicStateVector) => ({
                 ...state,
                 entropyGenerationRate: -5.0
             }));
-        }, /Thermodynamic State Validation Failed/);
+        }, /State validation failed/);
     });
 });

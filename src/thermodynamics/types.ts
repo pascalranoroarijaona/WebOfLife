@@ -180,11 +180,16 @@ export interface IThermodynamicStateVector {
 
 export type ThermodynamicStateVector = IThermodynamicStateVector;
 
+export interface ValidationFailure {
+  property: string;
+  reason: string;
+}
+
 export interface ValidationResult {
   isValid: boolean;
   violations: string[];
   valid?: boolean;
-  errors?: any[];
+  errors?: ValidationFailure[] | any[];
   warnings?: string[];
 }
 
@@ -260,6 +265,18 @@ export type FluxType = string;
 export type IBoundaryFluxStructure = IBoundaryFluxArray;
 export type ThermalStock = { temperature: number; thermalEnergy: number; [key: string]: any };
 export type BiogeochemicalStock = { totalMass: number; [key: string]: any };
+
+export type Result<T, E = string> =
+  | { success: true; value: T; error?: never; isOk: () => boolean; isErr: () => boolean }
+  | { success: false; error: E; value?: never; errorValue?: E; isOk: () => boolean; isErr: () => boolean };
+
+export function ok<T>(value: T): Result<T, never> {
+  return { success: true, value, isOk: () => true, isErr: () => false };
+}
+
+export function err<E>(error: E): Result<never, E> {
+  return { success: false, error, errorValue: error, isOk: () => false, isErr: () => true };
+}
 
 export class ThermodynamicStateMonad<T = any> {
   private state: IThermodynamicStateVector | any;
@@ -564,10 +581,10 @@ export function executeThermodynamicTransition(
   try {
     const nextState = transitionFn(state);
     if ((nextState.entropy < 0) || (nextState.entropyGenerationRate < 0) || (nextState.temperature <= 0)) {
-      return { isOk: () => false, isErr: () => true, error: new ThermodynamicEntropyViolationError(nextState) };
+      return { isOk: () => false, isErr: () => true, error: new ThermodynamicEntropyViolationError(nextState), value: undefined };
     }
-    return { isOk: () => true, isErr: () => false, value: nextState };
+    return { isOk: () => true, isErr: () => false, value: nextState, error: undefined };
   } catch (err) {
-    return { isOk: () => false, isErr: () => true, error: err };
+    return { isOk: () => false, isErr: () => true, error: err, value: undefined };
   }
 }

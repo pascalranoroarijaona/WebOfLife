@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 039: Web of Life - Thermodynamic State Vector Non-Negative Entropy Assertion Utility</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sprint 039</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Validator & Non-Negative Entropy Assertion Utility Active (60 FPS Render Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/30 p-6 flex flex-col gap-6 overflow-y-auto">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-emerald-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-emerald-400">42</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sprint-telemetry" class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">State Vector Validation</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-2 text-xs font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Entropy Rate:</span>
+                        <span id="telemetry-entropy" class="text-emerald-400">+0.042 J/K</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">ΔS Assertion:</span>
+                        <span id="telemetry-assertion" class="text-emerald-400">PASSED (&ge; 0)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">State Vector Norm:</span>
+                        <span id="telemetry-norm" class="text-slate-200">1.0000</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <canvas id="view-canvas" class="w-full h-full block"></canvas>
+            <div id="overlay-stats" class="absolute top-4 right-4 bg-slate-900/80 backdrop-blur border border-slate-800/80 rounded-lg p-3 text-xs font-mono text-slate-300 pointer-events-none flex flex-col gap-1 shadow-xl">
+                <div>THERMODYNAMIC_STATE: <span class="text-emerald-400 font-bold">NOMINAL</span></div>
+                <div>ENTROPY_VECTOR: <span class="text-cyan-400 font-bold">NON-NEGATIVE</span></div>
+                <div>SIM_TIME: <span id="sim-time" class="text-amber-400 font-bold">00:00:00</span></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 bg-slate-900/40 px-6 py-3 text-xs text-slate-500 flex justify-between items-center">
+        <div>Web of Life Simulation Engine &mdash; Sprint 039 Thermodynamic State Vector Non-Negative Entropy Assertion Utility</div>
+        <div class="flex items-center space-x-4">
+            <a href="01_RFC.md" class="hover:text-slate-300 transition">RFC</a>
+            <a href="02_METHODS.md" class="hover:text-slate-300 transition">Methods</a>
+            <a href="05_ACADEMIC_PREPRINT.pdf" class="hover:text-slate-300 transition">Preprint</a>
+        </div>
+    </footer>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let isRunning = true;
+        let generation = 1;
+        let simSeconds = 0;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let lastFpsUpdate = lastTime;
+
+        const canvas = document.getElementById('view-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020617, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        camera.position.set(0, 25, 45);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x0f172a, 2.0);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0x38bdf8, 3.0);
+        sunLight.position.set(20, 40, 20);
+        scene.add(sunLight);
+
+        const coreLight = new THREE.PointLight(0x10b981, 5, 50);
+        coreLight.position.set(0, 0, 0);
+        scene.add(coreLight);
+
+        // Create Thermodynamic Network Grid / Sphere
+        const group = new THREE.Group();
+        scene.add(group);
+
+        const sphereGeo = new THREE.IcosahedronGeometry(12, 3);
+        const sphereMat = new THREE.MeshStandardMaterial({
+            color: 0x064e3b,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.35
+        });
+        const wireSphere = new THREE.Mesh(sphereGeo, sphereMat);
+        group.add(wireSphere);
+
+        // Nodes representing thermodynamic state vector components
+        const nodeCount = 42;
+        const nodeGeo = new THREE.SphereGeometry(0.4, 16, 16);
+        const nodes = [];
+        const nodeData = [];
+
+        for (let i = 0; i < nodeCount; i++) {
+            const phi = Math.acos(-1 + (2 * i) / nodeCount);
+            const theta = Math.sqrt(nodeCount * Math.PI) * phi;
+
+            const x = 12 * Math.cos(theta) * Math.sin(phi);
+            const y = 12 * Math.sin(theta) * Math.sin(phi);
+            const z = 12 * Math.cos(phi);
+
+            const mat = new THREE.MeshStandardMaterial({
+                color: i % 2 === 0 ? 0x10b981 : 0x38bdf8,
+                emissive: i % 2 === 0 ? 0x047857 : 0x0284c7,
+                emissiveIntensity: 0.6
+            });
+
+            const mesh = new THREE.Mesh(nodeGeo, mat);
+            mesh.position.set(x, y, z);
+            group.add(mesh);
+
+            nodes.push(mesh);
+            nodeData.push({
+                basePos: new THREE.Vector3(x, y, z),
+                entropy: Math.random() * 0.5 + 0.1,
+                velocity: new THREE.Vector3((Math.random()-0.5)*0.02, (Math.random()-0.5)*0.02, (Math.random()-0.5)*0.02)
+            });
+        }
+
+        // Connecting lines for thermodynamic state network
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.15 });
+        const lineGeo = new THREE.BufferGeometry();
+        const linePositions = [];
+
+        for (let i = 0; i < nodeCount; i++) {
+            for (let j = i + 1; j < nodeCount; j++) {
+                if (nodes[i].position.distanceTo(nodes[j].position) < 8.5) {
+                    linePositions.push(nodes[i].position.x, nodes[i].position.y, nodes[i].position.z);
+                    linePositions.push(nodes[j].position.x, nodes[j].position.y, nodes[j].position.z);
+                }
+            }
+        }
+        lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+        const networkLines = new THREE.LineSegments(lineGeo, lineMat);
+        group.add(networkLines);
+
+        // UI Element References
+        const metricEntities = document.getElementById('metric-entities');
+        const metricFps = document.getElementById('metric-fps');
+        const metricGen = document.getElementById('metric-gen');
+        const telemetryEntropy = document.getElementById('telemetry-entropy');
+        const telemetryAssertion = document.getElementById('telemetry-assertion');
+        const telemetryNorm = document.getElementById('telemetry-norm');
+        const simTimeEl = document.getElementById('sim-time');
+
+        // Event Listeners
+        document.getElementById('btn-start').addEventListener('click', () => { isRunning = true; });
+        document.getElementById('btn-pause').addEventListener('click', () => { isRunning = false; });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            generation++;
+            metricGen.textContent = generation;
+            simSeconds = 0;
+            nodeData.forEach(d => {
+                d.entropy = Math.random() * 0.5 + 0.1;
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Main Animation & Assertion Loop
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            // FPS calculation
+            frameCount++;
+            if (now - lastFpsUpdate >= 1000) {
+                const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+                metricFps.textContent = fps;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+
+            if (isRunning) {
+                const dt = (now - lastTime) / 1000;
+                simSeconds += dt;
+
+                const hrs = String(Math.floor(simSeconds / 3600)).padStart(2, '0');
+                const mins = String(Math.floor((simSeconds % 3600) / 60)).padStart(2, '0');
+                const secs = String(Math.floor(simSeconds % 60)).padStart(2, '0');
+                simTimeEl.textContent = `${hrs}:${mins}:${secs}`;
+
+                group.rotation.y += 0.002;
+                group.rotation.x = Math.sin(simSeconds * 0.5) * 0.1;
+
+                // Update nodes and calculate thermodynamic entropy assertion
+                let totalEntropy = 0;
+                let minEntropy = Infinity;
+                let normSum = 0;
+
+                nodes.forEach((node, idx) => {
+                    const data = nodeData[idx];
+                    data.entropy += (Math.random() - 0.48) * 0.01;
+                    if (data.entropy < 0.001) data.entropy = 0.001; // Enforce non-negative entropy law
+
+                    totalEntropy += data.entropy;
+                    if (data.entropy < minEntropy) minEntropy = data.entropy;
+
+                    normSum += node.position.lengthSq();
+                });
+
+                const avgEntropy = totalEntropy / nodeCount;
+                telemetryEntropy.textContent = `+${avgEntropy.toFixed(4)} J/K`;
+                
+                if (minEntropy >= 0) {
+                    telemetryAssertion.textContent = "PASSED (\u2265 0)";
+                    telemetryAssertion.className = "text-emerald-400 font-bold";
+                } else {
+                    telemetryAssertion.textContent = "FAILED (< 0)";
+                    telemetryAssertion.className = "text-rose-500 font-bold";
+                }
+
+                telemetryNorm.textContent = Math.sqrt(normSum / nodeCount).toFixed(4);
+            }
+
+            lastTime = now;
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

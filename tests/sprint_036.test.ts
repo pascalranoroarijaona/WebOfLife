@@ -5,13 +5,13 @@ import {
   StateValidator, 
   ThermodynamicConstraintViolationError 
 } from '../src/thermodynamics/state_validator.js';
-import { ThermodynamicMonadProcess } from '../src/thermodynamics/thermodynamic_monad_process.js';
 
 class MockThermodynamicState implements ThermodynamicState {
   constructor(
     public entropy: number,
     public entropyGenerationRate: number,
-    public energy: number
+    public energy: number,
+    public temperature: number = 288.15
   ) {}
 
   public getEntropy(): number {
@@ -33,7 +33,10 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
     
     assert.strictEqual(StateValidator.validateEntropy(validState), true);
     assert.doesNotThrow(() => {
-      StateValidator.assertNonNegativeEntropy(validState);
+      const res = StateValidator.assertNonNegativeEntropy(validState);
+      if (res.isErr && res.isErr()) {
+        throw new ThermodynamicConstraintViolationError('Negative entropy');
+      }
     });
   });
 
@@ -44,7 +47,8 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
     assert.throws(() => {
       const res = StateValidator.assertNonNegativeEntropy(invalidState);
       if (res.isErr && res.isErr()) {
-        throw new ThermodynamicConstraintViolationError('Negative entropy');
+        const err = (res as any).errorValue ?? (res as any).error;
+        throw new ThermodynamicConstraintViolationError(err?.message ?? 'Negative entropy');
       }
     }, ThermodynamicConstraintViolationError);
   });
@@ -56,7 +60,8 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
     assert.throws(() => {
       const res = StateValidator.assertNonNegativeEntropy(invalidState);
       if (res.isErr && res.isErr()) {
-        throw new ThermodynamicConstraintViolationError('Negative entropy generation rate');
+        const err = (res as any).errorValue ?? (res as any).error;
+        throw new ThermodynamicConstraintViolationError(err?.message ?? 'Negative entropy generation rate');
       }
     }, ThermodynamicConstraintViolationError);
   });
@@ -65,7 +70,10 @@ describe('Sprint 036: Thermodynamic State Vector Non-Negative Entropy Assertion'
     const validState = new MockThermodynamicState(300.0, 1.0, 50000);
 
     assert.doesNotThrow(() => {
-      StateValidator.assertNonNegativeEntropy(validState);
+      const res = StateValidator.assertNonNegativeEntropy(validState);
+      if (res.isErr && res.isErr()) {
+        throw new ThermodynamicConstraintViolationError('Invalid');
+      }
     });
   });
 });
