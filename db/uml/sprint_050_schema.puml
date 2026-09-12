@@ -1,0 +1,97 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam shadowing false
+
+title Web of Life - Sprint 050: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
+
+package "src.thermodynamics" {
+  
+  interface ThermodynamicState {
+    + internalEnergy: number
+    + entropy: number
+    + temperature: number
+    + timestamp: number
+  }
+
+  class StateVector implements ThermodynamicState {
+    - internalEnergy: number
+    - entropy: number
+    - temperature: number
+    - timestamp: number
+    - solarFlux: number
+    + getEntropy(): number
+    + getInternalEnergy(): number
+    + getTemperature(): number
+    + getSolarFlux(): number
+    + clone(): StateVector
+  }
+
+  class ValidationResult {
+    + valid: boolean
+    + state: StateVector
+    + deltaEntropy: number
+    + reason?: string
+  }
+
+  class ThermodynamicMonadProcess {
+    - currentState: StateVector
+    + executeTransform(fn: StateTransformFunction): ValidationResult
+  }
+
+  note right of withEntropyCheck
+    **Monadic Pipe Operator**
+    Enforces Second Law:
+    \u0394S_univ = \u0394S_sys + \u0394S_surr \u2265 0
+    Rollback occurs if \u0394S < 0
+    and uncompensated by solarInput.
+  end note
+
+  class StateValidator {
+    {static} + withEntropyCheck(initialState: StateVector, transformFn: StateTransformFunction): ValidationResult
+  }
+}
+
+package "Database & Ledger Schema" {
+  class ThermodynamicStateTable {
+    + id: UUID
+    + pod_id: UUID
+    + internal_energy: NUMERIC
+    + entropy: NUMERIC
+    + temperature: NUMERIC
+    + solar_flux: NUMERIC
+    + timestamp: TIMESTAMPTZ
+  }
+
+  class ThermodynamicTransformationTable {
+    + id: UUID
+    + initial_state_id: UUID
+    + candidate_state_id: UUID
+    + result_state_id: UUID
+    + delta_entropy: NUMERIC
+    + solar_input: NUMERIC
+    + is_valid: BOOLEAN
+    + rejection_reason: TEXT
+    + executed_at: TIMESTAMPTZ
+  }
+
+  class ThermodynamicBlockTable {
+    + block_index: SERIAL
+    + block_hash: VARCHAR
+    + previous_block_hash: VARCHAR
+    + transformation_id: UUID
+    + merkle_root: VARCHAR
+    + validator_signature: VARCHAR
+    + minted_at: TIMESTAMPTZ
+  }
+}
+
+-- Relationships & Dependencies
+StateVector --> ThermodynamicState : implements
+StateValidator ..> StateVector : inspects
+StateValidator ..> ValidationResult : produces
+ThermodynamicMonadProcess --> StateVector : manages
+ThermodynamicTransformationTable --> ThermodynamicStateTable : references states
+ThermodynamicBlockTable --> ThermodynamicTransformationTable : anchors
+
+@enduml

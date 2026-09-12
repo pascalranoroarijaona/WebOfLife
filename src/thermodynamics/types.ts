@@ -194,6 +194,7 @@ export interface IThermodynamicStateVector {
 }
 
 export type ThermodynamicStateVector = IThermodynamicStateVector;
+export type ThermodynamicState = IThermodynamicStateVector;
 
 export interface ValidationFailure {
   property: string;
@@ -203,10 +204,22 @@ export interface ValidationFailure {
 export interface ValidationResult {
   isValid: boolean;
   valid?: boolean;
+  success?: boolean;
   violations?: string[];
   errors?: ValidationFailure[] | any[];
   warnings?: string[];
+  value?: any;
+  error?: any;
+  state?: any;
+  deltaEntropy?: number;
+  entropyChange?: number;
+  reason?: string;
+  universeEntropyChange: number;
+  isOk?: () => boolean;
+  isErr?: () => boolean;
 }
+
+export type StateTransformFunction = (state: any) => any;
 
 export interface IStateValidator {
   validate(state: IThermodynamicStateVector): ValidationResult;
