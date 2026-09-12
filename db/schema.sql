@@ -1,64 +1,61 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger (Sprint 068)
+-- Web of Life Database Schema: Sprint 069
+-- Thermodynamic State Vector Discrepancy Absolute Difference Math Function
 -- ============================================================================
 
--- Enable UUID extension
+-- Enable UUID extension if not present
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors Table
+-- 1. Thermodynamic State Vectors & Stock Ledgers
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL,
-    carbon DECIMAL(18, 8) NOT NULL DEFAULT 0.0,
-    nitrogen DECIMAL(18, 8) NOT NULL DEFAULT 0.0,
-    phosphorus DECIMAL(18, 8) NOT NULL DEFAULT 0.0,
-    water DECIMAL(18, 8) NOT NULL DEFAULT 0.0,
-    energy DECIMAL(18, 8) NOT NULL DEFAULT 0.0,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_thermodynamic_vectors_pod ON thermodynamic_state_vectors(pod_id, recorded_at DESC);
-
--- ----------------------------------------------------------------------------
--- 2. State Discrepancy Reports Table (Sprint 068)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS state_discrepancy_reports (
-    report_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    actual_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
-    expected_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
-    is_valid BOOLEAN NOT NULL,
-    max_discrepancy DECIMAL(18, 12) NOT NULL,
-    discrepancy_details JSONB NOT NULL,
-    evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_discrepancy_reports_valid ON state_discrepancy_reports(is_valid, evaluated_at DESC);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Stock Transactions & Blockchain Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_index BIGINT UNIQUE NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
-    hash VARCHAR(64) NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
+CREATE TABLE IF NOT EXISTS thermodynamic_states (
+    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_id VARCHAR(255) NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    validator_signature VARCHAR(128) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
-    source_pod_id UUID NOT NULL,
-    target_pod_id UUID NOT NULL,
-    element_type VARCHAR(32) NOT NULL,
-    amount DECIMAL(18, 8) NOT NULL,
-    entropy_delta DECIMAL(18, 8) NOT NULL,
-    signature VARCHAR(128) NOT NULL,
+    stocks JSONB NOT NULL DEFAULT '{}'::jsonb,
+    entropy_delta NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_thermodynamic_tx_block ON thermodynamic_transactions(block_id);
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity_time 
+    ON thermodynamic_states(entity_id, timestamp DESC);
+
+-- ----------------------------------------------------------------------------
+-- 2. State Discrepancy Ledger (Sprint 069 Tracking)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS state_discrepancy_logs (
+    discrepancy_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    actual_state_id UUID REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
+    expected_state_id UUID REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
+    absolute_deltas JSONB NOT NULL DEFAULT '{}'::jsonb,
+    max_absolute_delta NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_state_discrepancy_computed 
+    ON state_discrepancy_logs(computed_at DESC);
+
+-- ----------------------------------------------------------------------------
+-- 3. Thermodynamic Monad Stock Transactions & Blockchain Ledger
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_monad_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_index BIGINT NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    current_hash VARCHAR(64) NOT NULL,
+    actor_id VARCHAR(255) NOT NULL,
+    stock_inputs JSONB NOT NULL DEFAULT '{}'::jsonb,
+    stock_outputs JSONB NOT NULL DEFAULT '{}'::jsonb,
+    discrepancy_record_id UUID REFERENCES state_discrepancy_logs(discrepancy_id),
+    first_law_conserved BOOLEAN NOT NULL DEFAULT TRUE,
+    second_law_entropy_valid BOOLEAN NOT NULL DEFAULT TRUE,
+    signature VARCHAR(128) NOT NULL,
+    committed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_thermo_monad_block 
+    ON thermodynamic_monad_transactions(block_index DESC);
+
+CREATE INDEX IF NOT EXISTS idx_thermo_monad_hash 
+    ON thermodynamic_monad_transactions(current_hash);

@@ -37,7 +37,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
         ]);
         const report = validator.validateStateVector(prevVector, currVector, fluxDeltas);
         assert.strictEqual(report.isValid, false);
-        assert.ok(report.maxDiscrepancy > 1e-6);
+        assert.ok((report.maxDiscrepancy ?? 0) > 1e-6);
         assert.strictEqual(Array.isArray(report.discrepancies), true);
         const discArr = report.discrepancies;
         assert.strictEqual(discArr[0].isWithinTolerance, false);

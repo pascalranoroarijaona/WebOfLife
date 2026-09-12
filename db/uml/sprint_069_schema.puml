@@ -1,0 +1,68 @@
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 069 Architecture: Thermodynamic State Validator & Discrepancy Ledger
+
+package "Thermodynamics Core (TypeScript)" {
+    class StateVector {
+        - stocks: Map<string, number>
+        + getStocks(): Record<string, number>
+        + setStock(key: string, value: number): void
+        + clone(): StateVector
+    }
+
+    class StateValidator {
+        + {static} computeAbsoluteStockDelta(actual: StateVector | Record<string, number>, expected: StateVector | Record<string, number>): Record<string, number>
+    }
+
+    class ThermodynamicMonadPipeline {
+        - currentState: StateVector
+        + executeStep(inputStocks: Record<string, number>): ThermodynamicMonadPipeline
+        + validateAgainstExpected(expected: StateVector): Record<string, number>
+    }
+}
+
+package "Database & Blockchain Ledger (SQL)" {
+    class ThermodynamicStateTable {
+        + state_id: UUID
+        + entity_id: VARCHAR
+        + timestamp: TIMESTAMPTZ
+        + stocks: JSONB
+        + entropy_delta: NUMERIC
+    }
+
+    class StateDiscrepancyLogTable {
+        + discrepancy_id: UUID
+        + actual_state_id: UUID
+        + expected_state_id: UUID
+        + absolute_deltas: JSONB
+        + max_absolute_delta: NUMERIC
+        + computed_at: TIMESTAMPTZ
+    }
+
+    class ThermodynamicMonadTransactionTable {
+        + transaction_id: UUID
+        + block_index: BIGINT
+        + previous_hash: VARCHAR
+        + current_hash: VARCHAR
+        + actor_id: VARCHAR
+        + stock_inputs: JSONB
+        + stock_outputs: JSONB
+        + first_law_conserved: BOOLEAN
+        + second_law_entropy_valid: BOOLEAN
+        + signature: VARCHAR
+        + committed_at: TIMESTAMPTZ
+    }
+}
+
+StateVector --> StateValidator : "Supplies stocks to"
+StateValidator ..> StateVector : "Returns absolute deltas"
+ThermodynamicMonadPipeline --> StateVector : "Manages state"
+ThermodynamicMonadPipeline --> StateValidator : "Invokes computeAbsoluteStockDelta()"
+
+ThermodynamicStateTable "1" <-- "0..*" StateDiscrepancyLogTable : actual_state_id
+ThermodynamicStateTable "1" <-- "0..*" StateDiscrepancyLogTable : expected_state_id
+StateDiscrepancyLogTable "0..1" -- "0..*" ThermodynamicMonadTransactionTable : references discrepancy
+
+@enduml

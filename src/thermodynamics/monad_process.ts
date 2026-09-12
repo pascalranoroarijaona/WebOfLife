@@ -1,19 +1,15 @@
 /**
- * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Retro-Compatible)
+ * Thermodynamic Monad Process Module (Retro-Compatible)
  */
 import { ThermodynamicStateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator } from './state_validator.js';
 
-export { StateValidator as ThermodynamicStateValidator, StateValidator, validateOrThrowEntropy };
+export { StateValidator as ThermodynamicStateValidator, StateValidator, validateOrThrowEntropy, ThermodynamicStateVector };
 
 export interface IMonadProcess {
   execute(state: ThermodynamicStateVector): ThermodynamicStateVector;
 }
 
-/**
- * Base abstract class for thermodynamic monads enforcing the Second Law
- * via strict state validation.
- */
 export class ThermodynamicMonadProcess implements IMonadProcess {
   protected validator: StateValidator = new StateValidator();
 
@@ -51,9 +47,6 @@ export class BiogeochemicalMonadProcess extends ThermodynamicMonadProcess {
   }
 }
 
-/**
- * Executes a standard thermodynamic step across a monad process.
- */
 export function executeThermodynamicStep(
   process: IMonadProcess,
   state: ThermodynamicStateVector

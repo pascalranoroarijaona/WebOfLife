@@ -4,7 +4,7 @@ import { StateValidator } from '../src/thermodynamics/state_validator.js';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
 describe('Sprint 068: Thermodynamic State Vector Inventory Discrepancy Evaluator', () => {
     it('should validate exact state vector matches with zero discrepancy', () => {
-        const validator = new StateValidator();
+        const validator = new StateValidator(1e-6);
         const actual = new ThermodynamicStateVector({
             stocks: { carbon: 850, nitrogen: 3900000, phosphorus: 4e9, water: 1338000000 },
             energy: 1e12
