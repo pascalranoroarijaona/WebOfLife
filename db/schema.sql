@@ -1,32 +1,56 @@
--- Updated Schema & Ledger Definitions for Sprint 074
--- Focus: Thermodynamic State Vector Discrepancy Absolute Difference Validation & Stock/Flow Ledger
+-- ============================================================================
+-- Web of Life Database & Thermodynamic Blockchain Schema
+-- Sprint 075: Thermodynamic State Vector Elemental Tolerance Comparison Guard
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id VARCHAR(64) PRIMARY KEY,
-    entity_id VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    elements JSONB NOT NULL DEFAULT '{}', -- Maps elemental keys (C, N, P, H2O) to numeric stock values
-    vector_type VARCHAR(32) NOT NULL CHECK (vector_type IN ('ACTUAL', 'EXPECTED', 'DELTA'))
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. Thermodynamic Monad Pods & State Vectors
+CREATE TABLE earth_pods (
+    pod_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pod_name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE IF NOT EXISTS thermodynamic_discrepancy_logs (
-    log_id SERIAL PRIMARY KEY,
-    vector_id_actual VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
-    vector_id_expected VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
-    absolute_deltas JSONB NOT NULL DEFAULT '{}', -- Results of computeAbsoluteStockDelta
-    max_discrepancy NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
-    evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE thermodynamic_state_vectors (
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pod_id UUID REFERENCES earth_pods(pod_id) ON DELETE CASCADE,
+    carbon_stock NUMERIC(18, 6) NOT NULL,
+    nitrogen_stock NUMERIC(18, 6) NOT NULL,
+    phosphorus_stock NUMERIC(18, 6) NOT NULL,
+    water_stock NUMERIC(18, 6) NOT NULL,
+    entropy_measure NUMERIC(18, 6) NOT NULL,
+    solar_input_constraint NUMERIC(18, 6) NOT NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS blockchain_transactions (
-    tx_hash VARCHAR(64) PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    sender_pod VARCHAR(64) NOT NULL,
-    recipient_pod VARCHAR(64) NOT NULL,
-    stock_payload JSONB NOT NULL,
-    thermodynamic_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- 2. Elemental Tolerance Comparison Audits (Sprint 075)
+CREATE TABLE tolerance_validation_audits (
+    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+    element_name VARCHAR(64) NOT NULL, -- e.g., 'Carbon', 'Nitrogen', 'Phosphorus', 'Water'
+    difference_value NUMERIC(18, 6) NOT NULL,
+    tolerance_threshold NUMERIC(18, 6) NOT NULL,
+    is_compliant BOOLEAN NOT NULL,
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_vectors_entity ON thermodynamic_state_vectors(entity_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_discrepancy_logs_evaluated ON thermodynamic_discrepancy_logs(evaluated_at);
+-- 3. Thermodynamic Blockchain Ledger Transactions
+CREATE TABLE block_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_index BIGINT NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    current_hash VARCHAR(64) NOT NULL,
+    pod_id UUID REFERENCES earth_pods(pod_id),
+    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
+    transaction_signature VARCHAR(128) NOT NULL,
+    first_law_conserved BOOLEAN NOT NULL,
+    second_law_compliant BOOLEAN NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance and time-series efficiency
+CREATE INDEX idx_state_vectors_pod_id ON thermodynamic_state_vectors(pod_id, recorded_at DESC);
+CREATE INDEX idx_tolerance_audits_vector ON tolerance_validation_audits(vector_id, is_compliant);
+CREATE INDEX idx_block_transactions_index ON block_transactions(block_index DESC);

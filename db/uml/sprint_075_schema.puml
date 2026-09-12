@@ -1,0 +1,63 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F4F6F6
+skinparam classBorderColor #2C3E50
+
+title Web of Life - Sprint 075 Architecture: Thermodynamic State & Tolerance Validation
+
+class EarthPod {
+    +UUID podId
+    +String podName
+    +DateTime createdAt
+    +Boolean isActive
+    +validateHomeostasis() : Boolean
+}
+
+class ThermodynamicStateVector {
+    +UUID vectorId
+    +UUID podId
+    +Number carbonStock
+    +Number nitrogenStock
+    +Number phosphorusStock
+    +Number waterStock
+    +Number entropyMeasure
+    +Number solarInputConstraint
+    +DateTime recordedAt
+    +verifyVectorCompliance() : Boolean
+}
+
+class StateValidatorUtility {
+    {static} +isWithinTolerance(diff: number, tolerance: number): boolean
+}
+
+class ToleranceValidationAudit {
+    +UUID auditId
+    +UUID vectorId
+    +String elementName
+    +Number differenceValue
+    +Number toleranceThreshold
+    +Boolean isCompliant
+    +DateTime validatedAt
+}
+
+class BlockTransaction {
+    +UUID transactionId
+    +Long blockIndex
+    +String previousHash
+    +String currentHash
+    +UUID podId
+    +UUID vectorId
+    +String transactionSignature
+    +Boolean firstLawConserved
+    +Boolean secondLawCompliant
+    +DateTime timestamp
+}
+
+EarthPod "1" *-- "0..*" ThermodynamicStateVector : contains >
+ThermodynamicStateVector "1" --> "0..*" ToleranceValidationAudit : triggers audit >
+ToleranceValidationAudit ..> StateValidatorUtility : uses isWithinTolerance()
+ThermodynamicStateVector "1" -- "0..1" BlockTransaction : anchored by >
+EarthPod "1" -- "0..*" BlockTransaction : logs to ledger >
+
+@enduml

@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 13%
-SPRINT_GOAL: Thermodynamic State Vector Discrepancy Absolute Difference Math Function (`src/thermodynamics/state_validator.ts`): Implement isolated pure helper function `computeAbsoluteStockDelta(actual, expected)` to compute absolute differences per elemental key.
+SPRINT_GOAL: Thermodynamic State Vector Elemental Tolerance Comparison Guard (`src/thermodynamics/state_validator.ts`): Implement pure helper function `isWithinTolerance(diff, tolerance)` to evaluate numerical compliance boundaries.
 
 ## Web of Life Master Backlog
 
@@ -16,7 +16,7 @@ SPRINT_GOAL: Thermodynamic State Vector Discrepancy Absolute Difference Math Fun
 - [x] ThermodynamicState Vector Non-Negative Entropy Monad Pipe (`src/thermodynamics/state_validator.ts`): Implement a monadic pipeline operator `withEntropyCheck(state, fn)` that automatically intercepts and rejects state transformations yielding negative entropy.
 - [x] Thermodynamic State Vector Stock Conservation Delta Calculator (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical calculation of expected stock deltas from boundary flux rates and simulation time steps.
 - [x] Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper (`src/thermodynamics/state_validator.ts`): Implement isolated mathematical comparison helper checking absolute differences against individual elemental tolerances.
-- [ ] Thermodynamic State Vector Discrepancy Absolute Difference Math Function (`src/thermodynamics/state_validator.ts`): Implement isolated pure helper function `computeAbsoluteStockDelta(actual, expected)` to compute absolute differences per elemental key.
+- [x] Thermodynamic State Vector Discrepancy Absolute Difference Math Function (`src/thermodynamics/state_validator.ts`): Implement isolated pure helper function `computeAbsoluteStockDelta(actual, expected)` to compute absolute differences per elemental key.
 - [ ] Thermodynamic State Vector Elemental Tolerance Comparison Guard (`src/thermodynamics/state_validator.ts`): Implement pure helper function `isWithinTolerance(diff, tolerance)` to evaluate numerical compliance boundaries.
 - [ ] Thermodynamic State Vector Discrepancy Mapping Iterator (`src/thermodynamics/state_validator.ts`): Implement mapping function over stock collections to aggregate individual elemental discrepancy records.
 - [ ] Thermodynamic State Vector Discrepancy Aggregator (`src/thermodynamics/state_validator.ts`): Implement array mapping and maximum discrepancy accumulation logic over evaluation results.

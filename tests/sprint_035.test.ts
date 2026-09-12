@@ -8,7 +8,8 @@ import assert from 'node:assert';
 import { 
   StateValidator, 
   ThermodynamicEntropyViolationError, 
-  executeThermodynamicTransition
+  executeThermodynamicTransition,
+  assertNonNegativeEntropy
 } from '../src/thermodynamics/state_validator.js';
 import { ThermodynamicStateVector } from '../src/thermodynamics/state_vector.js';
 
@@ -29,7 +30,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
 
   it('should validate a normal thermodynamic state with non-negative entropy and rates', () => {
     assert.strictEqual(StateValidator.validateEntropy(validState), true);
-    const result = StateValidator.assertNonNegativeEntropy(validState);
+    const result = assertNonNegativeEntropy(validState);
     assert.strictEqual(result.isOk(), true);
     if (result.isOk()) {
       assert.deepStrictEqual((result as any).value, validState);
@@ -42,7 +43,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
       entropy: -0.001
     });
     assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
-    const result = StateValidator.assertNonNegativeEntropy(invalidState);
+    const result = assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
 
@@ -52,7 +53,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
       entropyGenerationRate: -0.5
     });
     assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
-    const result = StateValidator.assertNonNegativeEntropy(invalidState);
+    const result = assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
 
@@ -62,7 +63,7 @@ describe('Sprint 035: Thermodynamic State Non-Negative Entropy Assertion', () =>
       temperature: 0
     });
     assert.strictEqual(StateValidator.validateEntropy(invalidState), false);
-    const result = StateValidator.assertNonNegativeEntropy(invalidState);
+    const result = assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.isErr(), true);
   });
 
