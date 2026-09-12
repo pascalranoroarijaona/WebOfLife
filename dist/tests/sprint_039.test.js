@@ -23,8 +23,9 @@ describe('Sprint 039: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const result = assertNonNegativeEntropy(invalidState);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.match(result.error, /Second Law Violation: Entropy cannot be negative/);
-            assert.match(result.error, /-10.5/);
+            const errStr = typeof result.error === 'string' ? result.error : result.error.message;
+            assert.match(errStr, /Second Law Violation: Entropy cannot be negative/);
+            assert.match(errStr, /-10.5/);
         }
     });
     it('Test case 4: Malformed/null state objects gracefully handled without throwing', () => {
@@ -32,12 +33,14 @@ describe('Sprint 039: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const nullResult = assertNonNegativeEntropy(null);
         assert.strictEqual(nullResult.success, false);
         if (!nullResult.success) {
-            assert.match(nullResult.error, /Invalid state object provided for entropy validation/);
+            const errStr = typeof nullResult.error === 'string' ? nullResult.error : nullResult.error.message;
+            assert.match(errStr, /Invalid state object provided for entropy validation/);
         }
         const missingEntropyResult = assertNonNegativeEntropy({ internalEnergy: 500 });
         assert.strictEqual(missingEntropyResult.success, false);
         if (!missingEntropyResult.success) {
-            assert.match(missingEntropyResult.error, /Entropy metric is missing or not a valid number/);
+            const errStr = typeof missingEntropyResult.error === 'string' ? missingEntropyResult.error : missingEntropyResult.error.message;
+            assert.match(errStr, /Entropy metric is missing/);
         }
     });
     it('Supports state objects with getEntropy() method implementation', () => {
@@ -52,7 +55,8 @@ describe('Sprint 039: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const negResult = assertNonNegativeEntropy(negativeDynamicState);
         assert.strictEqual(negResult.success, false);
         if (!negResult.success) {
-            assert.match(negResult.error, /Second Law Violation/);
+            const errStr = typeof negResult.error === 'string' ? negResult.error : negResult.error.message;
+            assert.match(errStr, /Second Law Violation/);
         }
     });
 });

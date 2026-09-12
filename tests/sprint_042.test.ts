@@ -4,8 +4,8 @@ import { assertNonNegativeEntropy, ThermodynamicStateLike } from '../src/thermod
 
 describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion Utility', () => {
   it('should return success for valid zero or positive entropy states', () => {
-    const validZeroState: ThermodynamicStateLike = { entropy: 0, energy: 100, internalEnergy: 100, temperature: 300, entropyGenerationRate: 0 };
-    const validPosState: ThermodynamicStateLike = { entropy: 1542.5, energy: 5000, internalEnergy: 5000, temperature: 298.15, entropyGenerationRate: 1.0 };
+    const validZeroState: ThermodynamicStateLike = { entropy: 0, energy: 100, internalEnergy: 100, temperature: 300, entropyGenerationRate: 0, stocks: {} };
+    const validPosState: ThermodynamicStateLike = { entropy: 1542.5, energy: 5000, internalEnergy: 5000, temperature: 298.15, entropyGenerationRate: 1.0, stocks: {} };
 
     const resZero = assertNonNegativeEntropy(validZeroState);
     assert.strictEqual(resZero.success, true);
@@ -21,30 +21,33 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
   });
 
   it('should return failure for negative entropy states', () => {
-    const negativeState: ThermodynamicStateLike = { entropy: -10.5, energy: 1000, internalEnergy: 1000, temperature: 300, entropyGenerationRate: 0 };
+    const negativeState: ThermodynamicStateLike = { entropy: -10.5, energy: 1000, internalEnergy: 1000, temperature: 300, entropyGenerationRate: 0, stocks: {} };
     const res = assertNonNegativeEntropy(negativeState);
 
     assert.strictEqual(res.success, false);
     if (!res.success) {
-      assert.match(res.error, /Second Law Violation/);
-      assert.match(res.error, /-10.5/);
+      const errStr = typeof res.error === 'string' ? res.error : res.error.message;
+      assert.match(errStr, /Second Law Violation/);
+      assert.match(errStr, /-10.5/);
     }
   });
 
   it('should intercept malformed or non-numeric entropy states gracefully', () => {
-    const missingNumberState = { entropy: NaN, energy: 500, internalEnergy: 500, temperature: 300, entropyGenerationRate: 0 } as unknown as ThermodynamicStateLike;
-    const invalidTypeState = { entropy: "not-a-number" as unknown as number, energy: 200, internalEnergy: 200, temperature: 300, entropyGenerationRate: 0 };
+    const missingNumberState = { entropy: NaN, energy: 500, internalEnergy: 500, temperature: 300, entropyGenerationRate: 0, stocks: {} } as unknown as ThermodynamicStateLike;
+    const invalidTypeState = { entropy: "not-a-number" as unknown as number, energy: 200, internalEnergy: 200, temperature: 300, entropyGenerationRate: 0, stocks: {} };
 
     const resNaN = assertNonNegativeEntropy(missingNumberState);
     assert.strictEqual(resNaN.success, false);
     if (!resNaN.success) {
-      assert.match(resNaN.error, /entropy is NaN/);
+      const errStr = typeof resNaN.error === 'string' ? resNaN.error : resNaN.error.message;
+      assert.match(errStr, /entropy is NaN/);
     }
 
     const resType = assertNonNegativeEntropy(invalidTypeState);
     assert.strictEqual(resType.success, false);
     if (!resType.success) {
-      assert.match(resType.error, /Invalid entropy/);
+      const errStr = typeof resType.error === 'string' ? resType.error : resType.error.message;
+      assert.match(errStr, /Invalid entropy/);
     }
   });
 });

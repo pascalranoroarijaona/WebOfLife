@@ -11,6 +11,7 @@ export { CarbonCycle as CarbonCyclePOD };
 export { WaterCycle as WaterCyclePOD };
 export { NitrogenCycle as NitrogenCyclePOD };
 export { PhosphorusCycle as PhosphorusCyclePOD };
+export { CarbonCycle, WaterCycle, NitrogenCycle, PhosphorusCycle };
 export { EntropyState };
 export { applyThermalFlux, applyMassTransport, ThermodynamicStateMonad };
 export class CyclePOD extends ThermodynamicStructure {

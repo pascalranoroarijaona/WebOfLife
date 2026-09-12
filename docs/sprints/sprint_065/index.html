@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 065: Web of Life - Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+    <!-- Topbar Navigation -->
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/85 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-xl">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl animate-pulse">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Sprint 065</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Validator & Inventory Discrepancy Evaluator Core Active (60 FPS Draw Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/40 p-6 flex flex-col gap-6 overflow-y-auto z-20">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-cyan-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+                <button id="btn-validate" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition text-sm shadow-lg shadow-emerald-900/20 cursor-pointer">Run State Validator</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div id="sprint-telemetry" class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3 shadow-inner">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-cyan-400">65</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Discrepancy:</span>
+                        <span id="metric-discrepancy" class="font-mono font-bold text-emerald-400">0.000%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Validator Output</h2>
+                <div id="validator-output" class="bg-slate-950 font-mono text-xs text-slate-300 p-3 rounded border border-slate-800 h-32 overflow-y-auto">
+                    System ready. Click 'Run State Validator' to execute inventory discrepancy check.
+                </div>
+            </div>
+        </aside>
+
+        <!-- 3D Simulation Viewport -->
+        <div id="viewport" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <div id="canvas-container" class="absolute inset-0"></div>
+            <div class="absolute bottom-4 left-4 z-10 bg-slate-900/80 backdrop-blur border border-slate-800 px-4 py-2 rounded-lg text-xs text-slate-300 flex items-center space-x-3 shadow-lg">
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span><span>State Vector Node</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span>Equilibrium Flux</span></span>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // Setup Scene, Camera, Renderer
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020617, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 15, 25);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0x06b6d4, 2, 50);
+        pointLight.position.set(10, 20, 10);
+        scene.add(pointLight);
+
+        // Create Thermodynamic State Vectors & Inventory Discrepancy Network
+        const nodeCount = 65;
+        const nodes = [];
+        const geometry = new THREE.IcosahedronGeometry(0.6, 2);
+        
+        const materialPool = [
+            new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3, metalness: 0.8 }),
+            new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3, metalness: 0.8 }),
+            new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3, metalness: 0.8 })
+        ];
+
+        const networkGroup = new THREE.Group();
+        scene.add(networkGroup);
+
+        for (let i = 0; i < nodeCount; i++) {
+            const material = materialPool[i % materialPool.length];
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const radius = 5 + Math.random() * 8;
+
+            mesh.position.set(
+                radius * Math.sin(phi) * Math.cos(theta),
+                radius * Math.sin(phi) * Math.sin(theta),
+                radius * Math.cos(phi)
+            );
+
+            mesh.userData = {
+                id: i,
+                basePos: mesh.position.clone(),
+                energy: Math.random() * 100,
+                entropy: Math.random() * 50,
+                discrepancy: (Math.random() - 0.5) * 0.05
+            };
+
+            networkGroup.add(mesh);
+            nodes.push(mesh);
+        }
+
+        // Connecting lines for thermodynamic state network
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.4 });
+        const lineGeometry = new THREE.BufferGeometry();
+        const positions = [];
+
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                if (nodes[i].position.distanceTo(nodes[j].position) < 7) {
+                    positions.push(nodes[i].position.x, nodes[i].position.y, nodes[i].position.z);
+                    positions.push(nodes[j].position.x, nodes[j].position.y, nodes[j].position.z);
+                }
+            }
+        }
+        lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const wireframe = new THREE.LineSegments(lineGeometry, lineMaterial);
+        networkGroup.add(wireframe);
+
+        // Simulation Loop State
+        let isRunning = true;
+        let generation = 1;
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 60;
+
+        const metricEntities = document.getElementById('metric-entities');
+        const metricFps = document.getElementById('metric-fps');
+        const metricGen = document.getElementById('metric-gen');
+        const metricDiscrepancy = document.getElementById('metric-discrepancy');
+        const validatorOutput = document.getElementById('validator-output');
+
+        // Animation / Draw Loop (60 FPS)
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            frameCount++;
+            if (time - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (time - lastTime));
+                metricFps.textContent = fps;
+                frameCount = 0;
+                lastTime = time;
+            }
+
+            if (isRunning) {
+                networkGroup.rotation.y += 0.002;
+                networkGroup.rotation.x += 0.001;
+
+                nodes.forEach((node, idx) => {
+                    const t = time * 0.001 + idx;
+                    node.position.y = node.userData.basePos.y + Math.sin(t) * 0.5;
+                });
+
+                if (Math.random() < 0.02) {
+                    generation++;
+                    metricGen.textContent = generation;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+
+        // UI Controls Integration
+        document.getElementById('btn-start').addEventListener('click', () => {
+            isRunning = true;
+            document.getElementById('status-text').textContent = 'State Validator & Inventory Discrepancy Evaluator Core Active (60 FPS Draw Loop)';
+            document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-cyan-500 animate-pulse';
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            isRunning = false;
+            document.getElementById('status-text').textContent = 'Simulation Paused';
+            document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-amber-500';
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            generation = 1;
+            metricGen.textContent = generation;
+            nodes.forEach(node => {
+                node.userData.energy = Math.random() * 100;
+                node.userData.entropy = Math.random() * 50;
+            });
+            validatorOutput.textContent = 'World reset. State vectors re-initialized.';
+        });
+
+        document.getElementById('btn-validate').addEventListener('click', () => {
+            let totalDiscrepancy = 0;
+            nodes.forEach(node => {
+                totalDiscrepancy += Math.abs(node.userData.discrepancy);
+            });
+            const avgDiscrepancy = (totalDiscrepancy / nodes.length) * 100;
+            metricDiscrepancy.textContent = avgDiscrepancy.toFixed(3) + '%';
+
+            const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+            validatorOutput.innerHTML = `[${timestamp}] VALIDATION PASSED<br>` +
+                `- Total State Vectors: ${nodes.length}<br>` +
+                `- Inventory Discrepancy Vector: ${avgDiscrepancy.toFixed(4)}%<br>` +
+                `- Thermodynamic Equilibrium: STABLE`;
+        });
+
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>

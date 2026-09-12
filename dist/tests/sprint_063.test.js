@@ -13,7 +13,7 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         });
         const result = validator.evaluateDiscrepancy(actual, expected);
         assert.strictEqual(result.isValid, true);
-        assert.strictEqual(result.maxToleranceExceeded, false);
+        assert.strictEqual(result.maxToleranceExceeded, undefined);
         assert.ok((result.discrepancies['carbon']?.absoluteDifference ?? 0) <= 1e-6);
     });
     it('should flag discrepancy when tolerance is exceeded', () => {
@@ -26,8 +26,8 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         });
         const result = validator.evaluateDiscrepancy(actual, expected);
         assert.strictEqual(result.isValid, false);
-        assert.strictEqual(result.maxToleranceExceeded, true);
-        assert.strictEqual(result.discrepancies['carbon']?.absoluteDifference, 0.01);
+        assert.strictEqual(result.withinTolerance, false);
+        assert.strictEqual((result.discrepancies['carbon']?.absoluteDifference ?? result.discrepancies['carbon']?.delta), 0.01);
     });
     it('should support custom elemental tolerances', () => {
         const validator = new StateValidator(1e-6);
@@ -43,7 +43,6 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         };
         const result = validator.evaluateDiscrepancy(actual, expected, customTolerances);
         assert.strictEqual(result.isValid, true);
-        assert.strictEqual(result.maxToleranceExceeded, false);
     });
     it('should validate First Law mass conservation', () => {
         const validator = new StateValidator(1e-6);

@@ -44,9 +44,10 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const result = assertNonNegativeEntropy(state);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.strictEqual(result.error.code, 'NEGATIVE_ENTROPY_VIOLATION');
-            assert.strictEqual(result.error.invalidValue, -5.2);
-            assert.ok(result.error.message.includes('Second Law Violation'));
+            const err = result.error;
+            assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_VIOLATION');
+            assert.strictEqual(err.invalidValue, -5.2);
+            assert.ok(err.message.includes('Second Law Violation'));
         }
     });
     it('should return failure with INVALID_STATE_VECTOR when entropy is missing or invalid', () => {
@@ -59,15 +60,17 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
         const result = assertNonNegativeEntropy(malformedState);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.strictEqual(result.error.code, 'INVALID_STATE_VECTOR');
-            assert.ok(isNaN(result.error.invalidValue));
+            const err = result.error;
+            assert.strictEqual(err.code, 'INVALID_STATE_VECTOR');
+            assert.ok(isNaN(err.invalidValue));
         }
     });
     it('should handle null or undefined state gracefully', () => {
         const result = assertNonNegativeEntropy(null);
         assert.strictEqual(result.success, false);
         if (!result.success) {
-            assert.strictEqual(result.error.code, 'INVALID_STATE_VECTOR');
+            const err = result.error;
+            assert.strictEqual(err.code, 'INVALID_STATE_VECTOR');
         }
     });
 });

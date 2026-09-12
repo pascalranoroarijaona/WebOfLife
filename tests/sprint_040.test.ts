@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { assertNonNegativeEntropy } from '../src/thermodynamics/state_validator.js';
+import { assertNonNegativeEntropy, EntropyValidationError } from '../src/thermodynamics/state_validator.js';
 import { EarthPOD } from '../src/earth_pod.js';
 
 describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion', () => {
@@ -11,7 +11,7 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
     const result = assertNonNegativeEntropy(stateVector);
     assert.strictEqual(result.success, true);
     if (result.success) {
-      assert.strictEqual(result.value, true);
+      assert.strictEqual(result.value, stateVector);
     }
   });
 
@@ -25,9 +25,10 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
     const result = assertNonNegativeEntropy(invalidState);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.strictEqual(result.error.code, 'NEGATIVE_ENTROPY_DETECTED');
-      assert.strictEqual(result.error.violatingValue, -50.2);
-      assert.ok(result.error.path.includes('totalEntropy'));
+      const err = result.error as EntropyValidationError;
+      assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_DETECTED');
+      assert.strictEqual(err.violatingValue, -50.2);
+      assert.ok(err.path.includes('totalEntropy'));
     }
   });
 
@@ -43,9 +44,10 @@ describe('Sprint 040: Thermodynamic State Vector Non-Negative Entropy Assertion'
     const result = assertNonNegativeEntropy(nestedInvalidState);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.strictEqual(result.error.code, 'NEGATIVE_ENTROPY_DETECTED');
-      assert.strictEqual(result.error.violatingValue, -0.05);
-      assert.ok(result.error.path.includes('entropyGenerationRate'));
+      const err = result.error as EntropyValidationError;
+      assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_DETECTED');
+      assert.strictEqual(err.violatingValue, -0.05);
+      assert.ok(err.path.includes('entropyGenerationRate'));
     }
   });
 

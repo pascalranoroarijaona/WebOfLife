@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { assertNonNegativeEntropy } from '../src/thermodynamics/state_validator.js';
+import { assertNonNegativeEntropy, EntropyValidationError } from '../src/thermodynamics/state_validator.js';
 import { ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion Utility', () => {
@@ -51,9 +51,10 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(state);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.strictEqual(result.error.code, 'NEGATIVE_ENTROPY_VIOLATION');
-      assert.strictEqual(result.error.invalidValue, -5.2);
-      assert.ok(result.error.message.includes('Second Law Violation'));
+      const err = result.error as EntropyValidationError;
+      assert.strictEqual(err.code, 'NEGATIVE_ENTROPY_VIOLATION');
+      assert.strictEqual(err.invalidValue, -5.2);
+      assert.ok(err.message.includes('Second Law Violation'));
     }
   });
 
@@ -68,8 +69,9 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(malformedState);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.strictEqual(result.error.code, 'INVALID_STATE_VECTOR');
-      assert.ok(isNaN(result.error.invalidValue));
+      const err = result.error as EntropyValidationError;
+      assert.strictEqual(err.code, 'INVALID_STATE_VECTOR');
+      assert.ok(isNaN(err.invalidValue));
     }
   });
 
@@ -77,7 +79,8 @@ describe('Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(null as unknown as ThermodynamicStateVector);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.strictEqual(result.error.code, 'INVALID_STATE_VECTOR');
+      const err = result.error as EntropyValidationError;
+      assert.strictEqual(err.code, 'INVALID_STATE_VECTOR');
     }
   });
 });

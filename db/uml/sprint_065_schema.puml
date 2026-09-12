@@ -1,0 +1,55 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics & Validation" {
+
+  interface IStateValidator {
+    + validate(expected: ThermodynamicStateVector, actual: ThermodynamicStateVector, tolerances: Record<string, number>): ValidationResult
+  }
+
+  class StateValidator {
+    + validate(expected: ThermodynamicStateVector, actual: ThermodynamicStateVector, tolerances: Record<string, number>): ValidationResult
+  }
+
+  class ThermodynamicStateVector {
+    - entityId: string
+    - stock: Record<string, number>
+    + getStock(): Record<string, number>
+    + getElement(key: string): number
+  }
+
+  class ValidationResult {
+    + isValid: boolean
+    + discrepancies: Record<string, DiscrepancyDetail>
+    + maxDelta: number
+  }
+
+  class DiscrepancyDetail {
+    + expected: number
+    + actual: number
+    + delta: number
+    + tolerance: number
+  }
+
+  class ThermodynamicMonadProcess {
+    - validator: IStateValidator
+    + executeStep(expected: ThermodynamicStateVector, actual: ThermodynamicStateVector, tolerances: Record<string, number>): MonadResult
+  }
+
+  class BlockchainTransactionLedger {
+    - blockIndex: number
+    - previousHash: string
+    - currentHash: string
+    - signature: string
+    + recordTransaction(validation: ValidationResult): void
+  }
+
+  IStateValidator <|.. StateValidator
+  StateValidator --> ValidationResult : produces
+  ValidationResult *-- DiscrepancyDetail
+  ThermodynamicMonadProcess --> IStateValidator : uses
+  ThermodynamicMonadProcess --> BlockchainTransactionLedger : logs to
+  ThermodynamicStateVector -- ThermodynamicMonadProcess : evaluated in
+}
+
+@enduml

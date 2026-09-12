@@ -123,8 +123,11 @@ export class ThermodynamicStateVector {
         if (init instanceof Map) {
             unwrappedInit = { stocks: Object.fromEntries(init) };
         }
-        else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init)) {
+        else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init) && !('inventory' in init)) {
             unwrappedInit = { stocks: init };
+        }
+        else if (init && typeof init === 'object' && 'inventory' in init && !('stocks' in init)) {
+            unwrappedInit = { ...init, stocks: init.inventory };
         }
         const T0 = unwrappedInit?.T_0 ?? unwrappedInit?.ambientTemperature ?? unwrappedInit?.referenceTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
         this.timestamp = unwrappedInit?.timestamp ?? 0;

@@ -5,6 +5,8 @@
 
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 
+export type ElementType = 'carbon' | 'nitrogen' | 'phosphorus' | 'water' | 'oxygen' | 'energy' | 'qLoss' | string;
+
 export interface ThermodynamicToleranceConfig {
   getDefaultTolerance?: () => number;
   getElementTolerance?: (key: string) => number;
@@ -335,8 +337,10 @@ export class ThermodynamicStateVector implements IThermodynamicStateVector {
     let unwrappedInit: any = init;
     if (init instanceof Map) {
       unwrappedInit = { stocks: Object.fromEntries(init) };
-    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init)) {
+    } else if (init && typeof init === 'object' && !('timestamp' in init) && !('internalEnergy' in init) && !('entropy' in init) && !('stocks' in init) && !('energy' in init) && !('temperature' in init) && !('inventory' in init)) {
       unwrappedInit = { stocks: init };
+    } else if (init && typeof init === 'object' && 'inventory' in init && !('stocks' in init)) {
+      unwrappedInit = { ...init, stocks: (init as any).inventory };
     }
 
     const T0 = unwrappedInit?.T_0 ?? unwrappedInit?.ambientTemperature ?? unwrappedInit?.referenceTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
@@ -748,8 +752,10 @@ export type ValidationResult = {
   valid: boolean;
   errors?: ValidationFailure[];
   violations?: string[];
-  discrepancies?: Map<string, any>;
+  discrepancies?: Map<string, any> | Record<string, any>;
   maxTolerance?: number;
+  maxDelta?: number;
+  maxToleranceExceeded?: boolean;
   [key: string]: any;
 };
 
@@ -768,7 +774,7 @@ export type ValidationReport = {
   timestamp: number;
   isValid: boolean;
   maxDiscrepancy: number;
-  discrepancies: DiscrepancyResult[] | Map<string, any>;
+  discrepancies: DiscrepancyResult[] | Map<string, any> | Record<string, any>;
 };
 
 export type DiscrepancyReport = {

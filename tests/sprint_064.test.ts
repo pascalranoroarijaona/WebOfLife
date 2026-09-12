@@ -20,7 +20,7 @@ describe('Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     assert.strictEqual(result.isValid, true);
     assert.strictEqual(result.maxDelta, 0);
-    assert.strictEqual(result.discrepancies['carbon'].delta, 0);
+    assert.strictEqual((result.discrepancies as any)['carbon'].delta, 0);
   });
 
   it('should verify vectors within tolerance margins pass validation', () => {
@@ -54,9 +54,9 @@ describe('Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const result = validator.evaluateDiscrepancy(expected, actual);
 
     assert.strictEqual(result.isValid, false);
-    assert.strictEqual(result.discrepancies['carbon'].expected, 850.0);
-    assert.strictEqual(result.discrepancies['carbon'].actual, 850.00005);
-    assert.strictEqual(result.discrepancies['carbon'].delta, 0.00005);
+    assert.strictEqual((result.discrepancies as any)['carbon'].expected, 850.0);
+    assert.strictEqual((result.discrepancies as any)['carbon'].actual, 850.00005);
+    assert.strictEqual((result.discrepancies as any)['carbon'].delta, 0.00005);
     assert.strictEqual(result.maxDelta, 0.00005);
   });
 
@@ -79,6 +79,6 @@ describe('Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const result = validator.evaluateDiscrepancy(expected, actual, customConfig);
 
     assert.strictEqual(result.isValid, true);
-    assert.strictEqual(result.discrepancies['water'].tolerance, 1.0);
+    assert.strictEqual((result.discrepancies as any)['water'].tolerance, 1.0);
   });
 });

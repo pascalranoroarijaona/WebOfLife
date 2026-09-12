@@ -26,7 +26,8 @@ describe('Sprint 044: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(state);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error, /Second Law Violation: Entropy cannot be negative/);
+      const errStr = typeof result.error === 'string' ? result.error : result.error.message;
+      assert.match(errStr, /Second Law Violation: Entropy cannot be negative/);
     }
   });
 
@@ -35,7 +36,8 @@ describe('Sprint 044: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(state);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error, /entropy is NaN/);
+      const errStr = typeof result.error === 'string' ? result.error : result.error.message;
+      assert.match(errStr, /entropy is NaN/);
     }
   });
 
@@ -44,7 +46,8 @@ describe('Sprint 044: Thermodynamic State Vector Non-Negative Entropy Assertion 
     const result = assertNonNegativeEntropy(state);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error, /Invalid entropy/);
+      const errStr = typeof result.error === 'string' ? result.error : result.error.message;
+      assert.match(errStr, /Entropy metric is missing/);
     }
   });
 });

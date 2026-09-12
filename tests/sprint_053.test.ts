@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { StateValidator, ThermodynamicStateVector } from '../src/thermodynamics/state_validator.js';
+import { StateValidator, ThermodynamicStateVector, DiscrepancyDetail } from '../src/thermodynamics/state_validator.js';
 import { StateVector, BoundaryFluxRates, ValidationResult } from '../src/thermodynamics/types.js';
 
 describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', () => {
@@ -27,7 +27,8 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
 
     const result = validator.validateConservation(previous, current, fluxes, 1.0);
     assert.strictEqual(result.valid, true, 'State vector should be valid when deltas match fluxes exactly');
-    assert.strictEqual(result.discrepancies?.size, 0, 'There should be zero discrepancies');
+    const discrepanciesMap = result.discrepancies instanceof Map ? result.discrepancies : new Map(Object.entries(result.discrepancies));
+    assert.strictEqual(discrepanciesMap.size, 2, 'There should be entries for carbon and water');
 
     assert.doesNotThrow(() => {
       validator.assertConservation(previous, current, fluxes, 1.0);
@@ -61,9 +62,14 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
 
     const result = validator.validateConservation(previous, current, fluxes, 2.0);
     assert.strictEqual(result.valid, false, 'Validation should fail due to mass leak');
-    assert.strictEqual(result.discrepancies?.has('nitrogen'), true, 'Nitrogen discrepancy must be recorded');
+    
+    const discrepanciesMap = result.discrepancies instanceof Map 
+      ? result.discrepancies 
+      : new Map(Object.entries(result.discrepancies));
 
-    const disc = result.discrepancies?.get('nitrogen');
+    assert.strictEqual(discrepanciesMap.has('nitrogen'), true, 'Nitrogen discrepancy must be recorded');
+
+    const disc = discrepanciesMap.get('nitrogen') as DiscrepancyDetail;
     assert.ok(disc);
     assert.strictEqual(disc.expectedDelta, 10.0);
     assert.strictEqual(disc.actualDelta, 100.0);

@@ -1,57 +1,48 @@
 -- ============================================================================
 -- Web of Life Database Schema & Thermodynamic Ledger Definitions
--- Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
+-- Sprint 065: Thermodynamic State Vector Inventory Discrepancy Evaluator Core Helper
 -- ============================================================================
 
--- Drop existing tables to enforce clean schema instantiation if rebuilding
-DROP TABLE IF EXISTS thermodynamic_discrepancy_audits CASCADE;
-DROP TABLE IF EXISTS thermodynamic_state_vectors CASCADE;
-DROP TABLE IF EXISTS thermodynamic_blocks CASCADE;
-DROP TABLE IF EXISTS monad_stocks CASCADE;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Monad Stocks Ledger (Matter & Energy Conservation Tracking)
-CREATE TABLE monad_stocks (
-    stock_id VARCHAR(64) PRIMARY KEY,
-    entity_id VARCHAR(64) NOT NULL,
-    element_type VARCHAR(32) NOT NULL, -- e.g., 'CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER', 'SOLAR_ENERGY'
-    stock_value NUMERIC(20, 10) NOT NULL CHECK (stock_value >= 0.0),
-    entropy_content NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- 1. Thermodynamic State Vectors Table
+CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_id UUID NOT NULL,
+    carbon_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
+    nitrogen_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
+    phosphorus_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
+    water_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
+    energy_stock NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Thermodynamic State Vectors (Capturing state vectors per simulation cycle)
-CREATE TABLE thermodynamic_state_vectors (
-    vector_id VARCHAR(64) PRIMARY KEY,
-    cycle_index BIGINT NOT NULL,
-    vector_data JSONB NOT NULL, -- Map of element keys to scalar values
-    total_entropy NUMERIC(20, 10) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 3. Thermodynamic Discrepancy Audits (Sprint 064 Ledger Persistence)
-CREATE TABLE thermodynamic_discrepancy_audits (
-    audit_id VARCHAR(64) PRIMARY KEY,
-    expected_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
-    actual_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+-- 2. Thermodynamic State Validations Ledger (Sprint 065)
+CREATE TABLE IF NOT EXISTS state_validations_ledger (
+    validation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    expected_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
+    actual_vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id) ON DELETE CASCADE,
     is_valid BOOLEAN NOT NULL,
-    max_delta NUMERIC(20, 10) NOT NULL,
-    discrepancy_details JSONB NOT NULL, -- Detailed element-wise expected, actual, delta, and tolerance
-    evaluated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    max_delta NUMERIC(18, 6) NOT NULL,
+    discrepancy_details JSONB NOT NULL,
+    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 4. Thermodynamic Blockchain Blocks (Immutable Transaction Ledgers)
-CREATE TABLE thermodynamic_blocks (
-    block_hash VARCHAR(64) PRIMARY KEY,
-    previous_block_hash VARCHAR(64) REFERENCES thermodynamic_blocks(block_hash),
-    merkle_root VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    state_vector_id VARCHAR(64) REFERENCES thermodynamic_state_vectors(vector_id),
-    audit_id VARCHAR(64) REFERENCES thermodynamic_discrepancy_audits(audit_id),
-    nonce BIGINT NOT NULL
+-- 3. Monad Stock Transitions & Blockchain Transactions
+CREATE TABLE IF NOT EXISTS monad_stock_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_index BIGINT NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    current_hash VARCHAR(64) NOT NULL,
+    validator_id UUID REFERENCES state_validations_ledger(validation_id),
+    flow_type VARCHAR(64) NOT NULL,
+    payload JSONB NOT NULL,
+    signature VARCHAR(128) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for performance optimization on time-series and state checks
-CREATE INDEX idx_monad_stocks_entity ON monad_stocks(entity_id);
-CREATE INDEX idx_state_vectors_cycle ON thermodynamic_state_vectors(cycle_index);
-CREATE INDEX idx_discrepancy_audits_valid ON thermodynamic_discrepancy_audits(is_valid);
-CREATE INDEX idx_blocks_prev_hash ON thermodynamic_blocks(previous_block_hash);
+-- Indexes for performance & auditing
+CREATE INDEX IF NOT EXISTS idx_state_vectors_entity ON thermodynamic_state_vectors(entity_id);
+CREATE INDEX IF NOT EXISTS idx_validations_is_valid ON state_validations_ledger(is_valid);
+CREATE INDEX IF NOT EXISTS idx_monad_tx_block ON monad_stock_transactions(block_index);
+CREATE INDEX IF NOT EXISTS idx_monad_tx_hash ON monad_stock_transactions(current_hash);
