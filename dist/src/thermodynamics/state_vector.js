@@ -14,8 +14,10 @@ export class ThermodynamicStateVector {
     energy;
     internalEnergy;
     totalEntropy;
+    systemEntropy;
     exergy;
     stocks;
+    elementalStocks;
     entropyGenerationRate;
     exergyDestructionRate;
     timestamp;
@@ -32,29 +34,35 @@ export class ThermodynamicStateVector {
             netMassFlux: options?.fluxes?.netMassFlux ?? 0,
         };
         this.boundaryFluxes = this.fluxes;
-        const initialEntropy = options?.entropy ?? options?.totalEntropy ?? 0;
+        const initialEntropy = options?.entropy ?? options?.totalEntropy ?? options?.systemEntropy ?? 0;
         this.entropy = initialEntropy;
         this.energy = options?.energy ?? options?.internalEnergy ?? 1000;
         this.internalEnergy = this.energy;
         this.totalEntropy = initialEntropy;
+        this.systemEntropy = initialEntropy;
         this.exergy = 1e5;
         const rawStocks = options?.stocks ?? options?.elementalStocks ?? { carbon: 500, nitrogen: 200, phosphorus: 50, water: 10000 };
         this.stocks = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks;
+        if (options?.elementalStocks) {
+            this.elementalStocks = options.elementalStocks;
+        }
         this.entropyGenerationRate = options?.entropyGenerationRate ?? 0;
         this.exergyDestructionRate = options?.exergyDestructionRate ?? (this.temperature * this.entropyGenerationRate);
         this.timestamp = options?.timestamp ?? 0;
     }
     clone(overrides) {
-        const rawStocks = overrides?.stocks ?? this.stocks;
+        const rawStocks = overrides?.stocks ?? overrides?.elementalStocks ?? this.stocks;
         const stocksObj = rawStocks instanceof Map ? Object.fromEntries(rawStocks) : rawStocks;
         return new ThermodynamicStateVector({
             temperature: overrides?.temperature ?? this.temperature,
             fluxes: { ...this.fluxes, ...overrides?.fluxes },
-            entropy: overrides?.entropy ?? overrides?.totalEntropy ?? this.entropy,
-            totalEntropy: overrides?.totalEntropy ?? overrides?.entropy ?? this.entropy,
+            entropy: overrides?.entropy ?? overrides?.totalEntropy ?? overrides?.systemEntropy ?? this.entropy,
+            totalEntropy: overrides?.totalEntropy ?? overrides?.entropy ?? overrides?.systemEntropy ?? this.entropy,
+            systemEntropy: overrides?.systemEntropy ?? overrides?.entropy ?? overrides?.totalEntropy ?? this.systemEntropy,
             timestamp: overrides?.timestamp ?? this.timestamp,
             energy: overrides?.energy ?? overrides?.internalEnergy ?? this.energy,
             stocks: stocksObj,
+            elementalStocks: overrides?.elementalStocks ?? this.elementalStocks,
             entropyGenerationRate: overrides?.entropyGenerationRate ?? this.entropyGenerationRate,
             exergyDestructionRate: overrides?.exergyDestructionRate ?? this.exergyDestructionRate
         });
@@ -74,6 +82,7 @@ export class ThermodynamicStateVector {
             temperature: this.temperature,
             entropy: this.entropy,
             totalEntropy: this.totalEntropy,
+            systemEntropy: this.systemEntropy,
             energy: this.energy,
             internalEnergy: this.internalEnergy,
             entropyGenerationRate: this.entropyGenerationRate,
@@ -124,6 +133,7 @@ export class ThermodynamicMonadProcess {
                 fluxes: updatedFluxes,
                 entropy: newEntropy,
                 totalEntropy: newEntropy,
+                systemEntropy: newEntropy,
                 timestamp: timestamp + dt,
                 energy: energy + netFlux * dt,
                 stocks: stocks
@@ -134,6 +144,7 @@ export class ThermodynamicMonadProcess {
             fluxes: updatedFluxes,
             entropy: newEntropy,
             totalEntropy: newEntropy,
+            systemEntropy: newEntropy,
             timestamp: timestamp + dt,
             energy: energy + netFlux * dt,
             stocks: stocks

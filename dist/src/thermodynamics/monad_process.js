@@ -1,5 +1,9 @@
+/**
+ * Thermodynamic Monad Process with Second Law Non-Negative Entropy Guard (Sprint 46)
+ */
+import { ThermodynamicStateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator } from './state_validator.js';
-export { StateValidator as ThermodynamicStateValidator };
+export { StateValidator as ThermodynamicStateValidator, StateValidator };
 /**
  * Base abstract class for thermodynamic monads enforcing the Second Law
  * via strict state validation.
@@ -7,11 +11,8 @@ export { StateValidator as ThermodynamicStateValidator };
 export class ThermodynamicMonadProcess {
     validator = new StateValidator();
     execute(currentState) {
-        // 1. Perform underlying physical/biogeochemical stock transition
         const nextState = this.transitionStocks(currentState);
-        // 2. Enforce Second Law: S_dot_gen >= 0
         validateOrThrowEntropy(nextState);
-        // 3. Commit state update
         return nextState;
     }
     step(state, fluxFunction) {
@@ -29,6 +30,15 @@ export class ThermodynamicMonadProcess {
     }
     transitionStocks(state) {
         return state;
+    }
+}
+export class BiogeochemicalMonadProcess extends ThermodynamicMonadProcess {
+    transitionStocks(state) {
+        return new ThermodynamicStateVector({
+            ...state,
+            timestamp: (state.timestamp ?? 0) + 1,
+            entropyGenerationRate: state.entropyGenerationRate ?? 1.0
+        });
     }
 }
 /**

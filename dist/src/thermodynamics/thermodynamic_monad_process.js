@@ -4,6 +4,7 @@
  */
 import { STANDARD_AMBIENT_TEMPERATURE_K } from './types.js';
 import { StateValidator } from './state_validator.js';
+import { ThermodynamicStateVector } from './state_vector.js';
 export { StateValidator as ThermodynamicStateValidator };
 export class ThermodynamicMonadProcess {
     validator;
@@ -68,6 +69,9 @@ export class ThermodynamicMonadProcess {
         const sGen = s.entropyGenerationRate ?? 0;
         return sGen >= 0;
     }
+    execute(currentState) {
+        return this.step(currentState);
+    }
     step(stateOrFlux, fluxesOrDt, dtVal) {
         if (arguments.length === 2 && typeof fluxesOrDt === 'function') {
             const state = stateOrFlux;
@@ -103,6 +107,17 @@ export class ThermodynamicMonadProcess {
         this.validator.assertValid(candidateState);
         this.state = candidateState;
         return candidateState;
+    }
+}
+export class BiogeochemicalMonadProcess extends ThermodynamicMonadProcess {
+    execute(state) {
+        const next = new ThermodynamicStateVector({
+            ...state,
+            timestamp: (state.timestamp ?? 0) + 1,
+            entropyGenerationRate: state.entropyGenerationRate ?? 1.0
+        });
+        this.setStateVector(next);
+        return next;
     }
 }
 export function computeEntropyGenerationRate(dS_sys_dt, boundaryFluxes) {

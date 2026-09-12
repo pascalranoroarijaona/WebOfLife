@@ -1,0 +1,65 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F9F9F9
+skinparam classBorderColor #555555
+
+title Web of Life - Sprint 047 Architecture: Thermodynamic Entropy Guard
+
+class ThermodynamicEntropyViolationError {
+    +readonly entropyGenerationRate: number
+    +name: string
+    +message: string
+    +constructor(entropyGenerationRate: number, message?: string)
+}
+
+class ThermodynamicStateVector {
+    +vectorId: string
+    +monadId: string
+    +internalEnergy: number
+    +temperature: number
+    +entropy: number
+    +entropyGenerationRate: number
+    +isValid: boolean
+    +recordedAt: Date
+}
+
+class StateValidator {
+    +{static} validateOrThrowEntropy(state: ThermodynamicStateVector): void
+}
+
+class ThermodynamicMonadProcess {
+    +monadId: string
+    +executeTransformation(state: ThermodynamicStateVector): ThermodynamicStateVector
+    +verifyFirstLawConservation(): boolean
+}
+
+class MonadStockLedger {
+    +stockId: string
+    +monadId: string
+    +carbonStock: number
+    +nitrogenStock: number
+    +phosphorusStock: number
+    +waterStock: number
+    +updateStocks(delta: ThermodynamicStateVector): void
+}
+
+class BlockchainBlock {
+    +blockId: string
+    +blockHeight: number
+    +previousHash: string
+    +merkleRoot: string
+    +entropyStateHash: string
+    +validatorSignature: string
+    +createdAt: Date
+}
+
+Error <|-- ThermodynamicEntropyViolationError
+StateValidator ..> ThermodynamicStateVector : inspects >
+StateValidator ..> ThermodynamicEntropyViolationError : throws >
+ThermodynamicMonadProcess --> ThermodynamicStateVector : processes >
+MonadStockLedger --> ThermodynamicStateVector : tracks conservation >
+BlockchainBlock --> ThermodynamicStateVector : anchors state >
+
+@enduml

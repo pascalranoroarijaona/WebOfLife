@@ -4,7 +4,7 @@
 import { ThermodynamicStateVector } from './state_vector.js';
 import { validateOrThrowEntropy, StateValidator } from './state_validator.js';
 
-export { StateValidator as ThermodynamicStateValidator };
+export { StateValidator as ThermodynamicStateValidator, StateValidator };
 
 export interface IMonadProcess {
   execute(state: ThermodynamicStateVector): ThermodynamicStateVector;
@@ -18,13 +18,8 @@ export class ThermodynamicMonadProcess implements IMonadProcess {
   protected validator: StateValidator = new StateValidator();
 
   public execute(currentState: ThermodynamicStateVector): ThermodynamicStateVector {
-    // 1. Perform underlying physical/biogeochemical stock transition
     const nextState = this.transitionStocks(currentState);
-
-    // 2. Enforce Second Law: S_dot_gen >= 0
     validateOrThrowEntropy(nextState);
-
-    // 3. Commit state update
     return nextState;
   }
 
@@ -43,6 +38,16 @@ export class ThermodynamicMonadProcess implements IMonadProcess {
 
   protected transitionStocks(state: ThermodynamicStateVector): ThermodynamicStateVector {
     return state;
+  }
+}
+
+export class BiogeochemicalMonadProcess extends ThermodynamicMonadProcess {
+  protected transitionStocks(state: ThermodynamicStateVector): ThermodynamicStateVector {
+    return new ThermodynamicStateVector({
+      ...state,
+      timestamp: (state.timestamp ?? 0) + 1,
+      entropyGenerationRate: state.entropyGenerationRate ?? 1.0
+    });
   }
 }
 
