@@ -1,0 +1,64 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 035 Thermodynamic State Vector & Non-Negative Entropy Architecture
+
+package "src.thermodynamics" {
+    class ThermodynamicState {
+        +entropy: number
+        +entropyGenerationRate: number
+        +temperature: number
+        +toVector(): number[]
+    }
+
+    class StateValidator {
+        +{static} validateEntropy(state: ThermodynamicState): boolean
+        +{static} assertNonNegativeEntropy(state: ThermodynamicState): void
+    }
+
+    class ThermodynamicEntropyViolationError {
+        +message: string
+        +failedValue: number
+        +metric: string
+        +constructor(metric: string, value: number)
+    }
+
+    class ThermodynamicMonadProcess {
+        +execute(state: ThermodynamicState): ThermodynamicState
+    }
+
+    ThermodynamicMonadProcess --> ThermodynamicState : transforms
+    StateValidator ..> ThermodynamicState : validates
+    StateValidator ..> ThermodynamicEntropyViolationError : throws
+}
+
+package "Database & Ledger" {
+    class EarthPod {
+        +pod_id: string
+        +pod_name: string
+        +status: string
+    }
+
+    class ThermodynamicStateRecord {
+        +state_id: string
+        +pod_id: string
+        +block_id: string
+        +entropy: double precision
+        +entropy_generation_rate: double precision
+        +temperature: double precision
+        +recorded_at: timestamp
+    }
+
+    class BlockchainBlock {
+        +block_id: string
+        +previous_hash: string
+        +merkle_root: string
+        +signature: string
+    }
+
+    EarthPod "1" *-- "0..*" ThermodynamicStateRecord : tracks
+    BlockchainBlock "1" o-- "0..*" ThermodynamicStateRecord : secures
+}
+
+@enduml
