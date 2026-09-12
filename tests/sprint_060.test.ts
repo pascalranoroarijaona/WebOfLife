@@ -20,7 +20,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
       ['water', 1.0]
     ]);
 
-    const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas) as ValidationReport;
+    const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas) as unknown as ValidationReport;
 
     assert.strictEqual(report.isValid, true);
     assert.strictEqual(report.maxDiscrepancy, 0);
@@ -46,7 +46,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
       ['carbon', 2.0]
     ]);
 
-    const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas) as ValidationReport;
+    const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas) as unknown as ValidationReport;
 
     assert.strictEqual(report.isValid, false);
     assert.ok((report.maxDiscrepancy ?? 0) > 1e-6);
@@ -73,7 +73,7 @@ describe('Sprint 060: Thermodynamic State Vector Inventory Discrepancy Evaluator
       water: 5.2
     };
 
-    const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas) as ValidationReport;
+    const report = StateValidator.validateStateVector(prevVector, currVector, fluxDeltas) as unknown as ValidationReport;
     assert.strictEqual(report.isValid, true);
   });
 

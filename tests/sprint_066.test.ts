@@ -19,7 +19,8 @@ describe('Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator
       water: 1000.0
     };
 
-    const result = StateValidator.evaluateDiscrepancy(expected, actual, tolerances) as any;
+    const validator = new StateValidator(tolerances);
+    const result = validator.evaluateDiscrepancy(expected, actual, tolerances) as any;
     assert.strictEqual(result.isValid, true);
     for (const d of result.discrepancies) {
       assert.strictEqual(d.exceeded, false);
@@ -41,7 +42,8 @@ describe('Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator
       water: 1000.0
     };
 
-    const result = StateValidator.evaluateDiscrepancy(expected, actual, tolerances) as any;
+    const validator = new StateValidator(tolerances);
+    const result = validator.evaluateDiscrepancy(expected, actual, tolerances) as any;
     assert.strictEqual(result.isValid, true);
     for (const d of result.discrepancies) {
       assert.strictEqual(d.exceeded, false);
@@ -63,7 +65,8 @@ describe('Sprint 066: Thermodynamic State Vector Inventory Discrepancy Evaluator
       water: 1000.0
     };
 
-    const result = StateValidator.evaluateDiscrepancy(expected, actual, tolerances) as any;
+    const validator = new StateValidator(tolerances);
+    const result = validator.evaluateDiscrepancy(expected, actual, tolerances) as any;
     assert.strictEqual(result.isValid, false);
     
     const carbonDisc = result.discrepancies.find((d: any) => d.element === 'carbon');

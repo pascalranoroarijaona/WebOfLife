@@ -55,7 +55,7 @@ describe('Sprint 053: Thermodynamic State Vector Stock Conservation Asserter', (
 
     let hookCalled = false;
     let capturedResult: ValidationResult | null = null;
-    validator.registerConservationHook((res) => {
+    validator.registerConservationHook((res: ValidationResult) => {
       hookCalled = true;
       capturedResult = res;
     });

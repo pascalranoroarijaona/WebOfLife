@@ -10,8 +10,7 @@ describe('Sprint 065: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const v2 = new ThermodynamicStateVector({
             stocks: { carbon: 850, nitrogen: 3900000, phosphorus: 4e9, water: 1338000000 }
         });
-        const validator = new StateValidator();
-        const result = validator.validate(v1, v2, { carbon: 0.01, nitrogen: 0.01, phosphorus: 0.01, water: 0.01 });
+        const result = StateValidator.validate(v1, v2, { carbon: 0.01, nitrogen: 0.01, phosphorus: 0.01, water: 0.01 });
         assert.strictEqual(result.isValid, true);
         assert.strictEqual(result.maxDelta, 0);
         assert.strictEqual(result.discrepancies['carbon'].delta, 0);
@@ -23,8 +22,7 @@ describe('Sprint 065: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const v2 = new ThermodynamicStateVector({
             stocks: { carbon: 855.5, nitrogen: 3900000.0 }
         });
-        const validator = new StateValidator();
-        const result = validator.validate(v1, v2, { carbon: 1.0, nitrogen: 1.0 });
+        const result = StateValidator.validate(v1, v2, { carbon: 1.0, nitrogen: 1.0 });
         assert.strictEqual(result.isValid, false);
         assert.strictEqual(result.maxDelta, 5.5);
         assert.strictEqual(result.discrepancies['carbon'].delta, 5.5);
@@ -37,8 +35,7 @@ describe('Sprint 065: Thermodynamic State Vector Inventory Discrepancy Evaluator
         const v2 = new ThermodynamicStateVector({
             stocks: { custom_element: 10.002 } // delta 0.002 > default 0.001
         });
-        const validator = new StateValidator();
-        const result = validator.validate(v1, v2, {});
+        const result = StateValidator.validate(v1, v2, {});
         assert.strictEqual(result.isValid, false);
         assert.strictEqual(result.discrepancies['custom_element'].tolerance, 1e-3);
         assert.strictEqual(result.discrepancies['custom_element'].delta, 0.002);

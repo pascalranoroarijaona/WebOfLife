@@ -1,0 +1,41 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics & Blockchain" {
+    
+    class StateVector {
+        +vectorId: string
+        +entityId: string
+        +timestamp: Date
+        +elements: Map<string, number>
+        +vectorType: string
+        +get(key: string): number
+        +entries(): Array<[string, number]>
+    }
+
+    class StateValidator {
+        +{static} computeAbsoluteStockDelta(actual: Record<string, number>, expected: Record<string, number>): Record<string, number>
+        +{static} validateFirstLaw(actual: StateVector, expected: StateVector, tolerance: number): boolean
+    }
+
+    class ThermodynamicMonadProcess {
+        +state: StateVector
+        +chainHash: string
+        +bind(fn: Function): ThermodynamicMonadProcess
+        +validate(validator: Function): ThermodynamicMonadProcess
+    }
+
+    class BlockchainLedger {
+        +blockNumber: number
+        +txHash: string
+        +payload: Record<string, number>
+        +signature: string
+        +recordTransaction(tx: BlockchainTransactions): void
+    }
+
+    StateValidator ..> StateVector : operates on >
+    ThermodynamicMonadProcess --> StateVector : encapsulates >
+    ThermodynamicMonadProcess --> BlockchainLedger : commits state >
+}
+
+@enduml
