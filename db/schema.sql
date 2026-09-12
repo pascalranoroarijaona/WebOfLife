@@ -1,60 +1,32 @@
 -- ============================================================================
 -- Web of Life: Thermodynamic Blockchain & Relational Schema
--- Sprint 043: Thermodynamic State Vector Non-Negative Entropy Assertion Utility
+-- Updated for Sprint 044: Non-Negative Entropy Assertion Monad & Ledger Stocks
 -- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors & Entropy Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL,
-    cycle_index BIGINT NOT NULL,
-    entropy DOUBLE PRECISION NOT NULL CHECK (entropy >= 0.0),
-    mass_energy_total DOUBLE PRECISION NOT NULL,
-    state_payload JSONB NOT NULL,
-    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_non_negative_entropy CHECK (entropy >= 0.0)
+CREATE TABLE IF NOT EXISTS thermodynamic_states (
+    state_id VARCHAR(64) PRIMARY KEY,
+    internal_energy NUMERIC(18, 6) NOT NULL,
+    enthalpy NUMERIC(18, 6) NOT NULL,
+    entropy NUMERIC(18, 6) CHECK (entropy >= 0) NOT NULL, -- Second Law Enforcement
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_thermodynamic_vectors_pod_cycle 
-    ON thermodynamic_state_vectors (pod_id, cycle_index);
-
--- ----------------------------------------------------------------------------
--- 2. Monad Execution & Pipeline Guard Results
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS monad_execution_logs (
-    execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
-    pipeline_stage VARCHAR(128) NOT NULL,
-    success BOOLEAN NOT NULL,
+CREATE TABLE IF NOT EXISTS entropy_validation_ledger (
+    validation_id VARCHAR(64) PRIMARY KEY,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    is_success BOOLEAN NOT NULL,
     error_message TEXT,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_monad_exec_success 
-    ON monad_execution_logs (success, executed_at);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Blockchain Ledger Transactions
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
-    block_index BIGINT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_hash VARCHAR(64) PRIMARY KEY,
     previous_hash VARCHAR(64) NOT NULL,
-    block_hash VARCHAR(64) NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    entropy_ledger_state DOUBLE PRECISION NOT NULL CHECK (entropy_ledger_state >= 0.0),
-    validator_signature VARCHAR(128) NOT NULL
+    solar_flux_vector NUMERIC(18, 6) NOT NULL,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    nonce BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS thermodynamic_block_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_index BIGINT REFERENCES thermodynamic_blockchain_blocks(block_index),
-    vector_id UUID REFERENCES thermodynamic_state_vectors(vector_id),
-    transaction_type VARCHAR(64) NOT NULL,
-    delta_entropy DOUBLE PRECISION NOT NULL,
-    is_spontaneous_injection BOOLEAN NOT NULL DEFAULT FALSE
-);
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entropy ON thermodynamic_states(entropy);
+CREATE INDEX IF NOT EXISTS idx_validation_ledger_success ON entropy_validation_ledger(is_success);

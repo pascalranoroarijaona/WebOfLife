@@ -1,0 +1,38 @@
+@startuml
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics Subsystem" {
+    
+    interface "Result<T, E>" as Result {
+        +success: boolean
+        +value?: T
+        +error?: E
+    }
+
+    class ThermodynamicStateVector {
+        +internalEnergy: number
+        +enthalpy: number
+        +entropy: number
+        +constructor(u: number, h: number, s: number)
+    }
+
+    class StateValidator {
+        +{static} assertNonNegativeEntropy(state: ThermodynamicStateVector | { entropy: number }): Result<ThermodynamicStateVector | { entropy: number }, string>
+    }
+
+    class ThermodynamicBlock {
+        +blockHash: string
+        +previousHash: string
+        +solarFluxVector: number
+        +state: ThermodynamicStateVector
+        +nonce: number
+        +mine(): void
+    }
+
+    Result <-- StateValidator : returns
+    ThermodynamicStateVector --> StateValidator : inspected by
+    ThermodynamicBlock *-- ThermodynamicStateVector : contains
+}
+
+@enduml
