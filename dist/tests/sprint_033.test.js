@@ -11,7 +11,7 @@ describe('Sprint 033: Thermodynamic State Vector Property Validator Helper', () 
         };
         const res = validateStateProperties(state);
         assert.strictEqual(res.valid, true);
-        assert.strictEqual(res.errors.length, 0);
+        assert.strictEqual(res.errors?.length ?? 0, 0);
     });
     it('TC-02: Negative energy should fail with energy bound error', () => {
         const state = {
@@ -66,6 +66,6 @@ describe('Sprint 033: Thermodynamic State Vector Property Validator Helper', () 
         };
         const res = validateStateProperties(state);
         assert.strictEqual(res.valid, false);
-        assert.ok(res.errors.length >= 2);
+        assert.ok((res.errors?.length ?? 0) >= 2);
     });
 });

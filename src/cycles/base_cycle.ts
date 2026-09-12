@@ -127,7 +127,8 @@ export abstract class BaseCycle implements IThermodynamicModel {
       isFirstLawSatisfied: this.validateFirstLaw(),
       isSecondLawSatisfied: this.validateSecondLaw(),
       energyResidual: 0,
-      entropyResidual: 0
+      entropyResidual: 0,
+      isValid: this.validateFirstLaw() && this.validateSecondLaw()
     };
   }
 

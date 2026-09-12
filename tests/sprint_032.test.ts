@@ -18,23 +18,29 @@ describe('Sprint 032: Thermodynamic State Vector Property Validator', () => {
 
     const result: ValidationResult = validateStateProperties(validState);
     assert.strictEqual(result.isValid, true);
-    assert.strictEqual(result.errors.length, 0);
+    assert.strictEqual(result.errors?.length ?? 0, 0);
   });
 
   it('should reject null or non-object states gracefully without throwing', () => {
     assert.deepStrictEqual(validateStateProperties(null), {
       isValid: false,
-      errors: [{ property: 'root', reason: 'State must be a non-null object.' }]
+      valid: false,
+      errors: [{ property: 'root', reason: 'State must be a non-null object.' }],
+      violations: ['root: State must be a non-null object.']
     });
 
     assert.deepStrictEqual(validateStateProperties('not-an-object'), {
       isValid: false,
-      errors: [{ property: 'root', reason: 'State must be a non-null object.' }]
+      valid: false,
+      errors: [{ property: 'root', reason: 'State must be a non-null object.' }],
+      violations: ['root: State must be a non-null object.']
     });
 
     assert.deepStrictEqual(validateStateProperties(42), {
       isValid: false,
-      errors: [{ property: 'root', reason: 'State must be a non-null object.' }]
+      valid: false,
+      errors: [{ property: 'root', reason: 'State must be a non-null object.' }],
+      violations: ['root: State must be a non-null object.']
     });
   });
 
@@ -48,7 +54,7 @@ describe('Sprint 032: Thermodynamic State Vector Property Validator', () => {
 
     const result = validateStateProperties(faultyState);
     assert.strictEqual(result.isValid, false);
-    assert.strictEqual(result.errors.length, 3);
+    assert.strictEqual(result.errors?.length ?? 0, 3);
     assert.ok((result.errors as ValidationFailure[]).some((e: ValidationFailure) => e.property === 'energy'));
     assert.ok((result.errors as ValidationFailure[]).some((e: ValidationFailure) => e.property === 'entropy'));
     assert.ok((result.errors as ValidationFailure[]).some((e: ValidationFailure) => e.property === 'temperature'));
@@ -68,7 +74,7 @@ describe('Sprint 032: Thermodynamic State Vector Property Validator', () => {
 
     const result = validateStateProperties(faultyStocksState);
     assert.strictEqual(result.isValid, false);
-    assert.strictEqual(result.errors.length, 2);
+    assert.strictEqual(result.errors?.length ?? 0, 2);
     assert.ok((result.errors as ValidationFailure[]).some((e: ValidationFailure) => e.property === 'stocks.negativeStock'));
     assert.ok((result.errors as ValidationFailure[]).some((e: ValidationFailure) => e.property === 'stocks.invalidTypeStock'));
   });

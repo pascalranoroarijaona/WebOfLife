@@ -233,7 +233,7 @@ export class ThermodynamicMonadEngine {
         };
     }
     validateSecondLaw(transition) {
-        const sGen = transition.metrics?.internal_entropy_generation_rate ?? 0;
+        const sGen = transition.metrics?.internal_entropy_generation_rate ?? transition.entropyGenerationRate ?? 0;
         return sGen >= 0;
     }
 }

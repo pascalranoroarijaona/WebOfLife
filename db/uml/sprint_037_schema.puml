@@ -1,0 +1,78 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 037: Thermodynamic State Vector & Non-Negative Entropy Architecture
+
+package "src.thermodynamics" {
+    interface IThermodynamicStateVector {
+        + temperature: number
+        + internalEnergy: number
+        + entropy: number
+        + entropyGenerationRate: number
+        + exergy: number
+    }
+
+    interface IStateValidator {
+        + validate(state: IThermodynamicStateVector): ValidationResult
+    }
+
+    class ValidationResult {
+        + isValid: boolean
+        + violations: string[]
+    }
+
+    class ThermodynamicStateValidator implements IStateValidator {
+        + validate(state: IThermodynamicStateVector): ValidationResult
+        + assertValid(state: IThermodynamicStateVector): void
+    }
+
+    class ThermodynamicMonadProcess {
+        - validator: ThermodynamicStateValidator
+        + processFluxes(state: IThermodynamicStateVector): IThermodynamicStateVector
+        + commitTransaction(state: IThermodynamicStateVector): void
+    }
+}
+
+package "Database & Ledger Schema" {
+    class thermodynamic_state_vectors {
+        + id: UUID <<PK>>
+        + earth_pod_id: UUID
+        + timestamp: TIMESTAMPTZ
+        + temperature: DOUBLE PRECISION
+        + internal_energy: DOUBLE PRECISION
+        + entropy: DOUBLE PRECISION
+        + entropy_generation_rate: DOUBLE PRECISION
+        + exergy: DOUBLE PRECISION
+        + is_valid: BOOLEAN
+        + violation_notes: TEXT[]
+    }
+
+    class thermodynamic_monad_transactions {
+        + transaction_id: UUID <<PK>>
+        + state_vector_id: UUID <<FK>>
+        + pod_id: UUID
+        + previous_hash: VARCHAR(64)
+        + block_hash: VARCHAR(64)
+        + validation_status: VARCHAR(32)
+        + committed_at: TIMESTAMPTZ
+    }
+
+    class second_law_audit_log {
+        + audit_id: UUID <<PK>>
+        + state_vector_id: UUID <<FK>>
+        + violation_type: VARCHAR(64)
+        + error_message: TEXT
+        + detected_at: TIMESTAMPTZ
+    }
+}
+
+IThermodynamicStateVector <-- ThermodynamicStateValidator : inspects
+ValidationResult <-- ThermodynamicStateValidator : returns
+ThermodynamicStateValidator --> ThermodynamicMonadProcess : secures state pipeline
+ThermodynamicStateValidator ..> thermodynamic_state_vectors : persists telemetry
+ThermodynamicMonadProcess ..> thermodynamic_monad_transactions : records immutable block
+ThermodynamicStateValidator ..> second_law_audit_log : logs violations
+
+@enduml

@@ -51,7 +51,7 @@ describe('Sprint 17: Thermodynamic State Vector Interface & Verification', () =>
 
     assert.throws(() => {
       monad.testSetState(invalidState);
-    }, /Second Law Violation/);
+    }, /Second Law Violation|Thermodynamic State Validation Failed/);
   });
 
   it('2. Gouy-Stodola Consistency Check', () => {

@@ -21,7 +21,14 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
         fluxes: [],
         netHeatRate: 0,
         netWorkRate: 0,
-        netMassBalance: 0
+        netMassBalance: 0,
+        solarRadiationIn: 1.74e17,
+        longwaveRadiationOut: 1.74e17 * 0.99,
+        sensibleHeatFlux: 0,
+        latentHeatFlux: 0,
+        netMassFlux: 0,
+        heatFluxes: [],
+        massFluxes: []
       },
       exergyMetrics: {
         T_0: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -35,6 +42,13 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
     };
 
     const newFluxes: IBoundaryFluxStructure = {
+      solarRadiationIn: 1.74e17,
+      longwaveRadiationOut: 1.74e17 * 0.99,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0,
+      heatFluxes: [],
+      massFluxes: [],
       fluxes: [
         {
           id: 'solar_1',
@@ -54,12 +68,13 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
       netMassBalance: 0
     };
 
-    const nextState = ThermodynamicMonadProcess.step(initialState, newFluxes, 1.0);
+    const monadProcess = new ThermodynamicMonadProcess();
+    const nextState = monadProcess.step(initialState, newFluxes, 1.0);
 
     assert.strictEqual(nextState.timestamp, 1.0);
     assert.strictEqual((nextState.internalEnergy ?? 0) > (initialState.internalEnergy ?? 0), true);
     
-    const secondLawValid = ThermodynamicMonadProcess.validateSecondLaw(nextState);
+    const secondLawValid = monadProcess.validateSecondLaw();
     assert.strictEqual(secondLawValid, true, 'Second Law (S_gen >= 0) must be strictly satisfied');
   });
 
@@ -75,7 +90,7 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
       exergy: 1e5,
       stocks: {},
       exergyDestructionRate: 0,
-      boundaryFluxes: { fluxes: [], netHeatRate: 0, netWorkRate: 0, netMassBalance: 0 },
+      boundaryFluxes: { solarRadiationIn: 0, longwaveRadiationOut: 0, sensibleHeatFlux: 0, latentHeatFlux: 0, netMassFlux: 0, fluxes: [], netHeatRate: 0, netWorkRate: 0, netMassBalance: 0, heatFluxes: [], massFluxes: [] },
       exergyMetrics: {
         T_0: STANDARD_AMBIENT_TEMPERATURE_K,
         totalExergy: 1e5,
@@ -88,12 +103,20 @@ describe('Sprint 23: Thermodynamic State Vector Interface Contracts & Monad Tran
       entropyGenerationRate: -5.0
     };
 
-    const isValid = ThermodynamicMonadProcess.validateSecondLaw(badState);
+    const monadProcess = new ThermodynamicMonadProcess('bad_proc', 'Bad Pod', badState);
+    const isValid = monadProcess.validateSecondLaw();
     assert.strictEqual(isValid, false);
   });
 
   it('should maintain strict zero mass balance for closed planetary systems', () => {
     const fluxes: IBoundaryFluxStructure = {
+      solarRadiationIn: 0,
+      longwaveRadiationOut: 0,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0,
+      heatFluxes: [],
+      massFluxes: [],
       fluxes: [],
       netHeatRate: 0,
       netWorkRate: 0,

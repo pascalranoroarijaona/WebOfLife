@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 037: Web of Life - Thermodynamic State Vector Non-Negative Entropy Assertion</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+    <header id="topbar" class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">🧬</span>
+            <h1 class="text-xl font-bold tracking-tight text-white">Web of Life <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sprint 037</span></h1>
+        </div>
+        <div id="status-indicator" class="flex items-center space-x-2 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+            <span id="status-text">State Validator & Non-Negative Entropy Assertion Active (60 FPS Render Loop)</span>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside id="controls" class="w-full lg:w-80 border-r border-slate-800 bg-slate-900/30 p-6 flex flex-col gap-6 overflow-y-auto">
+            <div class="space-y-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Controls</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition shadow-lg shadow-emerald-900/20 text-sm cursor-pointer">Start</button>
+                    <button id="btn-pause" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-4 rounded transition text-sm cursor-pointer">Pause</button>
+                </div>
+                <button id="btn-reset" class="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-medium py-2 px-4 rounded transition text-sm border border-slate-700/50 cursor-pointer">Reset World</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Metrics</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Entities:</span>
+                        <span id="metric-entities" class="font-mono font-bold text-emerald-400">42</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">FPS:</span>
+                        <span id="metric-fps" class="font-mono font-bold text-slate-200">60</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">Generation:</span>
+                        <span id="metric-gen" class="font-mono font-bold text-slate-200">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sprint-telemetry" class="space-y-3 pt-4 border-t border-slate-800/80">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">State Vector Validation</h2>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-2 text-xs font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Entropy ΔS:</span>
+                        <span id="telemetry-entropy" class="text-emerald-400">+0.0000</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Non-Neg Assertion:</span>
+                        <span id="telemetry-assertion" class="text-emerald-400">PASSED</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">State Valid:</span>
+                        <span id="telemetry-valid" class="text-emerald-400">TRUE</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport -->
+        <div id="viewport-container" class="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+            <canvas id="render-canvas" class="w-full h-full block"></canvas>
+        </div>
+    </main>
+
+    <script type="module">
+        import { EarthPOD } from '../../../src/earth_pod.ts';
+        import { StateValidator } from '../../../src/thermodynamics/state_validator.ts';
+
+        const canvas = document.getElementById('render-canvas');
+        const pod = new EarthPOD(canvas);
+        const validator = new StateValidator();
+
+        let running = true;
+        let gen = 1;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsTimer = performance.now();
+
+        document.getElementById('btn-start').addEventListener('click', () => { running = true; });
+        document.getElementById('btn-pause').addEventListener('click', () => { running = false; });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            pod.reset();
+            gen = 1;
+            document.getElementById('metric-gen').textContent = gen;
+        });
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            // FPS calculation
+            frameCount++;
+            if (now - fpsTimer >= 1000) {
+                document.getElementById('metric-fps').textContent = Math.round((frameCount * 1000) / (now - fpsTimer));
+                frameCount = 0;
+                fpsTimer = now;
+            }
+
+            if (running) {
+                pod.update();
+                
+                // Validate thermodynamic state vector & entropy assertion
+                const state = pod.getStateVector();
+                const validation = validator.validate(state);
+
+                document.getElementById('telemetry-entropy').textContent = (state.entropy >= 0 ? '+' : '') + state.entropy.toFixed(4);
+                document.getElementById('telemetry-assertion').textContent = validation.nonNegativeEntropy ? 'PASSED' : 'FAILED';
+                document.getElementById('telemetry-valid').textContent = validation.isValid ? 'TRUE' : 'FALSE';
+                
+                document.getElementById('metric-entities').textContent = state.entityCount || 42;
+            }
+
+            pod.render();
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

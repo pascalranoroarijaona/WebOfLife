@@ -305,7 +305,7 @@ export class ThermodynamicMonadEngine {
   }
 
   public validateSecondLaw(transition: any): boolean {
-    const sGen = transition.metrics?.internal_entropy_generation_rate ?? 0;
+    const sGen = transition.metrics?.internal_entropy_generation_rate ?? transition.entropyGenerationRate ?? 0;
     return sGen >= 0;
   }
 }

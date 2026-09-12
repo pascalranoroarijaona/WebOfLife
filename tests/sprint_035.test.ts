@@ -70,7 +70,7 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
   });
 
   it('should execute thermodynamic transition successfully for compliant state changes', () => {
-    const transitionResult = executeThermodynamicTransition(validState, (s) => ({
+    const transitionResult = executeThermodynamicTransition(validState, (s: any) => ({
       ...s,
       entropy: s.entropy + 10,
       entropyGenerationRate: s.entropyGenerationRate + 1
@@ -79,7 +79,7 @@ describe('Sprint 35: Thermodynamic State Non-Negative Entropy Assertion', () => 
   });
 
   it('should return error monad on unphysical transition violating Second Law', () => {
-    const transitionResult = executeThermodynamicTransition(validState, (s) => ({
+    const transitionResult = executeThermodynamicTransition(validState, (s: any) => ({
       ...s,
       entropyGenerationRate: -5.0 // Unphysical backflow
     }));
