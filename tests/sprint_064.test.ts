@@ -19,7 +19,7 @@ describe('Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const result = validator.evaluateDiscrepancy(expected, actual);
 
     assert.strictEqual(result.isValid, true);
-    assert.strictEqual(result.maxDelta, 0);
+    assert.strictEqual(result.maxDelta ?? 0, 0);
     assert.strictEqual((result.discrepancies as any)['carbon'].delta, 0);
   });
 
@@ -37,7 +37,7 @@ describe('Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
     const result = validator.evaluateDiscrepancy(expected, actual);
 
     assert.strictEqual(result.isValid, true);
-    assert.ok(result.maxDelta <= 1e-6);
+    assert.ok((result.maxDelta ?? 0) <= 1e-6);
   });
 
   it('should verify vectors exceeding tolerance thresholds return isValid: false with accurate delta reporting', () => {
@@ -57,7 +57,7 @@ describe('Sprint 064: Thermodynamic State Vector Inventory Discrepancy Evaluator
     assert.strictEqual((result.discrepancies as any)['carbon'].expected, 850.0);
     assert.strictEqual((result.discrepancies as any)['carbon'].actual, 850.00005);
     assert.strictEqual((result.discrepancies as any)['carbon'].delta, 0.00005);
-    assert.strictEqual(result.maxDelta, 0.00005);
+    assert.strictEqual(result.maxDelta ?? 0, 0.00005);
   });
 
   it('should support custom tolerances via ThermodynamicToleranceConfig', () => {

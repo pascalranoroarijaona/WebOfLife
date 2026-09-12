@@ -7,8 +7,11 @@ import {
   STANDARD_AMBIENT_TEMPERATURE_K, 
   ThermodynamicStateVector as BaseThermodynamicStateVector,
   IBoundaryFluxArray,
-  IExergyMetrics
+  IExergyMetrics,
+  ElementalKey
 } from './types.js';
+
+export { ElementalKey };
 
 export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
   public computeDelta(previousState: ThermodynamicStateVector | BaseThermodynamicStateVector | any): Record<string, number> {
@@ -25,7 +28,7 @@ export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
 
 export type StateVector = ThermodynamicStateVector;
 export const StateVector = ThermodynamicStateVector;
-export { ThermodynamicStateVector as StateVectorClass };
+export { ThermodynamicStateVector as StateVectorClass, ThermodynamicStateVector as ThermodynamicState };
 
 export function createThermodynamicStateVector(init?: Partial<IThermodynamicStateVector>): ThermodynamicStateVector {
   return new ThermodynamicStateVector(init);

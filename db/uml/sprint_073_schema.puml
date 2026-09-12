@@ -1,0 +1,90 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 073: Thermodynamic State Vector Discrepancy Architecture
+
+package "Thermodynamics Core" {
+  enum ElementalKey {
+    C
+    N
+    P
+    H2O
+  }
+
+  class StateVector {
+    +entityId: UUID
+    +timestamp: DateTime
+    +stocks: Map<ElementalKey, number>
+    +metadata: Record<string, any>
+    +getStock(key: ElementalKey): number
+  }
+
+  class StateValidator {
+    +{static} computeAbsoluteStockDelta(actual: StateVector, expected: StateVector): Record<ElementalKey, number>
+    +{static} validateMatterConservation(delta: Record<ElementalKey, number>, tolerance: number): boolean
+  }
+}
+
+package "Database & Ledger Models" {
+  class ThermodynamicElementModel {
+    +elementKey: string
+    +elementName: string
+    +atomicWeight: number
+  }
+
+  class StateVectorRecord {
+    +vectorId: UUID
+    +entityId: UUID
+    +timestamp: DateTime
+    +vectorType: string
+  }
+
+  class StateVectorStockRecord {
+    +vectorId: UUID
+    +elementKey: string
+    +stockValue: number
+  }
+
+  class StateDiscrepancyLedgerRecord {
+    +discrepancyId: UUID
+    +actualVectorId: UUID
+    +expectedVectorId: UUID
+    +elementKey: string
+    +absoluteDelta: number
+    +computedAt: DateTime
+  }
+}
+
+package "Blockchain Consensus & Blocks" {
+  class ThermodynamicBlock {
+    +blockIndex: number
+    +blockHash: string
+    +previousHash: string
+    +merkleRoot: string
+    +validatorSignature: string
+    +nonce: number
+    +createdAt: DateTime
+  }
+
+  class ThermodynamicBlockTransaction {
+    +transactionId: UUID
+    +blockIndex: number
+    +discrepancyId: UUID
+    +entropyChange: number
+    +transactionSignature: string
+    +payload: JSON
+  }
+}
+
+-- Relationships & Dependencies
+StateVector "1" *-- "0..*" ElementalKey : contains keys
+StateValidator ..> StateVector : inspects
+StateValidator ..> ElementalKey : iterates
+StateVectorRecord "1" *-- "0..*" StateVectorStockRecord : persists
+StateDiscrepancyLedgerRecord --> StateVectorRecord : compares actual & expected
+ThermodynamicBlock "1" *-- "0..*" ThermodynamicBlockTransaction : encapsulates
+ThermodynamicBlockTransaction --> StateDiscrepancyLedgerRecord : anchors validation
+
+@enduml

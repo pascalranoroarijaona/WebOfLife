@@ -16,7 +16,7 @@ export class ThermodynamicStateVector extends BaseThermodynamicStateVector {
     }
 }
 export const StateVector = ThermodynamicStateVector;
-export { ThermodynamicStateVector as StateVectorClass };
+export { ThermodynamicStateVector as StateVectorClass, ThermodynamicStateVector as ThermodynamicState };
 export function createThermodynamicStateVector(init) {
     return new ThermodynamicStateVector(init);
 }

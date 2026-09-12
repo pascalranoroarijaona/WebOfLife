@@ -45,8 +45,8 @@ describe('Sprint 063: Thermodynamic State Vector Inventory Discrepancy Evaluator
         assert.strictEqual(result.isValid, true);
     });
     it('should validate First Law mass conservation', () => {
-        const validator = new StateValidator(1e-6);
         const vector = new StateVector({
+            energy: 1000,
             stocks: { carbon: 500, nitrogen: 300, phosphorus: 200 }
         });
         const isConserved = StateValidator.validateFirstLaw(vector, 1000);

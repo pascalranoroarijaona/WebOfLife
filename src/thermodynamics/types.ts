@@ -5,6 +5,7 @@
 export const STANDARD_AMBIENT_TEMPERATURE_K = 288.15;
 
 export type ElementType = 'carbon' | 'nitrogen' | 'phosphorus' | 'water' | 'oxygen' | 'energy' | 'qLoss' | string;
+export type ElementalKey = ElementType;
 
 export interface ElementTolerances {
   carbon?: number;
@@ -789,6 +790,7 @@ export type DiscrepancyResult = {
   actualDelta?: number;
   expectedDelta?: number;
   isWithinTolerance?: boolean;
+  violated?: boolean;
   error?: number;
   delta?: number;
   [key: string]: any;
@@ -802,9 +804,17 @@ export type ValidationReport = {
   errors?: ValidationFailure[];
   violations?: string[] | Record<string, string>;
   discrepancies?: Map<string, any> | Record<string, any> | DiscrepancyResult[];
+  poolDiscrepancies?: Record<string, DiscrepancyResult>;
+  withinTolerance?: boolean;
+  totalDiscrepancy?: number;
   maxTolerance?: number;
   maxDelta?: number;
+  maxDiscrepancy?: number;
   maxToleranceExceeded?: boolean;
+  totalAbsoluteDiscrepancy?: number;
+  isMassConserved?: boolean;
+  records?: DiscrepancyResult[];
+  items?: DiscrepancyResult[];
   [key: string]: any;
 };
 
