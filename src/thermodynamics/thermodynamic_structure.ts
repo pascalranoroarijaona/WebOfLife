@@ -1,19 +1,24 @@
 /**
- * Thermodynamic Structure and Base Implementations (Sprint 014 & Retro-Compatibility)
- * Provides foundational base classes for the Web of Life thermodynamic nodes incorporating strict thermodynamic contracts.
+ * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
+ * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
 import { 
   IThermodynamicSystem, 
   IThermodynamicStateVector, 
   STANDARD_AMBIENT_TEMPERATURE_K, 
-  ThermodynamicStateVector,
-  BoundaryFluxArray,
+  advanceThermodynamicState, 
+  ThermodynamicStateMonad, 
+  IBoundaryFluxArray, 
+  ThermodynamicStateVector, 
+  BoundaryFluxVector, 
+  ThermodynamicComplianceResult, 
+  BoundaryFluxArray, 
   ThermodynamicMetrics,
-  IBoundaryFluxArray,
-  ThermodynamicComplianceResult
+  IThermodynamicBoundaryFlux
 } from './types.js';
+import { executeThermodynamicStep } from './thermodynamic_monad_process.js';
 
-export { advanceThermodynamicState, ThermodynamicMonad } from './types.js';
+export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, ThermodynamicMetrics };
 
 export enum EntropyState {
   STEADY = "STEADY",
@@ -35,193 +40,6 @@ export interface Flow {
   substance: string;
   rate: number;
   flowType: string;
-}
-
-export abstract class BaseThermodynamicSystem {
-  protected state: ThermodynamicStateVector;
-
-  constructor(initialState: ThermodynamicStateVector) {
-    this.state = initialState;
-  }
-
-  public abstract computeEntropyGeneration(dt: number): number;
-  protected abstract calculateExergyEfficiency(): number;
-
-  public getMetrics(): ThermodynamicMetrics {
-    const sGen = this.computeEntropyGeneration(1.0);
-    const T0 = this.state.ambientReferenceTemp ?? STANDARD_AMBIENT_TEMPERATURE_K;
-    const iDest = sGen * T0;
-    return {
-      entropyGenerationRate: sGen,
-      exergyDestructionRate: iDest,
-      exergyEfficiency: this.calculateExergyEfficiency(),
-      isSecondLawValid: sGen >= -1e-9
-    };
-  }
-}
-
-export class ThermodynamicStateMonad {
-  private constructor(private readonly state: ThermodynamicStateVector) {}
-
-  public static unit(state: ThermodynamicStateVector): ThermodynamicStateMonad {
-    return new ThermodynamicStateMonad(state);
-  }
-
-  public static of(state: ThermodynamicStateVector): ThermodynamicStateMonad {
-    return new ThermodynamicStateMonad(state);
-  }
-
-  public map(fn: (s: ThermodynamicStateVector) => ThermodynamicStateVector): ThermodynamicStateMonad {
-    const nextState = fn(this.state);
-    
-    // Validate First Law / Mass Conservation bounds
-    const bFluxes = nextState.boundaryFluxes;
-    const netMassFlux = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.netMassFlux ?? 0) : 0;
-    if (Math.abs(netMassFlux) > 1e-6) {
-      console.warn(`[Warning] Mass conservation violation detected: netMassFlux = ${netMassFlux} kg/s`);
-    }
-
-    return new ThermodynamicStateMonad(nextState);
-  }
-
-  public getState(): ThermodynamicStateVector {
-    return this.state;
-  }
-}
-
-export function applyThermalFlux(
-  stock: any,
-  state: IThermodynamicStateVector,
-  qNet: number,
-  boundaryTemp: number,
-  dt: number
-): [any, IThermodynamicStateVector] {
-  const T0 = state.referenceTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-  const dU = qNet * dt;
-  const newInternalEnergy = state.internalEnergy + dU;
-
-  const entropyTransfer = qNet / boundaryTemp;
-  const sysTemp = T0;
-  const dotSGen = Math.abs(qNet) * Math.max(0, (1 / boundaryTemp - 1 / sysTemp));
-  const dotI = T0 * dotSGen;
-
-  const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
-  const dEntropy = (entropyTransfer + dotSGen) * dt;
-  const newEntropy = currentEntropy + dEntropy;
-
-  const bFluxes = state.boundaryFluxes;
-  const heatFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.heatFluxes) ? bFluxes.heatFluxes : new Map();
-  const massFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.massFluxes) ? bFluxes.massFluxes : new Map();
-  const solarRad = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.solarRadiationIn ?? 0) : 0;
-  const longwaveOut = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.longwaveRadiationOut ?? 0) : 0;
-  const sensible = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.sensibleHeatFlux ?? 0) : 0;
-  const latent = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.latentHeatFlux ?? 0) : 0;
-  const netMass = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.netMassFlux ?? 0) : 0;
-
-  const boundaryFluxes: IBoundaryFluxArray = {
-    heatFluxes: heatFluxesMap,
-    massFluxes: massFluxesMap,
-    radiativeNet: qNet,
-    ...(bFluxes && !Array.isArray(bFluxes) ? bFluxes : {}),
-    solarRadiationIn: solarRad,
-    longwaveRadiationOut: longwaveOut,
-    sensibleHeatFlux: sensible,
-    latentHeatFlux: latent,
-    netMassFlux: netMass
-  };
-
-  const updatedState: IThermodynamicStateVector = {
-    ...state,
-    internalEnergy: newInternalEnergy,
-    entropy: newEntropy,
-    totalEntropy: newEntropy,
-    temperature: sysTemp,
-    ambientReferenceTemp: T0,
-    entropyGenerationRate: dotSGen,
-    exergyDestructionRate: dotI,
-    boundaryFluxes,
-    validateSecondLaw: () => dotSGen >= 0
-  };
-
-  const updatedStock = {
-    ...stock,
-    temperature: sysTemp,
-    thermalEnergy: newInternalEnergy
-  };
-
-  return [updatedStock, updatedState];
-}
-
-export function applyMassTransport(
-  stock: any,
-  state: IThermodynamicStateVector,
-  massFluxes: Map<string, number>,
-  specificEnthalpy: number,
-  specificEntropy: number,
-  dt: number
-): [any, IThermodynamicStateVector] {
-  let totalMassRate = 0;
-  if (massFluxes instanceof Map) {
-    massFluxes.forEach((flux) => {
-      totalMassRate += flux;
-    });
-  } else if (massFluxes && typeof massFluxes === 'object') {
-    Object.values(massFluxes).forEach((flux: any) => {
-      totalMassRate += Number(flux) || 0;
-    });
-  }
-
-  const T0 = state.referenceTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
-  const energyFlux = totalMassRate * specificEnthalpy;
-  const dU = energyFlux * dt;
-  const entropyTransportRate = totalMassRate * specificEntropy;
-  
-  const dotSGen = Math.abs(totalMassRate * specificEntropy * 0.05);
-  const dotI = T0 * dotSGen;
-
-  const newInternalEnergy = state.internalEnergy + dU;
-  const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
-  const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
-
-  const bFluxes = state.boundaryFluxes;
-  const heatFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.heatFluxes) ? bFluxes.heatFluxes : new Map();
-  const radiative = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.radiativeNet ?? 0) : 0;
-  const solarRad = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.solarRadiationIn ?? 0) : 0;
-  const longwaveOut = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.longwaveRadiationOut ?? 0) : 0;
-  const sensible = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.sensibleHeatFlux ?? 0) : 0;
-  const latent = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.latentHeatFlux ?? 0) : 0;
-
-  const boundaryFluxes: IBoundaryFluxArray = {
-    heatFluxes: heatFluxesMap,
-    radiativeNet: radiative,
-    massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : new Map(),
-    ...(bFluxes && !Array.isArray(bFluxes) ? bFluxes : {}),
-    solarRadiationIn: solarRad,
-    longwaveRadiationOut: longwaveOut,
-    sensibleHeatFlux: sensible,
-    latentHeatFlux: latent,
-    netMassFlux: totalMassRate
-  };
-
-  const updatedState: IThermodynamicStateVector = {
-    ...state,
-    internalEnergy: newInternalEnergy,
-    entropy: newEntropy,
-    totalEntropy: newEntropy,
-    temperature: T0,
-    ambientReferenceTemp: T0,
-    entropyGenerationRate: dotSGen,
-    exergyDestructionRate: dotI,
-    boundaryFluxes,
-    validateSecondLaw: () => dotSGen >= 0
-  };
-
-  const updatedStock = {
-    ...stock,
-    totalMass: (stock.totalMass ?? 0) + totalMassRate * dt
-  };
-
-  return [updatedStock, updatedState];
 }
 
 export class ThermodynamicStructure implements IThermodynamicSystem {
@@ -283,13 +101,14 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
       internalEnergy: this.internalEnergyJoules,
       totalEntropy: this.entropyJoulesPerKelvin,
       temperature: T0,
+      ambientTemperature: T0,
       ambientReferenceTemp: T0,
       entropy: this.entropyJoulesPerKelvin,
       referenceTemperature: T0,
-      ambientTemperature: T0,
       T_0: T0,
       entropyGenerationRate: dotSGen,
       exergyDestructionRate: T0 * dotSGen,
+      exergy: 1e10,
       boundaryFluxes,
       thermalFluxes: {
         solarInbound: 1.74e17,
@@ -309,19 +128,26 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
     };
   }
 
-  public getBoundaryFluxes(): IBoundaryFluxArray {
+  public getBoundaryFluxes(): BoundaryFluxVector {
     return {
+      heatFluxes: new Map(),
+      radiationFlux: {
+        solarIncoming: 1.74e17,
+        terrestrialOutgoing: 1.74e17 * 0.99
+      },
+      workRate: 0,
+      massFluxes: new Map(),
+      specificEnthalpies: new Map(),
+      specificEntropies: new Map(),
       solarRadiationIn: 1.74e17,
       longwaveRadiationOut: 1.74e17 * 0.99,
       sensibleHeatFlux: 1e8,
       latentHeatFlux: 1e8,
-      netMassFlux: 0,
-      heatFluxes: new Map(),
-      massFluxes: new Map()
+      netMassFlux: 0
     };
   }
 
-  public stepThermodynamics(dt: number): void {
+  public stepThermodynamics(dt: number, _fluxes?: BoundaryFluxVector): void {
     this.internalEnergyJoules += 0.1 * dt;
     if (!this.validateSecondLaw()) {
       throw new Error(`Second Law Violation in ${this.name}: Negative entropy generation rate.`);
@@ -364,4 +190,172 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
     }
     return sum;
   }
+}
+
+export abstract class BaseThermodynamicSystem {
+  protected state: ThermodynamicStateVector;
+
+  constructor(initialState: ThermodynamicStateVector) {
+    this.state = initialState;
+  }
+
+  public abstract computeEntropyGeneration(dt: number): number;
+  protected abstract calculateExergyEfficiency(): number;
+
+  public getMetrics(): ThermodynamicMetrics {
+    const sGen = this.computeEntropyGeneration(1.0);
+    const T0 = this.state.ambientReferenceTemp ?? this.state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    const iDest = sGen * T0;
+    return {
+      entropyGenerationRate: sGen,
+      exergyDestructionRate: iDest,
+      exergyEfficiency: this.calculateExergyEfficiency(),
+      isSecondLawValid: sGen >= -1e-9
+    };
+  }
+}
+
+export function applyThermalFlux(
+  stock: any,
+  state: IThermodynamicStateVector,
+  qNet: number,
+  boundaryTemp: number,
+  dt: number
+): [any, IThermodynamicStateVector] {
+  const T0 = state.referenceTemperature ?? state.T_0 ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const dU = qNet * dt;
+  const newInternalEnergy = state.internalEnergy + dU;
+
+  const entropyTransfer = qNet / boundaryTemp;
+  const sysTemp = T0;
+  const dotSGen = Math.abs(qNet) * Math.max(0, (1 / boundaryTemp - 1 / sysTemp));
+  const dotI = T0 * dotSGen;
+
+  const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
+  const dEntropy = (entropyTransfer + dotSGen) * dt;
+  const newEntropy = currentEntropy + dEntropy;
+
+  const bFluxes = state.boundaryFluxes;
+  const isArr = Array.isArray(bFluxes);
+  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : {};
+
+  const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
+  const massFluxesMap = bfRecord.massFluxes ?? new Map();
+  const solarRad = bfRecord.solarRadiationIn ?? 0;
+  const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
+  const sensible = bfRecord.sensibleHeatFlux ?? 0;
+  const latent = bfRecord.latentHeatFlux ?? 0;
+  const netMass = bfRecord.netMassFlux ?? 0;
+
+  const boundaryFluxes: IBoundaryFluxArray = {
+    heatFluxes: heatFluxesMap,
+    massFluxes: massFluxesMap,
+    radiativeNet: qNet,
+    ...bfRecord,
+    solarRadiationIn: solarRad,
+    longwaveRadiationOut: longwaveOut,
+    sensibleHeatFlux: sensible,
+    latentHeatFlux: latent,
+    netMassFlux: netMass
+  };
+
+  const updatedState: IThermodynamicStateVector = {
+    ...state,
+    internalEnergy: newInternalEnergy,
+    entropy: newEntropy,
+    totalEntropy: newEntropy,
+    temperature: sysTemp,
+    ambientTemperature: T0,
+    ambientReferenceTemp: T0,
+    entropyGenerationRate: dotSGen,
+    exergyDestructionRate: dotI,
+    exergy: state.exergy ?? 1e5,
+    boundaryFluxes,
+    validateSecondLaw: () => dotSGen >= 0
+  };
+
+  const updatedStock = {
+    ...stock,
+    temperature: sysTemp,
+    thermalEnergy: newInternalEnergy
+  };
+
+  return [updatedStock, updatedState];
+}
+
+export function applyMassTransport(
+  stock: any,
+  state: IThermodynamicStateVector,
+  massFluxes: Map<string, number> | Record<string, number>,
+  specificEnthalpy: number,
+  specificEntropy: number,
+  dt: number
+): [any, IThermodynamicStateVector] {
+  let totalMassRate = 0;
+  if (massFluxes instanceof Map) {
+    massFluxes.forEach((flux) => {
+      totalMassRate += flux;
+    });
+  } else if (massFluxes && typeof massFluxes === 'object') {
+    Object.values(massFluxes).forEach((flux: any) => {
+      totalMassRate += Number(flux) || 0;
+    });
+  }
+
+  const T0 = state.referenceTemperature ?? state.T_0 ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const energyFlux = totalMassRate * specificEnthalpy;
+  const dU = energyFlux * dt;
+  const entropyTransportRate = totalMassRate * specificEntropy;
+  
+  const dotSGen = Math.abs(totalMassRate * specificEntropy * 0.05);
+  const dotI = T0 * dotSGen;
+
+  const newInternalEnergy = state.internalEnergy + dU;
+  const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
+  const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
+
+  const bFluxes = state.boundaryFluxes;
+  const isArr = Array.isArray(bFluxes);
+  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : {};
+
+  const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
+  const radiative = bfRecord.radiativeNet ?? 0;
+  const solarRad = bfRecord.solarRadiationIn ?? 0;
+  const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
+  const sensible = bfRecord.sensibleHeatFlux ?? 0;
+  const latent = bfRecord.latentHeatFlux ?? 0;
+
+  const boundaryFluxes: IBoundaryFluxArray = {
+    heatFluxes: heatFluxesMap,
+    radiativeNet: radiative,
+    massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : (massFluxes ?? new Map()),
+    ...bfRecord,
+    solarRadiationIn: solarRad,
+    longwaveRadiationOut: longwaveOut,
+    sensibleHeatFlux: sensible,
+    latentHeatFlux: latent,
+    netMassFlux: totalMassRate
+  };
+
+  const updatedState: IThermodynamicStateVector = {
+    ...state,
+    internalEnergy: newInternalEnergy,
+    entropy: newEntropy,
+    totalEntropy: newEntropy,
+    temperature: T0,
+    ambientTemperature: T0,
+    ambientReferenceTemp: T0,
+    entropyGenerationRate: dotSGen,
+    exergyDestructionRate: dotI,
+    exergy: state.exergy ?? 1e5,
+    boundaryFluxes,
+    validateSecondLaw: () => dotSGen >= 0
+  };
+
+  const updatedStock = {
+    ...stock,
+    totalMass: (stock.totalMass ?? 0) + totalMassRate * dt
+  };
+
+  return [updatedStock, updatedState];
 }

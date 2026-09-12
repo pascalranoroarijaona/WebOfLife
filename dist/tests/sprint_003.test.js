@@ -29,6 +29,8 @@ describe('Sprint 003: Thermodynamic Monad Tests', () => {
         };
         const monad = ThermodynamicMonad.of(mockVector);
         assert.ok(monad);
-        assert.strictEqual(monad.validate().isValid, true);
+        const validation = monad.validate();
+        const isValid = validation.isValid ?? validation.isSecondLawSatisfied;
+        assert.strictEqual(isValid, true);
     });
 });

@@ -1,6 +1,6 @@
 // File: src/earth_pod.ts
 import { ThermodynamicStructure, EntropyState, Stock, type Flow, applyThermalFlux, applyMassTransport } from './thermodynamics/thermodynamic_structure.js';
-import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicMonad, IBoundaryFluxArray, IExergyMetrics } from './thermodynamics/types.js';
+import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad, IBoundaryFluxArray, IExergyMetrics } from './thermodynamics/types.js';
 import { CarbonCycle } from './cycles/carbon.js';
 import { WaterCycle } from './cycles/water.js';
 import { NitrogenCycle } from './cycles/nitrogen.js';
@@ -22,7 +22,7 @@ export interface ThermodynamicState<T> {
 
 export { EntropyState, Stock };
 export type { Flow };
-export { applyThermalFlux, applyMassTransport, ThermodynamicMonad };
+export { applyThermalFlux, applyMassTransport, ThermodynamicStateMonad };
 
 export class CyclePOD extends ThermodynamicStructure {
   constructor(
@@ -378,10 +378,12 @@ export class EarthPOD extends ThermodynamicStructure {
     const netHeat = this.solarInputWatts * 0.01;
     const entropyGen = 150.0;
     const boundaryFluxes: IBoundaryFluxArray = {
-      solarRadiationIn: this.solarInputWatts,
-      longwaveRadiationOut: this.solarInputWatts * 0.99,
+      radiativeFlux: this.solarInputWatts,
       sensibleHeatFlux: 1e8,
       latentHeatFlux: 1e8,
+      massFluxRates: [0, 0, 0, 0],
+      solarRadiationIn: this.solarInputWatts,
+      longwaveRadiationOut: this.solarInputWatts * 0.99,
       netMassFlux: 0,
       solarInput: this.solarInputWatts,
       thermalRadiationOut: this.solarInputWatts * 0.99,
@@ -408,6 +410,7 @@ export class EarthPOD extends ThermodynamicStructure {
       entropy: 5e9,
       entropyGenerationRate: entropyGen,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,
+      exergy: 1e12,
       boundaryFluxes,
       exergyMetrics,
       validateSecondLaw: () => entropyGen >= 0,

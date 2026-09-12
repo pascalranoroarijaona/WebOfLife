@@ -1,16 +1,18 @@
 /**
  * @fileoverview Base Cycle extending IThermodynamicModel (Sprint 015 & Retro-Compatibility)
  */
-import { IThermodynamicModel, ThermodynamicStateVector, BoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K } from '../thermodynamics/types.js';
+import { IThermodynamicModel, IThermodynamicStateVector, ThermodynamicStateVector, BoundaryFlux, STANDARD_AMBIENT_TEMPERATURE_K } from '../thermodynamics/types.js';
 import { calculateFirstLawResidual, evaluateSecondLaw, stepThermodynamicMonad } from '../thermodynamics/methods.js';
 
 export { stepThermodynamicMonad };
 
 export abstract class BaseCycle implements IThermodynamicModel {
+  public id: string;
   protected stateVector: ThermodynamicStateVector;
   protected stocks: Map<string, number> = new Map();
 
   constructor(public name: string, initialStocks?: Record<string, number>) {
+    this.id = `${name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 9)}`;
     this.stateVector = {
       timestamp: 0,
       temperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -18,8 +20,10 @@ export abstract class BaseCycle implements IThermodynamicModel {
       ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 1e8,
       entropy: 1e5,
+      totalEntropy: 1e5,
       entropyGenerationRate: 15.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
+      exergy: 1e10,
       boundaryFluxes: [],
       validateFirstLaw: () => this.validateFirstLaw(),
       validateSecondLaw: () => this.validateSecondLaw()
@@ -75,7 +79,7 @@ export abstract class BaseCycle implements IThermodynamicModel {
     return this.stateVector.entropyGenerationRate >= 0;
   }
 
-  public getStateVector(): ThermodynamicStateVector {
+  public getStateVector(): IThermodynamicStateVector {
     return evaluateSecondLaw(this.stateVector);
   }
 

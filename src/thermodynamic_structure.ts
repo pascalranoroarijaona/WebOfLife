@@ -2,7 +2,20 @@
  * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { IThermodynamicSystem, IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad, IBoundaryFluxArray, ThermodynamicStateVector, BoundaryFluxVector, ThermodynamicComplianceResult, BoundaryFluxArray, ThermodynamicMetrics } from './thermodynamics/types.js';
+import { 
+  IThermodynamicSystem, 
+  IThermodynamicStateVector, 
+  STANDARD_AMBIENT_TEMPERATURE_K, 
+  advanceThermodynamicState, 
+  ThermodynamicStateMonad, 
+  IBoundaryFluxArray, 
+  ThermodynamicStateVector, 
+  BoundaryFluxVector, 
+  ThermodynamicComplianceResult, 
+  BoundaryFluxArray, 
+  ThermodynamicMetrics,
+  IThermodynamicBoundaryFlux
+} from './thermodynamics/types.js';
 import { executeThermodynamicStep } from './thermodynamics/thermodynamic_monad_process.js';
 
 export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, ThermodynamicMetrics };
@@ -95,6 +108,7 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
       T_0: T0,
       entropyGenerationRate: dotSGen,
       exergyDestructionRate: T0 * dotSGen,
+      exergy: 1e10,
       boundaryFluxes,
       thermalFluxes: {
         solarInbound: 1.74e17,
@@ -222,19 +236,22 @@ export function applyThermalFlux(
   const newEntropy = currentEntropy + dEntropy;
 
   const bFluxes = state.boundaryFluxes;
-  const heatFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.heatFluxes) ? bFluxes.heatFluxes : new Map();
-  const massFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.massFluxes) ? bFluxes.massFluxes : new Map();
-  const solarRad = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.solarRadiationIn ?? 0) : 0;
-  const longwaveOut = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.longwaveRadiationOut ?? 0) : 0;
-  const sensible = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.sensibleHeatFlux ?? 0) : 0;
-  const latent = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.latentHeatFlux ?? 0) : 0;
-  const netMass = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.netMassFlux ?? 0) : 0;
+  const isArr = Array.isArray(bFluxes);
+  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : {};
+
+  const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
+  const massFluxesMap = bfRecord.massFluxes ?? new Map();
+  const solarRad = bfRecord.solarRadiationIn ?? 0;
+  const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
+  const sensible = bfRecord.sensibleHeatFlux ?? 0;
+  const latent = bfRecord.latentHeatFlux ?? 0;
+  const netMass = bfRecord.netMassFlux ?? 0;
 
   const boundaryFluxes: IBoundaryFluxArray = {
     heatFluxes: heatFluxesMap,
     massFluxes: massFluxesMap,
     radiativeNet: qNet,
-    ...(bFluxes && !Array.isArray(bFluxes) ? bFluxes : {}),
+    ...bfRecord,
     solarRadiationIn: solarRad,
     longwaveRadiationOut: longwaveOut,
     sensibleHeatFlux: sensible,
@@ -252,6 +269,7 @@ export function applyThermalFlux(
     ambientReferenceTemp: T0,
     entropyGenerationRate: dotSGen,
     exergyDestructionRate: dotI,
+    exergy: state.exergy ?? 1e5,
     boundaryFluxes,
     validateSecondLaw: () => dotSGen >= 0
   };
@@ -268,7 +286,7 @@ export function applyThermalFlux(
 export function applyMassTransport(
   stock: any,
   state: IThermodynamicStateVector,
-  massFluxes: Map<string, number>,
+  massFluxes: Map<string, number> | Record<string, number>,
   specificEnthalpy: number,
   specificEntropy: number,
   dt: number
@@ -297,18 +315,21 @@ export function applyMassTransport(
   const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
 
   const bFluxes = state.boundaryFluxes;
-  const heatFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.heatFluxes) ? bFluxes.heatFluxes : new Map();
-  const radiative = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.radiativeNet ?? 0) : 0;
-  const solarRad = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.solarRadiationIn ?? 0) : 0;
-  const longwaveOut = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.longwaveRadiationOut ?? 0) : 0;
-  const sensible = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.sensibleHeatFlux ?? 0) : 0;
-  const latent = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.latentHeatFlux ?? 0) : 0;
+  const isArr = Array.isArray(bFluxes);
+  const bfRecord = !isArr && bFluxes ? (bFluxes as IBoundaryFluxArray) : {};
+
+  const heatFluxesMap = bfRecord.heatFluxes ?? new Map();
+  const radiative = bfRecord.radiativeNet ?? 0;
+  const solarRad = bfRecord.solarRadiationIn ?? 0;
+  const longwaveOut = bfRecord.longwaveRadiationOut ?? 0;
+  const sensible = bfRecord.sensibleHeatFlux ?? 0;
+  const latent = bfRecord.latentHeatFlux ?? 0;
 
   const boundaryFluxes: IBoundaryFluxArray = {
     heatFluxes: heatFluxesMap,
     radiativeNet: radiative,
-    massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : new Map(),
-    ...(bFluxes && !Array.isArray(bFluxes) ? bFluxes : {}),
+    massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : (massFluxes ?? new Map()),
+    ...bfRecord,
     solarRadiationIn: solarRad,
     longwaveRadiationOut: longwaveOut,
     sensibleHeatFlux: sensible,
@@ -326,6 +347,7 @@ export function applyMassTransport(
     ambientReferenceTemp: T0,
     entropyGenerationRate: dotSGen,
     exergyDestructionRate: dotI,
+    exergy: state.exergy ?? 1e5,
     boundaryFluxes,
     validateSecondLaw: () => dotSGen >= 0
   };

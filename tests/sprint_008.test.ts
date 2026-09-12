@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicStateMonad, IThermodynamicStateVector, BoundaryFluxVector } from '../src/thermodynamics/types.js';
+import { ThermodynamicStateMonad, IThermodynamicStateVector, BoundaryFluxVector, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
   const boundaryFlux: BoundaryFluxVector = {
@@ -21,7 +21,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
     specificEntropies: new Map()
   };
 
-  const initialVector: IThermodynamicStateVector = {
+  const initialVector: ThermodynamicStateVector = {
     timestamp: 1000,
     ambientTemperature: 288.15,
     systemTemperature: 288.15,
@@ -36,6 +36,7 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
     planetaryEmissionWatts: 950,
     entropyGenerationRate: 150.0,
     exergyDestructionRate: 288.15 * 150.0,
+    exergy: 1e8,
     boundaryHeatFlux: boundaryFlux,
     boundaryFluxes: boundaryFlux,
     massInventory: {
@@ -63,7 +64,8 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
           ...vec,
           timestamp: (vec.timestamp ?? 0) + 1,
           entropyGenerationRate: newSGen,
-          exergyDestructionRate: t0 * newSGen
+          exergyDestructionRate: t0 * newSGen,
+          exergy: vec.exergy ?? 1e8
         }
       };
     });
@@ -84,7 +86,8 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
           vector: {
             ...vec,
             entropyGenerationRate: invalidSGen,
-            exergyDestructionRate: t0 * invalidSGen
+            exergyDestructionRate: t0 * invalidSGen,
+            exergy: vec.exergy ?? 1e8
           }
         };
       });
@@ -101,7 +104,8 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
           vector: {
             ...vec,
             entropyGenerationRate: sGen,
-            exergyDestructionRate: 999999.0 // Inconsistent exergy destruction rate
+            exergyDestructionRate: 999999.0,
+            exergy: vec.exergy ?? 1e8
           }
         };
       });

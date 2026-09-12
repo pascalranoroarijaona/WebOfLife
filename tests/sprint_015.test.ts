@@ -8,7 +8,7 @@ import { NitrogenCycle } from '../src/cycles/nitrogen.js';
 import { PhosphorusCycle } from '../src/cycles/phosphorus.js';
 import { WaterCycle } from '../src/cycles/water.js';
 import { calculateFirstLawResidual, evaluateSecondLaw, stepThermodynamicMonad } from '../src/thermodynamics/methods.js';
-import { STANDARD_AMBIENT_TEMPERATURE_K } from '../src/thermodynamics/types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, IThermodynamicStateVector, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
   it('should enforce S_gen >= 0 across all planetary cycles', () => {
@@ -34,14 +34,16 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
   });
 
   it('should verify Gouy-Stodola proportionality: I_dot = T_0 * S_gen_dot', () => {
-    const baseState = {
+    const baseState: ThermodynamicStateVector = {
       timestamp: 0,
       temperature: 300,
+      totalEntropy: 50,
       deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 1000,
       entropy: 50,
       entropyGenerationRate: 12.5,
       exergyDestructionRate: 0, // will be evaluated
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       boundaryFluxes: []
     };
 
@@ -51,14 +53,16 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
   });
 
   it('should compute First Law residuals and monad updates correctly', () => {
-    const baseState = {
+    const baseState: ThermodynamicStateVector = {
       timestamp: 0,
       temperature: 298.15,
+      totalEntropy: 100,
       deadStateTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       internalEnergy: 5000,
       entropy: 100,
       entropyGenerationRate: 2.0,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 2.0,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       boundaryFluxes: [
         {
           fluxId: 'test_flux',
@@ -73,7 +77,7 @@ describe('Sprint 015: Thermodynamic State Vector & Monad Verification', () => {
     };
 
     const nextState = stepThermodynamicMonad(baseState, 1.0, baseState.boundaryFluxes);
-    assert.ok(nextState.internalEnergy > baseState.internalEnergy);
+    assert.ok((nextState.internalEnergy ?? 0) > (baseState.internalEnergy ?? 0));
     assert.ok(nextState.entropyGenerationRate >= 0);
 
     const residual = calculateFirstLawResidual(nextState, 1.0);

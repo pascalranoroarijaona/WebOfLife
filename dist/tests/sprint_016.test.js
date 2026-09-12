@@ -6,9 +6,11 @@ import { bootstrapMegaPod } from '../src/earth_pod.js';
 describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equations', () => {
     it('should enforce non-negative entropy generation rate (\dot{S}_{gen} >= 0)', () => {
         const initialState = {
+            timestamp: 0,
             internalEnergy: 1e6,
             enthalpy: 1e6,
             entropy: 5000,
+            totalEntropy: 5000,
             temperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: -1.0, // Invalid negative entropy generation
@@ -31,9 +33,11 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
     });
     it('should validate exact computation of exergy destruction rate (\dot{I} = T_0 \dot{S}_{gen})', () => {
         const initialState = {
+            timestamp: 0,
             internalEnergy: 1e6,
             enthalpy: 1e6,
             entropy: 5000,
+            totalEntropy: 5000,
             temperature: 288.15,
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             entropyGenerationRate: 5.0,
@@ -50,9 +54,10 @@ describe('Sprint 016: Thermodynamic State Vector & Nonequilibrium Energy Equatio
             specificEntropies: new Map()
         };
         const monad = ThermodynamicStateMonad.initialize(initialState, initialFluxes);
-        const { state } = monad.transit((s, f) => executeThermodynamicStep(s, f, 1.0)).extract();
-        const expectedI = state.ambientTemperature * state.entropyGenerationRate;
-        assert.strictEqual(Math.abs(state.exergyDestructionRate - expectedI) < 1e-5, true, `Exergy destruction rate (${state.exergyDestructionRate}) must equal T_0 * \\dot{S}_{gen} (${expectedI})`);
+        const extractedState = monad.transit((s, f) => executeThermodynamicStep(s, f, 1.0)).getState();
+        const T0 = extractedState.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+        const expectedI = T0 * extractedState.entropyGenerationRate;
+        assert.strictEqual(Math.abs(extractedState.exergyDestructionRate - expectedI) < 1e-5, true, `Exergy destruction rate (${extractedState.exergyDestructionRate}) must equal T_0 * \\dot{S}_{gen} (${expectedI})`);
     });
     it('should successfully bootstrap mega pod and verify planetary thermodynamic compliance', () => {
         const { earth } = bootstrapMegaPod();

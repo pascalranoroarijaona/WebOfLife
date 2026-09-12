@@ -42,7 +42,6 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
             entropyGenerationRate: entropyGen,
             exergyDestructionRate: exergyDestruction,
             boundaryFluxes,
-            exergyMetrics,
             validateSecondLaw: () => true
         });
         assert.strictEqual(monad.validate().isSecondLawSatisfied, true, 'Gouy-Stodola relation must be verified');
@@ -82,7 +81,6 @@ describe('Sprint 013: Thermodynamic State Vector Interface & Conservation Laws',
             entropyGenerationRate: 10,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 10,
             boundaryFluxes,
-            exergyMetrics,
             validateSecondLaw: () => true,
             validateFirstLaw: () => true
         });

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad as GlobalThermodynamicStateMonad } from '../src/thermodynamics/types.js';
+import { IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 import { advanceThermodynamicState, ThermodynamicStateMonad } from '../src/thermodynamics/thermodynamic_structure.js';
 import { EarthPOD } from '../src/earth_pod.js';
 
@@ -61,8 +61,8 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
   });
 
   it('should support ThermodynamicStateMonad state transitions with invariant enforcement', () => {
-    const monad = GlobalThermodynamicStateMonad.of(baseState);
-    const advancedMonad = monad.map((state: IThermodynamicStateVector) => advanceThermodynamicState(state, 2000, 150.0, 1.0));
+    const monad = ThermodynamicStateMonad.of(baseState);
+    const advancedMonad = monad.map((state: ThermodynamicStateVector) => advanceThermodynamicState(state, 2000, 150.0, 1.0));
     const newState = advancedMonad.getState();
 
     assert.strictEqual(newState.entropyGenerationRate, 150.0);
@@ -71,11 +71,16 @@ describe('Sprint 011: Thermodynamic State Vector Interface & Second Law Complian
   });
 
   it('should reject monad maps that produce negative entropy generation rates', () => {
-    const monad = GlobalThermodynamicStateMonad.of(baseState);
+    const monad = ThermodynamicStateMonad.of(baseState);
     assert.throws(() => {
-      monad.map((state: IThermodynamicStateVector) => ({
+      monad.map((state: ThermodynamicStateVector) => ({
         ...state,
+        temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+        internalEnergy: 1e6,
+        entropy: 1e3,
         entropyGenerationRate: -5.0,
+        exergyDestructionRate: 0,
+        boundaryFluxes: [],
         validateSecondLaw: () => false
       }));
     }, /Second Law Violation/);

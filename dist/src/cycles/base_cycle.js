@@ -6,10 +6,12 @@ import { calculateFirstLawResidual, evaluateSecondLaw, stepThermodynamicMonad } 
 export { stepThermodynamicMonad };
 export class BaseCycle {
     name;
+    id;
     stateVector;
     stocks = new Map();
     constructor(name, initialStocks) {
         this.name = name;
+        this.id = `${name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 9)}`;
         this.stateVector = {
             timestamp: 0,
             temperature: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -17,8 +19,10 @@ export class BaseCycle {
             ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
             internalEnergy: 1e8,
             entropy: 1e5,
+            totalEntropy: 1e5,
             entropyGenerationRate: 15.0,
             exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * 15.0,
+            exergy: 1e10,
             boundaryFluxes: [],
             validateFirstLaw: () => this.validateFirstLaw(),
             validateSecondLaw: () => this.validateSecondLaw()

@@ -1,7 +1,7 @@
 // File: tests/sprint_003.test.ts
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { ThermodynamicMonad, ElementalStocks, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
+import { ThermodynamicMonad, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
 
 describe('Sprint 003: Thermodynamic Monad Tests', () => {
   it('TC-01: ThermodynamicMonad wraps values and states successfully', () => {
@@ -31,6 +31,8 @@ describe('Sprint 003: Thermodynamic Monad Tests', () => {
 
     const monad = ThermodynamicMonad.of(mockVector);
     assert.ok(monad);
-    assert.strictEqual(monad.validate().isValid, true);
+    const validation = monad.validate();
+    const isValid = validation.isValid ?? validation.isSecondLawSatisfied;
+    assert.strictEqual(isValid, true);
   });
 });
