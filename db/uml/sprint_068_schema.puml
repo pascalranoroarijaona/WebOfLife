@@ -1,0 +1,72 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics & Validation (Sprint 068)" {
+  
+  class ThermodynamicStateVector {
+    - vectorId: string
+    - podId: string
+    - elements: Map<string, number>
+    + getElements(): Record<string, number>
+    + getElement(key: string): number
+  }
+
+  class ElementalTolerances {
+    + carbon: number
+    + nitrogen: number
+    + phosphorus: number
+    + water: number
+    + energy?: number
+    + [element: string]: number | undefined
+  }
+
+  class DiscrepancyDetail {
+    + expected: number
+    + actual: number
+    + absoluteDifference: number
+    + tolerance: number
+    + exceeded: boolean
+  }
+
+  class DiscrepancyReport {
+    + isValid: boolean
+    + discrepancies: Record<string, DiscrepancyDetail>
+    + maxDiscrepancy: number
+    + timestamp: number
+  }
+
+  class StateValidator {
+    - defaultTolerances: ElementalTolerances
+    + constructor(defaultTolerances?: ElementalTolerances)
+    + evaluate(actual: ThermodynamicStateVector, expected: ThermodynamicStateVector, tolerances?: ElementalTolerances): DiscrepancyReport
+  }
+
+  class ThermodynamicBlock {
+    + blockId: string
+    + blockIndex: number
+    + previousHash: string
+    + hash: string
+    + merkleRoot: string
+    + timestamp: number
+    + validatorSignature: string
+  }
+
+  class ThermodynamicTransaction {
+    + transactionId: string
+    + blockId: string
+    + sourcePodId: string
+    + targetPodId: string
+    + elementType: string
+    + amount: number
+    + entropyDelta: number
+    + signature: string
+  }
+
+  StateValidator --> ThermodynamicStateVector : inspects >
+  StateValidator --> ElementalTolerances : uses >
+  StateValidator ..> DiscrepancyReport : generates >
+  DiscrepancyReport *-- DiscrepancyDetail : contains >
+  ThermodynamicBlock "1" *-- "*" ThermodynamicTransaction : includes >
+}
+
+@enduml

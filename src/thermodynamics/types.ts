@@ -16,6 +16,8 @@ export interface ElementTolerances {
   [key: string]: number | undefined;
 }
 
+export type ElementalTolerances = ElementTolerances;
+
 export interface ThermodynamicToleranceConfig {
   getDefaultTolerance?: () => number;
   getElementTolerance?: (key: string) => number;
@@ -809,7 +811,7 @@ export type ValidationReport = {
 export type DiscrepancyReport = ValidationReport;
 export type ValidationResult = ValidationReport;
 
-export type ThermodynamicStateLike = any;
+export type ThermodynamicStateLike = IThermodynamicStateVector | Record<string, any>;
 
 export function photosyntheticFixation(stocks: ElementalStocks, carbonDelta: number, qLossDelta: number): ElementalStocks {
   const cloned = stocks.clone();
