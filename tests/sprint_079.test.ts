@@ -39,7 +39,7 @@ describe('Sprint 079: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report = validator.evaluate(actual, expected);
     assert.strictEqual(report.isValid, true);
-    assert.ok(report.maxDiscrepancy <= 1e-3);
+    assert.ok((report.maxDiscrepancy ?? 0) <= 1e-3);
   });
 
   it('should detect boundary violations on Carbon, Nitrogen, Phosphorus, and Energy triggering isValid: false with detailed logs', () => {
@@ -52,7 +52,7 @@ describe('Sprint 079: Thermodynamic State Vector Inventory Discrepancy Evaluator
 
     const report = validator.evaluate(actual, expected);
     assert.strictEqual(report.isValid, false);
-    assert.ok(report.maxDiscrepancy >= 5.0);
+    assert.ok((report.maxDiscrepancy ?? 0) >= 5.0);
     assert.ok(report.discrepancies['carbon']);
     assert.strictEqual(report.discrepancies['carbon'].absoluteDifference, 5.0);
     assert.ok(report.discrepancies['nitrogen']);

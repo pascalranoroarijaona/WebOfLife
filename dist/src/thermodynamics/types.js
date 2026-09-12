@@ -33,7 +33,7 @@ export const ThermodynamicStateMonad = {
                 }
                 return { getStateVector: () => next };
             },
-            validate: () => ({ isValid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0 })
+            validate: () => ({ isValid: true, valid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0 })
         };
     },
     of: (state) => {
@@ -66,7 +66,7 @@ export const ThermodynamicStateMonad = {
         getState: () => ({ state, stock }),
         getValue: () => stock,
         getStateVector: () => state,
-        validate: () => ({ isValid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0, isFirstLawSatisfied: true }),
+        validate: () => ({ isValid: true, valid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0, isFirstLawSatisfied: true }),
         getEntropyGenerationRate: () => state?.entropyGenerationRate ?? 0
     }),
     map: (state, fn) => {

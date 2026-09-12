@@ -7,7 +7,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { 
   StateValidator, 
-  ThermodynamicEntropyViolationError, 
   executeThermodynamicTransition,
   assertNonNegativeEntropy
 } from '../src/thermodynamics/state_validator.js';

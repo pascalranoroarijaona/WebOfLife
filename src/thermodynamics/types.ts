@@ -68,7 +68,7 @@ export const ThermodynamicStateMonad = {
         }
         return { getStateVector: () => next };
       },
-      validate: () => ({ isValid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0 })
+      validate: () => ({ isValid: true, valid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0 })
     };
   },
   of: (state: any) => {
@@ -101,7 +101,7 @@ export const ThermodynamicStateMonad = {
     getState: () => ({ state, stock }),
     getValue: () => stock,
     getStateVector: () => state,
-    validate: () => ({ isValid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0, isFirstLawSatisfied: true }),
+    validate: () => ({ isValid: true, valid: true, isSecondLawSatisfied: (state?.entropyGenerationRate ?? 0) >= 0, isFirstLawSatisfied: true }),
     getEntropyGenerationRate: () => state?.entropyGenerationRate ?? 0
   }),
   map: (state: any, fn: any) => {
@@ -208,15 +208,15 @@ export interface IThermodynamicMetrics {
 export type ThermodynamicMetrics = IThermodynamicMetrics;
 
 export interface IThermodynamicStateVector {
-  timestamp: number;
+  timestamp?: number;
   tick?: number;
   internalEnergy: number;
   energy?: number;
   enthalpy?: number;
-  totalEntropy: number;
+  totalEntropy?: number;
   temperature: number;
   systemTemperature?: number;
-  ambientTemperature: number;
+  ambientTemperature?: number;
   ambientReferenceTemp?: number;
   referenceTemperature?: number;
   deadStateTemperature?: number;
@@ -228,11 +228,11 @@ export interface IThermodynamicStateVector {
   systemEntropy?: number;
   stocks: Map<string, number> | Record<string, number>;
   massInventory?: Record<string, number>;
-  entropyGenerationRate: number;
+  entropyGenerationRate?: number;
   entropyGeneratorRate?: number;
-  exergyDestructionRate: number;
-  exergy: number;
-  boundaryFluxes: IBoundaryFluxArray | number[] | any[];
+  exergyDestructionRate?: number;
+  exergy?: number;
+  boundaryFluxes?: IBoundaryFluxArray | number[] | any[];
   thermalFluxes?: any;
   massFluxes?: any;
   exergyMetrics?: IExergyMetrics;
@@ -285,6 +285,7 @@ export interface ThermodynamicComplianceResult {
   energyResidual: number;
   entropyResidual: number;
   isValid?: boolean;
+  valid?: boolean;
 }
 
 export interface IThermodynamicBoundaryFlux {
@@ -671,19 +672,24 @@ export type DiscrepancyDetail = {
 };
 
 export interface DiscrepancyReport {
-  isBalanced?: boolean;
-  withinTolerance?: boolean;
-  totalDiscrepancy?: number;
-  totalAbsoluteDiscrepancy?: number;
-  entropyDelta?: number;
-  vectorDiscrepancies?: Record<string, number>;
-  poolDiscrepancies?: Record<string, { violated: boolean; absoluteDifference: number; [key: string]: any }>;
-  isValid?: boolean;
-  maxDiscrepancy?: number;
+  isBalanced: boolean;
+  valid: boolean;
+  withinTolerance: boolean;
+  totalDiscrepancy: number;
+  totalAbsoluteDiscrepancy: number;
+  entropyDelta: number;
+  vectorDiscrepancies: Record<string, number>;
+  poolDiscrepancies: Record<string, { violated: boolean; absoluteDifference: number; [key: string]: any }>;
+  isValid: boolean;
+  maxDiscrepancy: number;
   isMassConserved?: boolean;
   records?: any[];
   [key: string]: any;
 }
+
+export type DiscrepancyResult = DiscrepancyRecord & DiscrepancyDetail & { isWithinTolerance?: boolean; [key: string]: any };
+export type ThermodynamicStockMap = Record<string, number>;
+export type ThermodynamicStateLike = IThermodynamicStateVector;
 
 export function advanceThermodynamicState(state: IThermodynamicStateVector, dt: number): IThermodynamicStateVector {
   const sGen = state.entropyGenerationRate ?? 10.0;

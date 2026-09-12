@@ -1,0 +1,52 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 080: Thermodynamic State Validator Architecture
+
+interface IStateVector {
+  +stocks: Record<string, number>
+  +metadata: Record<string, any>
+}
+
+interface IStateDiscrepancyResult {
+  +isBalanced: boolean
+  +totalDiscrepancy: number
+  +componentDiscrepancies: Record<string, number>
+  +entropyDelta: number
+  +timestamp: number
+}
+
+interface IStateValidator {
+  +evaluateDiscrepancy(currentVector: IStateVector, expectedFlux: IStateVector): IStateDiscrepancyResult
+}
+
+class ThermodynamicStateValidator {
+  -tolerance: number
+  +__init__(tolerance: number)
+  +evaluateDiscrepancy(currentVector: IStateVector, expectedFlux: IStateVector): IStateDiscrepancyResult
+}
+
+class ThermodynamicBlockchainLedger {
+  +blockId: string
+  +parentBlockId: string
+  +vectorId: string
+  +evaluationId: number
+  +transactionSignature: string
+  +firstLawConserved: boolean
+  +secondLawEntropyValid: boolean
+  +commitTransaction(): void
+}
+
+IStateValidator <|.. ThermodynamicStateValidator
+ThermodynamicStateValidator ..> IStateVector : processes
+ThermodynamicStateValidator ..> IStateDiscrepancyResult : produces
+ThermodynamicBlockchainLedger --> IStateDiscrepancyResult : records validation
+
+note bottom of ThermodynamicStateValidator
+  Enforces First Law (Matter Conservation)
+  and Second Law (Entropy Delta >= 0)
+  via wrapped helper aggregator functions.
+end note
+
+@enduml
