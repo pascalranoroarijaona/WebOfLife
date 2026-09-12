@@ -1,69 +1,63 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger (Sprint 040)
+-- Web of Life Database Schema & Thermodynamic Ledger Definitions
+-- Sprint 041: Thermodynamic State Vector Non-Negative Entropy Assertion
 -- ============================================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "timescaledb";
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic State & Entropy Validation Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_states (
-    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_id VARCHAR(255) NOT NULL,
-    entropy_value NUMERIC(20, 10) NOT NULL CHECK (entropy_value >= 0.0),
-    enthalpy_value NUMERIC(20, 10) NOT NULL,
-    temperature NUMERIC(10, 4) NOT NULL,
-    vector_payload JSONB NOT NULL,
-    validation_status VARCHAR(50) NOT NULL DEFAULT 'VALIDATED',
-    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Enums for Thermodynamic Validation and State Monads
+CREATE TYPE validation_error_code AS ENUM (
+    'NEGATIVE_ENTROPY_VIOLATION',
+    'INVALID_STATE_VECTOR'
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_states_entity 
-    ON thermodynamic_states(entity_id, recorded_at);
-
--- ----------------------------------------------------------------------------
--- 2. Thermodynamic Stock & Flow Ledger (Biogeochemical Cycles)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    cycle_type VARCHAR(50) NOT NULL, -- CARBON, NITROGEN, PHOSPHORUS, WATER
-    stock_name VARCHAR(100) NOT NULL,
-    mass_or_energy NUMERIC(24, 10) NOT NULL,
-    entropy_content NUMERIC(20, 10) NOT NULL CHECK (entropy_content >= 0.0),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TYPE monad_status AS ENUM (
+    'PENDING',
+    'SUCCESS',
+    'FAILED'
 );
 
-CREATE TABLE IF NOT EXISTS thermodynamic_flows (
-    flow_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
-    target_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
-    transfer_amount NUMERIC(24, 10) NOT NULL,
-    entropy_production NUMERIC(20, 10) NOT NULL CHECK (entropy_production >= 0.0),
-    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Thermodynamic State Vectors Table (Time-Series Hypertable)
+CREATE TABLE thermodynamic_state_vectors (
+    id UUID DEFAULT uuid_generate_v4(),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    earth_pod_id UUID NOT NULL,
+    energy DOUBLE PRECISION NOT NULL,
+    entropy DOUBLE PRECISION NOT NULL,
+    temperature DOUBLE PRECISION NOT NULL,
+    biomass DOUBLE PRECISION NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    CONSTRAINT chk_entropy_non_negative CHECK (entropy >= 0.0)
 );
 
--- ----------------------------------------------------------------------------
--- 3. Blockchain Transaction & Monad State Signatures
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT UNIQUE NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
+-- Convert to TimescaleDB hypertable for optimal time-series analytics
+SELECT create_hypertable('thermodynamic_state_vectors', 'timestamp', if_not_exists => TRUE);
+
+-- Thermodynamic Validation Audit Log (Tracks Result Monad returns)
+CREATE TABLE thermodynamic_validation_audit_logs (
+    id UUID DEFAULT uuid_generate_v4(),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id),
+    success BOOLEAN NOT NULL,
+    error_code validation_error_code,
+    error_message TEXT,
+    invalid_value DOUBLE PRECISION,
+    CONSTRAINT fk_state_vector FOREIGN KEY (state_vector_id) REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE
+);
+
+-- Blockchain Block Transaction Signatures for Thermodynamic Cycles
+CREATE TABLE thermodynamic_blockchain_blocks (
+    block_hash VARCHAR(64) PRIMARY KEY,
+    previous_block_hash VARCHAR(64) REFERENCES thermodynamic_blockchain_blocks(block_hash),
     merkle_root VARCHAR(64) NOT NULL,
-    state_root VARCHAR(64) NOT NULL,
-    validator_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    validator_signature TEXT NOT NULL,
+    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id),
+    monad_status monad_status NOT NULL DEFAULT 'PENDING'
 );
 
-CREATE TABLE IF NOT EXISTS block_transactions (
-    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_id UUID REFERENCES blockchain_blocks(block_id) ON DELETE CASCADE,
-    monad_type VARCHAR(100) NOT NULL,
-    payload JSONB NOT NULL,
-    entropy_assertion_status BOOLEAN NOT NULL DEFAULT TRUE,
-    tx_hash VARCHAR(64) UNIQUE NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_block_transactions_hash 
-    ON block_transactions(tx_hash);
+-- Indexes for performance
+CREATE INDEX idx_thermodynamic_vectors_pod_time ON thermodynamic_state_vectors (earth_pod_id, timestamp DESC);
+CREATE INDEX idx_validation_audit_success ON thermodynamic_validation_audit_logs (success, timestamp DESC);
+CREATE INDEX idx_blockchain_timestamp ON thermodynamic_blockchain_blocks (timestamp DESC);

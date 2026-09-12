@@ -1,0 +1,53 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Web of Life - Thermodynamics & Blockchain" {
+    
+    interface ThermodynamicStateVector {
+        +energy: number
+        +entropy: number
+        +temperature: number
+        +biomass: number
+        +metadata?: Readonly<Record<string, unknown>>
+    }
+
+    interface ThermodynamicValidationError {
+        +code: 'NEGATIVE_ENTROPY_VIOLATION' | 'INVALID_STATE_VECTOR'
+        +message: string
+        +invalidValue: number
+        +timestamp: number
+    }
+
+    class "Result<T, E>" as Result {
+        +success: boolean
+        +value?: T
+        +error?: E
+    }
+
+    class StateValidator {
+        +{static} assertNonNegativeEntropy(state: ThermodynamicStateVector): Result<ThermodynamicStateVector, ThermodynamicValidationError>
+    }
+
+    class ThermodynamicMonadProcess {
+        +processCycle(state: ThermodynamicStateVector): Result<ThermodynamicStateVector, ThermodynamicValidationError>
+        +commitToLedger(state: ThermodynamicStateVector): void
+    }
+
+    class ThermodynamicBlockchainBlock {
+        +blockHash: string
+        +previousBlockHash: string
+        +merkleRoot: string
+        +timestamp: Date
+        +validatorSignature: string
+        +status: MonadStatus
+    }
+
+    StateValidator ..> ThermodynamicStateVector : inspects
+    StateValidator ..> Result : returns
+    Result o-- ThermodynamicStateVector : contains value
+    Result o-- ThermodynamicValidationError : contains error
+    ThermodynamicMonadProcess --> StateValidator : utilizes
+    ThermodynamicMonadProcess --> ThermodynamicBlockchainBlock : commits
+}
+@enduml

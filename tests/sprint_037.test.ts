@@ -108,7 +108,7 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
 
         const transformedState = monadProcess.bind(initialState, (state: IThermodynamicStateVector) => ({
             ...state,
-            entropy: state.entropy + 10,
+            entropy: (state.entropy ?? 0) + 10,
             entropyGenerationRate: 25.0
         }));
 

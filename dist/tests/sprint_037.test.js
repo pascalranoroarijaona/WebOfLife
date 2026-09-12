@@ -99,7 +99,7 @@ describe('Sprint 037: Thermodynamic State Vector Non-Negative Entropy Assertion'
         const monadProcess = new ThermodynamicMonadProcess();
         const transformedState = monadProcess.bind(initialState, (state) => ({
             ...state,
-            entropy: state.entropy + 10,
+            entropy: (state.entropy ?? 0) + 10,
             entropyGenerationRate: 25.0
         }));
         assert.strictEqual(transformedState.entropyGenerationRate, 25.0);

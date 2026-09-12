@@ -17,7 +17,7 @@ import {
   IBoundaryFluxArray,
   ThermodynamicStateMonad,
   ThermodynamicComplianceResult
-} from './types.js';
+} from './types';
 
 const T_0 = STANDARD_AMBIENT_TEMPERATURE_K;
 
@@ -71,12 +71,16 @@ export function computeExergyDestruction(
 }
 
 export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
-  private constructor(private readonly state: T) {}
+  private constructor(private readonly state: T, private readonly stateVector?: IThermodynamicStateVector) {}
 
-  public static unit<T>(initialState: T): ThermodynamicMonadClass<T> {
-    const monad = new ThermodynamicMonadClass(initialState);
+  public static unit<T>(initialState: T, initialStateVector?: IThermodynamicStateVector): ThermodynamicMonadClass<T> {
+    const monad = new ThermodynamicMonadClass(initialState, initialStateVector);
     monad.validateSecondLaw();
     return monad;
+  }
+
+  public static of<T>(initialState: T, initialStateVector?: IThermodynamicStateVector): ThermodynamicMonadClass<T> {
+    return ThermodynamicMonadClass.unit(initialState, initialStateVector);
   }
 
   public getState(): T {
@@ -84,7 +88,7 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 
   public getStateVector(): IThermodynamicStateVector {
-    return (this.state as any)?.getStateVector ? (this.state as any).getStateVector() : (this.state as any);
+    return this.stateVector ?? ((this.state as any)?.getStateVector ? (this.state as any).getStateVector() : (this.state as any));
   }
 
   public getValue(): T {
@@ -95,14 +99,25 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
     transition: (state: T) => U
   ): IThermodynamicMonad<U> {
     const nextState = transition(this.state);
-    const nextMonad = new ThermodynamicMonadClass(nextState);
+    const nextMonad = new ThermodynamicMonadClass(nextState, this.stateVector);
     nextMonad.validateSecondLaw();
     return nextMonad;
   }
 
-  public bind(fn: (val: any, vec?: any) => any): IThermodynamicMonad<any> {
-    const res = fn(this.state);
-    return new ThermodynamicMonadClass(res);
+  public bind(fn: (val: any, vec?: IThermodynamicStateVector | any) => any): IThermodynamicMonad<any> {
+    const res = fn(this.state, this.stateVector);
+    const nextVal = res?.nextStock ?? res?.value ?? res;
+    const nextVec = res?.nextState ?? res?.stateVector ?? this.stateVector;
+    return new ThermodynamicMonadClass(nextVal, nextVec);
+  }
+
+  public map(fn: (val: any, vec?: IThermodynamicStateVector | any) => any): IThermodynamicMonad<any> {
+    return this.bind(fn);
+  }
+
+  public transit(fn: (state: IThermodynamicStateVector, fluxes?: any) => any, fluxes?: any): IThermodynamicMonad<any> {
+    const nextVec = fn(this.stateVector ?? {}, fluxes);
+    return new ThermodynamicMonadClass(this.state, nextVec);
   }
 
   public extract(): any {
@@ -110,8 +125,9 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 
   public validateSecondLaw(): boolean {
-    const sGen = (this.state as any)?.entropyMetrics?.totalEntropyGenerationRate ?? (this.state as any)?.entropyGenerationRate ?? 0;
-    if (sGen < 0) {
+    const vec = this.stateVector;
+    const sGen = vec?.entropyGenerationRate ?? (this.state as any)?.entropyGenerationRate ?? 0;
+    if (sGen < -1e-9) {
       throw new Error(
         `ThermodynamicViolationError: \dot{S}_{gen} (${sGen}) < 0 violates Second Law.`
       );
@@ -120,7 +136,8 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 
   public validate(): ThermodynamicComplianceResult {
-    const sGen = (this.state as any)?.entropyGenerationRate ?? 0;
+    const vec = this.stateVector;
+    const sGen = vec?.entropyGenerationRate ?? (this.state as any)?.entropyGenerationRate ?? 0;
     return {
       isFirstLawSatisfied: true,
       isSecondLawSatisfied: sGen >= -1e-9,
@@ -131,7 +148,7 @@ export class ThermodynamicMonadClass<T> implements IThermodynamicMonad<T> {
   }
 }
 
-export { ThermodynamicStateMonad as ThermodynamicMonad };
+export const ThermodynamicMonad = ThermodynamicStateMonad;
 
 export function calculateFirstLawResidual(state: IThermodynamicStateVector, dt: number): number {
   let netHeatTransfer = 0;

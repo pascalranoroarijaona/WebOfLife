@@ -61,8 +61,8 @@ describe('Sprint 034: Thermodynamic State Vector Non-Negative Entropy Assertion'
         const initialVector = createMockVector(100, 5);
         const validTransition = (v) => ({
             ...v,
-            entropy: v.entropy + 10,
-            entropyGenerationRate: v.entropyGenerationRate + 1
+            entropy: (v.entropy ?? 0) + 10,
+            entropyGenerationRate: (v.entropyGenerationRate ?? 0) + 1
         });
         const invalidTransition = (v) => ({
             ...v,

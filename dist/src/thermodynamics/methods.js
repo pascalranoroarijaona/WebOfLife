@@ -3,7 +3,7 @@
  * @description Executable monad methods for calculating entropy generation, exergy destruction,
  * and validating thermodynamic state transitions against First and Second Law constraints.
  */
-import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad } from './types.js';
+import { STANDARD_AMBIENT_TEMPERATURE_K, ThermodynamicStateMonad } from './types';
 const T_0 = STANDARD_AMBIENT_TEMPERATURE_K;
 export function computeEntropyGeneration(netHeatFlux, boundaryTemperature, chemicalDissipationRate, diffusiveFluxRate) {
     if (chemicalDissipationRate < 0 || diffusiveFluxRate < 0) {
@@ -37,45 +37,61 @@ export function computeExergyDestruction(entropyMetrics, systemUsefulWork, total
 }
 export class ThermodynamicMonadClass {
     state;
-    constructor(state) {
+    stateVector;
+    constructor(state, stateVector) {
         this.state = state;
+        this.stateVector = stateVector;
     }
-    static unit(initialState) {
-        const monad = new ThermodynamicMonadClass(initialState);
+    static unit(initialState, initialStateVector) {
+        const monad = new ThermodynamicMonadClass(initialState, initialStateVector);
         monad.validateSecondLaw();
         return monad;
+    }
+    static of(initialState, initialStateVector) {
+        return ThermodynamicMonadClass.unit(initialState, initialStateVector);
     }
     getState() {
         return this.state;
     }
     getStateVector() {
-        return this.state?.getStateVector ? this.state.getStateVector() : this.state;
+        return this.stateVector ?? (this.state?.getStateVector ? this.state.getStateVector() : this.state);
     }
     getValue() {
         return this.state;
     }
     chain(transition) {
         const nextState = transition(this.state);
-        const nextMonad = new ThermodynamicMonadClass(nextState);
+        const nextMonad = new ThermodynamicMonadClass(nextState, this.stateVector);
         nextMonad.validateSecondLaw();
         return nextMonad;
     }
     bind(fn) {
-        const res = fn(this.state);
-        return new ThermodynamicMonadClass(res);
+        const res = fn(this.state, this.stateVector);
+        const nextVal = res?.nextStock ?? res?.value ?? res;
+        const nextVec = res?.nextState ?? res?.stateVector ?? this.stateVector;
+        return new ThermodynamicMonadClass(nextVal, nextVec);
+    }
+    map(fn) {
+        return this.bind(fn);
+    }
+    transit(fn, fluxes) {
+        const nextVec = fn(this.stateVector ?? {}, fluxes);
+        return new ThermodynamicMonadClass(this.state, nextVec);
     }
     extract() {
         return this.state;
     }
     validateSecondLaw() {
-        const sGen = this.state?.entropyMetrics?.totalEntropyGenerationRate ?? this.state?.entropyGenerationRate ?? 0;
-        if (sGen < 0) {
+        const vec = this.stateVector;
+        const sGen = vec?.entropyGenerationRate ?? this.state?.entropyGenerationRate ?? 0;
+        if (sGen < -1e-9) {
             throw new Error(`ThermodynamicViolationError: \dot{S}_{gen} (${sGen}) < 0 violates Second Law.`);
         }
         return true;
     }
     validate() {
-        const sGen = this.state?.entropyGenerationRate ?? 0;
+        const vec = this.stateVector;
+        const sGen = vec?.entropyGenerationRate ?? this.state?.entropyGenerationRate ?? 0;
         return {
             isFirstLawSatisfied: true,
             isSecondLawSatisfied: sGen >= -1e-9,
@@ -85,7 +101,7 @@ export class ThermodynamicMonadClass {
         };
     }
 }
-export { ThermodynamicStateMonad as ThermodynamicMonad };
+export const ThermodynamicMonad = ThermodynamicStateMonad;
 export function calculateFirstLawResidual(state, dt) {
     let netHeatTransfer = 0;
     let netEnthalpyFlux = 0;
