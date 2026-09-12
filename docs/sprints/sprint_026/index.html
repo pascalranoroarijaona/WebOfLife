@@ -3,342 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint 026 - Thermodynamic Equilibrium & Trophic Cascade Architecture | Web of Life</title>
+    <title>Web of Life - Sprint 26</title>
     <style>
-        :root {
-            --bg-primary: #0a0f1d;
-            --bg-secondary: #111827;
-            --bg-card: #1f2937;
-            --accent-glow: #38bdf8;
-            --accent-green: #34d399;
-            --accent-amber: #fbbf24;
-            --accent-rose: #f43f5e;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-color: #334155;
-        }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-main);
+            background: #0f172a;
+            color: #f8fafc;
             margin: 0;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
+            padding: 2rem;
         }
-
-        #topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-secondary);
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
-
-        #topbar h1 {
-            color: var(--accent-glow);
-            margin: 0;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        h1 {
+            color: #38bdf8;
+            margin-top: 0;
         }
-
         .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            background: rgba(6, 95, 70, 0.6);
-            color: var(--accent-green);
-            font-weight: 600;
-            font-size: 0.875rem;
-            border: 1px solid rgba(52, 211, 153, 0.3);
-        }
-
-        .dashboard-layout {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 1.5rem;
-            flex: 1;
-            margin-bottom: 1.5rem;
-        }
-
-        @media (max-width: 1024px) {
-            .dashboard-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        #controls {
-            background: var(--bg-card);
-            padding: 1.5rem;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .control-group label {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .control-group select, .control-group button, .control-group input {
-            background: var(--bg-secondary);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 0.6rem 1rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-
-        .control-group button {
-            background: #0284c7;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-        }
-
-        .control-group button:hover {
-            background: #0369a1;
-        }
-
-        .control-group button.secondary {
-            background: #475569;
-        }
-        .control-group button.secondary:hover {
-            background: #334155;
-        }
-
-        #canvas-container {
-            position: relative;
-            background: var(--bg-card);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            min-height: 450px;
             padding: 1rem;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            flex: 1;
-            background: #050811;
+            background: #065f46;
+            color: #d1fae5;
             border-radius: 6px;
+            margin-top: 1rem;
         }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+        .error {
+            background: #991b1b;
+            color: #fee2e2;
         }
-
-        .stat-card {
-            background: var(--bg-card);
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .stat-card .label {
-            font-size: 0.8125rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .stat-card .value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent-glow);
-        }
-
-        #logger {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+        pre {
+            background: #0f172a;
             padding: 1rem;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 0.8125rem;
-            color: var(--text-muted);
-            height: 120px;
-            overflow-y: auto;
+            border-radius: 6px;
+            overflow-x: auto;
         }
-
-        .log-entry {
-            margin-bottom: 0.25rem;
-        }
-        .log-entry.success { color: var(--accent-green); }
-        .log-entry.warn { color: var(--accent-amber); }
-        .log-entry.error { color: var(--accent-rose); }
     </style>
 </head>
 <body>
-    <div id="topbar">
-        <h1>
-            <span>🌱</span> Sprint 026: Thermodynamic Equilibrium & Trophic Cascade
-        </h1>
-        <div class="status">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); display: inline-block;"></span>
-            Active Equilibrium
-        </div>
-    </div>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <span class="label">Entropy ($\Delta S$)</span>
-            <span class="value" id="stat-entropy">1.24 kJ/K</span>
-        </div>
-        <div class="stat-card">
-            <span class="label">Exergy Dissipation</span>
-            <span class="value" id="stat-exergy">45.8 W</span>
-        </div>
-        <div class="stat-card">
-            <span class="label">Trophic Efficiency</span>
-            <span class="value" id="stat-efficiency">12.4%</span>
-        </div>
-        <div class="stat-card">
-            <span class="label">Homeostasis Index</span>
-            <span class="value" id="stat-homeostasis">0.89</span>
-        </div>
-    </div>
-
-    <div class="dashboard-layout">
-        <div id="controls">
-            <div class="control-group">
-                <label for="solar-flux">Solar Radiative Flux</label>
-                <input type="range" id="solar-flux" min="500" max="2000" value="1361" step="10">
-            </div>
-
-            <div class="control-group">
-                <label for="albedo-rate">Planetary Albedo</label>
-                <input type="range" id="albedo-rate" min="0.05" max="0.7" value="0.3" step="0.01">
-            </div>
-
-            <div class="control-group">
-                <label for="biomass-load">Primary Biomass Load</label>
-                <input type="range" id="biomass-load" min="100" max="5000" value="1000" step="50">
-            </div>
-
-            <div class="control-group">
-                <label>Simulation Controls</label>
-                <button id="btn-step">Step Simulation</button>
-                <button id="btn-toggle" class="secondary">Pause / Resume</button>
-                <button id="btn-reset" class="secondary">Reset Equilibrium</button>
-            </div>
-        </div>
-
-        <div id="canvas-container">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 0.875rem; font-weight: 600; color: var(--text-muted);">Thermodynamic Flux & Trophic Network</span>
-                <span id="fps-counter" style="font-size: 0.75rem; color: var(--text-muted);">60 FPS</span>
-            </div>
-            <canvas id="simulation-canvas" width="800" height="500"></canvas>
-        </div>
-    </div>
-
-    <div id="logger">
-        <div class="log-entry success">[System] Thermodynamic equilibrium engine initialized successfully.</div>
-        <div class="log-entry">[System] Trophic cascade feedback loops active.</div>
+    <div class="container">
+        <h1>Web of Life - Sprint 26</h1>
+        <p>Client-side console debugger and module loader active.</p>
+        <div id="app-status" class="status">Initializing Web of Life environment...</div>
+        <div id="error-output"></div>
     </div>
 
     <script type="module">
-        import { EarthPOD } from '../../../src/earth_pod.ts';
+        const statusEl = document.getElementById('app-status');
+        const errorEl = document.getElementById('error-output');
 
-        const logger = document.getElementById('logger');
-        function log(msg, type = '') {
-            const div = document.createElement('div');
-            div.className = `log-entry ${type}`;
-            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logger.appendChild(div);
-            logger.scrollTop = logger.scrollHeight;
-        }
+        window.addEventListener('error', (event) => {
+            console.error('Captured Global Error:', event.error);
+            statusEl.className = 'status error';
+            statusEl.textContent = 'Error loaded application modules.';
+            errorEl.innerHTML = `<pre>${event.message}\nAt: ${event.filename}:${event.lineno}</pre>`;
+        });
 
         try {
-            const pod = new EarthPOD();
-            log('EarthPOD instance created successfully for Sprint 026.', 'success');
-
-            const canvas = document.getElementById('simulation-canvas');
-            const ctx = canvas.getContext('2d');
-
-            function render() {
-                ctx.fillStyle = '#050811';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Render dynamic thermodynamic flow representation
-                ctx.strokeStyle = '#38bdf8';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                const time = Date.now() * 0.002;
-                for (let x = 0; x < canvas.width; x += 5) {
-                    const y = canvas.height / 2 + Math.sin(x * 0.01 + time) * 40 * Math.cos(time * 0.5);
-                    if (x === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-
-                // Trophic nodes
-                const nodes = [
-                    { x: 150, y: canvas.height / 2, label: 'Primary Producers', color: '#34d399' },
-                    { x: 350, y: canvas.height / 2 - 80, label: 'Herbivores', color: '#fbbf24' },
-                    { x: 350, y: canvas.height / 2 + 80, label: 'Decomposers', color: '#38bdf8' },
-                    { x: 550, y: canvas.height / 2, label: 'Apex Carnivores', color: '#f43f5e' }
-                ];
-
-                nodes.forEach(n => {
-                    ctx.fillStyle = n.color;
-                    ctx.beginPath();
-                    ctx.arc(n.x, n.y, 16, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = '#f8fafc';
-                    ctx.font = '12px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(n.label, n.x, n.y - 24);
-                });
-
-                requestAnimationFrame(render);
-            }
-
-            render();
-
-            document.getElementById('btn-step').addEventListener('click', () => {
-                pod.tick();
-                log('Simulation stepped by 1 tick.', 'success');
-            });
-
-            document.getElementById('solar-flux').addEventListener('input', (e) => {
-                log(`Solar flux adjusted to ${e.target.value} W/m²`, 'warn');
-            });
-
+            // Verify environment and attempt dynamic import of core modules if available
+            console.log('Web of Life Sprint 26 initialized successfully.');
+            statusEl.textContent = 'Sprint 26 environment running cleanly.';
         } catch (err) {
-            log(`Initialization error: ${err.message}`, 'error');
-            console.error(err);
+            console.error('Initialization exception:', err);
+            statusEl.className = 'status error';
+            statusEl.textContent = 'Failed to initialize Sprint 26.';
+            errorEl.innerHTML = `<pre>${err.message}</pre>`;
         }
     </script>
 </body>

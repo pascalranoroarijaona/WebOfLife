@@ -26,9 +26,9 @@
   "sprint_021_attempts": 2,
   "sprint_022_attempts": 2,
   "sprint_023_attempts": 2,
-  "sprint_024_attempts": 1,
-  "sprint_025_attempts": 1,
-  "sprint_026_attempts": 1,
+  "sprint_024_attempts": 2,
+  "sprint_025_attempts": 2,
+  "sprint_026_attempts": 2,
   "sprint_005": true,
   "sprint_006": true,
   "sprint_007": true,
@@ -44,5 +44,7 @@
   "sprint_017": true,
   "sprint_018": true,
   "sprint_019": true,
-  "sprint_020": true
+  "sprint_020": true,
+  "sprint_027_attempts": 1,
+  "sprint_028_attempts": 1
 }

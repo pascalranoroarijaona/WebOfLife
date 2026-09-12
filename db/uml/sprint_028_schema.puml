@@ -1,0 +1,121 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+abstract class Entity {
+    +entityId: String
+    +metadata: Map<String, Object>
+    +update(): void
+}
+
+abstract class SpatialNode {
+    #nodeId: String
+    #coordinates: Tuple<Float, Float>
+    #carryingCapacity: Float
+    #connectivityWeights: Map<String, Float>
+    {abstract} +queryNutrients(coords: Tuple<Float, Float>): Map<String, Float>
+    {abstract} +consumeNutrients(coords: Tuple<Float, Float>, demand: Map<String, Float>): Map<String, Float>
+}
+
+class BiomePatch {
+    -nutrients: NutrientPool
+    -receptor: SunlightReceptor
+    +queryNutrients(coords: Tuple<Float, Float>): Map<String, Float>
+    +consumeNutrients(coords: Tuple<Float, Float>, demand: Map<String, Float>): Map<String, Float>
+}
+
+class ObstacleNode {
+    +blockMovement: Boolean
+}
+
+class NutrientPool {
+    -carbon: Float
+    -nitrogen: Float
+    -phosphorus: Float
+    +extract(amount: Map<String, Float>): Map<String, Float>
+    +deposit(amount: Map<String, Float>): void
+}
+
+class SunlightReceptor {
+    -fluxRate: Float
+    +capturePhotonEnergy(): Float
+}
+
+abstract class Organism {
+    -energyStock: Float
+    -massStock: Float
+    {abstract} +metabolicProcess(): void
+    {abstract} +die(): Carcass
+}
+
+abstract class Autotroph {
+    +photosynthesize(): void
+}
+
+class PhotosyntheticProducer {
+    +metabolicProcess(): void
+    +die(): Carcass
+}
+
+abstract class Heterotroph {
+    {abstract} +consume(target: Organism): void
+}
+
+class Herbivore {
+    +consume(target: Organism): void
+    +metabolicProcess(): void
+    +die(): Carcass
+}
+
+class Carnivore {
+    +consume(target: Organism): void
+    +metabolicProcess(): void
+    +die(): Carcass
+}
+
+class Detritivore {
+    +scavenge(carcass: Carcass): void
+    +metabolicProcess(): void
+    +die(): Carcass
+}
+
+class Carcass {
+    -carbon: Float
+    -nitrogen: Float
+    -phosphorus: Float
+    +degrade(): void
+}
+
+interface IThermodynamicLedger {
+    +{abstract} auditMassConservation(): Float
+    +{abstract} recordDissipation(joules: Float, entropyDelta: Float): void
+}
+
+interface ISpatialNutrientSource {
+    +{abstract} queryNutrients(coordinates: Tuple<Float, Float>): Map<String, Float>
+    +{abstract} consumeNutrients(coordinates: Tuple<Float, Float>, demand: Map<String, Float>): Map<String, Float>
+}
+
+class ThermodynamicStateValidator {
+    +{static} validateStateVector(state: Map<String, Object>): Boolean
+    +{static} assertNonNegativeEntropy(entropyDelta: Float): void
+}
+
+Entity <|-- SpatialNode
+SpatialNode <|-- BiomePatch
+SpatialNode <|-- ObstacleNode
+BiomePatch *-- NutrientPool
+BiomePatch *-- SunlightReceptor
+
+Entity <|-- Organism
+Organism <|-- Autotroph
+Autotroph <|-- PhotosyntheticProducer
+
+Organism <|-- Heterotroph
+Heterotroph <|-- Herbivore
+Heterotroph <|-- Carnivore
+Heterotroph <|-- Detritivore
+
+BiomePatch ..|> ISpatialNutrientSource
+IThermodynamicLedger <.. ThermodynamicStateValidator : relies on
+
+@enduml

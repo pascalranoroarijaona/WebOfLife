@@ -1,52 +1,56 @@
--- ============================================================================
--- Web of Life Database & Thermodynamic Blockchain Schema
--- Sprint 027 Extension: Thermodynamic State Vector Baseline Structurer
--- ============================================================================
+-- Sprint 028: Spatial Equilibrium, Trophic Cascade Refinement, and Thermodynamic Ledger Stabilization
+-- Database Schema Extensions
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Drop existing tables if re-provisioning for clean state
+DROP TABLE IF EXISTS thermodynamic_ledger_audit CASCADE;
+DROP TABLE IF EXISTS detritivore_scavenge_events CASCADE;
+DROP TABLE IF EXISTS biome_patch_nutrients CASCADE;
+DROP TABLE IF EXISTS spatial_nodes CASCADE;
 
--- 1. Thermodynamic State Vectors Table
--- Captures immutable snapshots of thermodynamic states matching IThermodynamicStateVector
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_id UUID,
-    temperature NUMERIC(10, 4) NOT NULL DEFAULT 288.15, -- Default T_0 = 288.15 K
-    solar_radiation NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
-    thermal_emission NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
-    latent_heat NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
-    sensible_heat NUMERIC(12, 4) NOT NULL DEFAULT 0.0000, -- W/m^2
-    entropy NUMERIC(15, 6) NOT NULL DEFAULT 0.000000, -- J/K
-    timestamp BIGINT NOT NULL DEFAULT 0,
-    first_law_valid BOOLEAN NOT NULL DEFAULT TRUE,
-    second_law_valid BOOLEAN NOT NULL DEFAULT TRUE,
+-- Spatial Nodes and Biome Patches
+CREATE TABLE spatial_nodes (
+    node_id VARCHAR(64) PRIMARY KEY,
+    node_type VARCHAR(32) NOT NULL CHECK (node_type IN ('BiomePatch', 'ObstacleNode')),
+    coordinate_x DOUBLE PRECISION NOT NULL,
+    coordinate_y DOUBLE PRECISION NOT NULL,
+    carrying_capacity DOUBLE PRECISION NOT NULL CHECK (carrying_capacity >= 0),
+    connectivity_weights JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Thermodynamic Monad Stocks Table
--- Models conserved matter/energy stocks associated with biogeochemical cycles
-CREATE TABLE IF NOT EXISTS thermodynamic_monad_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE,
-    cycle_type VARCHAR(32) NOT NULL, -- e.g., 'CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER'
-    stock_mass NUMERIC(18, 6) NOT NULL, -- kg or moles depending on cycle
-    potential_energy NUMERIC(18, 6) NOT NULL, -- Joules
+CREATE TABLE biome_patch_nutrients (
+    patch_id VARCHAR(64) PRIMARY KEY REFERENCES spatial_nodes(node_id) ON DELETE CASCADE,
+    carbon_stock DOUBLE PRECISION NOT NULL CHECK (carbon_stock >= 0),
+    nitrogen_stock DOUBLE PRECISION NOT NULL CHECK (nitrogen_stock >= 0),
+    phosphorus_stock DOUBLE PRECISION NOT NULL CHECK (phosphorus_stock >= 0),
+    sunlight_flux DOUBLE PRECISION NOT NULL CHECK (sunlight_flux >= 0),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Detritivore Scavenge and Decomposition Events
+CREATE TABLE detritivore_scavenge_events (
+    event_id VARCHAR(64) PRIMARY KEY,
+    detritivore_id VARCHAR(64) NOT NULL,
+    carcass_id VARCHAR(64) NOT NULL,
+    assimilated_biomass DOUBLE PRECISION NOT NULL CHECK (assimilated_biomass >= 0),
+    residue_mass DOUBLE PRECISION NOT NULL CHECK (residue_mass >= 0),
+    entropy_increment DOUBLE PRECISION NOT NULL CHECK (entropy_increment >= 0),
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Thermodynamic Ledger & Conservation Audits (Blockchain Integration)
+CREATE TABLE thermodynamic_ledger_audit (
+    block_id VARCHAR(64) PRIMARY KEY,
+    previous_hash VARCHAR(128) NOT NULL,
+    merkle_root VARCHAR(128) NOT NULL,
+    total_system_mass DOUBLE PRECISION NOT NULL,
+    mass_discrepancy_delta DOUBLE PRECISION NOT NULL CHECK (ABS(mass_discrepancy_delta) <= 1e-12),
+    global_entropy DOUBLE PRECISION NOT NULL CHECK (global_entropy >= 0),
+    dissipated_heat_joules DOUBLE PRECISION NOT NULL CHECK (dissipated_heat_joules >= 0),
+    signature VARCHAR(256) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Thermodynamic Stock Transactions (Ledger)
--- Records stock transformations enforcing First (Conservation) & Second (Entropy >= 0) Laws
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_stock_id UUID REFERENCES thermodynamic_monad_stocks(stock_id),
-    target_stock_id UUID REFERENCES thermodynamic_monad_stocks(stock_id),
-    delta_mass NUMERIC(18, 6) NOT NULL,
-    delta_energy NUMERIC(18, 6) NOT NULL,
-    entropy_generated NUMERIC(15, 6) NOT NULL CHECK (entropy_generated >= 0),
-    transaction_hash VARCHAR(64) NOT NULL,
-    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 4. Blockchain Blocks Table
--- Anchors thermodynamic state vectors and transaction ledgers into cryptographic blocks
-CREATE INDEX IF NOT EXISTS idx_thermo_states_timestamp ON thermodynamic_state_vectors(timestamp);
-CREATE INDEX IF NOT EXISTS idx_stock_tx_hash ON thermodynamic_stock_transactions(transaction_hash);
+-- Indexes for high-frequency queries
+CREATE INDEX idx_spatial_nodes_coords ON spatial_nodes(coordinate_x, coordinate_y);
+CREATE INDEX idx_ledger_audit_created ON thermodynamic_ledger_audit(created_at);

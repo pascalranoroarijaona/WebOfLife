@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 7%
-SPRINT_GOAL: Thermodynamic State Vector Baseline Structurer (`src/thermodynamics/state_vector.ts`): Implement lightweight builder functions to instantiate valid state vectors with default ambient temperatures ($T_0 = 288.15\text{ K}$) and zeroed flux records.
+Roadmap Completion: 13%
+SPRINT_GOAL: Thermodynamic State Vector Validation Wrapper (`src/thermodynamics/state_validator.ts`): Code validation helper functions that assert required property existence and non-negative entropy fields prior to monad step executions.
 
 ## Web of Life Master Backlog
 
