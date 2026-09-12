@@ -1,5 +1,5 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 4%
+Roadmap Completion: 3%
 SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
 
 ## Web of Life Master Backlog
@@ -13,10 +13,11 @@ SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
 - [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
 - [ ] Prigogine Minimum Entropy Production Monad (`src/thermodynamics/dissipative_stability.ts`): Create an analytic monad method that tracks temporal changes in internal entropy generation ($\frac{d\dot{S}_{\text{gen}}}{dt}$), evaluating whether regional subsystems are relaxing toward Prigogine’s minimum entropy production state or sliding toward bifurcation/collapse.
-- [ ] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`).
+- [ ] Uber H3 Spatial Index Layer (`src/spatial/h3_grid.ts`): Implement a binding module that initializes base resolution global cell indices, handles parent/child cell indexing lookups, and translates lat/lon coordinates into valid H3 cell addresses for monad spatial anchoring.
 - [ ] Explicit H3 K-Ring Adjacency Matrix Builder (`src/spatial/h3_topology.ts`): Implement a sparse adjacency matrix generator that computes $k$-ring neighborhoods (where $k \in \{1, 2\}$) for any active set of H3 indices, mapping them to matrix row/column coordinates for gradient calculations across hexagonal boundaries.
 - [ ] Vectorized H3 Tensor Flux Router (`src/spatial/h3_tensor_routing.ts`): Build a tensor routing engine that executes sparse matrix multiplications ($\mathbf{J}_{\text{spatial}} = \mathbf{D} \cdot \nabla \mathbf{C}$) to simulate advection, diffusion, and runoff between adjacent hexagonal cells based on elevation and pressure gradients.
 - [ ] Adaptive H3 Mesh Refinement Heuristics (`src/spatial/h3_adaptive_mesh.ts`): Splitting and merging triggers where high thermodynamic gradients or ecological shocks automatically step up or step down H3 resolution levels.
+- [ ] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`).
 - [ ] Projection mapping and Geo View layout toggle in UI (`src/spatial/projection_mapping.ts`, `src/spatial/projection_helpers.ts`).
 - [ ] Integration of Uber H3 spatial index for hexagonal global partitioning (`src/h3_spatial.ts`).
 - [ ] Live Canvas 2D orbital/trophic renderer with interactive inspector. (`src/visualization/base_renderer.ts`, `src/visualization/orbital_renderer.ts`, `src/visualization/trophic_renderer.ts`, `src/visualization/inspector.ts`, `src/visualization/visualization_monad.ts`)

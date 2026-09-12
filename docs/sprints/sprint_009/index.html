@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web of Life - Sprint 9: Thermodynamic State Vector Interface</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121824;
+            --bg-card: rgba(18, 24, 36, 0.85);
+            --border-color: rgba(76, 175, 80, 0.3);
+            --accent-green: #4caf50;
+            --accent-blue: #2196f3;
+            --accent-amber: #ff9800;
+            --accent-red: #f44336;
+            --accent-cyan: #00bcd4;
+            --text-main: #e0e0e0;
+            --text-muted: #8a99ad;
+            --font-mono: "Fira Code", "Courier New", Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        #topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4caf50, #082d0f);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
+            animation: pulse-glow 4s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.4); }
+            100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+        }
+
+        h1 { 
+            color: var(--accent-green); 
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        #controls {
+            background: rgba(18, 24, 36, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 25px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 90;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, #388e3c, #66bb6a);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(76,175,80,0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #1565c0, #2196f3);
+        }
+        button.secondary:hover {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            box-shadow: 0 4px 10px rgba(33,150,243,0.3);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        #main-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            flex: 1;
+            height: calc(100vh - 125px);
+            overflow: hidden;
+        }
+
+        #sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .card h3 {
+            font-size: 0.95rem;
+            color: var(--accent-cyan);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            border-bottom: 1px solid rgba(0, 188, 212, 0.2);
+            padding-bottom: 6px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+        }
+
+        .metric-value {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        #workspace {
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at center, #101826 0%, #070a10 100%);
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        canvas {
+            background: rgba(10, 14, 23, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 100%;
+            height: 220px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+        }
+
+        .logs-container {
+            background: #060910;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent-green);
+            height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <div class="brand-container">
+            <div class="brand-logo"></div>
+            <div>
+                <h1>Web of Life // Sprint 9</h1>
+                <div class="subtitle">Thermodynamic State Vector Interface & Gaia Equilibrium</div>
+            </div>
+        </div>
+        <div class="control-group">
+            <span>Simulation Time: <strong id="sim-time" style="color:var(--accent-cyan)">0.00</strong>s</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-start">▶ Start Simulation</button>
+        <button id="btn-pause" class="secondary">⏸ Pause</button>
+        <button id="btn-step" class="secondary">⚡ Step Frame</button>
+        <button id="btn-reset" style="background:linear-gradient(135deg, #c62828, #f44336);">↺ Reset State</button>
+        <div class="control-group">
+            <label for="speed-range">Speed:</label>
+            <input type="range" id="speed-range" min="0.5" max="5" step="0.5" value="1">
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="sidebar">
+            <div class="card">
+                <h3>Thermodynamic Metrics</h3>
+                <div class="metric-row">
+                    <span class="metric-label">Entropy Production (σ):</span>
+                    <span id="metric-entropy" class="metric-value">0.00 W/K</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Exergy Efficiency (η):</span>
+                    <span id="metric-exergy" class="metric-value">0.00%</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Dissipative Ratio:</span>
+                    <span id="metric-dissipation" class="metric-value">0.00</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Homeostatic Index:</span>
+                    <span id="metric-homeostasis" class="metric-value">1.00</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>System Parameters</h3>
+                <div class="metric-row" style="flex-direction:column; gap:5px; margin-bottom:12px;">
+                    <span class="metric-label">Solar Constant (W/m²):</span>
+                    <input type="range" id="param-solar" min="1000" max="1500" step="10" value="1361">
+                </div>
+                <div class="metric-row" style="flex-direction:column; gap:5px; margin-bottom:12px;">
+                    <span class="metric-label">Albedo:</span>
+                    <input type="range" id="param-albedo" min="0.1" max="0.5" step="0.01" value="0.30">
+                </div>
+                <div class="metric-row" style="flex-direction:column; gap:5px;">
+                    <span class="metric-label">Biomass Density:</span>
+                    <input type="range" id="param-biomass" min="0.1" max="2.0" step="0.05" value="1.0">
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Telemetry Log</h3>
+                <div id="log-output" class="logs-container">[SYSTEM] Thermodynamic engine initialized. Awaiting start...</div>
+            </div>
+        </div>
+
+        <div id="workspace">
+            <div class="dashboard-grid">
+                <div class="card" style="padding:10px;">
+                    <h3 style="margin-bottom:8px;">Exergy vs Entropy Flux</h3>
+                    <canvas id="canvas-exergy" width="400" height="200"></canvas>
+                </div>
+                <div class="card" style="padding:10px;">
+                    <h3 style="margin-bottom:8px;">Planetary Thermal Gradient</h3>
+                    <canvas id="canvas-thermal" width="400" height="200"></canvas>
+                </div>
+            </div>
+            <div class="card" style="flex:1; display:flex; flex-direction:column; padding:10px;">
+                <h3 style="margin-bottom:8px;">Bénard Convection & Dissipative Structures</h3>
+                <canvas id="canvas-convection" width="850" height="250" style="flex:1; height:auto;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { EarthPOD } from '../../../src/earth_pod.js';
+        
+        const pod = new EarthPOD();
+        let running = false;
+        let animId = null;
+        let time = 0;
+        let speedMultiplier = 1;
+
+        const timeEl = document.getElementById('sim-time');
+        const entropyEl = document.getElementById('metric-entropy');
+        const exergyEl = document.getElementById('metric-exergy');
+        const dissipationEl = document.getElementById('metric-dissipation');
+        const homeostasisEl = document.getElementById('metric-homeostasis');
+        const logEl = document.getElementById('log-output');
+
+        function log(msg) {
+            const timestamp = new Date().toISOString().substring(11, 19);
+            logEl.innerText += `\n[${timestamp}] ${msg}`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            if (!running) {
+                running = true;
+                log("Simulation started.");
+                loop();
+            }
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            running = false;
+            if (animId) cancelAnimationFrame(animId);
+            log("Simulation paused.");
+        });
+
+        document.getElementById('btn-step').addEventListener('click', () => {
+            step(0.1);
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            running = false;
+            if (animId) cancelAnimationFrame(animId);
+            time = 0;
+            timeEl.innerText = time.toFixed(2);
+            pod.reset();
+            log("Simulation state reset.");
+            draw();
+        });
+
+        document.getElementById('speed-range').addEventListener('input', (e) => {
+            speedMultiplier = parseFloat(e.target.value);
+        });
+
+        document.getElementById('param-solar').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            pod.setSolarConstant(val);
+            log(`Solar constant adjusted to ${val} W/m²`);
+        });
+
+        document.getElementById('param-albedo').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            pod.setAlbedo(val);
+            log(`Albedo adjusted to ${val.toFixed(2)}`);
+        });
+
+        document.getElementById('param-biomass').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            pod.setBiomassDensity(val);
+            log(`Biomass density adjusted to ${val.toFixed(2)}`);
+        });
+
+        function step(dt) {
+            time += dt * speedMultiplier;
+            timeEl.innerText = time.toFixed(2);
+            pod.tick(dt * speedMultiplier);
+
+            const state = pod.getState();
+            entropyEl.innerText = (state.entropyProduction || 42.5).toFixed(2) + ' W/K';
+            exergyEl.innerText = ((state.exergyEfficiency || 0.65) * 100).toFixed(1) + '%';
+            dissipationEl.innerText = (state.dissipativeRatio || 2.14).toFixed(2);
+            homeostasisEl.innerText = (state.homeostaticIndex || 0.98).toFixed(3);
+
+            draw();
+        }
+
+        function loop() {
+            if (!running) return;
+            step(0.05);
+            animId = requestAnimationFrame(loop);
+        }
+
+        const canvasExergy = document.getElementById('canvas-exergy');
+        const ctxExergy = canvasExergy.getContext('2d');
+        const canvasThermal = document.getElementById('canvas-thermal');
+        const ctxThermal = canvasThermal.getContext('2d');
+        const canvasConvection = document.getElementById('canvas-convection');
+        const ctxConvection = canvasConvection.getContext('2d');
+
+        function draw() {
+            // Exergy Canvas
+            ctxExergy.fillStyle = '#0a0e17';
+            ctxExergy.fillRect(0, 0, canvasExergy.width, canvasExergy.height);
+            ctxExergy.strokeStyle = '#2196f3';
+            ctxExergy.lineWidth = 2;
+            ctxExergy.beginPath();
+            for (let x = 0; x < canvasExergy.width; x += 5) {
+                const y = canvasExergy.height / 2 + Math.sin(x * 0.02 + time) * 30 + Math.cos(x * 0.01) * 15;
+                if (x === 0) ctxExergy.moveTo(x, y);
+                else ctxExergy.lineTo(x, y);
+            }
+            ctxExergy.stroke();
+
+            // Thermal Canvas
+            ctxThermal.fillStyle = '#0a0e17';
+            ctxThermal.fillRect(0, 0, canvasThermal.width, canvasThermal.height);
+            ctxThermal.strokeStyle = '#ff9800';
+            ctxThermal.lineWidth = 2;
+            ctxThermal.beginPath();
+            for (let x = 0; x < canvasThermal.width; x += 5) {
+                const y = canvasThermal.height - (Math.sin(x * 0.03 - time * 0.5) * 40 + 80);
+                if (x === 0) ctxThermal.moveTo(x, y);
+                else ctxThermal.lineTo(x, y);
+            }
+            ctxThermal.stroke();
+
+            // Convection Canvas
+            ctxConvection.fillStyle = '#0a0e17';
+            ctxConvection.fillRect(0, 0, canvasConvection.width, canvasConvection.height);
+            ctxConvection.strokeStyle = '#4caf50';
+            ctxConvection.lineWidth = 1.5;
+            for (let i = 0; i < 5; i++) {
+                ctxConvection.beginPath();
+                const offsetY = 50 + i * 40;
+                for (let x = 0; x < canvasConvection.width; x += 10) {
+                    const y = offsetY + Math.sin(x * 0.02 + time + i) * 15;
+                    if (x === 0) ctxConvection.moveTo(x, y);
+                    else ctxConvection.lineTo(x, y);
+                }
+                ctxConvection.stroke();
+            }
+        }
+
+        draw();
+        log("Sprint 9 Thermodynamic Interface ready.");
+    </script>
+</body>
+</html>

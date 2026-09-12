@@ -245,6 +245,10 @@ export class SpeciesPOD extends ThermodynamicStructure {
     return val;
   }
 
+  netFlow(_substance: string): number {
+    return 1.0;
+  }
+
   exportEntropy(_tick: number): number {
     const val = this.population * 0.008;
     this.exportEntropyJoulesPerKelvin(val * 2);
@@ -367,6 +371,50 @@ export class EarthPOD extends ThermodynamicStructure {
       EarthPOD._instance = new EarthPOD();
     }
     return EarthPOD._instance;
+  }
+
+  public getStateVector(): ThermodynamicStateVector {
+    return {
+      timestamp: this.tickCreated,
+      ambientTemperature: 288.15,
+      systemTemperature: 288.15,
+      internalEnergy: 1e12,
+      totalEntropy: 5e9,
+      entropyGenerationRate: 150.0,
+      exergyDestructionRate: 288.15 * 150.0,
+      boundaryFluxes: {
+        solarRadiationIn: this.solarInputWatts,
+        thermalRadiationOut: this.solarInputWatts * 0.99,
+        sensibleHeatFlux: 1e10,
+        latentHeatFlux: 1e10,
+        netMassEnthalpyFlux: 0
+      },
+      T_0: 288.15,
+      deadStateTemperatureKelvin: 288.15,
+      systemInternalEnergyJoules: 1e12,
+      entropy: 5e9,
+      systemEntropyJoulesPerKelvin: 5e9,
+      temperature: 288.15,
+      temperatureKelvin: 288.15,
+      totalMass: 5.97e24,
+      mass: 5.97e24,
+      exergy: 1e11,
+      solarInputWatts: this.solarInputWatts,
+      planetaryEmissionWatts: this.solarInputWatts * 0.99,
+      entropyGenerationRateWattsPerKelvin: 150.0,
+      exergyDestructionRateWatts: 288.15 * 150.0,
+      exergyEfficiency: 0.85,
+      boundaryHeatFlux: { solarIn: this.solarInputWatts, infraRedOut: -this.solarInputWatts * 0.99 },
+      massInventory: { carbon: 850, water: 1.338e9, nitrogen: 3.9e6, phosphorus: 4e4 },
+      entropyMetrics: {
+        sGenRate: 150.0,
+        exergyDestruction: 288.15 * 150.0,
+        cumulativeQLoss: 0,
+        referenceTemperature: 288.15,
+        exergyDestructionRate: 288.15 * 150.0
+      },
+      ambientReference: { temperature0: 288.15, pressure0: 101325 }
+    };
   }
 
   importFreeEnergy(_tick: number): number {

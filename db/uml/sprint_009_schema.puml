@@ -1,0 +1,56 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Thermodynamics Architecture" {
+
+    interface ThermalBoundaryFlux {
+        + readonly heatTransferRateWatts: number
+        + readonly boundaryTemperatureKelvin: number
+    }
+
+    interface MassBoundaryFlux {
+        + readonly speciesId: string
+        + readonly massFlowRateKgPerSec: number
+        + readonly specificEnthalpyJoulesPerKg: number
+        + readonly specificEntropyJoulesPerKgKelvin: number
+    }
+
+    interface ThermodynamicStateVector {
+        + readonly timestamp: number
+        + readonly systemInternalEnergyJoules: number
+        + readonly systemEntropyJoulesPerKelvin: number
+        + readonly temperatureKelvin: number
+        + readonly deadStateTemperatureKelvin: number
+        + readonly solarInputWatts: number
+        + readonly planetaryEmissionWatts: number
+        + readonly thermalFluxes: readonly ThermalBoundaryFlux[]
+        + readonly massFluxes: readonly MassBoundaryFlux[]
+        + readonly entropyGenerationRateWattsPerKelvin: number
+        + readonly exergyDestructionRateWatts: number
+        + readonly exergyEfficiency: number
+    }
+
+    interface IThermodynamicSystem {
+        + getStateVector(): ThermodynamicStateVector
+        + computeEntropyGenerationRate(): number
+        + computeExergyDestructionRate(): number
+        + validateFirstLaw(tolerance: number): boolean
+        + validateSecondLaw(): boolean
+    }
+
+    class ThermodynamicStateMonad {
+        - readonly state: ThermodynamicStateVector
+        - constructor(state: ThermodynamicStateVector)
+        + {static} initialize(initialState: ThermodynamicStateVector): ThermodynamicStateMonad
+        + map(transitionFn: (current: ThermodynamicStateVector) => ThermodynamicStateVector): ThermodynamicStateMonad
+        + extract(): ThermodynamicStateVector
+    }
+
+    ThermodynamicStateVector *-- ThermalBoundaryFlux : contains >
+    ThermodynamicStateVector *-- MassBoundaryFlux : contains >
+    ThermodynamicStateMonad --> ThermodynamicStateVector : wraps >
+    IThermodynamicSystem ..> ThermodynamicStateVector : produces >
+}
+
+@enduml

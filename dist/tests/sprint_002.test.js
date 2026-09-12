@@ -11,6 +11,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
         assert.strictEqual(typeof stateVec.internalEnergy, 'number');
     });
     it('should execute ThermodynamicMonad transform and enforce Second Law (S_dot_gen >= 0)', () => {
+        const heatFlux = { solarIn: 50, infraRedOut: 5 };
         const initialState = {
             timestamp: 0,
             T_0: 288.15,
@@ -21,7 +22,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
             ambientTemperature: 288.15,
             entropy: 33.33,
             exergy: 1000,
-            boundaryHeatFlux: {},
+            boundaryHeatFlux: heatFlux,
             boundaryFluxes: [],
             massInventory: { carbon: 225 },
             stocks: {
@@ -65,6 +66,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
         assert.strictEqual(res.entropyMetrics.sGenRate, 2.0);
     });
     it('should throw an error on Second Law violation in ThermodynamicMonad', () => {
+        const heatFlux = { solarIn: 50, infraRedOut: 5 };
         const initialState = {
             timestamp: 0,
             T_0: 288.15,
@@ -75,7 +77,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
             ambientTemperature: 288.15,
             entropy: 33.33,
             exergy: 1000,
-            boundaryHeatFlux: {},
+            boundaryHeatFlux: heatFlux,
             boundaryFluxes: [],
             massInventory: { carbon: 225 },
             stocks: {

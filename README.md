@@ -45,9 +45,9 @@ IndividualMonad[] / HumanNodePOD
 
 ## 1. System Architecture & Multi-Agent Startup Engine
 
-The `Web of Life` codebase evolves autonomously via a Python-based multi-agent orchestration engine (`agent_orchestrator.py`) powered by Gemini. Rather than hardcoding static rules, a 14-persona agent team continuously brainstorms, architects, writes, tests, and audits every subsystem in iterative sprints.
+The `Web of Life` codebase evolves autonomously via a Python-based multi-agent orchestration engine (`agent_orchestrator.py`) powered by Gemini. Rather than hardcoding static rules, a 16-persona agent team continuously brainstorms, architects, writes, tests, and audits every subsystem in iterative sprints.
 
-### The 14-Persona Autonomous Startup Team
+### The 16-Persona Autonomous Startup Team
 
 | Persona | Role & Responsibilities |
 | :--- | :--- |
@@ -58,17 +58,24 @@ The `Web of Life` codebase evolves autonomously via a Python-based multi-agent o
 | **Lead Architect** | Translates Sprint Goals into formal technical specifications (`docs/sprints/sprint_00N/01_RFC.md`). |
 | **Method Miner** | Quantifies mass/energy deltas and mathematical process equations (`docs/sprints/sprint_00N/02_METHODS.md`). |
 | **Backend Engineer** | Implements modular TypeScript code in `src/` and native Node test suites in `tests/`. |
-| **Debugger Agent** | Intercepts build failures, analyzes stack traces/type mismatches, and applies auto-healing code patches. |
+| **Debugger Agent** | Intercepts build failures, analyzes stack traces/type mismatches, and applies auto-healing code patches with full repository context. |
+| **Retro-Compatibility Engineer** | Audits new TypeScript implementations against historical RFCs/Methods to ensure legacy tests and thermodynamic formulas are not broken. |
 | **UI Engineer** | Builds isolated sprint visualizations in `docs/sprints/sprint_00N/index.html` under strict non-regression constraints. |
 | **QA Thermodynamic Auditor** | Verifies First & Second Law mass/energy conservation ($\Delta \text{Stock} = 0$) in `04_AUDIT.md`. |
 | **Database & Blockchain Ledger Architect** | Maintains SQL schemas, UML models, and the cryptographic thermodynamic blockchain ledger (`db/schema.sql`, `db/uml/`). |
 | **Academic & Research Outreach Lead** | Authors arXiv/preprint drafts and LaTeX summaries (`05_ACADEMIC_PREPRINT.md`) to engage complexity scientists and climate research labs. |
 | **Scientific Storyteller & Media Strategist** | Translates technical RFCs into viral research narratives, X/Twitter threads, and LinkedIn spotlights (`06_VIRAL_STORYTELLING.md`). |
 | **DevRel & Community Architect** | Authors developer onboarding guides, GitHub Discussions, and contributor entry points (`07_COMMUNITY_GUIDE.md`). |
+| **Gaïa (The Earth Spirit)** | Generates poetic, thermodynamically-grounded English spoken-word audio briefings for the root repository and each sprint using Edge-TTS. |
 
-### Backlog Retrospective & Self-Healing Loop
+### Backlog Retrospective & Multi-Tiered Self-Healing Loops
 
-To prevent AI hallucination, the **Product Manager Agent** executes a retrospective audit during Step 1 of every sprint. It cross-checks every item marked `[x]` in `docs/BACKLOG.md` against the actual file tree and `src/` codebase. Any item lacking real TypeScript implementation is automatically unchecked back to `[ ]` and re-queued.
+To prevent AI hallucination and ensure monotonic progress, the orchestrator employs several active self-healing loops:
+1. **PM Retrospective Audit:** Cross-checks every `[x]` backlog item against the actual `src/` codebase. If logic is missing, it reverts the item to `[ ]`.
+2. **Retro-Compatibility Loop:** If new TypeScript breaks legacy tests, the `RETRO_COMPATIBILITY_ENGINEER` is summoned with a full snapshot of historical RFCs and Methods to patch the code while preserving past thermodynamic contracts.
+3. **UI Non-Regression & Headless Verification:** Playwright intercepts DOM issues and console errors in `index.html`, feeding them to the `BROWSER_CONSOLE_DEBUGGER` for an iterative 3-attempt fix loop.
+4. **Artifact & Audio Regeneration:** Automatically backfills missing Markdown files, LaTeX PDFs, and Gaïa's audio summaries if they are corrupted or too small.
+
 
 ---
 
@@ -126,7 +133,9 @@ web-of-life/
 ├── .agent_logs/              <- Quota tracking, state history, and execution logs
 │   ├── orchestrator.log      <- Full timestamped multi-agent execution log
 │   ├── quota_tracker.json    <- Daily API allowance tracker
-│   └── state_tracker.json    <- Completed sprint registry
+│   ├── state_tracker.json    <- Completed sprint registry
+│   ├── compatibility_tracker.json <- Ledger of successful legacy test validations
+│   └── ui_verified_tracker.json   <- UI non-regression repair cache
 ├── db/                       <- Database schemas, UML diagrams, and ledger definitions
 │   ├── schema.sql            <- Relational & time-series stock/flow database schema
 │   ├── uml/                  <- System class, sequence, and entity-relationship diagrams
@@ -135,14 +144,18 @@ web-of-life/
 ├── visual_qa_agent.py        <- Gemini Vision + Playwright visual layout auditor
 ├── index.html                <- Permanent Launcher Shell / Multi-sprint router
 ├── index.original.html       <- Pristine Commit 0 baseline UI template
+├── personas.json             <- Centralized multi-agent identity and prompt definitions
 ├── docs/
 │   ├── BACKLOG.md            <- Audited product backlog
+│   ├── gaia_repository_intro.mp3 <- Gaïa's English audio overview of the simulation
 │   └── sprints/              <- Sprint-isolated build artifacts
 │       └── sprint_00N/
 │           ├── 01_RFC.md     <- Architectural spec
 │           ├── 02_METHODS.md <- Process equation formulas
 │           ├── 03_RELEASE_NOTES.md
 │           ├── 04_AUDIT.md   <- First/Second Law static audit
+│           ├── 05_ACADEMIC_PREPRINT.pdf <- Compiled LaTeX preprint
+│           ├── gaia_sprint_summary.mp3  <- Sprint audio briefing
 │           └── index.html    <- Isolated Sprint N UI build
 ├── src/                      <- Core TypeScript domain code
 │   ├── earth_pod.ts          <- Mega-POD Terrestre hierarchy
@@ -192,7 +205,7 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 4%
+Roadmap Completion: 3%
 SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction rate ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays.
 
 ## Web of Life Master Backlog
@@ -206,10 +219,11 @@ SPRINT_GOAL: Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`
 - [ ] Explicit Gouy-Stodola Exergy Destruction Calculation (`src/thermodynamics/exergy_ledger.ts`): Replace placeholder entropy hooks with explicit internal entropy generation formulas accounting for metabolic heat dissipation, chemical reaction irreversibility, and boundary conduction: $\dot{I} = T_0 \sum \frac{dQ_i}{dt} \left(1 - \frac{T_0}{T_i}\right)$.
 - [ ] Carnot & Thermodynamic Efficiency Limiters (`src/thermodynamics/carnot_limits.ts`): Boundary constraints limiting technospheric and geological power generation units to their maximum theoretical thermal efficiency ($\eta = 1 - \frac{T_{\text{sink}}}{T_{\text{source}}}$).
 - [ ] Prigogine Minimum Entropy Production Monad (`src/thermodynamics/dissipative_stability.ts`): Create an analytic monad method that tracks temporal changes in internal entropy generation ($\frac{d\dot{S}_{\text{gen}}}{dt}$), evaluating whether regional subsystems are relaxing toward Prigogine’s minimum entropy production state or sliding toward bifurcation/collapse.
-- [ ] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`).
+- [ ] Uber H3 Spatial Index Layer (`src/spatial/h3_grid.ts`): Implement a binding module that initializes base resolution global cell indices, handles parent/child cell indexing lookups, and translates lat/lon coordinates into valid H3 cell addresses for monad spatial anchoring.
 - [ ] Explicit H3 K-Ring Adjacency Matrix Builder (`src/spatial/h3_topology.ts`): Implement a sparse adjacency matrix generator that computes $k$-ring neighborhoods (where $k \in \{1, 2\}$) for any active set of H3 indices, mapping them to matrix row/column coordinates for gradient calculations across hexagonal boundaries.
 - [ ] Vectorized H3 Tensor Flux Router (`src/spatial/h3_tensor_routing.ts`): Build a tensor routing engine that executes sparse matrix multiplications ($\mathbf{J}_{\text{spatial}} = \mathbf{D} \cdot \nabla \mathbf{C}$) to simulate advection, diffusion, and runoff between adjacent hexagonal cells based on elevation and pressure gradients.
 - [ ] Adaptive H3 Mesh Refinement Heuristics (`src/spatial/h3_adaptive_mesh.ts`): Splitting and merging triggers where high thermodynamic gradients or ecological shocks automatically step up or step down H3 resolution levels.
+- [ ] `GeoBiomePOD` coordinates and spatial anchors (`src/spatial/geo_biome_pod.ts`).
 - [ ] Projection mapping and Geo View layout toggle in UI (`src/spatial/projection_mapping.ts`, `src/spatial/projection_helpers.ts`).
 - [ ] Integration of Uber H3 spatial index for hexagonal global partitioning (`src/h3_spatial.ts`).
 - [ ] Live Canvas 2D orbital/trophic renderer with interactive inspector. (`src/visualization/base_renderer.ts`, `src/visualization/orbital_renderer.ts`, `src/visualization/trophic_renderer.ts`, `src/visualization/inspector.ts`, `src/visualization/visualization_monad.ts`)

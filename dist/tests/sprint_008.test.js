@@ -2,17 +2,31 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { ThermodynamicMonad } from '../src/thermodynamics/types.js';
 describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
+    const boundaryFlux = {
+        solarIn: 1000,
+        infraRedOut: 950,
+        infraredOut: 950,
+        sensibleLatentFlux: 50
+    };
     const initialVector = {
         timestamp: 1000,
-        T_0: 288.15,
+        ambientTemperature: 288.15,
+        systemTemperature: 288.15,
         internalEnergy: 1e9,
+        totalEntropy: 5e6,
+        T_0: 288.15,
         entropy: 5e6,
+        solarInputWatts: 1000,
+        planetaryEmissionWatts: 950,
         entropyGenerationRate: 150.0,
         exergyDestructionRate: 288.15 * 150.0,
-        boundaryHeatFlux: {
-            solarIn: 1000,
-            infraredOut: -950,
-            sensibleLatentFlux: 50
+        boundaryHeatFlux: boundaryFlux,
+        boundaryFluxes: {
+            solarRadiationIn: 1000,
+            thermalRadiationOut: 950,
+            sensibleHeatFlux: 25,
+            latentHeatFlux: 25,
+            netMassEnthalpyFlux: 0
         },
         massInventory: {
             carbon: 850,
@@ -30,13 +44,14 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
         const monad = ThermodynamicMonad.unit(100, initialVector);
         const nextMonad = monad.bind((val, vec) => {
             const newSGen = 200.0;
+            const t0 = vec.T_0 ?? 288.15;
             return {
                 value: val + 10,
                 vector: {
                     ...vec,
                     timestamp: vec.timestamp + 1,
                     entropyGenerationRate: newSGen,
-                    exergyDestructionRate: vec.T_0 * newSGen
+                    exergyDestructionRate: t0 * newSGen
                 }
             };
         });
@@ -49,12 +64,13 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
         assert.throws(() => {
             monad.bind((val, vec) => {
                 const invalidSGen = -10.0;
+                const t0 = vec.T_0 ?? 288.15;
                 return {
                     value: val,
                     vector: {
                         ...vec,
                         entropyGenerationRate: invalidSGen,
-                        exergyDestructionRate: vec.T_0 * invalidSGen
+                        exergyDestructionRate: t0 * invalidSGen
                     }
                 };
             });
@@ -74,6 +90,6 @@ describe('Sprint 008: Thermodynamic State Vector & Monad Validation', () => {
                     }
                 };
             });
-        }, /Exergy Inconsistency/);
+        }, /Exergy Destruction mismatch/);
     });
 });

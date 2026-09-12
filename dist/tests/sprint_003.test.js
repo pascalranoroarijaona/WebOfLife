@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { validateThermodynamicInvariants, ThermodynamicMonad } from '../src/thermodynamics/types.js';
 import { bootstrapMegaPod } from '../src/earth_pod.js';
 describe('Sprint 003: Thermodynamic State Vector & Invariants', () => {
+    const defaultHeatFlux = { solarIn: 100, infraRedOut: 10 };
     it('should validate valid thermodynamic state vectors correctly', () => {
         const state = {
             timestamp: 1000,
@@ -14,7 +15,7 @@ describe('Sprint 003: Thermodynamic State Vector & Invariants', () => {
             ambientTemperature: 288.15,
             entropy: 1676.67,
             exergy: 100000,
-            boundaryHeatFlux: {},
+            boundaryHeatFlux: defaultHeatFlux,
             boundaryFluxes: [],
             massInventory: { carbon: 450 },
             stocks: {
@@ -65,7 +66,7 @@ describe('Sprint 003: Thermodynamic State Vector & Invariants', () => {
             ambientTemperature: 288.15,
             entropy: 1676.67,
             exergy: 100000,
-            boundaryHeatFlux: {},
+            boundaryHeatFlux: defaultHeatFlux,
             boundaryFluxes: [],
             massInventory: { carbon: 450 },
             stocks: {
@@ -118,7 +119,7 @@ describe('Sprint 003: Thermodynamic State Vector & Invariants', () => {
             ambientTemperature: 288.15,
             entropy: 1676.67,
             exergy: 100000,
-            boundaryHeatFlux: {},
+            boundaryHeatFlux: defaultHeatFlux,
             boundaryFluxes: [],
             massInventory: { carbon: 450 },
             stocks: {
@@ -171,7 +172,7 @@ describe('Sprint 003: Thermodynamic State Vector & Invariants', () => {
             ambientTemperature: 288.15,
             entropy: 33.33,
             exergy: 1000,
-            boundaryHeatFlux: {},
+            boundaryHeatFlux: defaultHeatFlux,
             boundaryFluxes: [],
             massInventory: { carbon: 225 },
             stocks: {

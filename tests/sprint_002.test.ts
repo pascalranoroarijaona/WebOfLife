@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { EarthPOD, bootstrapMegaPod } from '../src/earth_pod.js';
-import { ThermodynamicMonad, ThermodynamicStateVector } from '../src/thermodynamics/types.js';
+import { ThermodynamicMonad, ThermodynamicStateVector, BoundaryHeatFlux } from '../src/thermodynamics/types.js';
 
 describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
   it('should initialize EarthPOD and retrieve valid thermodynamic state vector', () => {
@@ -13,6 +13,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
   });
 
   it('should execute ThermodynamicMonad transform and enforce Second Law (S_dot_gen >= 0)', () => {
+    const heatFlux: BoundaryHeatFlux = { solarIn: 50, infraRedOut: 5 };
     const initialState: ThermodynamicStateVector = {
       timestamp: 0,
       T_0: 288.15,
@@ -23,7 +24,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
       ambientTemperature: 288.15,
       entropy: 33.33,
       exergy: 1000,
-      boundaryHeatFlux: {},
+      boundaryHeatFlux: heatFlux,
       boundaryFluxes: [],
       massInventory: { carbon: 225 },
       stocks: {
@@ -69,6 +70,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
   });
 
   it('should throw an error on Second Law violation in ThermodynamicMonad', () => {
+    const heatFlux: BoundaryHeatFlux = { solarIn: 50, infraRedOut: 5 };
     const initialState: ThermodynamicStateVector = {
       timestamp: 0,
       T_0: 288.15,
@@ -79,7 +81,7 @@ describe('Sprint 002: Thermodynamic State Vector & Monad Validation', () => {
       ambientTemperature: 288.15,
       entropy: 33.33,
       exergy: 1000,
-      boundaryHeatFlux: {},
+      boundaryHeatFlux: heatFlux,
       boundaryFluxes: [],
       massInventory: { carbon: 225 },
       stocks: {
