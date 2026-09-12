@@ -1,66 +1,47 @@
--- ============================================================================
--- Web of Life: Thermodynamic State Vector & Conservation Ledger Schema
--- Sprint 051: Thermodynamic State Vector Stock Conservation Asserter
--- ============================================================================
+-- Web of Life Database, UML & Thermodynamic Blockchain Schema
+-- Sprint 052: Thermodynamic State Vector Stock Conservation Asserter
 
-CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
-    stock_id VARCHAR(64) PRIMARY KEY,
-    stock_name VARCHAR(128) NOT NULL UNIQUE,
-    category VARCHAR(64) NOT NULL, -- e.g., 'ELEMENTAL', 'ENERGETIC', 'ENTROPIC'
-    base_unit VARCHAR(32) NOT NULL,
-    default_tolerance NUMERIC(20, 10) DEFAULT 1e-6,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS thermodynamic_states (
+    state_id VARCHAR(64) PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    vector_data JSONB NOT NULL,
+    entropy_total DOUBLE PRECISION NOT NULL,
+    enthalpy_total DOUBLE PRECISION NOT NULL,
+    is_valid BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE IF NOT EXISTS state_vectors (
-    vector_id VARCHAR(64) PRIMARY KEY,
-    pod_id VARCHAR(64) NOT NULL,
-    timestamp BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS boundary_fluxes (
+    flux_id VARCHAR(64) PRIMARY KEY,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    element_name VARCHAR(64) NOT NULL,
+    flux_rate DOUBLE PRECISION NOT NULL,
+    delta_time DOUBLE PRECISION NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS state_vector_components (
-    vector_id VARCHAR(64) REFERENCES state_vectors(vector_id) ON DELETE CASCADE,
-    stock_id VARCHAR(64) REFERENCES thermodynamic_stocks(stock_id),
-    stock_value NUMERIC(30, 12) NOT NULL,
-    PRIMARY KEY (vector_id, stock_id)
-);
-
-CREATE TABLE IF NOT EXISTS flux_boundaries (
-    boundary_id VARCHAR(64) PRIMARY KEY,
-    pod_id VARCHAR(64) NOT NULL,
-    solar_input NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
-    dissipation_rate NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
-    recorded_at BIGINT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS boundary_net_fluxes (
-    boundary_id VARCHAR(64) REFERENCES flux_boundaries(boundary_id) ON DELETE CASCADE,
-    stock_id VARCHAR(64) REFERENCES thermodynamic_stocks(stock_id),
-    flux_rate NUMERIC(30, 12) NOT NULL,
-    PRIMARY KEY (boundary_id, stock_id)
-);
-
-CREATE TABLE IF NOT EXISTS conservation_validation_runs (
-    validation_id VARCHAR(64) PRIMARY KEY,
-    previous_vector_id VARCHAR(64) REFERENCES state_vectors(vector_id),
-    current_vector_id VARCHAR(64) REFERENCES state_vectors(vector_id),
-    boundary_id VARCHAR(64) REFERENCES flux_boundaries(boundary_id),
-    delta_time NUMERIC(16, 6) NOT NULL,
+CREATE TABLE IF NOT EXISTS conservation_reports (
+    report_id VARCHAR(64) PRIMARY KEY,
+    pre_state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    post_state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    element VARCHAR(64) NOT NULL,
+    expected_delta DOUBLE PRECISION NOT NULL,
+    actual_delta DOUBLE PRECISION NOT NULL,
+    discrepancy DOUBLE PRECISION NOT NULL,
+    tolerance DOUBLE PRECISION NOT NULL,
     is_valid BOOLEAN NOT NULL,
-    validated_at BIGINT NOT NULL,
-    block_signature VARCHAR(128)
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS conservation_violations (
-    violation_id VARCHAR(64) PRIMARY KEY,
-    validation_id VARCHAR(64) REFERENCES conservation_validation_runs(validation_id) ON DELETE CASCADE,
-    stock_id VARCHAR(64) REFERENCES thermodynamic_stocks(stock_id),
-    observed_delta NUMERIC(30, 12) NOT NULL,
-    predicted_delta NUMERIC(30, 12) NOT NULL,
-    discrepancy NUMERIC(30, 12) NOT NULL,
-    tolerance NUMERIC(20, 10) NOT NULL
+CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_ledger (
+    block_index SERIAL PRIMARY KEY,
+    block_hash VARCHAR(64) UNIQUE NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    state_id VARCHAR(64) REFERENCES thermodynamic_states(state_id),
+    report_id VARCHAR(64) REFERENCES conservation_reports(report_id),
+    transaction_signature VARCHAR(128) NOT NULL,
+    proof_of_work BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_state_vectors_pod_timestamp ON state_vectors(pod_id, timestamp);
-CREATE INDEX idx_validation_runs_validity ON conservation_validation_runs(is_valid);
+CREATE INDEX IF NOT EXISTS idx_conservation_reports_valid ON conservation_reports(is_valid);
+CREATE INDEX IF NOT EXISTS idx_boundary_fluxes_element ON boundary_fluxes(element_name);

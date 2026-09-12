@@ -1,0 +1,48 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class StateVector {
+  +stateId: string
+  +timestamp: number
+  +stocks: Map<string, number>
+  +entropy: number
+  +enthalpy: number
+  +clone(): StateVector
+}
+
+class ConservationReport {
+  +isValid: boolean
+  +element: string
+  +expectedDelta: number
+  +actualDelta: number
+  +discrepancy: number
+  +tolerance: number
+}
+
+class StateValidator {
+  -tolerance: number
+  +constructor(tolerance: number)
+  +validateStockConservation(preState: StateVector, postState: StateVector, boundaryFluxes: Map<string, number>, deltaTime: number): ConservationReport[]
+}
+
+class ThermodynamicMonadProcess {
+  -validator: StateValidator
+  +execute(preState: StateVector, boundaryFluxes: Map<string, number>, deltaTime: number, transitionFn: (s: StateVector) => StateVector): StateVector
+}
+
+class ThermodynamicBlockchainLedger {
+  +blockIndex: number
+  +blockHash: string
+  +previousHash: string
+  +stateId: string
+  +transactionSignature: string
+  +recordTransaction(report: ConservationReport, signature: string): void
+}
+
+StateValidator --> ConservationReport : generates >
+ThermodynamicMonadProcess --> StateValidator : uses >
+ThermodynamicMonadProcess --> StateVector : transforms >
+ThermodynamicBlockchainLedger --> ConservationReport : logs >
+
+@enduml

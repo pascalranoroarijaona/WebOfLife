@@ -14,13 +14,13 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
         });
         const result = withEntropyCheck(initialState, (s) => new ThermodynamicStateVector({
             ...s,
-            internalEnergy: s.internalEnergy - 100,
-            entropy: s.entropy + 2.0, // System entropy increases
+            internalEnergy: (s.internalEnergy ?? 1000) - 100,
+            entropy: (s.entropy ?? 100) + 2.0, // System entropy increases
             dissipatedHeat: 100
         }));
         assert.strictEqual(result.success, true);
         assert.strictEqual(result.entropyChange, 2.0);
-        assert.ok(result.universeEntropyChange >= 0);
+        assert.ok((result.universeEntropyChange ?? 0) >= 0);
     });
     it('should approve solar-driven biosynthesis (local entropy reduction balanced by solar flux)', () => {
         const initialState = new ThermodynamicStateVector({
@@ -33,14 +33,14 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
         });
         const result = withEntropyCheck(initialState, (s) => new ThermodynamicStateVector({
             ...s,
-            internalEnergy: s.internalEnergy + 1000,
-            entropy: s.entropy - 1.0, // Local ordering / entropy reduction
+            internalEnergy: (s.internalEnergy ?? 5000) + 1000,
+            entropy: (s.entropy ?? 500) - 1.0, // Local ordering / entropy reduction
             solarInput: 2000,
             dissipatedHeat: 500
         }));
         assert.strictEqual(result.success, true);
         assert.strictEqual(result.entropyChange, -1.0);
-        assert.ok(result.universeEntropyChange >= 0);
+        assert.ok((result.universeEntropyChange ?? 0) >= 0);
     });
     it('should reject perpetual motion / negative entropy generation without work or heat compensation', () => {
         const initialState = new ThermodynamicStateVector({
@@ -53,7 +53,7 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
         });
         const result = withEntropyCheck(initialState, (s) => new ThermodynamicStateVector({
             ...s,
-            entropy: s.entropy - 5.0 // Impossible spontaneous reduction in entropy with zero compensation
+            entropy: (s.entropy ?? 100) - 5.0 // Impossible spontaneous reduction in entropy with zero compensation
         }));
         assert.strictEqual(result.success, false);
         assert.ok(result.error !== undefined);
@@ -71,7 +71,7 @@ describe('Sprint 049: Thermodynamic State Vector Non-Negative Entropy Monad Pipe
         const monad = new EntropyMonad(initialState);
         const finalMonad = monad.bind((s) => new ThermodynamicStateVector({
             ...s,
-            entropy: s.entropy + 1.0,
+            entropy: (s.entropy ?? 200) + 1.0,
             dissipatedHeat: (s.dissipatedHeat ?? 0) + 100
         }));
         assert.strictEqual(finalMonad.getState().entropy, 201);

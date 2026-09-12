@@ -194,7 +194,9 @@ export interface IThermodynamicStateVector {
 }
 
 export type ThermodynamicStateVector = IThermodynamicStateVector;
+export type StateVector = IThermodynamicStateVector;
 export type ThermodynamicState = IThermodynamicStateVector;
+export type ThermodynamicStateLike = IThermodynamicStateVector;
 
 export interface ValidationFailure {
   property: string;
