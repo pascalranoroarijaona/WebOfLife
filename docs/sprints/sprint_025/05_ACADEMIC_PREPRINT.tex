@@ -1,0 +1,69 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{Thermodynamic State Vector Interface Contracts and Non-Equilibrium Entropy Generation in Biosphere Simulations}
+\author{Chief Systems Architect \& Process Mining Research Group \\ \texttt{https://github.com/pascalranoroarijaona/WebOfLife}}
+\date{Sprint 25 Technical Report}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Simulating macroscopic biophysical systems such as the Earth's biosphere requires rigorous adherence to the laws of thermodynamics, particularly when modeling non-equilibrium steady states driven by external solar radiation. In this paper, we formalize the TypeScript interface contracts and executable monad methods introduced in Sprint 25 of the \textit{Web of Life} simulation framework. By embedding strict typing for internal entropy generation ($\dot{S}_{\text{gen}}$), exergy destruction ($\dot{I} = T_0 \dot{S}_{\text{gen}}$), and boundary flux arrays, our framework guarantees both mass conservation (First Law) and thermodynamic admissibility (Second Law) across all biogeochemical cycles.
+\end{abstract}
+
+\section{Introduction \& Theoretical Foundations}
+The \textit{Web of Life} simulation framework models planetary biogeochemical cycles under non-equilibrium thermodynamic constraints. To prevent unphysical energy sinks or entropy reduction without external work, Sprint 25 establishes explicit interface contracts and execution wrappers.
+
+\subsection{First Law of Thermodynamics}
+The system energy evolution follows the open-system energy balance:
+\begin{equation}
+\frac{dE_{\text{system}}}{dt} = \sum \dot{Q}_k - \dot{W}_{\text{system}} + \sum_{i} \dot{m}_i \left( h_i + \frac{v_i^2}{2} + g z_i \right)
+\end{equation}
+
+\subsection{Second Law of Thermodynamics \& Entropy Generation}
+Local entropy evolution is governed by heat exchanges across boundaries and internal irreversible dissipations:
+\begin{equation}
+\frac{dS_{\text{system}}}{dt} = \sum_{k} \frac{\dot{Q}_k}{T_k} + \dot{S}_{\text{gen}} \quad \text{where} \quad \dot{S}_{\text{gen}} \ge 0
+\end{equation}
+
+\subsection{Exergy Destruction Rate ($\dot{I}$)}
+Applying the Gouy-Stodola theorem with an ambient reference temperature $T_0 = 298.15\text{ K}$:
+\begin{equation}
+\dot{I} = T_0 \cdot \dot{S}_{\text{gen}}
+\end{equation}
+
+\section{Core Interface Contracts}
+The TypeScript architecture enforces strict type safety across all thermodynamic state snapshots in \texttt{src/thermodynamics/types.ts}:
+
+\begin{verbatim}
+export interface ThermodynamicVector {
+  readonly temperature: number; // Kelvin (K)
+  readonly pressure: number;    // Pascal (Pa)
+  readonly volume: number;      // Cubic meters (m^3)
+  readonly internalEnergy: number; // Joules (J)
+  readonly enthalpy: number;    // Joules (J)
+  readonly entropy: number;     // Joules per Kelvin (J/K)
+  readonly exergy: number;      // Joules (J)
+}
+
+export interface EntropyGenerationMetrics {
+  readonly thermalDissipation: number; // W/K
+  readonly chemicalReactionEntropy: number; // W/K
+  readonly diffusiveTransportEntropy: number; // W/K
+  readonly totalEntropyGenerationRate: number; // W/K, must be >= 0
+}
+\end{verbatim}
+
+\section{Executable Monad Methods}
+State transitions are wrapped in the \texttt{ThermodynamicMonad} class (\texttt{src/thermodynamics/methods.ts}), which automatically intercepts violations of the Second Law and throws a \texttt{ThermodynamicViolationError} if $\dot{S}_{\text{gen}} < 0$.
+
+\section{Conclusion}
+Sprint 25 bridges theoretical non-equilibrium thermodynamics and software engineering by embedding physical laws directly into the type system and execution monads of the \textit{Web of Life} simulator.
+
+\end{document}

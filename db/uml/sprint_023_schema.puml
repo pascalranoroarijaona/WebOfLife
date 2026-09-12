@@ -1,0 +1,127 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #2C3E50
+
+title Web of Life - Sprint 023: Thermodynamic State Vector & Exergy Architecture
+
+package "TypeScript Thermodynamics (src/thermodynamics)" {
+    
+    enum FluxType {
+        SOLAR_SHORTWAVE
+        TERRESTRIAL_LONGWAVE
+        SENSIBLE_HEAT
+        LATENT_HEAT
+        MASS_FLUX
+    }
+
+    interface IBoundaryFlux {
+        +id: string
+        +type: FluxType
+        +magnitude: number
+        +temperature: number
+        +specificEnthalpy?: number
+        +specificEntropy?: number
+    }
+
+    interface IBoundaryFluxStructure {
+        +fluxes: ReadonlyArray<IBoundaryFlux>
+        +netHeatRate: number
+        +netWorkRate: number
+        +netMassBalance: number
+    }
+
+    interface IExergyDestructionMetrics {
+        +ambientTemperature: number
+        +entropyGenerationRate: number
+        +exergyDestructionRate: number
+        +inputExergyRate: number
+        +exergeticEfficiency: number
+    }
+
+    interface IThermodynamicStateVector {
+        +timestamp: number
+        +internalEnergy: number
+        +totalEntropy: number
+        +boundaryFluxes: IBoundaryFluxStructure
+        +exergyMetrics: IExergyDestructionMetrics
+    }
+
+    interface IThermodynamicValidator {
+        +validateFirstLaw(state: IThermodynamicStateVector, dt: number): boolean
+        +validateSecondLaw(state: IThermodynamicStateVector): boolean
+    }
+}
+
+package "Database & Blockchain Schema (db/schema.sql)" {
+    
+    class ThermodynamicControlVolume {
+        +id: UUID
+        +name: string
+        +description: string
+        +createdAt: TIMESTAMP
+    }
+
+    class ThermodynamicStateVectorRecord {
+        +id: UUID
+        +controlVolumeId: UUID
+        +timestamp: BIGINT
+        +internalEnergy: NUMERIC
+        +totalEntropy: NUMERIC
+        +ambientTemperature: NUMERIC
+        +entropyGenerationRate: NUMERIC
+        +exergyDestructionRate: NUMERIC
+        +inputExergyRate: NUMERIC
+        +exergeticEfficiency: NUMERIC
+    }
+
+    class BoundaryFluxStructureRecord {
+        +id: UUID
+        +stateVectorId: UUID
+        +netHeatRate: NUMERIC
+        +netWorkRate: NUMERIC
+        +netMassBalance: NUMERIC
+    }
+
+    class BoundaryFluxItemRecord {
+        +id: UUID
+        +fluxStructureId: UUID
+        +fluxType: FluxType
+        +magnitude: NUMERIC
+        +temperature: NUMERIC
+        +specificEnthalpy: NUMERIC
+        +specificEntropy: NUMERIC
+    }
+
+    class ThermodynamicBlockRecord {
+        +blockIndex: BIGINT
+        +blockHash: string
+        +previousBlockHash: string
+        +merkleRoot: string
+        +timestamp: BIGINT
+        +validatorSignature: string
+    }
+
+    class ThermodynamicBlockTransaction {
+        +transactionId: UUID
+        +blockIndex: BIGINT
+        +stateVectorId: UUID
+        +firstLawSatisfied: boolean
+        +secondLawSatisfied: boolean
+        +transactionPayload: JSONB
+    }
+}
+
+-- Relationships
+IThermodynamicStateVector *-- IBoundaryFluxStructure : composition
+IThermodynamicStateVector *-- IExergyDestructionMetrics : composition
+IBoundaryFluxStructure *-- IBoundaryFlux : contains array
+
+ThermodynamicControlVolume "1" -- "*" ThermodynamicStateVectorRecord : bounds
+ThermodynamicStateVectorRecord "1" -- "1" BoundaryFluxStructureRecord : has
+BoundaryFluxStructureRecord "1" -- "*" BoundaryFluxItemRecord : comprises
+ThermodynamicBlockRecord "1" -- "*" ThermodynamicBlockTransaction : records
+ThermodynamicStateVectorRecord "1" -- "0..1" ThermodynamicBlockTransaction : audited in
+
+@enduml

@@ -1,0 +1,124 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F9F9F9
+skinparam classBorderColor #333333
+
+title Web of Life - Sprint 022: Thermodynamic State Vector & Ledger Architecture
+
+package "TypeScript Interfaces (src/thermodynamics/types.ts)" {
+  interface IThermodynamicReferenceState {
+    +readonly T_0: number
+    +readonly P_0: number
+    +readonly chemical_potentials: Record<string, number>
+  }
+
+  interface IBoundaryFluxVector {
+    +readonly heat_flux_Q_dot: number
+    +readonly boundary_temperature_T_b: number
+    +readonly mass_fluxes: Record<string, number>
+    +readonly entropy_flux_S_dot: number
+  }
+
+  interface IThermodynamicStateVector {
+    +readonly timestamp: number
+    +readonly internal_energy_U: number
+    +readonly entropy_S: number
+    +readonly temperature_T: number
+    +readonly pressure_P: number
+    +readonly volume_V: number
+    +readonly stock_masses: Record<string, number>
+  }
+
+  interface IEntropyGenerationMetrics {
+    +readonly internal_entropy_generation_rate: number
+    +readonly reference_temperature_T0: number
+    +readonly exergy_destruction_rate: number
+    +readonly satisfies_second_law: boolean
+  }
+
+  interface IThermodynamicMonadTransition {
+    +readonly prior_state: IThermodynamicStateVector
+    +readonly posterior_state: IThermodynamicStateVector
+    +readonly boundary_flux: IBoundaryFluxVector
+    +readonly metrics: IEntropyGenerationMetrics
+  }
+
+  interface IThermodynamicProcessContract {
+    +executeTransition(currentState: IThermodynamicStateVector, dt: number): IThermodynamicMonadTransition
+    +validateFirstLaw(transition: IThermodynamicMonadTransition): boolean
+    +validateSecondLaw(transition: IThermodynamicMonadTransition): boolean
+  }
+}
+
+package "Relational Database & Ledger Schema (db/schema.sql)" {
+  class thermodynamic_reference_states {
+    +UUID id <<PK>>
+    +VARCHAR pod_id
+    +DOUBLE PRECISION T_0
+    +DOUBLE PRECISION P_0
+    +JSONB chemical_potentials
+    +TIMESTAMP created_at
+  }
+
+  class thermodynamic_state_vectors {
+    +UUID id <<PK>>
+    +VARCHAR pod_id
+    +BIGINT timestamp
+    +DOUBLE PRECISION internal_energy_U
+    +DOUBLE PRECISION entropy_S
+    +DOUBLE PRECISION temperature_T
+    +DOUBLE PRECISION pressure_P
+    +DOUBLE PRECISION volume_V
+    +JSONB stock_masses
+  }
+
+  class boundary_flux_vectors {
+    +UUID id <<PK>>
+    +UUID state_vector_id <<FK>>
+    +DOUBLE PRECISION heat_flux_Q_dot
+    +DOUBLE PRECISION boundary_temperature_T_b
+    +JSONB mass_fluxes
+    +DOUBLE PRECISION entropy_flux_S_dot
+  }
+
+  class entropy_generation_metrics {
+    +UUID id <<PK>>
+    +UUID state_vector_id <<FK>>
+    +DOUBLE PRECISION internal_entropy_generation_rate
+    +DOUBLE PRECISION reference_temperature_T0
+    +DOUBLE PRECISION exergy_destruction_rate
+    +BOOLEAN satisfies_second_law
+  }
+
+  class thermodynamic_monad_transitions {
+    +UUID id <<PK>>
+    +BIGINT block_index
+    +VARCHAR transaction_hash
+    +VARCHAR previous_hash
+    +UUID prior_state_id <<FK>>
+    +UUID posterior_state_id <<FK>>
+    +UUID boundary_flux_id <<FK>>
+    +UUID metrics_id <<FK>>
+    +BOOLEAN first_law_verified
+    +BOOLEAN second_law_verified
+    +VARCHAR signature
+    +TIMESTAMP committed_at
+  }
+}
+
+-- Relationships
+thermodynamic_state_vectors "1" --o "0..*" boundary_flux_vectors : records fluxes
+thermodynamic_state_vectors "1" --o "0..*" entropy_generation_metrics : evaluates 2nd law
+thermodynamic_monad_transitions "1" --> "1" thermodynamic_state_vectors : prior_state
+thermodynamic_monad_transitions "1" --> "1" thermodynamic_state_vectors : posterior_state
+thermodynamic_monad_transitions "1" --> "1" boundary_flux_vectors : boundary_flux
+thermodynamic_monad_transitions "1" --> "1" entropy_generation_metrics : metrics
+
+IThermodynamicMonadTransition ..> IThermodynamicStateVector : uses
+IThermodynamicMonadTransition ..> IBoundaryFluxVector : uses
+IThermodynamicMonadTransition ..> IEntropyGenerationMetrics : uses
+IThermodynamicProcessContract ..> IThermodynamicMonadTransition : produces
+
+@enduml

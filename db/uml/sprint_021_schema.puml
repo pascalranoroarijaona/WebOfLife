@@ -1,0 +1,58 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+title Web of Life - Sprint 021: Thermodynamic State Vector Architecture
+
+package "src.thermodynamics" {
+    
+    enum FluxType {
+        SOLAR_IRRADIANCE
+        LONGWAVE_RADIATION
+        SENSIBLE_HEAT
+        LATENT_HEAT
+        CHEMICAL_ENDBEAU
+        METABOLIC_DISSIPATION
+    }
+
+    interface IBoundaryFlux {
+        + readonly id: string
+        + readonly type: FluxType
+        + readonly magnitudeWatts: number
+        + readonly boundaryTemperatureKelvin: number
+        + readonly timestamp: number
+    }
+
+    interface IThermodynamicStateVector {
+        + readonly internalEnergyJoules: number
+        + readonly absoluteEntropyJoulesPerKelvin: number
+        + readonly entropyGenerationRate: number
+        + readonly exergyDestructionRate: number
+        + readonly referenceTemperatureKelvin: number
+        + readonly boundaryFluxes: readonly IBoundaryFlux[]
+    }
+
+    interface IThermodynamicLawValidator {
+        + validateFirstLaw(stateBefore: IThermodynamicStateVector, stateAfter: IThermodynamicStateVector, deltaSeconds: number, tolerance?: number): boolean
+        + validateSecondLaw(state: IThermodynamicStateVector): boolean
+    }
+
+    interface "IThermodynamicMonadPayload<T>" as IThermodynamicMonadPayload {
+        + readonly stock: T
+        + readonly thermodynamicState: IThermodynamicStateVector
+        + readonly metadata: Object
+    }
+
+    class "ThermodynamicMonad<T>" as ThermodynamicMonad {
+        - payload: IThermodynamicMonadPayload<T>
+        + {static} unit<T>(stock: T, initialState: IThermodynamicStateVector, processId: string): ThermodynamicMonad<T>
+        + bind<U>(transitionFn: Function): ThermodynamicMonad<U>
+        + extract(): IThermodynamicMonadPayload<T>
+    }
+}
+
+IThermodynamicStateVector o-- "0..*" IBoundaryFlux : contains >
+IBoundaryFlux --> FluxType : uses type >
+ThermodynamicMonad --> IThermodynamicMonadPayload : wraps >
+IThermodynamicMonadPayload --> IThermodynamicStateVector : tracks >
+
+@enduml

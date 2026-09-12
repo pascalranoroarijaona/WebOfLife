@@ -1,0 +1,129 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 25: Thermodynamic State Vector & Ledger Architecture
+
+package "src.thermodynamics" {
+  interface ThermodynamicVector {
+    +readonly temperature: number
+    +readonly pressure: number
+    +readonly volume: number
+    +readonly internalEnergy: number
+    +readonly enthalpy: number
+    +readonly entropy: number
+    +readonly exergy: number
+  }
+
+  interface BoundaryFluxItem {
+    +readonly speciesId: string
+    +readonly molarRate: number
+    +readonly massRate: number
+    +readonly enthalpyFlux: number
+    +readonly entropyFlux: number
+    +readonly exergyFlux: number
+  }
+
+  interface BoundaryFluxArray {
+    +readonly incomingSolarRadiation: BoundaryFluxItem
+    +readonly outgoingThermalRadiation: BoundaryFluxItem
+    +readonly matterFluxes: ReadonlyArray<BoundaryFluxItem>
+    +readonly netHeatFlux: number
+    +readonly netWorkFlux: number
+  }
+
+  interface EntropyGenerationMetrics {
+    +readonly thermalDissipation: number
+    +readonly chemicalReactionEntropy: number
+    +readonly diffusiveTransportEntropy: number
+    +readonly totalEntropyGenerationRate: number
+  }
+
+  interface ExergyDestructionMetrics {
+    +readonly ambientTemperatureReference: number
+    +readonly exergyDestructionRate: number
+    +readonly secondLawEfficiency: number
+  }
+
+  interface ThermodynamicStateSnapshot {
+    +readonly timestamp: number
+    +readonly stateVector: ThermodynamicVector
+    +readonly boundaryFluxes: BoundaryFluxArray
+    +readonly entropyMetrics: EntropyGenerationMetrics
+    +readonly exergyMetrics: ExergyDestructionMetrics
+  }
+
+  interface IThermodynamicMonad<T> {
+    +getState(): T
+    +chain<U>(transition: (state: T) => U): IThermodynamicMonad<U>
+    +validateSecondLaw(): boolean
+  }
+}
+
+package "Database Schema" {
+  class thermodynamic_snapshots {
+    +snapshot_id: UUID <<PK>>
+    +timestamp: BIGINT
+    +temperature: NUMERIC
+    +pressure: NUMERIC
+    +volume: NUMERIC
+    +internal_energy: NUMERIC
+    +enthalpy: NUMERIC
+    +entropy: NUMERIC
+    +exergy: NUMERIC
+  }
+
+  class boundary_flux_records {
+    +flux_record_id: UUID <<PK>>
+    +snapshot_id: UUID <<FK>>
+    +flux_type: VARCHAR
+    +species_id: VARCHAR
+    +molar_rate: NUMERIC
+    +mass_rate: NUMERIC
+    +enthalpy_flux: NUMERIC
+    +entropy_flux: NUMERIC
+    +exergy_flux: NUMERIC
+  }
+
+  class entropy_generation_metrics {
+    +metric_id: UUID <<PK>>
+    +snapshot_id: UUID <<FK>>
+    +thermal_dissipation: NUMERIC
+    +chemical_reaction_entropy: NUMERIC
+    +diffusive_transport_entropy: NUMERIC
+    +total_entropy_generation_rate: NUMERIC {>= 0}
+  }
+
+  class exergy_destruction_metrics {
+    +exergy_metric_id: UUID <<PK>>
+    +snapshot_id: UUID <<FK>>
+    +ambient_temperature_reference: NUMERIC
+    +exergy_destruction_rate: NUMERIC
+    +second_law_efficiency: NUMERIC {[0, 1]}
+  }
+
+  class thermodynamic_ledger_blocks {
+    +block_id: UUID <<PK>>
+    +block_index: BIGINT
+    +previous_hash: VARCHAR
+    +merkle_root: VARCHAR
+    +snapshot_id: UUID <<FK>>
+    +second_law_proof_valid: BOOLEAN
+    +signature: VARCHAR
+    +timestamp: BIGINT
+  }
+}
+
+ThermodynamicStateSnapshot --> ThermodynamicVector : stateVector
+ThermodynamicStateSnapshot --> BoundaryFluxArray : boundaryFluxes
+ThermodynamicStateSnapshot --> EntropyGenerationMetrics : entropyMetrics
+ThermodynamicStateSnapshot --> ExergyDestructionMetrics : exergyMetrics
+BoundaryFluxArray --> BoundaryFluxItem : incoming / outgoing / matter
+
+thermodynamic_snapshots ||--o{ boundary_flux_records : has
+thermodynamic_snapshots ||--o{ entropy_generation_metrics : has
+thermodynamic_snapshots ||--o{ exergy_destruction_metrics : has
+thermodynamic_snapshots ||--o{ thermodynamic_ledger_blocks : references
+
+@enduml

@@ -534,6 +534,22 @@ def cleanup_outreach_artifacts() -> None:
                 deleted_count += 1
     print(f"🧹 Cleanup complete: Purged {deleted_count} outreach artifact files across {len(sprint_dirs)} sprint folders.")
 
+def commit_and_push_sprint(sprint_num: int) -> None:
+    """Commits and pushes the successfully completed sprint artifacts to the git repository."""
+    print(f"   📦 Committing and pushing Sprint {sprint_num:03d} to origin/main...")
+    try:
+        subprocess.run("git add .", shell=True, capture_output=True, text=True, cwd=REPO_ROOT)
+        commit_msg = f"Adding Materials for Sprint {sprint_num:03d}"
+        subprocess.run(f'git commit -am "{commit_msg}"', shell=True, capture_output=True, text=True, cwd=REPO_ROOT)
+        
+        push_res = subprocess.run("git push -u origin main", shell=True, capture_output=True, text=True, cwd=REPO_ROOT)
+        if push_res.returncode == 0 or "Everything up-to-date" in push_res.stderr:
+            print(f"   🚀 Successfully pushed Sprint {sprint_num:03d} to GitHub!")
+        else:
+            print(f"   ⚠️ Git push notice: {push_res.stderr.strip()}")
+    except Exception as e:
+        print(f"   ⚠️ Git operation failed: {e}")
+
 def hard_reset_repository() -> None:
     """Executes a hard git reset by creating an orphan branch, wiping commit history, and force-pushing to main."""
     print("🧊 [FRESET] Freezing repository and wiping git history...")
@@ -1744,6 +1760,10 @@ def execute_sprint_cycle() -> bool:
         generate_docs_dashboard()
         clear_backups()
         print(f"🎉 SPRINT {sprint_num:03d} SUCCESSFULLY RELEASED & AUDITED!")
+        
+        # Automatically commit and push successful sprint to remote repository
+        commit_and_push_sprint(sprint_num)
+        
         return True
 
     except Exception as e:
@@ -1818,7 +1838,7 @@ def generate_docs_dashboard():
         "body { background: #02050a; color: #c8f5f2; font-family: 'Courier New', monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }",
         "#sidebar { width: 340px; background: rgba(5, 14, 24, 0.95); border-right: 1px solid #315064; padding: 20px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.5); z-index: 10; }",
         "#sidebar h1 { color: #00ffe1; font-size: 1.2rem; border-bottom: 1px solid #315064; padding-bottom: 10px; margin-top: 0; }",
-        ".backlog-btn { display: block; width: 100%; text-align: center; background: #102331; border: 1px solid #ffaa00; color: #ffaa00; padding: 8px 10px; border-radius: 5px; text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 20px; cursor: pointer; transition: all 0.2s; }",
+        ".backlog-btn { display: block; width: 80%; text-align: center; background: #102331; border: 1px solid #ffaa00; color: #ffaa00; padding: 8px 10px; border-radius: 5px; text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 20px; cursor: pointer; transition: all 0.2s; }",
         ".backlog-btn:hover { background: #ffaa00; color: #02050a; }",
         ".sprint-group { margin-bottom: 15px; border: 1px solid #203846; border-radius: 6px; background: rgba(17, 35, 48, 0.5); overflow: hidden; }",
         ".sprint-group summary { color: #ffaa00; font-size: 0.95rem; font-weight: bold; padding: 10px 14px; cursor: pointer; background: rgba(16, 35, 49, 0.8); user-select: none; outline: none; }",
@@ -1845,7 +1865,8 @@ def generate_docs_dashboard():
         "</head><body>",
         "<div id='sidebar'>",
         "<h1>🌍 Web of Life Explorer</h1>",
-        "<a id='backlog-link' class='backlog-btn' onclick=\"loadMarkdown('BACKLOG.md', 'backlog-link')\">📋 View Master BACKLOG.md</a>"
+        "<a id='backlog-link' class='backlog-btn' onclick=\"loadMarkdown('BACKLOG.md', 'backlog-link')\">📋 View Master BACKLOG.md</a>",
+        "<br/><audio controls style='width:80%; margin: 6px 0; height:28px;'>Repo Audio Intro<source src='sprints/gaia_repository_intro.mp3' type='audio/mpeg'>Audio non supporté.</audio>"
     ]
     
     for i, s_dir in enumerate(sprint_dirs):

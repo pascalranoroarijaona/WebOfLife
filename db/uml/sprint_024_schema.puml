@@ -1,0 +1,66 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 024 Thermodynamic State Vector & Process Architecture
+
+interface IThermodynamicStateVector {
+    + temperature: number
+    + pressure: number
+    + specificEntropy: number
+    + specificEnthalpy: number
+    + specificExergy: number
+    + chemicalPotentials?: Record<string, number>
+}
+
+interface IHeatFlux {
+    + rate: number
+    + boundaryTemperature: number
+}
+
+interface IMassFlux {
+    + species: string
+    + massFlowRate: number
+    + specificEnthalpy: number
+    + specificEntropy: number
+}
+
+interface IRadiationFlux {
+    + power: number
+    + sourceTemperature: number
+    + bandType: 'solar_shortwave' | 'terrestrial_longwave'
+}
+
+interface IBoundaryFluxArray {
+    + heatFluxes: IHeatFlux[]
+    + massFluxes: IMassFlux[]
+    + radiationFluxes: IRadiationFlux[]
+    + netEntropyTransferRate: number
+}
+
+interface IThermodynamicProcessResult {
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+    + referenceTemperature: number
+    + boundaryFluxes: IBoundaryFluxArray
+    + resultingState: IThermodynamicStateVector
+    + updatedStockValues: Record<string, number>
+}
+
+class ThermodynamicMonadEngine {
+    - monadId: string
+    + evaluateProcessStep(state: IThermodynamicStateVector, fluxes: IBoundaryFluxArray): IThermodynamicProcessResult
+    + validateSecondLaw(result: IThermodynamicProcessResult): boolean
+}
+
+IThermodynamicProcessResult *-- IBoundaryFluxArray : aggregates
+IThermodynamicProcessResult *-- IThermodynamicStateVector : resultingState
+IBoundaryFluxArray o-- IHeatFlux : contains
+IBoundaryFluxArray o-- IMassFlux : contains
+IBoundaryFluxArray o-- IRadiationFlux : contains
+
+ThermodynamicMonadEngine ..> IThermodynamicProcessResult : produces
+ThermodynamicMonadEngine ..> IThermodynamicStateVector : consumes
+ThermodynamicMonadEngine ..> IBoundaryFluxArray : consumes
+
+@enduml
