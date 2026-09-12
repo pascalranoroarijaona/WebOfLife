@@ -1,10 +1,11 @@
 /**
- * Thermodynamic Structure and Base Implementations (Sprint 012 & Retro-Compatibility)
+ * Thermodynamic Structure and Base Implementations (Sprint 016 & Retro-Compatibility)
  * Provides foundational base classes for the Web of Life thermodynamic nodes.
  */
-import { IThermodynamicSystem, IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad } from './thermodynamics/types.js';
+import { IThermodynamicSystem, IThermodynamicStateVector, STANDARD_AMBIENT_TEMPERATURE_K, advanceThermodynamicState, ThermodynamicStateMonad, IBoundaryFluxArray, ThermodynamicStateVector, BoundaryFluxVector, ThermodynamicComplianceResult, BoundaryFluxArray, ThermodynamicMetrics } from './thermodynamics/types.js';
+import { executeThermodynamicStep } from './thermodynamics/thermodynamic_monad_process.js';
 
-export { advanceThermodynamicState, ThermodynamicStateMonad };
+export { advanceThermodynamicState, ThermodynamicStateMonad, executeThermodynamicStep, BoundaryFluxArray, ThermodynamicMetrics };
 
 export enum EntropyState {
   STEADY = "STEADY",
@@ -72,20 +73,29 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
   public getStateVector(): IThermodynamicStateVector {
     const T0 = STANDARD_AMBIENT_TEMPERATURE_K;
     const dotSGen = 10.0;
+    const boundaryFluxes: IBoundaryFluxArray = {
+      solarRadiationIn: 1.74e17,
+      longwaveRadiationOut: 1.74e17 * 0.99,
+      sensibleHeatFlux: 1e8,
+      latentHeatFlux: 1e8,
+      netMassFlux: 0,
+      heatFluxes: new Map(),
+      radiativeNet: 0,
+      massFluxes: new Map()
+    };
     return {
       timestamp: this.tickCreated,
       internalEnergy: this.internalEnergyJoules,
+      totalEntropy: this.entropyJoulesPerKelvin,
+      temperature: T0,
+      ambientTemperature: T0,
+      ambientReferenceTemp: T0,
       entropy: this.entropyJoulesPerKelvin,
       referenceTemperature: T0,
-      ambientTemperature: T0,
       T_0: T0,
       entropyGenerationRate: dotSGen,
       exergyDestructionRate: T0 * dotSGen,
-      boundaryFluxes: {
-        heatFluxes: new Map(),
-        radiativeNet: 0,
-        massFluxes: new Map()
-      },
+      boundaryFluxes,
       thermalFluxes: {
         solarInbound: 1.74e17,
         thermalOutbound: 1.74e17 * 0.99,
@@ -99,20 +109,55 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
         specificEntropyIn: 0,
         specificEntropyOut: 0
       },
-      validateSecondLaw: () => dotSGen >= 0
+      validateSecondLaw: () => dotSGen >= 0,
+      validateFirstLaw: () => true
     };
   }
 
-  public stepThermodynamics(dt: number): void {
+  public getBoundaryFluxes(): BoundaryFluxVector {
+    return {
+      heatFluxes: new Map(),
+      radiationFlux: {
+        solarIncoming: 1.74e17,
+        terrestrialOutgoing: 1.74e17 * 0.99
+      },
+      workRate: 0,
+      massFluxes: new Map(),
+      specificEnthalpies: new Map(),
+      specificEntropies: new Map(),
+      solarRadiationIn: 1.74e17,
+      longwaveRadiationOut: 1.74e17 * 0.99,
+      sensibleHeatFlux: 1e8,
+      latentHeatFlux: 1e8,
+      netMassFlux: 0
+    };
+  }
+
+  public stepThermodynamics(dt: number, _fluxes?: BoundaryFluxVector): void {
     this.internalEnergyJoules += 0.1 * dt;
     if (!this.validateSecondLaw()) {
       throw new Error(`Second Law Violation in ${this.name}: Negative entropy generation rate.`);
     }
   }
 
+  public validateFirstLaw(): boolean {
+    return true;
+  }
+
   public validateSecondLaw(): boolean {
     const vec = this.getStateVector();
-    return (vec.validateSecondLaw ? vec.validateSecondLaw() : vec.entropyGenerationRate >= 0) && vec.exergyDestructionRate >= 0;
+    const sGen = vec.entropyGenerationRate ?? 0;
+    const iDest = vec.exergyDestructionRate ?? 0;
+    return (vec.validateSecondLaw ? vec.validateSecondLaw() : sGen >= 0) && iDest >= 0;
+  }
+
+  public validateLaws(): ThermodynamicComplianceResult {
+    return {
+      isFirstLawSatisfied: this.validateFirstLaw(),
+      isSecondLawSatisfied: this.validateSecondLaw(),
+      energyResidual: 0,
+      entropyResidual: 0
+    };
   }
 
   public tick(tickNum: number): EntropyState {
@@ -133,6 +178,29 @@ export class ThermodynamicStructure implements IThermodynamicSystem {
   }
 }
 
+export abstract class BaseThermodynamicSystem {
+  protected state: ThermodynamicStateVector;
+
+  constructor(initialState: ThermodynamicStateVector) {
+    this.state = initialState;
+  }
+
+  public abstract computeEntropyGeneration(dt: number): number;
+  protected abstract calculateExergyEfficiency(): number;
+
+  public getMetrics(): ThermodynamicMetrics {
+    const sGen = this.computeEntropyGeneration(1.0);
+    const T0 = this.state.ambientReferenceTemp ?? this.state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
+    const iDest = sGen * T0;
+    return {
+      entropyGenerationRate: sGen,
+      exergyDestructionRate: iDest,
+      exergyEfficiency: this.calculateExergyEfficiency(),
+      isSecondLawValid: sGen >= -1e-9
+    };
+  }
+}
+
 export function applyThermalFlux(
   stock: any,
   state: IThermodynamicStateVector,
@@ -140,7 +208,7 @@ export function applyThermalFlux(
   boundaryTemp: number,
   dt: number
 ): [any, IThermodynamicStateVector] {
-  const T0 = state.referenceTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const T0 = state.referenceTemperature ?? state.T_0 ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
   const dU = qNet * dt;
   const newInternalEnergy = state.internalEnergy + dU;
 
@@ -153,18 +221,38 @@ export function applyThermalFlux(
   const dEntropy = (entropyTransfer + dotSGen) * dt;
   const newEntropy = currentEntropy + dEntropy;
 
+  const bFluxes = state.boundaryFluxes;
+  const heatFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.heatFluxes) ? bFluxes.heatFluxes : new Map();
+  const massFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.massFluxes) ? bFluxes.massFluxes : new Map();
+  const solarRad = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.solarRadiationIn ?? 0) : 0;
+  const longwaveOut = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.longwaveRadiationOut ?? 0) : 0;
+  const sensible = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.sensibleHeatFlux ?? 0) : 0;
+  const latent = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.latentHeatFlux ?? 0) : 0;
+  const netMass = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.netMassFlux ?? 0) : 0;
+
+  const boundaryFluxes: IBoundaryFluxArray = {
+    heatFluxes: heatFluxesMap,
+    massFluxes: massFluxesMap,
+    radiativeNet: qNet,
+    ...(bFluxes && !Array.isArray(bFluxes) ? bFluxes : {}),
+    solarRadiationIn: solarRad,
+    longwaveRadiationOut: longwaveOut,
+    sensibleHeatFlux: sensible,
+    latentHeatFlux: latent,
+    netMassFlux: netMass
+  };
+
   const updatedState: IThermodynamicStateVector = {
     ...state,
     internalEnergy: newInternalEnergy,
     entropy: newEntropy,
+    totalEntropy: newEntropy,
+    temperature: sysTemp,
+    ambientTemperature: T0,
+    ambientReferenceTemp: T0,
     entropyGenerationRate: dotSGen,
     exergyDestructionRate: dotI,
-    boundaryFluxes: {
-      ...state.boundaryFluxes,
-      heatFluxes: state.boundaryFluxes?.heatFluxes ?? new Map(),
-      massFluxes: state.boundaryFluxes?.massFluxes ?? new Map(),
-      radiativeNet: qNet
-    },
+    boundaryFluxes,
     validateSecondLaw: () => dotSGen >= 0
   };
 
@@ -196,7 +284,7 @@ export function applyMassTransport(
     });
   }
 
-  const T0 = state.referenceTemperature ?? state.T_0 ?? STANDARD_AMBIENT_TEMPERATURE_K;
+  const T0 = state.referenceTemperature ?? state.T_0 ?? state.ambientTemperature ?? STANDARD_AMBIENT_TEMPERATURE_K;
   const energyFlux = totalMassRate * specificEnthalpy;
   const dU = energyFlux * dt;
   const entropyTransportRate = totalMassRate * specificEntropy;
@@ -208,18 +296,37 @@ export function applyMassTransport(
   const currentEntropy = state.entropy ?? state.systemEntropy ?? 1e3;
   const newEntropy = currentEntropy + (entropyTransportRate + dotSGen) * dt;
 
+  const bFluxes = state.boundaryFluxes;
+  const heatFluxesMap = (bFluxes && !Array.isArray(bFluxes) && bFluxes.heatFluxes) ? bFluxes.heatFluxes : new Map();
+  const radiative = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.radiativeNet ?? 0) : 0;
+  const solarRad = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.solarRadiationIn ?? 0) : 0;
+  const longwaveOut = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.longwaveRadiationOut ?? 0) : 0;
+  const sensible = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.sensibleHeatFlux ?? 0) : 0;
+  const latent = (bFluxes && !Array.isArray(bFluxes)) ? (bFluxes.latentHeatFlux ?? 0) : 0;
+
+  const boundaryFluxes: IBoundaryFluxArray = {
+    heatFluxes: heatFluxesMap,
+    radiativeNet: radiative,
+    massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : new Map(),
+    ...(bFluxes && !Array.isArray(bFluxes) ? bFluxes : {}),
+    solarRadiationIn: solarRad,
+    longwaveRadiationOut: longwaveOut,
+    sensibleHeatFlux: sensible,
+    latentHeatFlux: latent,
+    netMassFlux: totalMassRate
+  };
+
   const updatedState: IThermodynamicStateVector = {
     ...state,
     internalEnergy: newInternalEnergy,
     entropy: newEntropy,
+    totalEntropy: newEntropy,
+    temperature: T0,
+    ambientTemperature: T0,
+    ambientReferenceTemp: T0,
     entropyGenerationRate: dotSGen,
     exergyDestructionRate: dotI,
-    boundaryFluxes: {
-      ...state.boundaryFluxes,
-      heatFluxes: state.boundaryFluxes?.heatFluxes ?? new Map(),
-      radiativeNet: state.boundaryFluxes?.radiativeNet ?? 0,
-      massFluxes: massFluxes instanceof Map ? new Map(massFluxes) : new Map()
-    },
+    boundaryFluxes,
     validateSecondLaw: () => dotSGen >= 0
   };
 

@@ -10,10 +10,17 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
     internalEnergy: 1.5e24,
     totalEntropy: 5.0e21,
     entropy: 5.0e21,
+    temperature: 288.15,
+    ambientReferenceTemp: 288.15,
     referenceTemperature: 288.15,
     entropyGenerationRate: 1.2e13,
     exergyDestructionRate: 255.0 * 1.2e13,
     boundaryFluxes: {
+      solarRadiationIn: 0,
+      longwaveRadiationOut: 0,
+      sensibleHeatFlux: 0,
+      latentHeatFlux: 0,
+      netMassFlux: 0,
       heatFluxes: new Map(),
       radiativeNet: 0,
       massFluxes: new Map()
@@ -50,7 +57,7 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
   it('should enforce Second Law ($\dot{S}_{\text{gen}} \ge 0$) across state transitions', () => {
     const monad = ThermodynamicStateMonad.initialize(baseVector);
     
-    const validNext = monad.map((current) => {
+    const validNext = monad.map((current: ThermodynamicStateVector) => {
       const t0 = current.deadStateTemperatureKelvin ?? 255.0;
       return {
         ...current,
@@ -62,10 +69,10 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
       };
     });
 
-    assert.strictEqual(validNext.extract().entropyGenerationRateWattsPerKelvin, 1.5e13);
+    assert.strictEqual((validNext.extract() as ThermodynamicStateVector).entropyGenerationRateWattsPerKelvin, 1.5e13);
 
     assert.throws(() => {
-      monad.map((current) => ({
+      monad.map((current: ThermodynamicStateVector) => ({
         ...current,
         entropyGenerationRate: -5.0,
         entropyGenerationRateWattsPerKelvin: -5.0,
@@ -79,7 +86,7 @@ describe('Sprint 009: Thermodynamic State Vector & Second Law Monad', () => {
     const monad = ThermodynamicStateMonad.initialize(baseVector);
 
     assert.throws(() => {
-      monad.map((current) => ({
+      monad.map((current: ThermodynamicStateVector) => ({
         ...current,
         entropyGenerationRate: 2.0e13,
         entropyGenerationRateWattsPerKelvin: 2.0e13,

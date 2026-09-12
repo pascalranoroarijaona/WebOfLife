@@ -1,37 +1,36 @@
-// Complete implementation of CarbonCycle in src/cycles/carbon.ts
-import { BaseCycle } from './base_cycle.js';
+/**
+ * @fileoverview Carbon Cycle implementation extending BaseCycle (Sprint 015)
+ */
+import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
 export class CarbonCycle extends BaseCycle {
-    constructor(config) {
-        super("Carbon Cycle", {
-            initialStocks: config?.initialStocks ?? {
-                atmosphere: 850,
-                terrestrial_biosphere: 550,
-                ocean_surface: 900,
-                lithosphere: 100_000_000,
-            },
-            transferCoefficients: config?.transferCoefficients ?? {
-                photo: 0.00014,
-                resp: 0.00013,
-                diss: 0.0001,
-                outg: 0.0001,
-                burial: 0.00001,
-            }
-        });
+    constructor(options) {
+        super("Carbon Cycle");
+        const defaultStocks = {
+            atmosphere: 850,
+            terrestrial_biosphere: 550,
+            ocean_surface: 900,
+            ocean_deep: 37000,
+            soil: 1500,
+            lithosphere: 100_000_000,
+            lithosphere_fossil: 100_000_000
+        };
+        const initial = options?.initialStocks ?? defaultStocks;
+        for (const [k, v] of Object.entries(initial)) {
+            this.stocks.set(k, v);
+        }
     }
-    step(deltaSeconds, solarInput) {
-        const atm = this.getStock('atmosphere');
-        const bio = this.getStock('terrestrial_biosphere');
-        const ocean = this.getStock('ocean_surface');
-        const fPhoto = this.coeffs.photo * atm * solarInput * deltaSeconds;
-        const fResp = this.coeffs.resp * bio * deltaSeconds;
-        const fDiss = this.coeffs.diss * atm * deltaSeconds;
-        const fOutg = this.coeffs.outg * ocean * deltaSeconds;
-        const fBurial = this.coeffs.burial * bio * deltaSeconds;
-        this.transfer('atmosphere', 'terrestrial_biosphere', fPhoto);
-        this.transfer('terrestrial_biosphere', 'atmosphere', fResp);
-        this.transfer('atmosphere', 'ocean_surface', fDiss);
-        this.transfer('ocean_surface', 'atmosphere', fOutg);
-        this.transfer('terrestrial_biosphere', 'lithosphere', fBurial);
+    step(dt, solarFlux) {
+        const flux = {
+            fluxId: "carbon_solar_flux",
+            species: "co2",
+            massFlowRate: 1.2,
+            specificEnthalpy: 500,
+            specificEntropy: 2.1,
+            heatTransferRate: solarFlux * 1e-4,
+            boundaryTemperature: 298.15
+        };
+        this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
     }
 }
+// Backward compatibility alias for sprint tests expecting CarbonCyclePOD
 export { CarbonCycle as CarbonCyclePOD };

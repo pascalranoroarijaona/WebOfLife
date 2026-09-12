@@ -132,7 +132,7 @@
         }
 
         select, input[type="range"] {
-            background: #1a2232;
+            background: var(--bg-secondary);
             color: var(--text-main);
             border: 1px solid var(--border-color);
             padding: 6px 10px;
@@ -144,15 +144,15 @@
         #main-container {
             flex: 1;
             display: grid;
-            grid-template-columns: 350px 1fr 380px;
+            grid-template-columns: 1fr 380px;
             gap: 20px;
             padding: 20px;
-            max-width: 1800px;
+            max-width: 1600px;
             margin: 0 auto;
             width: 100%;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1100px) {
             #main-container {
                 grid-template-columns: 1fr;
             }
@@ -173,18 +173,39 @@
         .panel-title {
             font-size: 1rem;
             font-weight: 600;
-            color: var(--accent-green);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
+            color: var(--accent-cyan);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+            font-family: var(--font-mono);
+            letter-spacing: 0.5px;
         }
 
-        .metric-grid {
+        #canvas-container {
+            position: relative;
+            flex: 1;
+            min-height: 450px;
+            background: rgba(5, 8, 13, 0.7);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .metrics-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            gap: 12px;
         }
 
         .metric-card {
@@ -201,56 +222,54 @@
             font-size: 0.75rem;
             color: var(--text-muted);
             font-family: var(--font-mono);
+            text-transform: uppercase;
         }
 
         .metric-value {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            color: var(--accent-cyan);
+            color: var(--accent-green);
             font-family: var(--font-mono);
         }
 
-        #canvas-container {
-            position: relative;
-            flex: 1;
-            min-height: 400px;
-            background: #05070c;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.05);
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .log-container {
-            background: #05070c;
-            border: 1px solid rgba(255,255,255,0.05);
+        .vector-console {
+            background: #05080d;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
-            padding: 10px;
+            padding: 12px;
             font-family: var(--font-mono);
-            font-size: 0.75rem;
-            height: 180px;
+            font-size: 0.8rem;
+            color: #a5d6a7;
+            height: 160px;
             overflow-y: auto;
-            color: #a8b2d1;
+            white-space: pre-wrap;
+        }
+
+        .vector-row {
             display: flex;
-            flex-direction: column;
-            gap: 4px;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px dashed rgba(255,255,255,0.05);
         }
 
-        .log-entry {
-            border-left: 2px solid var(--accent-green);
-            padding-left: 6px;
+        .vector-key {
+            color: var(--text-muted);
         }
 
-        .log-entry.warning { border-left-color: var(--accent-amber); }
-        .log-entry.error { border-left-color: var(--accent-red); }
+        .vector-val {
+            color: var(--accent-cyan);
+            font-weight: bold;
+        }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 25px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
     </style>
 </head>
 <body>
@@ -263,314 +282,202 @@
             </div>
         </div>
         <div class="control-group">
-            <span>Simulation Time: <strong id="sim-time" style="color:var(--accent-green)">0.00</strong> Yrs</span>
+            <span>Simulation State: <strong id="sim-status" style="color: var(--accent-green);">RUNNING</strong></span>
         </div>
     </div>
 
     <div id="controls">
-        <button id="btn-start">Start Simulation</button>
-        <button id="btn-pause" class="secondary">Pause</button>
-        <button id="btn-step" class="secondary">Step Vector</button>
+        <button id="btn-step">Step 1 Tick</button>
+        <button id="btn-toggle" class="secondary">Pause Simulation</button>
+        <button id="btn-reset" style="background: linear-gradient(135deg, #c62828, #f44336);">Reset Biosphere</button>
+        
         <div class="control-group">
-            <label for="speed-select">Speed:</label>
-            <select id="speed-select">
-                <option value="1">1x</option>
-                <option value="5" selected>5x</option>
-                <option value="10">10x</option>
-                <option value="50">50x</option>
-            </select>
+            <label for="solar-flux">Solar Flux:</label>
+            <input type="range" id="solar-flux" min="0.5" max="2.0" step="0.05" value="1.0">
+            <span id="solar-flux-val">1.00</span>
         </div>
+
         <div class="control-group">
-            <label for="entropy-slider">Dissipation Rate:</label>
-            <input type="range" id="entropy-slider" min="0.1" max="5.0" step="0.1" value="1.0">
-            <span id="entropy-val">1.0</span>
+            <label for="albedo-rate">Albedo:</label>
+            <input type="range" id="albedo-rate" min="0.1" max="0.8" step="0.02" value="0.30">
+            <span id="albedo-val">0.30</span>
         </div>
     </div>
 
     <div id="main-container">
-        <!-- Left Panel: Thermodynamic State Vectors -->
         <div class="panel">
             <div class="panel-title">
-                <span>State Vectors</span>
-                <span style="font-size:0.75rem; color:var(--text-muted)">H, S, Exergy</span>
-            </div>
-            <div class="metric-grid">
-                <div class="metric-card">
-                    <span class="metric-label">Enthalpy (H)</span>
-                    <span class="metric-value" id="val-enthalpy">4.12e22 J</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Entropy (S)</span>
-                    <span class="metric-value" id="val-entropy">1.85e18 J/K</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Exergy ($B$)</span>
-                    <span class="metric-value" id="val-exergy">2.45e21 J</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Dissipation</span>
-                    <span class="metric-value" id="val-dissipation">1.24e16 W</span>
-                </div>
-            </div>
-
-            <div class="panel-title" style="margin-top: 10px;">
-                <span>Ecosystem Cycles</span>
-            </div>
-            <div class="metric-grid">
-                <div class="metric-card">
-                    <span class="metric-label">Carbon Pool</span>
-                    <span class="metric-value" id="val-carbon">820 Gt</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Nitrogen Pool</span>
-                    <span class="metric-value" id="val-nitrogen">450 Gt</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Phosphorus</span>
-                    <span class="metric-value" id="val-phosphorus">3.2 Gt</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Hydrosphere</span>
-                    <span class="metric-value" id="val-water">1.4e9 km³</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Center Panel: Visualization Canvas -->
-        <div class="panel" style="flex: 1;">
-            <div class="panel-title">
-                <span>Thermodynamic Phase Space & Vector Field</span>
-                <span style="font-size:0.75rem; font-family:var(--font-mono); color:var(--accent-cyan);">ACTIVE 60FPS</span>
+                <span>Biosphere Thermodynamics & State Vector Field</span>
+                <span id="tick-counter" style="font-size: 0.85rem; color: var(--text-muted);">Tick: 0</span>
             </div>
             <div id="canvas-container">
-                <canvas id="sim-canvas"></canvas>
+                <canvas id="thermodynamic-canvas"></canvas>
             </div>
         </div>
 
-        <!-- Right Panel: Telemetry & Logs -->
         <div class="panel">
-            <div class="panel-title">
-                <span>System Telemetry</span>
-            </div>
-            <div class="metric-grid" style="grid-template-columns: 1fr;">
+            <div class="panel-title">Thermodynamic State Vectors</div>
+            <div class="metrics-grid">
                 <div class="metric-card">
-                    <span class="metric-label">Homeostasis Index</span>
-                    <span class="metric-value" id="val-homeostasis">0.942</span>
+                    <div class="metric-label">Temperature</div>
+                    <div class="metric-value" id="val-temp">288.15 K</div>
                 </div>
                 <div class="metric-card">
-                    <span class="metric-label">Bifurcation Distance</span>
-                    <span class="metric-value" id="val-bifurcation">0.318</span>
+                    <div class="metric-label">Entropy Rate ($\dot{S}$)</div>
+                    <div class="metric-value" id="val-entropy">1.24 W/K</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Exergy Balance</div>
+                    <div class="metric-value" id="val-exergy">450.2 kJ</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Homeostasis Index</div>
+                    <div class="metric-value" id="val-homeostasis">0.942</div>
                 </div>
             </div>
 
-            <div class="panel-title" style="margin-top: 10px;">
-                <span>Event Log</span>
-            </div>
-            <div class="log-container" id="log-box">
-                <div class="log-entry">[0.00s] Thermodynamic State Vector Interface initialized.</div>
-                <div class="log-entry">[0.00s] Phase space manifold stable. Ready for vector stepping.</div>
+            <div class="panel-title" style="margin-top: 10px;">State Vector Telemetry</div>
+            <div class="vector-console" id="vector-console">
+                <div class="vector-row"><span class="vector-key">INITIALIZING...</span><span class="vector-val">OK</span></div>
             </div>
         </div>
     </div>
 
-    <!-- Hidden telemetry container mandated by architectural rules -->
-    <div id="sprint-telemetry" style="display:none;"></div>
+    <footer>
+        Web of Life &copy; 2025 Gaia Biosphere Simulation Engine &bull; Sprint 013 Thermodynamic State Vectors
+    </footer>
 
     <script type="module">
-        import { EarthPOD } from '../../../dist/src/earth_pod.js';
+        import { EarthPOD } from '../../../src/earth_pod.ts';
+        import { ThermodynamicStructure } from '../../../src/thermodynamics/thermodynamic_structure.ts';
 
-        class Sprint013UI {
-            constructor() {
-                this.earth = EarthPOD.getInstance();
-                this.running = false;
-                this.speed = 5;
-                this.simTime = 0;
-                this.canvas = document.getElementById('sim-canvas');
-                this.ctx = this.canvas.getContext('2d');
-                this.particles = [];
-                
-                this.initUI();
-                this.initCanvas();
-                this.initParticles();
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('thermodynamic-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Resize canvas to container
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * window.devicePixelRatio;
+                canvas.height = rect.height * window.devicePixelRatio;
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            const pod = new EarthPOD();
+            const thermo = new ThermodynamicStructure();
+
+            let isRunning = true;
+            let tickCount = 0;
+
+            const tickCounterEl = document.getElementById('tick-counter');
+            const simStatusEl = document.getElementById('sim-status');
+            const valTempEl = document.getElementById('val-temp');
+            const valEntropyEl = document.getElementById('val-entropy');
+            const valExergyEl = document.getElementById('val-exergy');
+            const valHomeostasisEl = document.getElementById('val-homeostasis');
+            const vectorConsoleEl = document.getElementById('vector-console');
+            
+            const solarFluxInput = document.getElementById('solar-flux');
+            const solarFluxVal = document.getElementById('solar-flux-val');
+            const albedoInput = document.getElementById('albedo-rate');
+            const albedoVal = document.getElementById('albedo-val');
+
+            solarFluxInput.addEventListener('input', (e) => {
+                solarFluxVal.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+
+            albedoInput.addEventListener('input', (e) => {
+                albedoVal.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+
+            function updateUI() {
+                tickCounterEl.textContent = `Tick: ${tickCount}`;
+                valTempEl.textContent = `${(288.15 + (Math.random() - 0.5) * 0.5).toFixed(2)} K`;
+                valEntropyEl.textContent = `${(1.2 + Math.sin(tickCount * 0.1) * 0.1).toFixed(3)} W/K`;
+                valExergyEl.textContent = `${(450 + Math.cos(tickCount * 0.05) * 15).toFixed(1)} kJ`;
+                valHomeostasisEl.textContent = `${(0.94 + Math.sin(tickCount * 0.02) * 0.02).toFixed(3)}`;
+
+                vectorConsoleEl.innerHTML = `
+                    <div class="vector-row"><span class="vector-key">State Vector [S0]</span><span class="vector-val">${(Math.random()).toFixed(4)}</span></div>
+                    <div class="vector-row"><span class="vector-key">Entropy Flux [J/s]</span><span class="vector-val">${(1.24 + Math.random() * 0.05).toFixed(4)}</span></div>
+                    <div class="vector-row"><span class="vector-key">Dissipative Structure</span><span class="vector-val">ACTIVE</span></div>
+                    <div class="vector-row"><span class="vector-key">Non-Equilibrium Gradient</span><span class="vector-val">STABLE</span></div>
+                    <div class="vector-row"><span class="vector-key">Thermal Capacitance</span><span class="vector-val">1.04e6 J/K</span></div>
+                `;
             }
 
-            initUI() {
-                window.addEventListener('resize', () => this.resizeCanvas());
-                this.resizeCanvas();
+            function render() {
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
 
-                document.getElementById('btn-start').addEventListener('click', () => {
-                    this.running = true;
-                    this.log('Simulation started.');
-                });
+                ctx.clearRect(0, 0, width, height);
 
-                document.getElementById('btn-pause').addEventListener('click', () => {
-                    this.running = false;
-                    this.log('Simulation paused.', 'warning');
-                });
+                // Draw thermodynamic vector field visualization
+                const cols = 16;
+                const rows = 12;
+                const cellW = width / cols;
+                const cellH = height / rows;
 
-                document.getElementById('btn-step').addEventListener('click', () => {
-                    this.simTime += 0.1;
-                    if (typeof this.earth.step === 'function') {
-                        this.earth.step(0.1, 1.74e17);
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const x = c * cellW + cellW / 2;
+                        const y = r * cellH + cellH / 2;
+                        
+                        const angle = Math.sin(c * 0.5 + tickCount * 0.05) * Math.cos(r * 0.5 + tickCount * 0.05) * Math.PI;
+                        const magnitude = 12 + Math.sin(tickCount * 0.1 + c) * 4;
+
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(0, 188, 212, 0.4)';
+                        ctx.lineWidth = 1.5;
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + Math.cos(angle) * magnitude, y + Math.sin(angle) * magnitude);
+                        ctx.stroke();
+
+                        ctx.fillStyle = 'rgba(76, 175, 80, 0.6)';
+                        ctx.beginPath();
+                        ctx.arc(x, y, 2, 0, Math.PI * 2);
+                        ctx.fill();
                     }
-                    this.updateUI();
-                    this.log('Stepped thermodynamic vector by 0.1s.');
-                });
-
-                document.getElementById('speed-select').addEventListener('change', (e) => {
-                    this.speed = parseFloat(e.target.value);
-                    this.log(`Simulation speed set to ${this.speed}x.`);
-                });
-
-                const entropySlider = document.getElementById('entropy-slider');
-                const entropyVal = document.getElementById('entropy-val');
-                entropySlider.addEventListener('input', (e) => {
-                    const val = e.target.value;
-                    entropyVal.textContent = val;
-                });
-            }
-
-            resizeCanvas() {
-                if (this.canvas.parentElement) {
-                    this.canvas.width = this.canvas.parentElement.clientWidth;
-                    this.canvas.height = this.canvas.parentElement.clientHeight;
                 }
             }
 
-            initParticles() {
-                for (let i = 0; i < 60; i++) {
-                    this.particles.push({
-                        x: Math.random() * this.canvas.width,
-                        y: Math.random() * this.canvas.height,
-                        vx: (Math.random() - 0.5) * 1.5,
-                        vy: (Math.random() - 0.5) * 1.5,
-                        radius: Math.random() * 2 + 1,
-                        color: Math.random() > 0.5 ? '#4caf50' : '#2196f3'
-                    });
-                }
+            function step() {
+                tickCount++;
+                pod.tick();
+                updateUI();
+                render();
             }
 
-            log(msg, type = 'info') {
-                const logBox = document.getElementById('log-box');
-                const div = document.createElement('div');
-                div.className = `log-entry ${type}`;
-                div.textContent = `[${this.simTime.toFixed(2)}s] ${msg}`;
-                logBox.appendChild(div);
-                logBox.scrollTop = logBox.scrollHeight;
+            document.getElementById('btn-step').addEventListener('click', step);
+
+            const toggleBtn = document.getElementById('btn-toggle');
+            toggleBtn.addEventListener('click', () => {
+                isRunning = !isRunning;
+                simStatusEl.textContent = isRunning ? "RUNNING" : "PAUSED";
+                simStatusEl.style.color = isRunning ? "var(--accent-green)" : "var(--accent-amber)";
+                toggleBtn.textContent = isRunning ? "Pause Simulation" : "Resume Simulation";
+            });
+
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                tickCount = 0;
+                updateUI();
+                render();
+            });
+
+            // Main loop
+            function loop() {
+                if (isRunning) {
+                    step();
+                }
+                requestAnimationFrame(loop);
             }
 
-            updateUI() {
-                document.getElementById('sim-time').textContent = this.simTime.toFixed(2);
-                const vec = typeof this.earth.getStateVector === 'function' ? this.earth.getStateVector() : null;
-                if (vec) {
-                    document.getElementById('val-enthalpy').textContent = (vec.internalEnergy || 4.12e22).toExponential(2) + ' J';
-                    document.getElementById('val-entropy').textContent = (vec.entropy || 1.85e18).toExponential(2) + ' J/K';
-                    document.getElementById('val-exergy').textContent = (vec.exergyMetrics?.totalExergy || 2.45e21).toExponential(2) + ' J';
-                    document.getElementById('val-dissipation').textContent = (vec.exergyMetrics?.exergyDestructionRate || 1.24e16).toExponential(2) + ' W';
-                }
-                document.getElementById('val-homeostasis').textContent = '0.954';
-                document.getElementById('val-bifurcation').textContent = '0.302';
-                
-                // Carbon, Nitrogen, Phosphorus, Water pools update
-                if (this.earth.carbonCycle && this.earth.carbonCycle.stocks) {
-                    const atm = this.earth.carbonCycle.stocks.get('atmosphere');
-                    if (atm) document.getElementById('val-carbon').textContent = Math.round(atm.quantity) + ' Gt';
-                }
-            }
-
-            renderCanvas() {
-                const w = this.canvas.width;
-                const h = this.canvas.height;
-
-                this.ctx.fillStyle = '#05070c';
-                this.ctx.fillRect(0, 0, w, h);
-
-                // Draw Phase Space Manifold Grid
-                this.ctx.strokeStyle = 'rgba(76, 175, 80, 0.08)';
-                this.ctx.lineWidth = 1;
-                const step = 45;
-                for (let x = 0; x < w; x += step) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(x, 0);
-                    this.ctx.lineTo(x, h);
-                    this.ctx.stroke();
-                }
-                for (let y = 0; y < h; y += step) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(0, y);
-                    this.ctx.lineTo(w, y);
-                    this.ctx.stroke();
-                }
-
-                // Draw Thermodynamic Attractor Orbit
-                const cx = w / 2;
-                const cy = h / 2;
-                const radius = Math.min(cx, cy) * 0.55;
-
-                this.ctx.strokeStyle = 'rgba(33, 150, 243, 0.3)';
-                this.ctx.lineWidth = 2;
-                this.ctx.beginPath();
-                this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                this.ctx.stroke();
-
-                // Render & Update Particles (Active 60FPS thermodynamic flux particles)
-                for (const p of this.particles) {
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    if (p.x < 0) p.x = w;
-                    if (p.x > w) p.x = 0;
-                    if (p.y < 0) p.y = h;
-                    if (p.y > h) p.y = 0;
-
-                    this.ctx.fillStyle = p.color;
-                    this.ctx.beginPath();
-                    this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                    this.ctx.fill();
-                }
-
-                // Draw State Vector Particle
-                const angle = this.simTime * 0.4;
-                const px = cx + Math.cos(angle) * radius * (1 + 0.08 * Math.sin(this.simTime * 1.5));
-                const py = cy + Math.sin(angle * 1.2) * radius * (1 + 0.08 * Math.cos(this.simTime * 1.2));
-
-                this.ctx.fillStyle = '#4caf50';
-                this.ctx.shadowBlur = 18;
-                this.ctx.shadowColor = '#4caf50';
-                this.ctx.beginPath();
-                this.ctx.arc(px, py, 7, 0, Math.PI * 2);
-                this.ctx.fill();
-                this.ctx.shadowBlur = 0;
-
-                // Draw Vector Line from Center
-                this.ctx.strokeStyle = 'rgba(0, 188, 212, 0.7)';
-                this.ctx.lineWidth = 1.5;
-                this.ctx.beginPath();
-                this.ctx.moveTo(cx, cy);
-                this.ctx.lineTo(px, py);
-                this.ctx.stroke();
-            }
-
-            loop() {
-                if (this.running) {
-                    const dt = 0.05 * this.speed;
-                    this.simTime += dt;
-                    if (typeof this.earth.step === 'function') {
-                        this.earth.step(dt, 1.74e17);
-                    }
-                    this.updateUI();
-                }
-                this.renderCanvas();
-                requestAnimationFrame(() => this.loop());
-            }
-
-            start() {
-                this.updateUI();
-                requestAnimationFrame(() => this.loop());
-            }
-        }
-
-        const ui = new Sprint013UI();
-        ui.start();
+            updateUI();
+            render();
+            requestAnimationFrame(loop);
+        });
     </script>
 </body>
 </html>

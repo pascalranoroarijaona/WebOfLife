@@ -1,0 +1,107 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 013: Thermodynamic State Vector UML Schema
+
+package "src.thermodynamics" {
+  
+  interface IBoundaryFluxArray {
+    + solarInput: number
+    + thermalRadiationOut: number
+    + matterEnthalpyFlux: number
+    + netHeatFlux: number
+  }
+
+  interface IExergyMetrics {
+    + T_0: number
+    + entropyGenerationRate: number
+    + exergyDestructionRate: number
+    + totalExergy: number
+  }
+
+  interface IThermodynamicStateVector {
+    + tick: number
+    + internalEnergy: number
+    + totalEntropy: number
+    + boundaryFluxes: IBoundaryFluxArray
+    + exergyMetrics: IExergyMetrics
+    + validateFirstLaw(dt: number, previousEnergy: number): boolean
+    + validateSecondLaw(): boolean
+  }
+
+  class ThermodynamicStateEngine {
+    - tick: number
+    - internalEnergy: number
+    - totalEntropy: number
+    - boundaryFluxes: IBoundaryFluxArray
+    - exergyMetrics: IExergyMetrics
+    + validateFirstLaw(dt: number, previousEnergy: number): boolean
+    + validateSecondLaw(): boolean
+    + evolve(dt: number): IThermodynamicStateVector
+  }
+
+  IThermodynamicStateVector *-- IBoundaryFluxArray : contains
+  IThermodynamicStateVector *-- IExergyMetrics : contains
+  ThermodynamicStateEngine ..|> IThermodynamicStateVector : implements
+}
+
+package "src.cycles" {
+  class BaseCycle {
+    + processCycle(vector: IThermodynamicStateVector): IThermodynamicStateVector
+  }
+  class CarbonCycle
+  class NitrogenCycle
+  class PhosphorusCycle
+  class WaterCycle
+
+  BaseCycle <|-- CarbonCycle
+  BaseCycle <|-- NitrogenCycle
+  BaseCycle <|-- PhosphorusCycle
+  BaseCycle <|-- WaterCycle
+  
+  BaseCycle ..> IThermodynamicStateVector : threads monad
+}
+
+package "Database & Ledger Models" {
+  class ThermodynamicStateVectorTable {
+    + vector_id: BIGSERIAL
+    + tick: BIGINT
+    + internal_energy: NUMERIC
+    + total_entropy: NUMERIC
+    + first_law_valid: BOOLEAN
+    + second_law_valid: BOOLEAN
+  }
+
+  class BoundaryFluxArrayTable {
+    + flux_id: BIGSERIAL
+    + solar_input: NUMERIC
+    + thermal_radiation_out: NUMERIC
+    + matter_enthalpy_flux: NUMERIC
+    + net_heat_flux: NUMERIC
+  }
+
+  class ExergyMetricsTable {
+    + metrics_id: BIGSERIAL
+    + t_0: NUMERIC
+    + entropy_generation_rate: NUMERIC
+    + exergy_destruction_rate: NUMERIC
+    + total_exergy: NUMERIC
+  }
+
+  class ThermodynamicTransactionLedger {
+    + transaction_id: UUID
+    + block_index: BIGINT
+    + previous_hash: VARCHAR
+    + current_hash: VARCHAR
+    + entropy_delta: NUMERIC
+    + validator_signature: VARCHAR
+  }
+
+  ThermodynamicStateVectorTable --> BoundaryFluxArrayTable : references
+  ThermodynamicStateVectorTable --> ExergyMetricsTable : references
+  ThermodynamicStateVectorTable ||--o{ ThermodynamicTransactionLedger : audited by
+}
+
+@enduml

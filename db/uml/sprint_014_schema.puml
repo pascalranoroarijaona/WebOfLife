@@ -1,0 +1,51 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "Thermodynamics Domain" {
+  interface ThermodynamicStateVector {
+    +readonly timestamp: number
+    +readonly internalEnergy: number
+    +readonly totalEntropy: number
+    +readonly temperature: number
+    +readonly ambientReferenceTemp: number
+    +readonly boundaryFluxes: BoundaryFluxArray
+  }
+
+  interface BoundaryFluxArray {
+    +solarRadiationIn: number
+    +longwaveRadiationOut: number
+    +sensibleHeatFlux: number
+    +latentHeatFlux: number
+    +netMassFlux: number
+  }
+
+  interface ThermodynamicMetrics {
+    +entropyGenerationRate: number
+    +exergyDestructionRate: number
+    +exergyEfficiency: number
+    +isSecondLawValid: boolean
+  }
+
+  abstract class BaseThermodynamicSystem {
+    #state: ThermodynamicStateVector
+    +computeEntropyGeneration(dt: number): number
+    +getMetrics(): ThermodynamicMetrics
+    # {abstract} calculateExergyEfficiency(): number
+  }
+
+  class ThermodynamicStateMonad {
+    -state: ThermodynamicStateVector
+    -constructor(state: ThermodynamicStateVector)
+    +{static} unit(state: ThermodynamicStateVector): ThermodynamicStateMonad
+    +map(fn: (s: ThermodynamicStateVector) => ThermodynamicStateVector): ThermodynamicStateMonad
+    +getState(): ThermodynamicStateVector
+  }
+}
+
+ThermodynamicStateVector *-- BoundaryFluxArray : contains
+BaseThermodynamicSystem --> ThermodynamicStateVector : manages
+BaseThermodynamicSystem ..> ThermodynamicMetrics : produces
+ThermodynamicStateMonad --> ThermodynamicStateVector : wraps
+@enduml

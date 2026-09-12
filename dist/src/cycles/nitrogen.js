@@ -1,35 +1,32 @@
-// Complete implementation of NitrogenCycle in src/cycles/nitrogen.ts
-import { BaseCycle } from './base_cycle.js';
+/**
+ * @fileoverview Nitrogen Cycle implementation extending BaseCycle (Sprint 015)
+ */
+import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
 export class NitrogenCycle extends BaseCycle {
-    constructor(config) {
-        super("Nitrogen Cycle", {
-            initialStocks: config?.initialStocks ?? {
-                atmosphere_n2: 3_900_000,
-                soil_ammonia: 100,
-                soil_nitrate: 150,
-                biomass: 3.5,
-            },
-            transferCoefficients: config?.transferCoefficients ?? {
-                fix: 0.00005,
-                nitrif: 0.0002,
-                assim: 0.0001,
-                denit: 0.00008,
-            }
-        });
+    constructor() {
+        super("Nitrogen Cycle");
+        const defaultStocks = {
+            atmosphere: 3_900_000,
+            soil: 100,
+            biosphere: 3.5,
+            ocean: 700
+        };
+        for (const [k, v] of Object.entries(defaultStocks)) {
+            this.stocks.set(k, v);
+        }
     }
-    step(deltaSeconds, solarInput) {
-        const n2 = this.getStock('atmosphere_n2');
-        const nh3 = this.getStock('soil_ammonia');
-        const no3 = this.getStock('soil_nitrate');
-        const bio = this.getStock('biomass');
-        const fFix = this.coeffs.fix * n2 * solarInput * deltaSeconds;
-        const fNitrif = this.coeffs.nitrif * nh3 * deltaSeconds;
-        const fAssim = this.coeffs.assim * no3 * bio * deltaSeconds;
-        const fDenit = this.coeffs.denit * no3 * deltaSeconds;
-        this.transfer('atmosphere_n2', 'soil_ammonia', fFix);
-        this.transfer('soil_ammonia', 'soil_nitrate', fNitrif);
-        this.transfer('soil_nitrate', 'biomass', fAssim);
-        this.transfer('soil_nitrate', 'atmosphere_n2', fDenit);
+    step(dt, solarFlux) {
+        const flux = {
+            fluxId: "nitrogen_fixation_flux",
+            species: "n2",
+            massFlowRate: 0.5,
+            specificEnthalpy: 300,
+            specificEntropy: 1.5,
+            heatTransferRate: solarFlux * 1e-5,
+            boundaryTemperature: 295.0
+        };
+        this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
     }
 }
+// Backward compatibility alias for sprint tests expecting NitrogenCyclePOD
 export { NitrogenCycle as NitrogenCyclePOD };

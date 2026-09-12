@@ -1,71 +1,57 @@
 -- ============================================================================
--- Web of Life Database & Thermodynamic Blockchain Ledger Schema
--- Sprint 012: Thermodynamic State Vector & Exergy Ledger Integration
+-- Web of Life: Thermodynamic State Vector & Exergy Ledger Schema (Sprint 15)
+-- Enforces First and Second Laws of Thermodynamics on Ecological Stocks/Flows
 -- ============================================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic State Vectors Table
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_state_vectors (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id VARCHAR(64) NOT NULL,
-    internal_energy NUMERIC(24, 6) NOT NULL, -- Joules [J]
-    entropy NUMERIC(24, 6) NOT NULL,        -- Joules per Kelvin [J/K]
-    reference_temperature NUMERIC(8, 4) NOT NULL DEFAULT 288.15, -- Kelvin [K]
-    entropy_generation_rate NUMERIC(18, 6) NOT NULL CHECK (entropy_generation_rate >= 0), -- [W/K], S_gen >= 0
-    exergy_destruction_rate NUMERIC(18, 6) NOT NULL CHECK (exergy_destruction_rate >= 0),  -- [W], I = T0 * S_gen
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    simulation_tick BIGINT NOT NULL
+-- Enum for Thermodynamic Cycles
+CREATE TYPE cycle_type AS ENUM ('CARBON', 'NITROGEN', 'PHOSPHORUS', 'WATER');
+
+-- Table: thermodynamic_states
+-- Captures time-series thermodynamic vectors for each planetary cycle subsystem
+CREATE TABLE thermodynamic_states (
+    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cycle_name cycle_type NOT NULL,
+    timestamp BIGINT NOT NULL,
+    temperature DOUBLE PRECISION NOT NULL CHECK (temperature >= 0),
+    dead_state_temperature DOUBLE PRECISION NOT NULL CHECK (dead_state_temperature >= 0),
+    internal_energy DOUBLE PRECISION NOT NULL,
+    entropy DOUBLE PRECISION NOT NULL,
+    entropy_generation_rate DOUBLE PRECISION NOT NULL CHECK (entropy_generation_rate >= 0),
+    exergy_destruction_rate DOUBLE PRECISION NOT NULL CHECK (exergy_destruction_rate >= 0),
+    first_law_residual DOUBLE PRECISION NOT NULL,
+    second_law_valid BOOLEAN GENERATED ALWAYS AS (entropy_generation_rate >= 0.0) STORED,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_thermodynamic_vectors_pod_tick ON thermodynamic_state_vectors(pod_id, simulation_tick);
-
--- ----------------------------------------------------------------------------
--- 2. Boundary Flux Arrays Table
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS boundary_flux_vectors (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    state_vector_id UUID REFERENCES thermodynamic_state_vectors(id) ON DELETE CASCADE,
-    boundary_segment_id VARCHAR(64) NOT NULL,
-    heat_flux_watts NUMERIC(18, 6) NOT NULL,     -- Thermal heat transfer rate [W]
-    radiative_net_watts NUMERIC(18, 6) NOT NULL, -- Net shortwave/longwave radiative flux [W]
-    mass_flux_kg_s NUMERIC(18, 6) NOT NULL       -- Mass transport rate [kg/s]
+-- Table: boundary_fluxes
+-- Records individual mass/energy/entropy flows crossing subsystem boundaries
+CREATE TABLE boundary_fluxes (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    state_id UUID NOT NULL REFERENCES thermodynamic_states(state_id) ON DELETE CASCADE,
+    species VARCHAR(64) NOT NULL,
+    mass_flow_rate DOUBLE PRECISION NOT NULL,
+    specific_enthalpy DOUBLE PRECISION NOT NULL,
+    specific_entropy DOUBLE PRECISION NOT NULL,
+    heat_transfer_rate DOUBLE PRECISION NOT NULL,
+    boundary_temperature DOUBLE PRECISION NOT NULL CHECK (boundary_temperature >= 0),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_boundary_fluxes_state ON boundary_flux_vectors(state_vector_id);
+-- Indexing for high-frequency time-series queries and thermodynamic auditing
+CREATE INDEX idx_thermo_states_cycle_time ON thermodynamic_states(cycle_name, timestamp DESC);
+CREATE INDEX idx_boundary_fluxes_state_id ON boundary_fluxes(state_id);
 
--- ----------------------------------------------------------------------------
--- 3. Monad Stock Transitions Table
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_monad_transitions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id VARCHAR(64) NOT NULL,
-    previous_state_id UUID REFERENCES thermodynamic_state_vectors(id),
-    next_state_id UUID REFERENCES thermodynamic_state_vectors(id),
-    stock_payload JSONB NOT NULL, -- Serialized biogeochemical cycle stocks (C, N, P, Water)
-    second_law_verified BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_monad_transitions_pod ON thermodynamic_monad_transitions(pod_id);
-
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Blockchain Ledger Signatures
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_ledger_blocks (
-    block_index BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
+-- Blockchain Transaction Ledger for Thermodynamic Verification Records
+CREATE TABLE thermodynamic_ledger_blocks (
+    block_id BIGSERIAL PRIMARY KEY,
     previous_hash VARCHAR(64) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL UNIQUE,
+    state_id UUID NOT NULL REFERENCES thermodynamic_states(state_id),
+    miner_signature VARCHAR(128) NOT NULL,
     merkle_root VARCHAR(64) NOT NULL,
-    transition_id UUID REFERENCES thermodynamic_monad_transitions(id),
-    total_exergy_destruction NUMERIC(24, 6) NOT NULL,
-    miner_node_id VARCHAR(64) NOT NULL,
-    nonce BIGINT NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    timestamp BIGINT NOT NULL
 );
 
-CREATE INDEX idx_ledger_blocks_hash ON thermodynamic_ledger_blocks(block_hash);
-CREATE INDEX idx_ledger_blocks_index ON thermodynamic_ledger_blocks(block_index);
+CREATE INDEX idx_ledger_block_hash ON thermodynamic_ledger_blocks(block_hash);

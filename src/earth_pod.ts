@@ -378,10 +378,17 @@ export class EarthPOD extends ThermodynamicStructure {
     const netHeat = this.solarInputWatts * 0.01;
     const entropyGen = 150.0;
     const boundaryFluxes: IBoundaryFluxArray = {
+      solarRadiationIn: this.solarInputWatts,
+      longwaveRadiationOut: this.solarInputWatts * 0.99,
+      sensibleHeatFlux: 1e8,
+      latentHeatFlux: 1e8,
+      netMassFlux: 0,
       solarInput: this.solarInputWatts,
       thermalRadiationOut: this.solarInputWatts * 0.99,
       matterEnthalpyFlux: 0,
-      netHeatFlux: netHeat
+      netHeatFlux: netHeat,
+      heatFluxes: new Map(),
+      massFluxes: new Map()
     };
     const exergyMetrics: IExergyMetrics = {
       T_0: STANDARD_AMBIENT_TEMPERATURE_K,
@@ -394,6 +401,10 @@ export class EarthPOD extends ThermodynamicStructure {
       tick: this.tickCreated,
       timestamp: this.tickCreated,
       internalEnergy: 1e12,
+      totalEntropy: 5e9,
+      temperature: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientReferenceTemp: STANDARD_AMBIENT_TEMPERATURE_K,
+      ambientTemperature: STANDARD_AMBIENT_TEMPERATURE_K,
       entropy: 5e9,
       entropyGenerationRate: entropyGen,
       exergyDestructionRate: STANDARD_AMBIENT_TEMPERATURE_K * entropyGen,

@@ -1,0 +1,112 @@
+@startuml
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Web of Life - Sprint 15: Thermodynamic State Vector & Exergy Architecture
+
+package "Thermodynamics TypeScript Contracts (src/thermodynamics/types.ts)" {
+  interface BoundaryFlux {
+    +readonly fluxId: string
+    +readonly species: string
+    +readonly massFlowRate: number
+    +readonly specificEnthalpy: number
+    +readonly specificEntropy: number
+    +readonly heatTransferRate: number
+    +readonly boundaryTemperature: number
+  }
+
+  interface ThermodynamicStateVector {
+    +readonly timestamp: number
+    +readonly temperature: number
+    +readonly deadStateTemperature: number
+    +internalEnergy: number
+    +entropy: number
+    +entropyGenerationRate: number
+    +exergyDestructionRate: number
+    +boundaryFluxes: BoundaryFlux[]
+  }
+
+  interface IThermodynamicModel {
+    +stepThermodynamics(dt: number): void
+    +validateFirstLaw(): boolean
+    +validateSecondLaw(): boolean
+    +getStateVector(): ThermodynamicStateVector
+  }
+}
+
+package "Cycle Hierarchy (src/cycles/)" {
+  abstract class BaseCycle {
+    #stateVector: ThermodynamicStateVector
+    +stepThermodynamics(dt: number): void
+    +validateFirstLaw(): boolean
+    +validateSecondLaw(): boolean
+    +getStateVector(): ThermodynamicStateVector
+  }
+
+  class CarbonCycle {
+    +stepThermodynamics(dt: number): void
+  }
+  class NitrogenCycle {
+    +stepThermodynamics(dt: number): void
+  }
+  class PhosphorusCycle {
+    +stepThermodynamics(dt: number): void
+  }
+  class WaterCycle {
+    +stepThermodynamics(dt: number): void
+  }
+
+  IThermodynamicModel <|.. BaseCycle
+  BaseCycle <|-- CarbonCycle
+  BaseCycle <|-- NitrogenCycle
+  BaseCycle <|-- PhosphorusCycle
+  BaseCycle <|-- WaterCycle
+}
+
+package "Relational Database Schema (db/schema.sql)" {
+  entity "thermodynamic_states" {
+    * state_id : UUID <<PK>>
+    --
+    * cycle_name : cycle_type
+    * timestamp : BIGINT
+    * temperature : DOUBLE PRECISION
+    * dead_state_temperature : DOUBLE PRECISION
+    * internal_energy : DOUBLE PRECISION
+    * entropy : DOUBLE PRECISION
+    * entropy_generation_rate : DOUBLE PRECISION {>= 0}
+    * exergy_destruction_rate : DOUBLE PRECISION {>= 0}
+    * first_law_residual : DOUBLE PRECISION
+    * second_law_valid : BOOLEAN
+  }
+
+  entity "boundary_fluxes" {
+    * flux_id : UUID <<PK>>
+    --
+    * state_id : UUID <<FK>>
+    * species : VARCHAR(64)
+    * mass_flow_rate : DOUBLE PRECISION
+    * specific_enthalpy : DOUBLE PRECISION
+    * specific_entropy : DOUBLE PRECISION
+    * heat_transfer_rate : DOUBLE PRECISION
+    * boundary_temperature : DOUBLE PRECISION
+  }
+
+  entity "thermodynamic_ledger_blocks" {
+    * block_id : BIGSERIAL <<PK>>
+    --
+    * previous_hash : VARCHAR(64)
+    * block_hash : VARCHAR(64)
+    * state_id : UUID <<FK>>
+    * miner_signature : VARCHAR(128)
+    * merkle_root : VARCHAR(64)
+    * timestamp : BIGINT
+  }
+
+  thermodynamic_states ||--o{ boundary_fluxes : "contains fluxes"
+  thermodynamic_states ||--o{ thermodynamic_ledger_blocks : "anchored to block"
+}
+
+ThermodynamicStateVector "1" *-- "0..*" BoundaryFlux : composes
+BaseCycle --> ThermodynamicStateVector : maintains
+@enduml

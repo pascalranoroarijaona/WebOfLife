@@ -8,7 +8,7 @@ describe('Sprint 004: Metabolic Thermodynamics & Extended Trophic Cascades', () 
     const monad = ThermodynamicMonad.of(initialStocks);
 
     // Test valid transformation (photosynthesis fix carbon while maintaining total elemental mass sum)
-    const nextMonad = monad.bind((stocks) => photosyntheticFixation(stocks, 10.0, 0.05));
+    const nextMonad = monad.bind((stocks: ElementalStocks) => photosyntheticFixation(stocks, 10.0, 0.05));
     const validation = nextMonad.validate();
     assert.strictEqual(validation.isValid, true, `Validation failed: ${validation.violations?.join(', ')}`);
   });

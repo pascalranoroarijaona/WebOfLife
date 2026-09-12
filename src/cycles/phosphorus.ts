@@ -1,40 +1,36 @@
-// Complete implementation of PhosphorusCycle in src/cycles/phosphorus.ts
-import { BaseCycle } from './base_cycle.js';
+/**
+ * @fileoverview Phosphorus Cycle implementation extending BaseCycle (Sprint 015)
+ */
+import { BaseCycle, stepThermodynamicMonad } from './base_cycle.js';
+import { BoundaryFlux } from '../thermodynamics/types.js';
 
 export class PhosphorusCycle extends BaseCycle {
-  constructor(config?: { initialStocks?: Record<string, number>; transferCoefficients?: Record<string, number> }) {
-    super("Phosphorus Cycle", {
-      initialStocks: config?.initialStocks ?? {
-        lithosphere_apatite: 4e9,
-        soil_phosphate: 200,
-        aquatic_sediment: 90000,
-        biomass: 3,
-      },
-      transferCoefficients: config?.transferCoefficients ?? {
-        weath: 0.00001,
-        uptake: 0.00005,
-        litter: 0.00004,
-        lith: 0.000002,
-      }
-    });
+  constructor() {
+    super("Phosphorus Cycle");
+    const defaultStocks = {
+      lithosphere_rock: 4e9,
+      soil: 200,
+      biosphere: 3,
+      ocean: 90000
+    };
+    for (const [k, v] of Object.entries(defaultStocks)) {
+      this.stocks.set(k, v);
+    }
   }
 
-  public step(deltaSeconds: number, solarInput: number): void {
-    const apatite = this.getStock('lithosphere_apatite');
-    const po4 = this.getStock('soil_phosphate');
-    const bio = this.getStock('biomass');
-    const sed = this.getStock('aquatic_sediment');
-
-    const fWeath = this.coeffs.weath * apatite * solarInput * deltaSeconds;
-    const fUptake = this.coeffs.uptake * po4 * bio * deltaSeconds;
-    const fLitter = this.coeffs.litter * bio * deltaSeconds;
-    const fLith = this.coeffs.lith * sed * deltaSeconds;
-
-    this.transfer('lithosphere_apatite', 'soil_phosphate', fWeath);
-    this.transfer('soil_phosphate', 'biomass', fUptake);
-    this.transfer('biomass', 'aquatic_sediment', fLitter);
-    this.transfer('aquatic_sediment', 'lithosphere_apatite', fLith);
+  public step(dt: number, solarFlux: number): void {
+    const flux: BoundaryFlux = {
+      fluxId: "phosphorus_weathering_flux",
+      species: "po4",
+      massFlowRate: 0.1,
+      specificEnthalpy: 150,
+      specificEntropy: 0.8,
+      heatTransferRate: solarFlux * 1e-6,
+      boundaryTemperature: 290.0
+    };
+    this.stateVector = stepThermodynamicMonad(this.stateVector, dt, [flux]);
   }
 }
 
+// Backward compatibility alias for sprint tests expecting PhosphorusCyclePOD
 export { PhosphorusCycle as PhosphorusCyclePOD };

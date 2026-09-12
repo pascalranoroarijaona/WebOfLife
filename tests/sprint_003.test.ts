@@ -12,10 +12,17 @@ describe('Sprint 003: Thermodynamic Monad Tests', () => {
       internalEnergy: 10000,
       totalEntropy: 33.33,
       entropy: 33.33,
+      temperature: 288.15,
+      ambientReferenceTemp: 288.15,
       referenceTemperature: 288.15,
       entropyGenerationRate: 1.0,
       exergyDestructionRate: 288.15,
       boundaryFluxes: {
+        solarRadiationIn: 0,
+        longwaveRadiationOut: 0,
+        sensibleHeatFlux: 0,
+        latentHeatFlux: 0,
+        netMassFlux: 0,
         heatFluxes: new Map(),
         radiativeNet: 0,
         massFluxes: new Map()

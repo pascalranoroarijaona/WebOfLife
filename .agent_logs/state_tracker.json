@@ -1,5 +1,5 @@
 {
-  "current_sprint": 13,
+  "current_sprint": 16,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -60,6 +60,21 @@
       "sprint": 12,
       "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux arrays.",
       "timestamp": "2026-09-12T09:08:46.302992+00:00"
+    },
+    {
+      "sprint": 13,
+      "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux arrays.",
+      "timestamp": "2026-09-12T09:15:17.370687+00:00"
+    },
+    {
+      "sprint": 14,
+      "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux arrays.",
+      "timestamp": "2026-09-12T09:21:55.721464+00:00"
+    },
+    {
+      "sprint": 15,
+      "goal": "Thermodynamic State Vector Interface (`src/thermodynamics/types.ts`): Establish strict contracts for internal entropy generation ($\\dot{S}_{\\text{gen}}$), exergy destruction rate ($\\dot{I} = T_0 \\dot{S}_{\\text{gen}}$), and boundary flux arrays.",
+      "timestamp": "2026-09-12T09:27:18.606576+00:00"
     }
   ]
 }

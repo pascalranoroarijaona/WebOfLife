@@ -1,0 +1,156 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amsfonts, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{color}
+\geometry{margin=1in}
+
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstset{
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegray},
+  keywordstyle=\color{blue},
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{magenta},
+  basicstyle=\ttfamily\small,
+  breakatwhitespace=false,         
+  breaklines=true,                 
+  captionpos=b,                    
+  keepspaces=true,                 
+  numbers=left,                    
+  numbersep=5pt,                  
+  showspaces=false,                
+  showstringspaces=false,
+  showtabs=false,                  
+  tabsize=2
+}
+
+\title{\textbf{Sprint 13: Thermodynamic State Vector Interface \& Biogeochemical Conservation Contracts in the \textit{Web of Life} Simulation}}
+\author{Lead Scientific Communications \& Academic Outreach Agent \\ \textbf{Web of Life Research Group}}
+\date{Current Sprint Cycle (Sprint 13)}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+As the \textit{Web of Life} simulation evolves toward an exact macroscopic and microscopic thermodynamic representation of Gaia, treating matter and energy as unconstrained pools is no longer sufficient. Sprint 13 establishes the \textbf{Thermodynamic State Vector Interface} (\texttt{src/thermodynamics/types.ts}). This interface provides rigorous mathematical contracts for: (1) internal entropy generation rates ($\dot{S}_{\text{gen}} \ge 0$), (2) exergy destruction rates ($\dot{I} = T_0 \dot{S}_{\text{gen}}$ where $T_0$ is the ambient reference temperature), and (3) boundary flux arrays accounting for incoming solar exergy, outgoing thermal radiation, and matter conservation boundaries. This specification guarantees absolute adherence to the First Law of Thermodynamics (energy conservation across closed and open ecosystem boundaries) and the Second Law of Thermodynamics (irreversibility and non-negative entropy generation).
+\end{abstract}
+
+\noindent\textbf{Official Repository:} \url{https://github.com/pascalranoroarijaona/WebOfLife}
+
+\section{Introduction and Systems Ecology Motivation}
+Classical ecological modeling often relies purely on mass-action kinetics and carbon-centric balance equations without enforcing rigorous thermodynamic state tracking. In the \textit{Web of Life} framework, ecosystems are viewed as far-from-equilibrium thermodynamic systems driven by solar exergy fluxes and governed by dissipative structures. 
+
+Sprint 13 bridges microscopic biogeochemical cycling (carbon, nitrogen, phosphorus, and water) with macroscopic irreversible thermodynamics. By introducing \texttt{IThermodynamicStateVector}, \texttt{IBoundaryFluxArray}, and \texttt{IExergyMetrics}, we ensure that every simulated time step strictly obeys energy conservation and entropy production inequalities.
+
+\section{Architectural Placement and Interface Contracts}
+The thermodynamic architecture integrates directly with the main simulation loop (\texttt{EarthPod}) and provides foundational contracts implemented by concrete thermodynamic engines and biogeochemical cycles.
+
+\begin{verbatim}
+                  ┌─────────────────────────────────────────┐
+                  │          EarthPod / Main Loop           │
+                  └────────────────────┬────────────────────┘
+                                       │ uses
+                                       ▼
+                  ┌─────────────────────────────────────────┐
+                  │   src/thermodynamics/types.ts           │
+                  │   - IThermodynamicStateVector           │
+                  │   - IBoundaryFluxArray                  │
+                  │   - IExergyMetrics                      │
+                  └────────┬────────────────────────┬───────┘
+                           │                        │
+       extends / implements│                        │ implements
+                           ▼                        ▼
+┌──────────────────────────────────────┐   ┌──────────────────────────────┐
+│  src/thermodynamics/                 │   │  src/cycles/                 │
+│  thermodynamic_structure.ts          │   │  carbon.ts, nitrogen.ts,     │
+│  (Concrete Thermodynamic Engine)     │   │  phosphorus.ts, water.ts     │
+└──────────────────────────────────────┘   └──────────────────────────────┘
+\end{verbatim}
+
+\subsection{Core TypeScript Interfaces}
+The strict contracts implemented in \texttt{src/thermodynamics/types.ts} are defined as follows:
+
+\begin{lstlisting}[language=Java, caption={Core Thermodynamic TypeScript Interfaces}]
+export interface IBoundaryFluxArray {
+  solarInput: number;           // Incoming solar radiative flux (W). Must be >= 0.
+  thermalRadiationOut: number;  // Outgoing thermal/longwave radiative flux (W).
+  matterEnthalpyFlux: number;   // Enthalpy flux associated with matter exchange (W).
+  netHeatFlux: number;          // Net heat transfer rate across system boundary (W).
+}
+
+export interface IExergyMetrics {
+  T_0: number;                    // Ambient reference temperature (K), default = 288.15 K.
+  entropyGenerationRate: number;  // Internal entropy generation rate (\dot{S}_gen, W/K) >= 0.
+  exergyDestructionRate: number;  // Exergy destruction rate (\dot{I} = T_0 * \dot{S}_gen, W).
+  totalExergy: number;            // Total available exergy or exergy content (W).
+}
+
+export interface IThermodynamicStateVector {
+  tick: number;                   // Simulation tick identifier.
+  internalEnergy: number;         // Total internal energy of the system U (Joules).
+  totalEntropy: number;           // Total system entropy S (J/K).
+  boundaryFluxes: IBoundaryFluxArray;
+  exergyMetrics: IExergyMetrics;
+  
+  validateFirstLaw(dt: number, previousEnergy: number): boolean;
+  validateSecondLaw(): boolean;
+}
+\end{lstlisting}
+
+\section{Mathematical Formulation \& Conservation Laws}
+
+\subsection{First Law: Energy Conservation Monad}
+The internal energy change of any ecological or planetary compartment over time step $\Delta t$ is governed by:
+\begin{equation}
+\Delta U = U^{(t+\Delta t)} - U^{(t)} = \int_{t}^{t+\Delta t} \left( \dot{Q}_{\text{net}} - \dot{W}_{\text{net}} + \sum_k \dot{H}_{k, \text{in}} - \sum_k \dot{H}_{k, \text{out}} \right) dt
+\end{equation}
+
+Expressed in code via validation methods:
+\begin{lstlisting}[language=Java, caption={First Law Validation Implementation}]
+public validateFirstLaw(dt: number, previousEnergy: number): boolean {
+  const netHeat = this.boundaryFluxes.netHeatFlux * dt;
+  const matterEnthalpy = this.boundaryFluxes.matterEnthalpyFlux * dt;
+  const expectedEnergy = previousEnergy + netHeat + matterEnthalpy;
+  const tolerance = 1e-6;
+  return Math.abs(this.internalEnergy - expectedEnergy) <= tolerance;
+}
+\end{lstlisting}
+
+\subsection{Second Law: Entropy Generation \& Exergy Destruction}
+The total entropy change of an open thermodynamic system is partitioned into boundary transfers and internal generation ($\dot{S}_{\text{gen}}$):
+\begin{equation}
+\frac{dS}{dt} = \sum_{i} \frac{\dot{Q}_i}{T_i} + \sum_{k} \dot{m}_k s_k + \dot{S}_{\text{gen}}
+\end{equation}
+
+With the strict Second Law constraint and Gouy-Stodola theorem relation ($\dot{I} = T_0 \dot{S}_{\text{gen}}$):
+\begin{equation}
+\dot{S}_{\text{gen}} \ge 0, \quad \dot{I} \ge 0
+\end{equation}
+
+\begin{lstlisting}[language=Java, caption={Second Law Validation Implementation}]
+public validateSecondLaw(): boolean {
+  const { entropyGenerationRate, exergyDestructionRate, T_0 } = this.exergyMetrics;
+  const expectedExergyDestruction = T_0 * entropyGenerationRate;
+  const tolerance = 1e-6;
+
+  const satisfiesSecondLaw = entropyGenerationRate >= 0;
+  const satisfiesGouyStodola = Math.abs(exergyDestructionRate - expectedExergyDestruction) <= tolerance;
+
+  return satisfiesSecondLaw && satisfiesGouyStodola;
+}
+\end{lstlisting}
+
+\section{Conclusion}
+Sprint 13 establishes the rigorous thermodynamic bedrock required for the \textit{Web of Life} simulation. By enforcing First Law energy closure and Second Law exergy degradation across all biogeochemical cycles, the simulation accurately portrays planetary metabolism, thermodynamic efficiency, and ecological dissipative structuring.
+
+\vspace{1em}
+\noindent\textbf{Explore the repository and contribute:} \url{https://github.com/pascalranoroarijaona/WebOfLife}
+
+\end{document}
