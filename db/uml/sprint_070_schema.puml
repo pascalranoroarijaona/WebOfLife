@@ -1,0 +1,41 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life Thermodynamics" {
+    class ThermodynamicStateVector {
+        +entityId: string
+        +vectorType: string
+        +stocks: Map<string, number>
+        +timestamp: Date
+        +getVal(key: string): number
+    }
+
+    class StateValidator {
+        +{static} computeAbsoluteStockDelta(actual: ThermodynamicStateVector, expected: ThermodynamicStateVector): Record<string, number>
+    }
+
+    class ThermodynamicMonadProcess {
+        +currentState: ThermodynamicStateVector
+        +expectedState: ThermodynamicStateVector
+        +executeProcess(): ThermodynamicStateVector
+        +validateDiscrepancy(): Record<string, number>
+    }
+
+    class BlockchainLedger {
+        +blockId: number
+        +previousHash: string
+        +currentHash: string
+        +transactionSignature: string
+        +stateDeltaSummary: Record<string, number>
+        +entropyChange: number
+        +commitBlock(): void
+    }
+}
+
+ThermodynamicStateVector --* ThermodynamicMonadProcess : manages >
+StateValidator ..> ThermodynamicStateVector : inspects >
+ThermodynamicMonadProcess ..> StateValidator : invokes computeAbsoluteStockDelta() >
+ThermodynamicMonadProcess --> BlockchainLedger : records state delta >
+
+@enduml

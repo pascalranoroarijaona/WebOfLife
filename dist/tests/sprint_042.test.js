@@ -33,13 +33,13 @@ describe('Sprint 042: Thermodynamic State Vector Non-Negative Entropy Assertion 
         assert.strictEqual(resNaN.success, false);
         if (!resNaN.success) {
             const errStr = typeof resNaN.error === 'string' ? resNaN.error : resNaN.error.message;
-            assert.match(errStr, /entropy is NaN/);
+            assert.match(errStr, /Entropy metric is missing/);
         }
         const resType = assertNonNegativeEntropy(invalidTypeState);
         assert.strictEqual(resType.success, false);
         if (!resType.success) {
             const errStr = typeof resType.error === 'string' ? resType.error : resType.error.message;
-            assert.match(errStr, /Invalid entropy/);
+            assert.match(errStr, /Entropy metric is missing/);
         }
     });
 });

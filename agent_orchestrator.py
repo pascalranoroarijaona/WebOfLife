@@ -1278,7 +1278,7 @@ def execute_sprint_cycle() -> bool:
         file_tree_summary = get_repository_summary()
         
         # Détection de boucle et préparation du contexte d'urgence
-        recent_history = get_recent_sprint_history(5)
+        recent_history = get_recent_sprint_history(1)
         stuck_warning = ""
         if is_sprint_stuck(threshold=4):
             print("   ⚠️ [Alerte] Boucle détectée ! Le PM va être forcé de fragmenter la tâche en cours.")
