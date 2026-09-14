@@ -1,0 +1,58 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+title Web of Life - Sprint 011 Architecture (H3 Spatial Validation & Thermodynamic Ledger)
+
+interface IH3Validator {
+  + validateIndex(h3Index: string): boolean
+}
+
+class H3GridManager {
+  - {static} H3_REGEX: RegExp
+  - {static} H3_EXPECTED_LENGTH: number
+  + validateIndex(h3Index: string): boolean
+}
+
+class SpatialMonad {
+  - h3Index: string
+  - validator: IH3Validator
+  - enthalpyStock: number
+  + processStateTransition(payload: string): void
+  + verifyBoundary(): boolean
+}
+
+class TrophicStock {
+  - stockId: string
+  - trophicLevel: TrophicLevel
+  - enthalpyJoules: number
+  - biomassKg: number
+  + transferEnergy(target: TrophicStock, amount: number): void
+}
+
+class ThermodynamicBlock {
+  - blockId: string
+  - blockHeight: int
+  - previousHash: string
+  - merkleRoot: string
+  - solarInputJoules: number
+  - dissipatedEnthalpyJoules: number
+  - minerSignature: string
+  + verifyIntegrity(): boolean
+}
+
+class SpatialMonadTransaction {
+  - txId: string
+  - h3IndexPayload: string
+  - transactionType: String
+  - enthalpyDeltaJoules: number
+  - signature: string
+  + persistLedger(): void
+}
+
+IH3Validator <|.. H3GridManager
+H3GridManager --* SpatialMonad : uses for validation
+SpatialMonad --> TrophicStock : encapsulates energy
+ThermodynamicBlock "1" *-- "*" SpatialMonadTransaction : contains
+SpatialMonadTransaction --> SpatialMonad : records transition state
+
+@enduml

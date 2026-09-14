@@ -1,14 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { H3Validator, H3Error, H3ErrorCode } from '../src/spatial/h3_grid';
-import { H3ValidationMonad } from '../src/monads/spatial_monad';
+import { H3Validator, H3Error, H3ErrorCode } from '../src/spatial/h3_grid.js';
+import { H3ValidationMonad } from '../src/monads/spatial_monad.js';
 
 describe('Sprint 006: Uber H3 Index String Format Validation & Error Code Mapping', () => {
   const validator = new H3Validator();
 
   it('should validate correct 15-character hex H3 index strings', () => {
     // A sample valid H3-like 15-char hex string with resolution 5 and base cell 10
-    // E.g., 85283473fffffff
     const validIndex = '85283473fffffff';
     assert.strictEqual(validator.validate(validIndex), true);
     assert.doesNotThrow(() => validator.assertValid(validIndex));
@@ -57,14 +56,14 @@ describe('Sprint 006: Uber H3 Index String Format Validation & Error Code Mappin
     };
 
     const monad = H3ValidationMonad.unit(initialState, validator);
-    const nextMonad = monad.bind(state => ({
+    const nextMonad = monad.bind((state: { h3Index: string; matter: { carbon: number }; energy: { solar: number } }) => ({
       ...state,
       matter: { carbon: state.matter.carbon + 10 }
     }));
 
     const result = nextMonad.match<number | H3ErrorCode>(
-      s => s.matter.carbon,
-      err => err.code
+      (s: { h3Index: string; matter: { carbon: number }; energy: { solar: number } }) => s.matter.carbon,
+      (err: { code: H3ErrorCode; message: string }) => err.code
     );
 
     assert.strictEqual(result, 110);
@@ -78,14 +77,14 @@ describe('Sprint 006: Uber H3 Index String Format Validation & Error Code Mappin
     };
 
     const monad = H3ValidationMonad.unit(initialState, validator);
-    const failedMonad = monad.bind(state => ({
+    const failedMonad = monad.bind((state: { h3Index: string; matter: { carbon: number }; energy: { solar: number } }) => ({
       ...state,
       h3Index: 'INVALID_INDEX_STR'
     }));
 
     const errorCode: H3ErrorCode = failedMonad.match<H3ErrorCode>(
       () => H3ErrorCode.SUCCESS,
-      err => err.code
+      (err: { code: H3ErrorCode; message: string }) => err.code
     );
 
     assert.strictEqual(errorCode, H3ErrorCode.INVALID_CHARACTER);
