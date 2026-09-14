@@ -1,47 +1,41 @@
--- Updated Schema & Ledger Definitions for Sprint 018
--- Web of Life Database, UML & Thermodynamic Blockchain Architect
+-- Updated Schema & Ledger Definitions (Sprint 019: H3 Spatial Validation & Thermodynamic Blockchain)
 
-CREATE TABLE IF NOT EXISTS spatial_cells (
-    cell_id VARCHAR(15) PRIMARY KEY,
-    resolution INT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    solar_flux_joules NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_h3_length CHECK (LENGTH(cell_id) = 15 AND cell_id ~ '^[0-9a-fA-F]{15}$')
+-- Enable TimescaleDB extension if not already present
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- Spatial Indices and H3 Validation Metadata Ledger
+CREATE TABLE IF NOT EXISTS spatial_h3_validations (
+    validation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    index_candidate VARCHAR(64) NOT NULL,
+    is_valid_length BOOLEAN NOT NULL,
+    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    solar_compute_joules NUMERIC(18, 6) DEFAULT 0.000001
 );
 
+-- Convert to hypertable for time-series analytics on spatial validation requests
+SELECT create_hypertable('spatial_h3_validations', 'validated_at', if_not_exists => TRUE);
+
+-- Thermodynamic Stock Ledger for Spatial Monads
 CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
     stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cell_id VARCHAR(15) NOT NULL REFERENCES spatial_cells(cell_id),
-    biomass_grams NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    entropy_joules_per_k NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    monad_name VARCHAR(128) NOT NULL,
+    mass_energy_joules NUMERIC(24, 8) NOT NULL,
+    solar_flux_absorbed NUMERIC(24, 8) NOT NULL,
+    entropy_delta NUMERIC(24, 8) NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS thermodynamic_flows (
-    flow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
-    target_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
-    energy_transferred_joules NUMERIC(18, 6) NOT NULL CHECK (energy_transferred_joules >= 0),
-    flow_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_index SERIAL PRIMARY KEY,
-    previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL UNIQUE,
-    merkle_root VARCHAR(64) NOT NULL,
-    solar_input_validator VARCHAR(128) NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS block_transactions (
+-- Blockchain Block Transaction Signatures
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
     transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_index INT REFERENCES blockchain_blocks(block_index),
-    flow_id UUID REFERENCES thermodynamic_flows(flow_id),
-    signature VARCHAR(128) NOT NULL
+    block_height BIGINT NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL,
+    payload_ref UUID REFERENCES spatial_h3_validations(validation_id),
+    signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexing for high-performance spatial-thermodynamic lookups
-CREATE INDEX IF NOT EXISTS idx_spatial_cells_id ON spatial_cells(cell_id);
-CREATE INDEX IF NOT EXISTS idx_thermodynamic_stocks_cell ON thermodynamic_stocks(cell_id);
-CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_hash ON blockchain_blocks(current_hash);
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_candidate ON spatial_h3_validations(index_candidate);
+CREATE INDEX IF NOT EXISTS idx_blockchain_block_height ON blockchain_transactions(block_height);

@@ -1,0 +1,43 @@
+```code snippet
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+
+title Web of Life - Sprint 019 Architecture (H3 Spatial Validation & Thermodynamic Blockchain)
+
+class H3GridValidator {
+    + isValidH3IndexLength(index: string): boolean
+}
+
+class SpatialH3ValidationRecord {
+    + validationId: UUID
+    + indexCandidate: string
+    + isValidLength: boolean
+    + validatedAt: Timestamp
+    + solarComputeJoules: decimal
+}
+
+class ThermodynamicStock {
+    + stockId: UUID
+    + monadName: string
+    + massEnergyJoules: decimal
+    + solarFluxAbsorbed: decimal
+    + entropyDelta: decimal
+    + updatedAt: Timestamp
+}
+
+class BlockchainTransaction {
+    + transactionId: UUID
+    + blockHeight: long
+    + previousHash: string
+    + blockHash: string
+    + payloadRef: UUID
+    + signature: string
+    + createdAt: Timestamp
+}
+
+H3GridValidator --> SpatialH3ValidationRecord : generates validation state
+SpatialH3ValidationRecord "1" o-- "1" BlockchainTransaction : anchors to ledger
+ThermodynamicStock "1" --> "*" BlockchainTransaction : governs energy state
+
+@enduml
