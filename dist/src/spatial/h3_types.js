@@ -1,32 +1,12 @@
 /**
- * Web of Life - H3 Types and Unified Thermodynamic/DGGS Contracts
- * Retro-compatible across Sprints 001 - 049
+ * Spatial H3 Types & Interface Definitions
+ * Defines vertical strata, boundary contact geometry, and planetary discretization schemas.
  */
-// =============================================================================
-// SPRINT 005 & SPRINT 006: ERROR CODES
-// =============================================================================
-export var H3ErrorCode;
-(function (H3ErrorCode) {
-    H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
-    H3ErrorCode["INVALID_LENGTH"] = "H3_ERR_INVALID_LENGTH";
-    H3ErrorCode["INVALID_CHARACTER"] = "H3_ERR_INVALID_CHARACTER";
-    H3ErrorCode["INVALID_RESOLUTION"] = "H3_ERR_INVALID_RESOLUTION";
-    H3ErrorCode["INVALID_BASE_CELL"] = "H3_ERR_INVALID_BASE_CELL";
-    H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
-})(H3ErrorCode || (H3ErrorCode = {}));
-// =============================================================================
-// SPRINT 035: GUARD CLAUSE EXCEPTIONS
-// =============================================================================
-export class SpatialGuardClauseException extends Error {
-    constructor(message) {
-        super(`[SpatialGuardClauseException] ${message}`);
-        this.name = 'SpatialGuardClauseException';
-        Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
-    }
-}
-// =============================================================================
-// SPRINT 045: THERMODYNAMIC CHANNELS & CONSTANTS
-// =============================================================================
+import { THERMODYNAMIC_CONSTANTS } from '../thermodynamics/constants.js';
+export { THERMODYNAMIC_CONSTANTS };
+/**
+ * State tensor channels for Float64 contiguous spatial layout
+ */
 export var ThermodynamicChannel;
 (function (ThermodynamicChannel) {
     ThermodynamicChannel[ThermodynamicChannel["WATER_MASS_KG"] = 0] = "WATER_MASS_KG";
@@ -39,22 +19,19 @@ export var ThermodynamicChannel;
     ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 7] = "SENSIBLE_HEAT_JOULES";
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
-export const THERMODYNAMIC_CONSTANTS = {
-    MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 10_000.0,
-    SPECIFIC_HEAT: {
-        WATER: 4184.0,
-        SOIL_ORGANIC_CARBON: 1800.0,
-        VEGETATION_BIOMASS: 1900.0,
-        ATMOSPHERIC_CO2: 846.0,
-        MINERAL_NITROGEN: 1200.0,
-        REGOLITH: 840.0,
-    },
-    SPECIFIC_ENTHALPY: {
-        WATER: -15.87e6,
-        SOIL_ORGANIC_CARBON: -32.79e6,
-        VEGETATION_BIOMASS: -17.50e6,
-        ATMOSPHERIC_CO2: -8.94e6,
-        MINERAL_NITROGEN: -2.85e6,
-    },
-};
+export class SpatialGuardClauseException extends Error {
+    constructor(message) {
+        super(`[SpatialGuardClauseException] ${message}`);
+        this.name = 'SpatialGuardClauseException';
+        Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
+    }
+}
+export var H3ErrorCode;
+(function (H3ErrorCode) {
+    H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
+    H3ErrorCode["INVALID_LENGTH"] = "H3_ERR_INVALID_LENGTH";
+    H3ErrorCode["INVALID_CHARACTER"] = "H3_ERR_INVALID_CHARACTER";
+    H3ErrorCode["INVALID_RESOLUTION"] = "H3_ERR_INVALID_RESOLUTION";
+    H3ErrorCode["INVALID_BASE_CELL"] = "H3_ERR_INVALID_BASE_CELL";
+    H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
+})(H3ErrorCode || (H3ErrorCode = {}));

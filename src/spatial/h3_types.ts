@@ -1,61 +1,94 @@
 /**
- * Web of Life - H3 Types and Unified Thermodynamic/DGGS Contracts
- * Retro-compatible across Sprints 001 - 049
+ * Spatial H3 Types & Interface Definitions
+ * Defines vertical strata, boundary contact geometry, and planetary discretization schemas.
  */
 
-// =============================================================================
-// SPRINT 005 & SPRINT 006: ERROR CODES
-// =============================================================================
+import { THERMODYNAMIC_CONSTANTS } from '../thermodynamics/constants.js';
 
-export enum H3ErrorCode {
-  SUCCESS = "H3_SUCCESS",
-  INVALID_LENGTH = "H3_ERR_INVALID_LENGTH",
-  INVALID_CHARACTER = "H3_ERR_INVALID_CHARACTER",
-  INVALID_RESOLUTION = "H3_ERR_INVALID_RESOLUTION",
-  INVALID_BASE_CELL = "H3_ERR_INVALID_BASE_CELL",
-  NULL_INDEX = "H3_ERR_NULL_INDEX"
+export { THERMODYNAMIC_CONSTANTS };
+
+/**
+ * Geometric definition of a vertical stratum for an H3 cell relative to Mean Sea Level (MSL).
+ */
+export interface IVerticalStratum {
+  /** Altitude/elevation of stratum base relative to MSL (meters). */
+  readonly zBaseMeters: number;
+  /** Altitude/elevation of stratum top relative to MSL (meters). */
+  readonly zTopMeters: number;
 }
 
-// =============================================================================
-// SPRINT 035: GUARD CLAUSE EXCEPTIONS
-// =============================================================================
-
-export class SpatialGuardClauseException extends Error {
-  constructor(message: string) {
-    super(`[SpatialGuardClauseException] ${message}`);
-    this.name = 'SpatialGuardClauseException';
-    Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
-  }
+/**
+ * Configuration options for calculating H3 boundary contact area.
+ */
+export interface IH3BoundaryContactAreaOptions {
+  /** Custom planetary radius in meters (defaults to WGS84 authalic radius: 6,371,007.2 m). */
+  readonly planetaryRadiusMeters?: number;
+  /** Whether to apply radial expansion scaling (1 + z / R). Default: true. */
+  readonly applyRadialExpansion?: boolean;
+  /** Explicit boundary length override in meters (optional, bypasses geodesic lookup). */
+  readonly boundaryLengthMeters?: number;
 }
 
-// =============================================================================
-// SPRINT 021 - 028: RESOLUTION TIERS
-// =============================================================================
-
-export type H3Resolution =
-  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-
-export type H3ResolutionTier = H3Resolution;
-
-export interface IResolutionTierValidator {
-  validateResolution(resolution: number): boolean;
-  assertValidResolution(resolution: number): asserts resolution is H3ResolutionTier;
+/**
+ * Detailed output for vertical boundary cross-section calculation.
+ */
+export interface IH3BoundaryContactAreaResult {
+  /** Effective vertical contact area in square meters (m^2). */
+  readonly contactAreaM2: number;
+  /** Shared lateral boundary length in meters (m). */
+  readonly boundaryLengthMeters: number;
+  /** Overlapping vertical depth/height in meters (m). */
+  readonly overlapHeightMeters: number;
+  /** Midpoint elevation of the overlapping interface relative to MSL (meters). */
+  readonly midPointElevationMeters: number;
+  /** Whether the cells are verified direct topological neighbors. */
+  readonly isAdjacent: boolean;
 }
 
-// =============================================================================
-// SPRINT 048: BOUNDARY CALCULATOR CONTRACT
-// =============================================================================
+/**
+ * Interface contract for discrete H3 boundary cross-section calculators.
+ */
+export interface IH3BoundaryContactCalculator {
+  calculateBoundaryContactArea(
+    cellIndexA: string,
+    stratumA: IVerticalStratum,
+    cellIndexB: string,
+    stratumB: IVerticalStratum,
+    options?: IH3BoundaryContactAreaOptions
+  ): IH3BoundaryContactAreaResult;
 
-export interface IH3BoundaryCalculator {
-  calculateSharedBoundaryLength(originId: string, neighborId: string): number;
-  calculateSharedBoundary?(a: string, b: string): any;
+  getSharedBoundaryEdgeLength(
+    cellIndexA: string,
+    cellIndexB: string,
+    radiusMeters?: number
+  ): number;
+
+  calculateVerticalOverlap(
+    stratumA: IVerticalStratum,
+    stratumB: IVerticalStratum
+  ): { overlapHeightMeters: number; midPointElevationMeters: number };
 }
 
-// =============================================================================
-// SPRINT 045: THERMODYNAMIC CHANNELS & CONSTANTS
-// =============================================================================
+/**
+ * Coordinate pair representation [latitude, longitude] in degrees.
+ */
+export type LatLngCoord = [number, number];
 
+/**
+ * H3 Cell Surface Descriptor.
+ */
+export interface IH3CellInfo {
+  readonly h3Index: string;
+  readonly resolution: number;
+  readonly centerLatLng: LatLngCoord;
+  readonly boundaryVertices: LatLngCoord[];
+  readonly isPentagon: boolean;
+  readonly areaM2: number;
+}
+
+/**
+ * State tensor channels for Float64 contiguous spatial layout
+ */
 export enum ThermodynamicChannel {
   WATER_MASS_KG = 0,
   SOIL_ORGANIC_CARBON_KG = 1,
@@ -68,26 +101,9 @@ export enum ThermodynamicChannel {
   CHANNEL_COUNT = 8,
 }
 
-export const THERMODYNAMIC_CONSTANTS = {
-  MIN_TEMPERATURE_KELVIN: 2.7315,
-  DEFAULT_REGOLITH_MASS_KG: 10_000.0,
-  SPECIFIC_HEAT: {
-    WATER: 4184.0,
-    SOIL_ORGANIC_CARBON: 1800.0,
-    VEGETATION_BIOMASS: 1900.0,
-    ATMOSPHERIC_CO2: 846.0,
-    MINERAL_NITROGEN: 1200.0,
-    REGOLITH: 840.0,
-  },
-  SPECIFIC_ENTHALPY: {
-    WATER: -15.87e6,
-    SOIL_ORGANIC_CARBON: -32.79e6,
-    VEGETATION_BIOMASS: -17.50e6,
-    ATMOSPHERIC_CO2: -8.94e6,
-    MINERAL_NITROGEN: -2.85e6,
-  },
-} as const;
-
+/**
+ * Partial override parameters for discrete H3 cells
+ */
 export interface CellThermodynamicOverride {
   waterMassKg?: number;
   soilOrganicCarbonKg?: number;
@@ -99,6 +115,9 @@ export interface CellThermodynamicOverride {
   sensibleHeatJoules?: number;
 }
 
+/**
+ * Granular ledger record for overridden cells
+ */
 export interface CellThermodynamicDeltaRecord {
   h3Index: string;
   cellIndex: number;
@@ -109,6 +128,9 @@ export interface CellThermodynamicDeltaRecord {
   overriddenFields: (keyof CellThermodynamicOverride)[];
 }
 
+/**
+ * Report generated upon executing thermodynamic overrides
+ */
 export interface ThermodynamicOverrideReport {
   timestamp: number;
   cellCountModified: number;
@@ -132,42 +154,37 @@ export interface OverrideOptions {
   allowMassDestruction?: boolean;
 }
 
-// =============================================================================
-// SPRINT 049: TOPOLOGY & FLUX CONTRACTS
-// =============================================================================
+export type H3ResolutionTier =
+  | 0
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15;
 
-export interface H3CellDecomposition {
-  readonly mode: number;
-  readonly reserved: number;
-  readonly resolution: number;
-  readonly baseCell: number;
-  readonly digits: readonly number[];
-  readonly isPentagon: boolean;
+export class SpatialGuardClauseException extends Error {
+  constructor(message: string) {
+    super(`[SpatialGuardClauseException] ${message}`);
+    this.name = 'SpatialGuardClauseException';
+    Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
+  }
 }
 
-export interface IH3TopologyValidator {
-  isPentagon(h3Index: string | bigint): boolean;
-  getBaseCell(h3Index: string | bigint): number;
-  getResolution(h3Index: string | bigint): number;
-  getCoordinationNumber(h3Index: string | bigint): 5 | 6;
-  decompose(h3Index: string | bigint): H3CellDecomposition;
-  validateIndex(h3Index: string | bigint): void;
-}
-
-export interface FluxStencil {
-  readonly sourceCell: string | bigint;
-  readonly targetCell: string | bigint;
-  readonly contactAreaM2?: number;
-  readonly dtSeconds?: number;
-  readonly sourceConcentration?: number;
-  readonly targetConcentration?: number;
-  readonly diffusionCoeff?: number;
-  readonly velocityNormal?: number;
-}
-
-export interface Flux {
-  readonly massFlux: number;
-  readonly energyFlux: number;
-  readonly isPentagonalInterface: boolean;
-  readonly effectiveAreaM2: number;
+export enum H3ErrorCode {
+  SUCCESS = 'H3_SUCCESS',
+  INVALID_LENGTH = 'H3_ERR_INVALID_LENGTH',
+  INVALID_CHARACTER = 'H3_ERR_INVALID_CHARACTER',
+  INVALID_RESOLUTION = 'H3_ERR_INVALID_RESOLUTION',
+  INVALID_BASE_CELL = 'H3_ERR_INVALID_BASE_CELL',
+  NULL_INDEX = 'H3_ERR_NULL_INDEX',
 }

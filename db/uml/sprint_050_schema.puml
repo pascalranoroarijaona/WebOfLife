@@ -1,0 +1,177 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 4
+skinparam classFontSize 12
+skinparam classFontName "Courier"
+skinparam classAttributeIconSize 0
+skinparam packageFontSize 14
+skinparam packageFontName "Helvetica"
+skinparam defaultTextAlignment left
+skinparam arrowColor #1B365D
+skinparam shadowing false
+
+title Web of Life - Vertical Boundary Contact Area & Thermodynamic Monad Ledger (Sprint 050)
+
+package "Spatial Boundary Geometry Domain (src/spatial)" {
+  
+  interface IVerticalStratum <<interface>> {
+    +zBaseMeters: number
+    +zTopMeters: number
+  }
+
+  interface IH3BoundaryContactAreaOptions <<interface>> {
+    +planetaryRadiusMeters?: number
+    +applyRadialExpansion?: boolean
+    +boundaryLengthMeters?: number
+  }
+
+  interface IH3BoundaryContactAreaResult <<interface>> {
+    +contactAreaM2: number
+    +boundaryLengthMeters: number
+    +overlapHeightMeters: number
+    +midPointElevationMeters: number
+    +isAdjacent: boolean
+  }
+
+  interface IH3BoundaryContactCalculator <<interface>> {
+    +calculateBoundaryContactArea(cellA: string, stratA: IVerticalStratum, cellB: string, stratB: IVerticalStratum, opts?: IH3BoundaryContactAreaOptions): IH3BoundaryContactAreaResult
+    +getSharedBoundaryEdgeLength(cellA: string, cellB: string, radius: number): number
+    +calculateVerticalOverlap(stratA: IVerticalStratum, stratB: IVerticalStratum): number
+  }
+
+  class H3BoundaryContactCalculator implements IH3BoundaryContactCalculator {
+    -earthRadiusMeters: number
+    -edgeLengthCache: Map<string, number>
+    +calculateBoundaryContactArea(cellA: string, stratA: IVerticalStratum, cellB: string, stratB: IVerticalStratum, opts?: IH3BoundaryContactAreaOptions): IH3BoundaryContactAreaResult
+    +getSharedBoundaryEdgeLength(cellA: string, cellB: string, radius: number): number
+    +calculateVerticalOverlap(stratA: IVerticalStratum, stratB: IVerticalStratum): number
+    -canonicalKey(cellA: string, cellB: string): string
+    -computeRadialScale(elevation: number): number
+  }
+
+  class H3AdjacencyManager {
+    -contactCalculator: IH3BoundaryContactCalculator
+    +getBoundaryContactArea(cellA: string, stratA: IVerticalStratum, cellB: string, stratB: IVerticalStratum): IH3BoundaryContactAreaResult
+    +getAdjacentNeighbors(cellIndex: string): string[]
+    +areNeighbors(cellA: string, cellB: string): boolean
+  }
+
+  H3AdjacencyManager o-- IH3BoundaryContactCalculator : delegates to
+  H3BoundaryContactCalculator ..> IH3BoundaryContactAreaResult : produces
+  H3BoundaryContactCalculator ..> IVerticalStratum : consumes
+  H3BoundaryContactCalculator ..> IH3BoundaryContactAreaOptions : configures
+}
+
+package "Thermodynamic State & Monad Domain (src/monads)" {
+
+  class SpatialMonad<TState> {
+    -state: TState
+    +bind<TNext>((state: TState) => SpatialMonad<TNext>): SpatialMonad<TNext>
+    +applyFluxDivergence(dt: number, interfaces: IH3BoundaryContactAreaResult[]): SpatialMonad<TState>
+    +assertThermodynamicInvariance(): boolean
+  }
+
+  class LateralFluxTensor {
+    +fluxDensity: number
+    +fluxType: string
+    +calculateTotalTransfer(contactAreaM2: number, dtSeconds: number): number
+  }
+
+  SpatialMonad ..> LateralFluxTensor : executes divergence
+  SpatialMonad ..> IH3BoundaryContactAreaResult : scales via contactAreaM2
+}
+
+package "Relational & Blockchain Persistence (db/schema.sql)" {
+
+  entity "h3_cell_strata" as H3CellStrata {
+    *stratum_id : UUID <<PK>>
+    --
+    *h3_index : VARCHAR(15)
+    *resolution : SMALLINT
+    *layer_type : planetary_stratum_layer
+    *z_base_meters : DOUBLE PRECISION
+    *z_top_meters : DOUBLE PRECISION
+    volume_m3 : DOUBLE PRECISION <<GENERATED>>
+    is_active : BOOLEAN
+    created_at : TIMESTAMPTZ
+  }
+
+  entity "h3_boundary_interfaces" as H3BoundaryInterfaces {
+    *interface_id : UUID <<PK>>
+    --
+    *cell_index_a : VARCHAR(15)
+    *cell_index_b : VARCHAR(15)
+    *stratum_id_a : UUID <<FK>>
+    *stratum_id_b : UUID <<FK>>
+    is_adjacent : BOOLEAN
+    nominal_edge_length_meters : DOUBLE PRECISION
+    midpoint_elevation_meters : DOUBLE PRECISION
+    radial_scale_factor : DOUBLE PRECISION
+    effective_overlap_height_meters : DOUBLE PRECISION
+    *contact_area_m2 : DOUBLE PRECISION
+    geometry_checksum : VARCHAR(64)
+    calculated_at : TIMESTAMPTZ
+  }
+
+  entity "thermodynamic_blocks" as ThermodynamicBlocks {
+    *block_height : BIGSERIAL <<PK>>
+    --
+    *block_hash : VARCHAR(64) <<UQ>>
+    previous_block_hash : VARCHAR(64)
+    epoch_timestamp : TIMESTAMPTZ
+    delta_time_seconds : DOUBLE PRECISION
+    total_mass_kg : NUMERIC(38, 8)
+    total_internal_energy_joules : NUMERIC(38, 8)
+    entropy_production_joules_per_kelvin : NUMERIC(38, 8)
+    merkle_root : VARCHAR(64)
+    created_at : TIMESTAMPTZ
+  }
+
+  entity "thermodynamic_lateral_flux_transactions" as LateralFluxTransactions {
+    *transaction_id : UUID <<PK>>
+    --
+    *block_height : BIGINT <<FK>>
+    *interface_id : UUID <<FK>>
+    *flux_type : thermodynamic_flux_type
+    flux_density : DOUBLE PRECISION
+    total_flux_quantity : NUMERIC(38, 12)
+    symmetry_verified : BOOLEAN
+    transaction_signature : VARCHAR(128)
+    executed_at : TIMESTAMPTZ
+  }
+
+  entity "thermodynamic_cell_stocks" as CellStocks {
+    *stock_record_id : UUID <<PK>>
+    --
+    *block_height : BIGINT <<FK>>
+    *stratum_id : UUID <<FK>>
+    mass_stock_kg : NUMERIC(38, 8)
+    internal_energy_joules : NUMERIC(38, 8)
+    temperature_kelvin : DOUBLE PRECISION
+    pressure_pascals : DOUBLE PRECISION
+    divergence_mass_in_kg : NUMERIC(38, 12)
+    divergence_mass_out_kg : NUMERIC(38, 12)
+    divergence_energy_in_joules : NUMERIC(38, 12)
+    divergence_energy_out_joules : NUMERIC(38, 12)
+    recorded_at : TIMESTAMPTZ
+  }
+
+  H3CellStrata ||--o{ H3BoundaryInterfaces : "stratum_id_a"
+  H3CellStrata ||--o{ H3BoundaryInterfaces : "stratum_id_b"
+  H3CellStrata ||--o{ CellStocks : "tracks stock"
+  ThermodynamicBlocks ||--o{ LateralFluxTransactions : "commits"
+  ThermodynamicBlocks ||--o{ CellStocks : "anchors epoch"
+  H3BoundaryInterfaces ||--o{ LateralFluxTransactions : "constrains flux area"
+}
+
+note bottom of H3BoundaryContactCalculator
+  **Thermodynamic Symmetry Guarantee:**
+  L_scaled = L_geodesic(u, v) * (1 + z_mid / R)
+  Delta_z  = max(0, min(top_u, top_v) - max(base_u, base_v))
+  A_contact(u, v) == A_contact(v, u)
+  Lexicographical canonical ordering (cell_a < cell_b)
+  prevents floating-point asymmetry and drift.
+end note
+
+@enduml

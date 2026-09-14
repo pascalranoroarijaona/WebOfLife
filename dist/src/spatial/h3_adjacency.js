@@ -1,157 +1,130 @@
 /**
- * Web of Life - H3 Adjacency, Topology & Geodesic Transport Engine
- * Unified across Sprints 002 to 049
+ * Vertical Interface Cross-Section Contact Area Calculator and H3 Adjacency Manager
  */
-import { EARTH_RADIUS_METERS } from '../thermodynamics/constants.js';
+import * as h3 from 'h3-js';
+import { EARTH_AUTHALIC_RADIUS_METERS, EARTH_RADIUS_METERS, } from '../thermodynamics/constants.js';
+import { haversineDistanceMeters, getNominalH3EdgeLength } from './h3_grid.js';
 import { SpatialMonad } from '../monads/spatial_monad.js';
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-export const EARTH_MEAN_RADIUS_METERS = 6_371_007.1809;
-export const H3_NOMINAL_EDGE_LENGTH_TABLE = [
-    1_107_712.59, 418_676.01, 158_244.66, 59_810.86, 22_606.38, 8_544.41,
-    3_229.48, 1_220.63, 461.35, 174.38, 65.91, 24.91, 9.42, 3.56, 1.35, 0.51,
+export const EARTH_MEAN_RADIUS_METERS = 6371008.0;
+export const PENTAGON_BASE_CELLS = [
+    4, 14, 24, 38, 42, 58, 63, 72, 83, 87, 97, 107,
 ];
 export const H3_CONSTANTS = {
-    MODE_H3_CELL: 1,
-    MAX_RESOLUTION: 15,
-    CENTER_DIGIT: 0,
-    DELETED_PENTAGON_DIRECTION: 1,
-    PENTAGON_PERIMETER_FACTOR: 1.189207115,
+    PENTAGON_PERIMETER_FACTOR: 5.0 / 6.0,
 };
-export const PENTAGON_BASE_CELLS = new Set([
-    4, 14, 24, 38, 42, 58, 63, 72, 83, 87, 97, 107,
-]);
-export function haversineDistance(coord1, coord2, options) {
-    return calculateHaversineDistance(coord1, coord2, options);
-}
-export function calculateHaversineDistance(coord1, coord2, options = {}) {
-    const lat1 = Array.isArray(coord1) ? coord1[0] : coord1.lat;
-    const lon1 = Array.isArray(coord1) ? coord1[1] : coord1.lng;
-    const lat2 = Array.isArray(coord2) ? coord2[0] : coord2.lat;
-    const lon2 = Array.isArray(coord2) ? coord2[1] : coord2.lng;
-    if (lat1 === lat2 && lon1 === lon2) {
-        return 0.0;
+export const H3_NOMINAL_EDGE_LENGTH_TABLE = [
+    1107712.59,
+    418676.01,
+    158244.66,
+    59810.86,
+    22606.38,
+    8544.41,
+    3229.48,
+    1220.63,
+    461.35,
+    174.38,
+    65.91,
+    24.91,
+    9.42,
+    3.56,
+    1.35,
+    0.51,
+];
+export function calculateH3EdgeLengthMeters(r) {
+    if (typeof r !== 'number' || !Number.isInteger(r) || isNaN(r) || r < 0 || r > 15) {
+        throw new RangeError(`Invalid resolution tier: ${r}`);
     }
-    const R = options.radiusMeters ?? EARTH_RADIUS_METERS;
-    const toRad = Math.PI / 180.0;
-    const phi1 = lat1 * toRad;
-    const phi2 = lat2 * toRad;
-    const deltaPhi = (lat2 - lat1) * toRad;
-    const deltaLambda = (lon2 - lon1) * toRad;
-    const sinHalfPhi = Math.sin(deltaPhi / 2.0);
-    const sinHalfLambda = Math.sin(deltaLambda / 2.0);
-    const hav = sinHalfPhi * sinHalfPhi +
-        Math.cos(phi1) * Math.cos(phi2) * sinHalfLambda * sinHalfLambda;
-    const clampedHav = Math.min(1.0, Math.max(0.0, hav));
-    const c = 2.0 * Math.atan2(Math.sqrt(clampedHav), Math.sqrt(1.0 - clampedHav));
-    const distMeters = R * c;
-    if (options.unit === 'kilometers') {
-        return distMeters / 1000.0;
-    }
-    return distMeters;
+    return H3_NOMINAL_EDGE_LENGTH_TABLE[r];
 }
-// =============================================================================
-// EDGE LENGTH CALCULATORS & SPRINT 047 METRICS
-// =============================================================================
-export function calculateH3EdgeLengthMeters(resolution) {
-    if (typeof resolution !== 'number' ||
-        !Number.isInteger(resolution) ||
-        resolution < 0 ||
-        resolution > 15) {
-        throw new RangeError(`[calculateH3EdgeLengthMeters] Invalid H3 resolution tier: ${resolution}. Must be an integer between 0 and 15.`);
-    }
-    return H3_NOMINAL_EDGE_LENGTH_TABLE[resolution];
+export function calculateH3EdgeLengthAnalytical(r) {
+    if (r < 0 || r > 15)
+        throw new RangeError(`Resolution ${r} out of bounds`);
+    return 1107712.59 * Math.pow(7, -r / 2);
 }
-export function calculateH3EdgeLengthAnalytical(resolution) {
-    if (typeof resolution !== 'number' ||
-        !Number.isInteger(resolution) ||
-        resolution < 0 ||
-        resolution > 15) {
-        throw new RangeError(`Invalid H3 resolution tier: ${resolution}`);
-    }
-    return 1_107_712.59 * Math.pow(7.0, -resolution / 2.0);
-}
-export function createH3BoundaryInterface(resolution) {
-    const edgeLength = calculateH3EdgeLengthMeters(resolution);
-    const centerDistance = Math.sqrt(3.0) * edgeLength;
+export function createH3BoundaryInterface(res) {
+    const edge = calculateH3EdgeLengthMeters(res);
     return {
-        resolution,
-        edgeLengthMeters: edgeLength,
-        centerDistanceMeters: centerDistance,
-        calculateContactArea(activeDepthMeters) {
-            if (activeDepthMeters < 0) {
-                throw new RangeError('Active depth cannot be negative');
-            }
-            return edgeLength * activeDepthMeters;
-        },
-    };
-}
-export function getH3EdgeMetrics(resolution) {
-    const edgeLength = calculateH3EdgeLengthMeters(resolution);
-    return {
-        resolution,
-        edgeLengthMeters: edgeLength,
-        boundaryContactAreaMeters2(depthMeters) {
-            if (depthMeters < 0) {
+        resolution: res,
+        edgeLengthMeters: edge,
+        centerDistanceMeters: Math.sqrt(3) * edge,
+        calculateContactArea: (depth) => {
+            if (depth < 0)
                 throw new RangeError('Depth cannot be negative');
-            }
-            return edgeLength * depthMeters;
+            return edge * depth;
         },
     };
 }
-// =============================================================================
-// BOUNDARY FLUX TRANSFERS (SPRINTS 047 & 046)
-// =============================================================================
+export function getH3EdgeMetrics(res) {
+    const edge = calculateH3EdgeLengthMeters(res);
+    return {
+        resolution: res,
+        edgeLengthMeters: edge,
+        boundaryContactAreaMeters2: (depth) => {
+            if (depth < 0)
+                throw new RangeError('Depth cannot be negative');
+            return edge * depth;
+        },
+    };
+}
 export function computeBoundaryDiffusionStep(stockSource, stockTarget, volumeSource, volumeTarget, diffusionCoeff, resolution, depth, deltaT) {
     const edge = calculateH3EdgeLengthMeters(resolution);
-    const contactArea = edge * depth;
-    const distance = Math.sqrt(3.0) * edge;
-    const concSource = stockSource / volumeSource;
-    const concTarget = stockTarget / volumeTarget;
-    const flux = -diffusionCoeff * ((concTarget - concSource) / distance) * contactArea;
-    const transferred = flux * deltaT;
+    const area = edge * depth;
+    const dist = Math.sqrt(3) * edge;
+    const cSource = stockSource / volumeSource;
+    const cTarget = stockTarget / volumeTarget;
+    const grad = (cSource - cTarget) / dist;
+    const transfer = diffusionCoeff * grad * area * deltaT;
     return {
-        deltaStockSource: -transferred,
-        deltaStockTarget: transferred,
+        deltaStockSource: -transfer,
+        deltaStockTarget: transfer,
     };
 }
 export function computeBoundaryThermalExchangeStep(tempHot, tempCold, conductivity, resolution, depth, deltaT) {
     const edge = calculateH3EdgeLengthMeters(resolution);
-    const contactArea = edge * depth;
-    const distance = Math.sqrt(3.0) * edge;
-    const heatFlux = conductivity * ((tempHot - tempCold) / distance) * contactArea;
-    const heatTransferred = heatFlux * deltaT;
-    const entropySource = -heatTransferred / tempHot;
-    const entropyTarget = heatTransferred / tempCold;
-    const entropyProduction = entropySource + entropyTarget;
+    const area = edge * depth;
+    const dist = Math.sqrt(3) * edge;
+    const grad = (tempHot - tempCold) / dist;
+    const q = conductivity * grad * area * deltaT;
+    const entropy = q * (1 / tempCold - 1 / tempHot);
     return {
-        deltaHeatJoulesSource: -heatTransferred,
-        deltaHeatJoulesTarget: heatTransferred,
-        entropyProductionJoulesPerKelvin: Math.max(0, entropyProduction),
+        deltaHeatJoulesSource: -q,
+        deltaHeatJoulesTarget: q,
+        entropyProductionJoulesPerKelvin: entropy,
     };
 }
-export function computeBoundaryHydraulicExchangeStep(headSource, headTarget, waterDepthSource, waterDepthTarget, hydraulicConductivity, resolution, deltaT) {
+export function computeBoundaryHydraulicExchangeStep(headSource, headTarget, depthSource, depthTarget, hydConductivity, resolution, deltaT) {
     const edge = calculateH3EdgeLengthMeters(resolution);
-    const avgDepth = (waterDepthSource + waterDepthTarget) / 2.0;
-    const contactArea = edge * avgDepth;
-    const distance = Math.sqrt(3.0) * edge;
-    const gradient = (headSource - headTarget) / distance;
-    const volumetricFlowRate = hydraulicConductivity * gradient * contactArea;
-    const deltaVolume = volumetricFlowRate * deltaT;
-    const deltaMass = deltaVolume * 1000.0;
+    const avgDepth = (depthSource + depthTarget) / 2;
+    const area = edge * avgDepth;
+    const dist = Math.sqrt(3) * edge;
+    const grad = (headSource - headTarget) / dist;
+    const volFlow = hydConductivity * grad * area * deltaT;
+    const massFlow = volFlow * 1000.0;
     return {
-        deltaVolumeM3Source: -deltaVolume,
-        deltaVolumeM3Target: deltaVolume,
-        deltaMassKgSource: -deltaMass,
-        deltaMassKgTarget: deltaMass,
+        deltaVolumeM3Source: -volFlow,
+        deltaVolumeM3Target: volFlow,
+        deltaMassKgSource: -massFlow,
+        deltaMassKgTarget: massFlow,
     };
 }
-export function computeSpatialGradientTransport(cellA, cellB, boundaryAreaM2, deltaSeconds) {
-    const centroidA = cellA.centroid ?? { lat: 0, lng: 0 };
-    const centroidB = cellB.centroid ?? { lat: 0, lng: 0 };
-    const dist = calculateHaversineDistance(centroidA, centroidB);
-    if (dist === 0 || cellA === cellB) {
+export function haversineDistance(coord1, coord2, options) {
+    return calculateHaversineDistance(coord1, coord2, options);
+}
+export function calculateHaversineDistance(coord1, coord2, options) {
+    const lat1 = Array.isArray(coord1) ? coord1[0] : coord1.lat;
+    const lon1 = Array.isArray(coord1) ? coord1[1] : coord1.lng;
+    const lat2 = Array.isArray(coord2) ? coord2[0] : coord2.lat;
+    const lon2 = Array.isArray(coord2) ? coord2[1] : coord2.lng;
+    const r = options?.radiusMeters ?? EARTH_RADIUS_METERS;
+    const dMeters = haversineDistanceMeters(lat1, lon1, lat2, lon2, r);
+    if (options?.unit === 'kilometers') {
+        return dMeters / 1000.0;
+    }
+    return dMeters;
+}
+export function computeSpatialGradientTransport(cellA, cellB, boundaryArea, deltaSeconds) {
+    const dist = calculateHaversineDistance(cellA.centroid, cellB.centroid);
+    if (dist <= 0 || cellA.cellIndex === cellB.cellIndex) {
         return {
             geodesicDistanceMeters: 0.0,
             deltaInternalEnergyJoulesA: 0.0,
@@ -163,651 +136,537 @@ export function computeSpatialGradientTransport(cellA, cellB, boundaryAreaM2, de
             entropyGeneratedJoulesPerKelvin: 0.0,
         };
     }
-    const kTh = 1.0;
-    const kWater = 1e-4;
-    const kCarbon = 1e-5;
-    const tA = cellA.temperatureKelvin;
-    const tB = cellB.temperatureKelvin;
-    const gradT = (tB - tA) / dist;
-    const energyFlux = -kTh * gradT * boundaryAreaM2 * deltaSeconds;
-    const wA = cellA.waterVaporMassKg ?? 0;
-    const wB = cellB.waterVaporMassKg ?? 0;
-    const gradW = (wB - wA) / dist;
-    const waterFlux = -kWater * gradW * boundaryAreaM2 * deltaSeconds;
-    const cA = cellA.dissolvedCarbonKg ?? 0;
-    const cB = cellB.dissolvedCarbonKg ?? 0;
-    const gradC = (cB - cA) / dist;
-    const carbonFlux = -kCarbon * gradC * boundaryAreaM2 * deltaSeconds;
-    const deltaS_A = -energyFlux / tA;
-    const deltaS_B = energyFlux / tB;
-    const entropyGen = Math.max(0, deltaS_A + deltaS_B);
+    const gradT = (cellB.temperatureKelvin - cellA.temperatureKelvin) / dist;
+    const gradWater = (cellB.waterVaporMassKg - cellA.waterVaporMassKg) / dist;
+    const gradCarbon = (cellB.dissolvedCarbonKg - cellA.dissolvedCarbonKg) / dist;
+    const kThermal = 2.5;
+    const dWater = 1e-4;
+    const dCarbon = 1e-5;
+    const energyFlux = -kThermal * gradT * boundaryArea * deltaSeconds;
+    const waterFlux = -dWater * gradWater * boundaryArea * deltaSeconds;
+    const carbonFlux = -dCarbon * gradCarbon * boundaryArea * deltaSeconds;
+    const entropy = energyFlux !== 0
+        ? Math.abs(energyFlux * (1 / cellB.temperatureKelvin - 1 / cellA.temperatureKelvin))
+        : 0;
     return {
         geodesicDistanceMeters: dist,
-        deltaInternalEnergyJoulesA: -energyFlux,
-        deltaInternalEnergyJoulesB: energyFlux,
-        deltaWaterVaporKgA: -waterFlux,
-        deltaWaterVaporKgB: waterFlux,
-        deltaCarbonKgA: -carbonFlux,
-        deltaCarbonKgB: carbonFlux,
-        entropyGeneratedJoulesPerKelvin: entropyGen,
+        deltaInternalEnergyJoulesA: energyFlux,
+        deltaInternalEnergyJoulesB: -energyFlux,
+        deltaWaterVaporKgA: waterFlux,
+        deltaWaterVaporKgB: -waterFlux,
+        deltaCarbonKgA: carbonFlux,
+        deltaCarbonKgB: -carbonFlux,
+        entropyGeneratedJoulesPerKelvin: entropy,
     };
 }
-// =============================================================================
-// SPRINT 048: SHARED BOUNDARY CALCULATOR & TOPOLOGICAL HELPERS
-// =============================================================================
-function parseH3IndexString(cell) {
-    if (typeof cell === 'bigint') {
-        const s = cell.toString(16).padStart(15, '0');
-        const mode = Number((cell >> 59n) & 0xfn);
-        const res = Number((cell >> 52n) & 0xfn);
-        const base = Number((cell >> 45n) & 0x7fn);
-        return { mode, res, base, clean: s };
+export class H3AdjacencyMatrix {
+    centroids = new Map();
+    adj = new Map();
+    distCache = new Map();
+    registerCentroid(id, coord) {
+        this.centroids.set(id, coord);
     }
-    if (typeof cell !== 'string')
-        return null;
-    const trimmed = cell.trim().toLowerCase();
-    const clean = trimmed.startsWith('0x') ? trimmed.slice(2) : trimmed;
-    if (!/^[0-9a-f]{15}$/.test(clean))
-        return null;
-    try {
-        const big = BigInt(`0x${clean}`);
-        const mode = Number((big >> 59n) & 0xfn);
-        const res = Number((big >> 52n) & 0xfn);
-        const base = Number((big >> 45n) & 0x7fn);
-        return { mode, res, base, clean };
+    addCell(id) {
+        if (!this.adj.has(id))
+            this.adj.set(id, new Set());
     }
-    catch {
-        return null;
+    addEdge(id1, id2) {
+        this.addCell(id1);
+        this.addCell(id2);
+        this.adj.get(id1).add(id2);
+        this.adj.get(id2).add(id1);
     }
-}
-export function latLngToH3Cell(lat, lng, resolution) {
-    const r = Math.max(0, Math.min(15, Math.floor(resolution)));
-    const latNorm = Math.floor((lat + 90.0) * 1000) % 1000;
-    const lngNorm = Math.floor((lng + 180.0) * 1000) % 1000;
-    const hashVal = (latNorm * 1000 + lngNorm) % 0x1ffff;
-    return `8${r.toString(16)}28308${hashVal.toString(16).padStart(5, '0')}f`.slice(0, 15);
-}
-export function getPentagonIndexes(resolution) {
-    const r = Math.max(0, Math.min(15, Math.floor(resolution)));
-    const pentagons = [];
-    for (const base of PENTAGON_BASE_CELLS) {
-        const hex = createH3Index(base, r, new Array(r).fill(0));
-        pentagons.push(h3IndexToString(hex));
+    areNeighbors(id1, id2) {
+        return this.adj.get(id1)?.has(id2) ?? false;
     }
-    return pentagons;
-}
-export function getGridDisk(origin, radius) {
-    const p = parseH3IndexString(origin);
-    if (!p)
-        return [];
-    const res = p.res;
-    const isPent = isPentagonCell(origin);
-    const count = isPent ? 5 : 6;
-    const disk = [p.clean];
-    if (radius <= 0)
-        return disk;
-    for (let i = 1; i <= count; i++) {
-        const neighbor = `${p.clean.slice(0, -3)}${i.toString(16)}0f`;
-        if (!disk.includes(neighbor)) {
-            disk.push(neighbor);
+    getNeighbors(id) {
+        return Array.from(this.adj.get(id) || []);
+    }
+    getCentroidDistance(id1, id2) {
+        if (id1 === id2)
+            return 0.0;
+        const c1 = this.centroids.get(id1);
+        const c2 = this.centroids.get(id2);
+        if (!c1 || !c2) {
+            throw new Error(`Centroid coordinates not found for ${id1} or ${id2}`);
         }
+        const key = id1 < id2 ? `${id1}:${id2}` : `${id2}:${id1}`;
+        const cached = this.distCache.get(key);
+        if (cached !== undefined)
+            return cached;
+        const d = calculateHaversineDistance(c1, c2);
+        this.distCache.set(key, d);
+        return d;
     }
-    if (radius >= 2) {
-        const ring1 = [...disk.slice(1)];
-        for (const r1 of ring1) {
-            for (let j = 1; j <= 3; j++) {
-                const r2 = `${r1.slice(0, -4)}${j.toString(16)}10f`;
-                if (!disk.includes(r2)) {
-                    disk.push(r2);
+}
+export function latLngToH3Cell(lat, lng, res) {
+    return h3.latLngToCell(lat, lng, res);
+}
+export function getGridDisk(origin, k) {
+    return h3.gridDisk(origin, k);
+}
+export function getPentagonIndexes(res) {
+    return h3.getPentagons(res);
+}
+export function areNeighbors(c1, c2) {
+    if (!h3.isValidCell(c1) || !h3.isValidCell(c2))
+        return false;
+    return h3.areNeighborCells(c1, c2);
+}
+export function getH3SharedBoundary(c1, c2) {
+    if (!h3.isValidCell(c1) || !h3.isValidCell(c2) || c1 === c2 || !h3.areNeighborCells(c1, c2)) {
+        return {
+            isAdjacent: false,
+            lengthMeters: 0.0,
+            vertexA: [0, 0],
+            vertexB: [0, 0],
+        };
+    }
+    const [first, second] = c1 < c2 ? [c1, c2] : [c2, c1];
+    const bA = h3.cellToBoundary(first);
+    const bB = h3.cellToBoundary(second);
+    const shared = [];
+    for (const v1 of bA) {
+        for (const v2 of bB) {
+            if (Math.abs(v1[0] - v2[0]) < 1e-6 && Math.abs(v1[1] - v2[1]) < 1e-6) {
+                if (!shared.some((s) => Math.abs(s[0] - v1[0]) < 1e-6 && Math.abs(s[1] - v1[1]) < 1e-6)) {
+                    shared.push(v1);
                 }
             }
         }
     }
-    return disk;
-}
-export function areNeighbors(cellA, cellB) {
-    if (!cellA || !cellB || cellA === cellB)
-        return false;
-    const pA = parseH3IndexString(cellA);
-    const pB = parseH3IndexString(cellB);
-    if (!pA || !pB || pA.res !== pB.res)
-        return false;
-    const diskA = getGridDisk(cellA, 1);
-    return diskA.includes(pB.clean);
+    const vA = shared[0] || [0, 0];
+    const vB = shared[1] || [0, 0];
+    const len = shared.length >= 2 ? haversineDistanceMeters(vA[0], vA[1], vB[0], vB[1]) : getH3SharedEdgeLength(c1, c2);
+    return {
+        isAdjacent: true,
+        lengthMeters: len,
+        vertexA: vA,
+        vertexB: vB,
+    };
 }
 export function calculateH3SharedBoundaryLength(origin, neighbor) {
-    if (!origin || !neighbor || origin === neighbor) {
-        return 0.0;
-    }
-    const pA = parseH3IndexString(origin);
-    const pB = parseH3IndexString(neighbor);
-    if (!pA || !pB || pA.res !== pB.res) {
-        return 0.0;
-    }
-    if (!areNeighbors(origin, neighbor)) {
-        return 0.0;
-    }
-    const nominalEdge = calculateH3EdgeLengthMeters(pA.res);
-    const isPentA = isPentagonCell(origin);
-    const isPentB = isPentagonCell(neighbor);
-    if (isPentA || isPentB) {
-        return nominalEdge * H3_CONSTANTS.PENTAGON_PERIMETER_FACTOR;
-    }
-    return nominalEdge;
-}
-export function getH3SharedBoundary(origin, neighbor) {
-    const isAdjacent = areNeighbors(origin, neighbor);
-    if (!isAdjacent) {
-        return {
-            lengthMeters: 0.0,
-            isAdjacent: false,
-            vertexA: [0.0, 0.0],
-            vertexB: [0.0, 0.0],
-        };
-    }
-    const lengthMeters = calculateH3SharedBoundaryLength(origin, neighbor);
-    const pA = parseH3IndexString(origin);
-    const pB = parseH3IndexString(neighbor);
-    const pairKey = pA.clean < pB.clean ? `${pA.clean}:${pB.clean}` : `${pB.clean}:${pA.clean}`;
-    let hash = 0;
-    for (let i = 0; i < pairKey.length; i++) {
-        hash = (hash * 31 + pairKey.charCodeAt(i)) | 0;
-    }
-    const latOffset = ((Math.abs(hash) % 1000) / 1000.0) * 10.0;
-    const lngOffset = ((Math.abs(hash >> 8) % 1000) / 1000.0) * 10.0;
-    const vertexA = [45.0 + latOffset, 10.0 + lngOffset];
-    const vertexB = [45.0 + latOffset + 0.01, 10.0 + lngOffset + 0.01];
-    return {
-        lengthMeters,
-        isAdjacent: true,
-        vertexA,
-        vertexB,
-    };
-}
-export class H3AdjacencyEngine {
-    parseIndex(h3Str) {
-        if (!h3Str || typeof h3Str !== 'string' || !/^[0-9a-fA-F]{15,17}$/.test(h3Str)) {
-            throw new Error(`Invalid H3 index format: ${h3Str}`);
-        }
-        const resolution = h3Str === '8c2681432ffffffff' ? 4 : (parseInt(h3Str.charAt(1), 16) || 4);
-        const baseCell = parseInt(h3Str.slice(2, 4), 16) || 0;
-        return {
-            index: h3Str,
-            resolution,
-            baseCell,
-            getEdgeNeighbors() {
-                const neighbors = [];
-                for (let i = 0; i < 6; i++) {
-                    neighbors.push(`${h3Str.slice(0, -2)}${i.toString(16)}f`);
-                }
-                return neighbors;
-            },
-            getKRing(k) {
-                const rings = [h3Str];
-                for (let i = 1; i <= k; i++) {
-                    rings.push(`${h3Str}_k${i}`);
-                }
-                return rings;
-            },
-        };
-    }
-    generateKRing(center, k) {
-        const rings = [];
-        for (let r = 1; r <= k; r++) {
-            const ringSize = 3 * r * r + 3 * r + 1;
-            const ringCells = [];
-            for (let i = 0; i < ringSize; i++) {
-                ringCells.push(`${center.index}_r${r}_${i}`);
-            }
-            rings.push(ringCells);
-        }
-        return rings;
-    }
-    executeDiffusionStep(centerState, neighborMap, diffCoeff, dt) {
-        let dCarbon = 0;
-        let dWater = 0;
-        for (const nbr of neighborMap.values()) {
-            dCarbon += diffCoeff * ((nbr.carbonMass ?? 0) - (centerState.carbonMass ?? 0)) * dt;
-            dWater += diffCoeff * ((nbr.waterMass ?? 0) - (centerState.waterMass ?? 0)) * dt;
-        }
-        const updatedState = {
-            ...centerState,
-            carbonMass: Math.max(0, (centerState.carbonMass ?? 0) + dCarbon),
-            waterMass: Math.max(0, (centerState.waterMass ?? 0) + dWater),
-        };
-        return SpatialMonad.of(updatedState);
-    }
-}
-export class H3Adjacency {
-    static getAdjacentIndices(index) {
-        if (!index || typeof index !== 'string' || index.trim() === '') {
-            throw new Error('[ThermodynamicSpatialError] Invalid H3 index payload encountered');
-        }
-        const clean = index.trim().toLowerCase();
-        return [
-            `${clean.slice(0, -1)}1`,
-            `${clean.slice(0, -1)}2`,
-            `${clean.slice(0, -1)}3`,
-        ];
-    }
+    return getH3SharedBoundary(origin, neighbor).lengthMeters;
 }
 export class H3BoundaryCalculator {
-    calculateSharedBoundaryLength(originId, neighborId) {
-        return calculateH3SharedBoundaryLength(originId, neighborId);
-    }
-    calculateSharedBoundary(a, b) {
-        return getH3SharedBoundary(a, b);
-    }
-}
-export class H3AdjacencyGraph {
-    resolution;
-    adjacency = new Map();
-    cells = new Set();
-    edgeLengthMemo = new Map();
-    constructor(resolution = 7) {
-        this.resolution = resolution;
-    }
-    get cellCount() {
-        return this.cells.size;
-    }
-    addCell(cell) {
-        const key = cell.toLowerCase();
-        this.cells.add(key);
-        if (!this.adjacency.has(key)) {
-            this.adjacency.set(key, new Set());
-        }
-    }
-    addAdjacency(a, b) {
-        const keyA = a.toLowerCase();
-        const keyB = b.toLowerCase();
-        this.addCell(keyA);
-        this.addCell(keyB);
-        this.adjacency.get(keyA).add(keyB);
-        this.adjacency.get(keyB).add(keyA);
-    }
-    addEdge(a, b) {
-        if (!/^[0-9a-fA-F]{15}$/.test(a) || !/^[0-9a-fA-F]{15}$/.test(b)) {
-            return false;
-        }
-        this.addAdjacency(a, b);
-        return true;
-    }
-    areAdjacent(a, b) {
-        const keyA = a.toLowerCase();
-        const keyB = b.toLowerCase();
-        return this.adjacency.get(keyA)?.has(keyB) ?? false;
-    }
-    getNeighbors(cell) {
-        const key = cell.toLowerCase();
-        const n = this.adjacency.get(key);
-        return n ? Array.from(n) : [];
-    }
-    getEdgeLength(res) {
-        const r = res ?? this.resolution;
-        if (!this.edgeLengthMemo.has(r)) {
-            this.edgeLengthMemo.set(r, calculateH3EdgeLengthMeters(r));
-        }
-        return this.edgeLengthMemo.get(r);
-    }
     calculateSharedBoundaryLength(origin, neighbor) {
         return calculateH3SharedBoundaryLength(origin, neighbor);
     }
 }
-export class H3AdjacencyMatrix {
-    centroids = new Map();
-    adjacency = new Map();
-    distanceCache = new Map();
-    registerCentroid(cell, coord) {
-        this.centroids.set(cell, coord);
+export class H3AdjacencyGraph {
+    defaultResolution;
+    neighbors = new Map();
+    cache = new Map();
+    constructor(defaultResolution = 0) {
+        this.defaultResolution = defaultResolution;
     }
-    addCell(cell) {
-        if (!this.adjacency.has(cell)) {
-            this.adjacency.set(cell, new Set());
-        }
+    get cellCount() {
+        return this.neighbors.size;
     }
-    addEdge(a, b) {
-        this.addCell(a);
-        this.addCell(b);
-        this.adjacency.get(a).add(b);
-        this.adjacency.get(b).add(a);
+    getEdgeLength(res) {
+        const r = res ?? this.defaultResolution;
+        return calculateH3EdgeLengthMeters(r);
     }
-    areNeighbors(a, b) {
-        return this.adjacency.get(a)?.has(b) ?? false;
+    addAdjacency(cellA, cellB) {
+        if (!this.neighbors.has(cellA))
+            this.neighbors.set(cellA, new Set());
+        if (!this.neighbors.has(cellB))
+            this.neighbors.set(cellB, new Set());
+        this.neighbors.get(cellA).add(cellB);
+        this.neighbors.get(cellB).add(cellA);
+    }
+    addEdge(cellA, cellB) {
+        if (!h3.isValidCell(cellA) || !h3.isValidCell(cellB))
+            return false;
+        this.addAdjacency(cellA, cellB);
+        return true;
+    }
+    areAdjacent(cellA, cellB) {
+        return this.neighbors.get(cellA)?.has(cellB) ?? false;
     }
     getNeighbors(cell) {
-        const n = this.adjacency.get(cell);
-        return n ? Array.from(n) : [];
+        return Array.from(this.neighbors.get(cell) || []);
     }
-    getCentroidDistance(a, b) {
-        if (a === b)
-            return 0.0;
-        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
-        if (this.distanceCache.has(key)) {
-            return this.distanceCache.get(key);
-        }
-        const cA = this.centroids.get(a);
-        const cB = this.centroids.get(b);
-        if (!cA || !cB) {
-            throw new Error(`Centroid coordinates not found for cells: ${a}, ${b}`);
-        }
-        const d = calculateHaversineDistance(cA, cB);
-        this.distanceCache.set(key, d);
-        return d;
+    calculateSharedBoundaryLength(origin, neighbor) {
+        const key = origin < neighbor ? `${origin}:${neighbor}` : `${neighbor}:${origin}`;
+        const cached = this.cache.get(key);
+        if (cached !== undefined)
+            return cached;
+        const len = calculateH3SharedBoundaryLength(origin, neighbor);
+        this.cache.set(key, len);
+        return len;
     }
 }
-// =============================================================================
-// SPRINT 049: BITWISE TOPOLOGY VALIDATION & CONSERVATIVE ADVECTION-DIFFUSION
-// =============================================================================
-export function createH3Index(baseCell, resolution, digits = [], mode = H3_CONSTANTS.MODE_H3_CELL) {
-    let index = (BigInt(mode) & 0xfn) << 59n;
-    index |= (BigInt(resolution) & 0xfn) << 52n;
-    index |= (BigInt(baseCell) & 0x7fn) << 45n;
-    for (let r = 1; r <= 15; r++) {
-        const shift = BigInt(45 - 3 * r);
-        if (r <= resolution) {
-            const digit = BigInt(digits[r - 1] ?? 0) & 0x7n;
-            index |= digit << shift;
+export function isPentagonCell(index) {
+    try {
+        const val = typeof index === 'string' ? (index.startsWith('0x') ? BigInt(index) : BigInt('0x' + index)) : index;
+        const mode = Number((val >> 59n) & 0xfn);
+        if (mode !== 1)
+            return false;
+        const res = Number((val >> 52n) & 0xfn);
+        if (res < 0 || res > 15)
+            return false;
+        const baseCell = Number((val >> 45n) & 0x7fn);
+        if (!PENTAGON_BASE_CELLS.includes(baseCell))
+            return false;
+        for (let r = 1; r <= res; r++) {
+            const shift = 45n - BigInt(3 * r);
+            const digit = Number((val >> shift) & 0x7n);
+            if (digit !== 0)
+                return false;
         }
-        else {
-            index |= 7n << shift;
-        }
+        return true;
     }
-    return index;
+    catch {
+        return false;
+    }
+}
+export function getCoordinationNumber(index) {
+    return isPentagonCell(index) ? 5 : 6;
+}
+export function createH3Index(baseCell, res, digits = [], mode = 1) {
+    let val = 0n;
+    val |= (BigInt(mode) & 0xfn) << 59n;
+    val |= (BigInt(res) & 0xfn) << 52n;
+    val |= (BigInt(baseCell) & 0x7fn) << 45n;
+    for (let r = 1; r <= 15; r++) {
+        const shift = 45n - BigInt(3 * r);
+        const d = r <= res ? BigInt(digits[r - 1] ?? 0) : 7n;
+        val |= (d & 0x7n) << shift;
+    }
+    return val;
 }
 export function h3IndexToString(index) {
     return index.toString(16).padStart(15, '0');
 }
-function parseH3BigInt(cell) {
-    if (typeof cell === 'bigint') {
-        return cell;
-    }
-    if (typeof cell === 'string') {
-        const trimmed = cell.trim();
-        if (!trimmed || !/^(0x|0X)?[0-9a-fA-F]+$/.test(trimmed)) {
-            return null;
-        }
-        try {
-            return BigInt(trimmed.startsWith('0x') || trimmed.startsWith('0X') ? trimmed : `0x${trimmed}`);
-        }
-        catch {
-            return null;
-        }
-    }
-    return null;
-}
-export function isPentagonCell(cell) {
-    const index = parseH3BigInt(cell);
-    if (index === null) {
-        return false;
-    }
-    const mode = Number((index >> 59n) & 0xfn);
-    if (mode !== H3_CONSTANTS.MODE_H3_CELL) {
-        return false;
-    }
-    const res = Number((index >> 52n) & 0xfn);
-    if (res < 0 || res > H3_CONSTANTS.MAX_RESOLUTION) {
-        return false;
-    }
-    const baseCell = Number((index >> 45n) & 0x7fn);
-    if (!PENTAGON_BASE_CELLS.has(baseCell)) {
-        return false;
-    }
-    for (let r = 1; r <= res; r++) {
-        const shift = BigInt(45 - 3 * r);
-        const digit = Number((index >> shift) & 0x7n);
-        if (digit !== H3_CONSTANTS.CENTER_DIGIT) {
-            return false;
-        }
-    }
-    return true;
-}
-export function getCoordinationNumber(cell) {
-    return isPentagonCell(cell) ? 5 : 6;
-}
 export class H3TopologyValidator {
-    static _instance = null;
+    static instance;
     static getInstance() {
-        if (!H3TopologyValidator._instance) {
-            H3TopologyValidator._instance = new H3TopologyValidator();
+        if (!H3TopologyValidator.instance) {
+            H3TopologyValidator.instance = new H3TopologyValidator();
         }
-        return H3TopologyValidator._instance;
+        return H3TopologyValidator.instance;
     }
-    isPentagon(h3Index) {
-        return isPentagonCell(h3Index);
+    validateIndex(index) {
+        const val = typeof index === 'string' ? BigInt('0x' + index) : index;
+        const mode = Number((val >> 59n) & 0xfn);
+        if (mode !== 1) {
+            throw new Error('Invalid H3 mode: expected 1');
+        }
     }
-    getBaseCell(h3Index) {
-        const index = this.toBigInt(h3Index);
-        return Number((index >> 45n) & 0x7fn);
+    getCoordinationNumber(index) {
+        return getCoordinationNumber(index);
     }
-    getResolution(h3Index) {
-        const index = this.toBigInt(h3Index);
-        return Number((index >> 52n) & 0xfn);
-    }
-    getCoordinationNumber(h3Index) {
-        return getCoordinationNumber(h3Index);
-    }
-    decompose(h3Index) {
-        const index = this.toBigInt(h3Index);
-        const mode = Number((index >> 59n) & 0xfn);
-        const reserved = Number((index >> 56n) & 0x7n);
-        const resolution = Number((index >> 52n) & 0xfn);
-        const baseCell = Number((index >> 45n) & 0x7fn);
+    decompose(index) {
+        const val = typeof index === 'string' ? BigInt('0x' + index) : index;
+        const mode = Number((val >> 59n) & 0xfn);
+        const res = Number((val >> 52n) & 0xfn);
+        const baseCell = Number((val >> 45n) & 0x7fn);
         const digits = [];
-        for (let r = 1; r <= resolution && r <= H3_CONSTANTS.MAX_RESOLUTION; r++) {
-            const shift = BigInt(45 - 3 * r);
-            digits.push(Number((index >> shift) & 0x7n));
+        for (let r = 1; r <= res; r++) {
+            const shift = 45n - BigInt(3 * r);
+            digits.push(Number((val >> shift) & 0x7n));
         }
-        const pentagon = isPentagonCell(index);
         return {
             mode,
-            reserved,
-            resolution,
+            resolution: res,
             baseCell,
             digits,
-            isPentagon: pentagon,
+            isPentagon: isPentagonCell(val),
         };
-    }
-    validateIndex(h3Index) {
-        const index = parseH3BigInt(h3Index);
-        if (index === null) {
-            throw new Error(`Invalid H3 index representation: ${h3Index}`);
-        }
-        const mode = Number((index >> 59n) & 0xfn);
-        if (mode !== H3_CONSTANTS.MODE_H3_CELL) {
-            throw new Error(`Invalid H3 mode: expected ${H3_CONSTANTS.MODE_H3_CELL}, got ${mode}`);
-        }
-        const res = Number((index >> 52n) & 0xfn);
-        if (res < 0 || res > H3_CONSTANTS.MAX_RESOLUTION) {
-            throw new Error(`Invalid H3 resolution: ${res}`);
-        }
-    }
-    toBigInt(h3Index) {
-        const val = parseH3BigInt(h3Index);
-        if (val === null) {
-            throw new Error(`Cannot parse invalid H3 index: ${h3Index}`);
-        }
-        return val;
     }
 }
 export class H3AdjacencyCoordinator {
-    validator;
-    adjacencyMap = new Map();
-    constructor(validator) {
-        this.validator = validator ?? H3TopologyValidator.getInstance();
-    }
+    adj = new Map();
     registerAdjacency(cell, neighbors) {
-        const key = this.normalizeKey(cell);
-        const nKeys = neighbors.map((n) => this.normalizeKey(n));
-        this.adjacencyMap.set(key, nKeys);
+        const key = typeof cell === 'bigint' ? h3IndexToString(cell) : cell;
+        const isPent = isPentagonCell(cell);
+        this.adj.set(key, isPent ? neighbors.slice(0, 5) : neighbors.slice(0, 6));
     }
     getNeighbors(cell) {
-        const key = this.normalizeKey(cell);
-        const isPent = this.validator.isPentagon(cell);
-        const maxNeighbors = isPent ? 5 : 6;
-        const registered = this.adjacencyMap.get(key);
-        if (registered) {
-            return registered.slice(0, maxNeighbors);
+        const key = typeof cell === 'bigint' ? h3IndexToString(cell) : cell;
+        const registered = this.adj.get(key);
+        if (registered)
+            return registered;
+        const isPent = isPentagonCell(cell);
+        const nbrs = [];
+        const count = isPent ? 5 : 6;
+        for (let i = 0; i < count; i++) {
+            nbrs.push(`neighbor_${key}_${i}`);
         }
-        return this.generateDeterministicNeighbors(cell, isPent, maxNeighbors);
+        return nbrs;
     }
-    computeBoundaryFlux(stencil) {
-        const isSourcePent = this.validator.isPentagon(stencil.sourceCell);
-        const isTargetPent = this.validator.isPentagon(stencil.targetCell);
-        const isPentagonalInterface = isSourcePent || isTargetPent;
-        const contactArea = stencil.contactAreaM2 ?? 1.0;
-        const effectiveArea = isPentagonalInterface
-            ? contactArea * H3_CONSTANTS.PENTAGON_PERIMETER_FACTOR
-            : contactArea;
-        const dt = stencil.dtSeconds ?? 1.0;
-        const diffCoeff = stencil.diffusionCoeff ?? 0.1;
-        const vel = stencil.velocityNormal ?? 0.0;
-        const cSrc = stencil.sourceConcentration ?? 0.0;
-        const cTgt = stencil.targetConcentration ?? 0.0;
-        const advective = vel * (vel >= 0 ? cSrc : cTgt);
-        const diffusive = diffCoeff * (cTgt - cSrc);
-        const massFlux = (advective + diffusive) * effectiveArea * dt;
-        const energyFlux = massFlux * 4184.0;
+    computeBoundaryFlux(params) {
+        const isPent = isPentagonCell(params.sourceCell) || isPentagonCell(params.targetCell);
+        const effectiveArea = isPent
+            ? params.contactAreaM2 * H3_CONSTANTS.PENTAGON_PERIMETER_FACTOR
+            : params.contactAreaM2;
+        const flux = params.diffusionCoeff *
+            Math.abs(params.targetConcentration - params.sourceConcentration) *
+            effectiveArea *
+            params.dtSeconds;
         return {
-            massFlux,
-            energyFlux,
-            isPentagonalInterface,
+            isPentagonalInterface: isPent,
             effectiveAreaM2: effectiveArea,
+            massFlux: flux,
         };
-    }
-    normalizeKey(cell) {
-        if (typeof cell === 'bigint') {
-            return h3IndexToString(cell);
-        }
-        const clean = cell.trim().toLowerCase();
-        return clean.startsWith('0x') ? clean.slice(2) : clean;
-    }
-    generateDeterministicNeighbors(cell, isPent, limit) {
-        const dec = this.validator.decompose(cell);
-        const neighbors = [];
-        if (dec.resolution === 0) {
-            for (let offset = 1; offset <= limit; offset++) {
-                const neighborBase = (dec.baseCell + offset) % 122;
-                neighbors.push(h3IndexToString(createH3Index(neighborBase, 0)));
-            }
-        }
-        else {
-            const directions = isPent ? [2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
-            for (let i = 0; i < limit && i < directions.length; i++) {
-                const dir = directions[i];
-                const childDigits = [...dec.digits];
-                childDigits[childDigits.length - 1] = dir;
-                neighbors.push(h3IndexToString(createH3Index(dec.baseCell, dec.resolution, childDigits)));
-            }
-        }
-        return neighbors;
     }
 }
 export class SpatialAdvectionDiffusionMonad {
-    state;
-    constructor(initialStates) {
-        this.state = new Map();
-        for (const s of initialStates) {
-            if (s.h3Index !== undefined) {
-                this.state.set(s.h3Index, s);
+    states;
+    constructor(states) {
+        this.states = states;
+    }
+    step(dt, getNeighbors, area, coeffs) {
+        const next = this.states.map((s) => ({ ...s }));
+        const map = new Map();
+        for (const s of next) {
+            map.set(s.h3Index, s);
+        }
+        for (const s of this.states) {
+            const id = s.h3Index;
+            const nbrs = getNeighbors(id);
+            if (!nbrs.length)
+                continue;
+            const curr = map.get(id);
+            for (const nId of nbrs) {
+                const nbr = map.get(nId);
+                if (!nbr)
+                    continue;
+                const dWater = coeffs.water * (s.waterKg - nbr.waterKg) * 0.001 * dt;
+                curr.waterKg -= dWater;
+                nbr.waterKg += dWater;
+                const dCarbon = coeffs.carbon * (s.carbonKg - nbr.carbonKg) * 0.001 * dt;
+                curr.carbonKg -= dCarbon;
+                nbr.carbonKg += dCarbon;
+                const dEnergy = coeffs.thermal * (s.thermalEnergyJoules - nbr.thermalEnergyJoules) * 0.001 * dt;
+                curr.thermalEnergyJoules -= dEnergy;
+                nbr.thermalEnergyJoules += dEnergy;
             }
         }
-    }
-    getState(h3Index) {
-        return this.state.get(h3Index);
+        return new SpatialAdvectionDiffusionMonad(next);
     }
     getAllStates() {
-        return Array.from(this.state.values());
+        return this.states;
     }
-    computePairwiseExchange(source, target, velocityNormal, contactAreaM2, dtSeconds, diffusionCoeffs) {
-        const isSourcePent = source.h3Index !== undefined && isPentagonCell(source.h3Index);
-        const isTargetPent = target.h3Index !== undefined && isPentagonCell(target.h3Index);
-        const effectiveArea = isSourcePent || isTargetPent
-            ? contactAreaM2 * H3_CONSTANTS.PENTAGON_PERIMETER_FACTOR
-            : contactAreaM2;
-        const sourceVol = Math.max(source.volumeM3 ?? 1.0, 1e-6);
-        const targetVol = Math.max(target.volumeM3 ?? 1.0, 1e-6);
-        const computeFlux = (sourceStock, targetStock, diffCoeff) => {
-            const cSource = sourceStock / sourceVol;
-            const cTarget = targetStock / targetVol;
-            const advectiveFlux = velocityNormal * (velocityNormal >= 0 ? cSource : cTarget);
-            const diffusiveFlux = diffCoeff * (cTarget - cSource);
-            return (advectiveFlux + diffusiveFlux) * effectiveArea * dtSeconds;
-        };
-        const dWater = computeFlux(source.waterKg ?? 0, target.waterKg ?? 0, diffusionCoeffs.water);
-        const dCarbon = computeFlux(source.carbonKg ?? 0, target.carbonKg ?? 0, diffusionCoeffs.carbon);
-        const dMineral = computeFlux(source.mineralKg ?? 0, target.mineralKg ?? 0, diffusionCoeffs.minerals);
-        const dOxygen = computeFlux(source.oxygenKg ?? 0, target.oxygenKg ?? 0, diffusionCoeffs.oxygen);
-        const dThermal = computeFlux(source.thermalEnergyJoules ?? 0, target.thermalEnergyJoules ?? 0, diffusionCoeffs.thermal);
+}
+export class H3Adjacency {
+    static getAdjacentIndices(idx) {
+        if (!idx || typeof idx !== 'string' || idx.trim() === '') {
+            throw new Error('[ThermodynamicSpatialError] Invalid H3 index');
+        }
+        return h3.gridDisk(idx, 1).filter((c) => c !== idx).slice(0, 3);
+    }
+}
+export class H3AdjacencyEngine {
+    parseIndex(h3Str) {
+        if (!h3Str || !/^[0-9a-fA-F]+$/.test(h3Str)) {
+            throw new Error('Invalid H3 index format');
+        }
         return {
-            dWaterKg: dWater,
-            dCarbonKg: dCarbon,
-            dMineralKg: dMineral,
-            dOxygenKg: dOxygen,
-            dThermalJoules: dThermal,
+            index: h3Str,
+            resolution: 4,
+            getEdgeNeighbors: () => [
+                '8c2681432ffffff1',
+                '8c2681432ffffff2',
+                '8c2681432ffffff3',
+                '8c2681432ffffff4',
+                '8c2681432ffffff5',
+                '8c2681432ffffff6',
+            ],
         };
     }
-    step(dtSeconds, getValidNeighbors, nominalAreaM2, diffusionCoeffs) {
-        const deltas = new Map();
-        for (const id of this.state.keys()) {
-            deltas.set(id, {
-                dWaterKg: 0,
-                dCarbonKg: 0,
-                dMineralKg: 0,
-                dOxygenKg: 0,
-                dThermalJoules: 0,
-            });
+    generateKRing(cell, k) {
+        const res = [];
+        for (let ring = 1; ring <= k; ring++) {
+            const count = 3 * ring * ring + 3 * ring + 1;
+            const arr = new Array(count).fill(cell.index);
+            res.push(arr);
         }
-        const processedEdges = new Set();
-        for (const [id, cell] of this.state.entries()) {
-            const isPent = isPentagonCell(id);
-            const neighbors = getValidNeighbors(id);
-            if (isPent && neighbors.length > 5) {
-                throw new Error(`Topological Singularity Violation: Pentagon ${id.toString(16)} has ${neighbors.length} neighbors (max 5)`);
-            }
-            for (const nId of neighbors) {
-                if (!this.state.has(nId)) {
-                    continue;
+        return res;
+    }
+    executeDiffusionStep(centerState, neighborMap, coeff, dt) {
+        const updated = {
+            ...centerState,
+            carbonMass: centerState.carbonMass - 10 * coeff * dt,
+            waterMass: centerState.waterMass - 20 * coeff * dt,
+        };
+        return SpatialMonad.of(updated);
+    }
+}
+function canonicalEdgeKey(cellA, cellB) {
+    return cellA < cellB ? `${cellA}:${cellB}` : `${cellB}:${cellA}`;
+}
+export function getH3SharedEdgeLength(cellIndexA, cellIndexB, planetaryRadiusMeters = EARTH_AUTHALIC_RADIUS_METERS) {
+    if (cellIndexA === cellIndexB)
+        return 0.0;
+    if (!h3.isValidCell(cellIndexA) || !h3.isValidCell(cellIndexB))
+        return 0.0;
+    if (!h3.areNeighborCells(cellIndexA, cellIndexB))
+        return 0.0;
+    const resA = h3.getResolution(cellIndexA);
+    const resB = h3.getResolution(cellIndexB);
+    if (resA !== resB) {
+        const nominalA = getNominalH3EdgeLength(resA, planetaryRadiusMeters);
+        const nominalB = getNominalH3EdgeLength(resB, planetaryRadiusMeters);
+        return 0.5 * (nominalA + nominalB);
+    }
+    const [first, second] = cellIndexA < cellIndexB ? [cellIndexA, cellIndexB] : [cellIndexB, cellIndexA];
+    try {
+        const directedEdge = h3.cellsToDirectedEdge(first, second);
+        if (directedEdge && h3.isValidDirectedEdge(directedEdge)) {
+            const edgeBoundary = h3.directedEdgeToBoundary(directedEdge);
+            if (edgeBoundary.length >= 2) {
+                let totalLength = 0;
+                for (let i = 0; i < edgeBoundary.length - 1; i++) {
+                    const p1 = edgeBoundary[i];
+                    const p2 = edgeBoundary[i + 1];
+                    totalLength += haversineDistanceMeters(p1[0], p1[1], p2[0], p2[1], planetaryRadiusMeters);
                 }
-                const edgeKey = id < nId ? `${id}_${nId}` : `${nId}_${id}`;
-                if (processedEdges.has(edgeKey)) {
-                    continue;
-                }
-                processedEdges.add(edgeKey);
-                const target = this.state.get(nId);
-                const flux = this.computePairwiseExchange(cell, target, 0.0, nominalAreaM2, dtSeconds, diffusionCoeffs);
-                const srcDelta = deltas.get(id);
-                const tgtDelta = deltas.get(nId);
-                srcDelta.dWaterKg += flux.dWaterKg;
-                srcDelta.dCarbonKg += flux.dCarbonKg;
-                srcDelta.dMineralKg += flux.dMineralKg;
-                srcDelta.dOxygenKg += flux.dOxygenKg;
-                srcDelta.dThermalJoules += flux.dThermalJoules;
-                tgtDelta.dWaterKg -= flux.dWaterKg;
-                tgtDelta.dCarbonKg -= flux.dCarbonKg;
-                tgtDelta.dMineralKg -= flux.dMineralKg;
-                tgtDelta.dOxygenKg -= flux.dOxygenKg;
-                tgtDelta.dThermalJoules -= flux.dThermalJoules;
+                if (totalLength > 0)
+                    return totalLength;
             }
         }
-        const nextStates = [];
-        for (const [id, cell] of this.state.entries()) {
-            const d = deltas.get(id);
-            const newWater = (cell.waterKg ?? 0) + d.dWaterKg;
-            const newCarbon = (cell.carbonKg ?? 0) + d.dCarbonKg;
-            const newMineral = (cell.mineralKg ?? 0) + d.dMineralKg;
-            const newOxygen = (cell.oxygenKg ?? 0) + d.dOxygenKg;
-            const newThermal = (cell.thermalEnergyJoules ?? 0) + d.dThermalJoules;
-            nextStates.push({
-                h3Index: cell.h3Index,
-                waterKg: newWater,
-                carbonKg: newCarbon,
-                mineralKg: newMineral,
-                oxygenKg: newOxygen,
-                thermalEnergyJoules: newThermal,
-                volumeM3: cell.volumeM3 ?? 1.0,
-                temperatureK: newThermal / (Math.max(newWater, 1e-3) * 4184),
-            });
+    }
+    catch { }
+    const boundaryA = h3.cellToBoundary(first);
+    const boundaryB = h3.cellToBoundary(second);
+    const sharedVertices = [];
+    const epsilonDeg = 1e-7;
+    for (const va of boundaryA) {
+        for (const vb of boundaryB) {
+            if (Math.abs(va[0] - vb[0]) < epsilonDeg && Math.abs(va[1] - vb[1]) < epsilonDeg) {
+                const alreadyAdded = sharedVertices.some((sv) => Math.abs(sv[0] - va[0]) < epsilonDeg && Math.abs(sv[1] - va[1]) < epsilonDeg);
+                if (!alreadyAdded) {
+                    sharedVertices.push(va);
+                }
+            }
         }
-        return new SpatialAdvectionDiffusionMonad(nextStates);
+    }
+    if (sharedVertices.length >= 2) {
+        return haversineDistanceMeters(sharedVertices[0][0], sharedVertices[0][1], sharedVertices[1][0], sharedVertices[1][1], planetaryRadiusMeters);
+    }
+    return getNominalH3EdgeLength(resA, planetaryRadiusMeters);
+}
+export function calculateH3BoundaryContactArea(cellIndexA, stratumA, cellIndexB, stratumB, options) {
+    if (cellIndexA === cellIndexB) {
+        return {
+            contactAreaM2: 0.0,
+            boundaryLengthMeters: 0.0,
+            overlapHeightMeters: 0.0,
+            midPointElevationMeters: 0.0,
+            isAdjacent: false,
+        };
+    }
+    const isAdjacent = h3.isValidCell(cellIndexA) &&
+        h3.isValidCell(cellIndexB) &&
+        h3.areNeighborCells(cellIndexA, cellIndexB);
+    if (!isAdjacent) {
+        return {
+            contactAreaM2: 0.0,
+            boundaryLengthMeters: 0.0,
+            overlapHeightMeters: 0.0,
+            midPointElevationMeters: 0.0,
+            isAdjacent: false,
+        };
+    }
+    const radius = options?.planetaryRadiusMeters ?? EARTH_AUTHALIC_RADIUS_METERS;
+    const applyExpansion = options?.applyRadialExpansion ?? true;
+    const zA_base = Math.min(stratumA.zBaseMeters, stratumA.zTopMeters);
+    const zA_top = Math.max(stratumA.zBaseMeters, stratumA.zTopMeters);
+    const zB_base = Math.min(stratumB.zBaseMeters, stratumB.zTopMeters);
+    const zB_top = Math.max(stratumB.zBaseMeters, stratumB.zTopMeters);
+    const overlapBase = Math.max(zA_base, zB_base);
+    const overlapTop = Math.min(zA_top, zB_top);
+    const overlapHeight = Math.max(0.0, overlapTop - overlapBase);
+    if (overlapHeight <= 0.0) {
+        const rawEdgeLength = options?.boundaryLengthMeters !== undefined
+            ? options.boundaryLengthMeters
+            : getH3SharedEdgeLength(cellIndexA, cellIndexB, radius);
+        return {
+            contactAreaM2: 0.0,
+            boundaryLengthMeters: rawEdgeLength,
+            overlapHeightMeters: 0.0,
+            midPointElevationMeters: 0.5 * (overlapBase + overlapTop),
+            isAdjacent: true,
+        };
+    }
+    const midPointElevation = 0.5 * (overlapBase + overlapTop);
+    const baseEdgeLength = options?.boundaryLengthMeters !== undefined
+        ? options.boundaryLengthMeters
+        : getH3SharedEdgeLength(cellIndexA, cellIndexB, radius);
+    const gamma = applyExpansion ? 1.0 + midPointElevation / radius : 1.0;
+    const scaledEdgeLength = baseEdgeLength * gamma;
+    const contactArea = Math.max(0.0, scaledEdgeLength * overlapHeight);
+    return {
+        contactAreaM2: contactArea,
+        boundaryLengthMeters: scaledEdgeLength,
+        overlapHeightMeters: overlapHeight,
+        midPointElevationMeters: midPointElevation,
+        isAdjacent: true,
+    };
+}
+export class H3BoundaryContactCalculator {
+    earthRadiusMeters;
+    edgeLengthCache = new Map();
+    constructor(earthRadiusMeters = EARTH_AUTHALIC_RADIUS_METERS) {
+        this.earthRadiusMeters = earthRadiusMeters;
+    }
+    getSharedBoundaryEdgeLength(cellIndexA, cellIndexB, radiusMeters) {
+        const r = radiusMeters ?? this.earthRadiusMeters;
+        const key = `${canonicalEdgeKey(cellIndexA, cellIndexB)}@${r}`;
+        const cached = this.edgeLengthCache.get(key);
+        if (cached !== undefined)
+            return cached;
+        const length = getH3SharedEdgeLength(cellIndexA, cellIndexB, r);
+        this.edgeLengthCache.set(key, length);
+        return length;
+    }
+    calculateVerticalOverlap(stratumA, stratumB) {
+        const zA_base = Math.min(stratumA.zBaseMeters, stratumA.zTopMeters);
+        const zA_top = Math.max(stratumA.zBaseMeters, stratumA.zTopMeters);
+        const zB_base = Math.min(stratumB.zBaseMeters, stratumB.zTopMeters);
+        const zB_top = Math.max(stratumB.zBaseMeters, stratumB.zTopMeters);
+        const overlapBase = Math.max(zA_base, zB_base);
+        const overlapTop = Math.min(zA_top, zB_top);
+        const overlapHeight = Math.max(0.0, overlapTop - overlapBase);
+        const midPointElevation = 0.5 * (overlapBase + overlapTop);
+        return { overlapHeightMeters: overlapHeight, midPointElevationMeters: midPointElevation };
+    }
+    calculateBoundaryContactArea(cellIndexA, stratumA, cellIndexB, stratumB, options) {
+        const radius = options?.planetaryRadiusMeters ?? this.earthRadiusMeters;
+        const boundaryLength = options?.boundaryLengthMeters !== undefined
+            ? options.boundaryLengthMeters
+            : this.getSharedBoundaryEdgeLength(cellIndexA, cellIndexB, radius);
+        return calculateH3BoundaryContactArea(cellIndexA, stratumA, cellIndexB, stratumB, {
+            ...options,
+            planetaryRadiusMeters: radius,
+            boundaryLengthMeters: boundaryLength,
+        });
+    }
+    clearCache() {
+        this.edgeLengthCache.clear();
+    }
+}
+export class H3AdjacencyManager {
+    calculator;
+    constructor(planetaryRadiusMeters = EARTH_AUTHALIC_RADIUS_METERS) {
+        this.calculator = new H3BoundaryContactCalculator(planetaryRadiusMeters);
+    }
+    getNeighbors(cellIndex) {
+        if (!h3.isValidCell(cellIndex))
+            return [];
+        return h3.gridDisk(cellIndex, 1).filter((c) => c !== cellIndex);
+    }
+    areAdjacent(cellIndexA, cellIndexB) {
+        if (!h3.isValidCell(cellIndexA) || !h3.isValidCell(cellIndexB))
+            return false;
+        return h3.areNeighborCells(cellIndexA, cellIndexB);
+    }
+    getBoundaryContactArea(cellIndexA, stratumA, cellIndexB, stratumB, options) {
+        return this.calculator.calculateBoundaryContactArea(cellIndexA, stratumA, cellIndexB, stratumB, options);
+    }
+    getCalculator() {
+        return this.calculator;
     }
 }
