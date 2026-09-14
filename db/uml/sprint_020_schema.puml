@@ -1,0 +1,53 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #F9F9F9
+
+title Web of Life - Sprint 020: Spatial Monad & H3 Validation Architecture
+
+class SpatialValidator {
+    +validateH3Length(h3Index: string): boolean
+}
+
+class SpatialMonad {
+    -rawToken: string
+    -isValid: boolean
+    -trophicLayer: string
+    +consume(token: string): SpatialMonad
+    +evaluate(): boolean
+    +allocateEnergy(): TrophicStock
+}
+
+class SpatialValidationRecord {
+    +validationId: UUID
+    +h3Index: string
+    +isValid: boolean
+    +validatedAt: DateTime
+    +solarEpochCycle: long
+    +entropyDelta: decimal
+}
+
+class SpatialMonadStock {
+    +stockId: UUID
+    +validationId: UUID
+    +trophicLayer: string
+    +energyAllocation: decimal
+    +createdAt: DateTime
+}
+
+class SpatialBlockchainLedger {
+    +blockId: long
+    +previousHash: string
+    +currentHash: string
+    +validationId: UUID
+    +merkleRoot: string
+    +solarSignature: string
+    +committedAt: DateTime
+}
+
+SpatialValidator ..> SpatialMonad : evaluates
+SpatialMonad --> SpatialValidationRecord : persists state
+SpatialValidationRecord "1" -- "0..*" SpatialMonadStock : allocates trophic stock
+SpatialValidationRecord "1" -- "1" SpatialBlockchainLedger : secures via hash
+
+@enduml

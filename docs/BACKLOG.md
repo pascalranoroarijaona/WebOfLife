@@ -40,15 +40,27 @@ SPRINT_GOAL: Implement 15-character length validation helper function src/spatia
 - [ ] Microbial necromass respiration and temperature-dependent decomposition kinetics (`src/geobiome/soil_matrix.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
+- [ ] Implement Gibbs free energy of mixing calculation helper for ambient gas streams (`src/technosphere/dac_thermodynamics.ts`)
 - [ ] Minimum theoretical separation work calculator using Gibbs free energy of mixing for ambient CO2 (`src/technosphere/dac_thermodynamics.ts`)
+- [ ] Implement solid-sorbent thermal regeneration energy requirement function (`src/technosphere/dac.ts`)
+- [ ] Implement liquid-solvent calcium carbonate calcination enthalpy balance (`src/technosphere/dac.ts`)
 - [ ] Parasitic electrical and thermal load simulation for solid-sorbent and liquid-solvent DAC monads (`src/technosphere/dac.ts`)
+- [ ] Implement olivine carbonation mass-balance stoichiometry solver (`src/technosphere/basalt_carbonation.ts`)
 - [ ] Olivine and basalt carbonation mineral sequestration reaction kinetics and mass balance (`src/technosphere/basalt_carbonation.ts`)
+- [ ] Implement carbothermal reduction stock-flow calculator for metallurgical silicon (`src/technosphere/semiconductors_silicon.ts`)
+- [ ] Implement Siemens reactor CVD mass-yield equation for electronic-grade polysilicon (`src/technosphere/semiconductors_silicon.ts`)
 - [ ] Multi-stage metallurgical and electronic-grade silicon stock-flow reduction monads (`src/technosphere/semiconductors_silicon.ts`)
+- [ ] Implement UPW and hydrofluoric acid consumption balancer per semiconductor node (`src/technosphere/semiconductors_fab.ts`)
 - [ ] Semiconductor fabrication facility material and ultrapure water consumption balancer (`src/technosphere/semiconductors_fab.ts`)
+- [ ] Implement distance-dependent Joule heating loss calculation for regional grids (`src/technosphere/energy_grid.ts`)
 - [ ] Regional electrical and thermal transmission networks with capacity constraints and Joule heating losses (`src/technosphere/energy_grid.ts`)
+- [ ] Implement Carnot efficiency bounding function for thermal power plants (`src/technosphere/power_plants.ts`)
 - [ ] Carnot-bounded power generation efficiency and thermal conversion monads (`src/technosphere/power_plants.ts`)
+- [ ] Implement Gouy-Stodola exergy destruction validation middleware (`src/technosphere/exergy_grid.ts`)
 - [ ] Gouy-Stodola theorem validation middleware for Second Law exergy efficiency across industrial grids (`src/technosphere/exergy_grid.ts`)
+- [ ] Implement heavy metal spatial diffusion and bioaccumulation tracking monads (`src/technosphere/industrial_pollution.ts`)
 - [ ] Heavy metal, microplastic, and xenobiotic industrial pollution stock tracking monads (`src/technosphere/industrial_pollution.ts`)
+- [ ] Implement technospheric thermal waste routing interface into planetary boundary layers (`src/monads/technosphere_coupling.ts`)
 - [ ] Biogeochemical cycle coupling interface for technospheric emissions and thermal waste (`src/monads/technosphere_coupling.ts`)
 
 ### Phase 4: Blockchain Ledger & AI Symbiosis

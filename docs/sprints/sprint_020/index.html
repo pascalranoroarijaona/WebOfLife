@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@3.7.2"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 019: H3 15-Character Length Validation</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+  <canvas id="simCanvas"></canvas>
+
+  <div id="topbar">
+    <h1>Sprint 019: H3 15-Character Length Validation</h1>
+    <h2>Thermodynamic Web of Life &bull; Spatial Resolution Subsystem</h2>
+    <p>
+      Validating strict <span class="highlight">15-character H3 index precision</span> for high-density ecological spatial partitioning and thermodynamic flux tracking.
+    </p>
+    <div class="social-links">
+      <a href="01_RFC.html" target="_blank">📄 RFC</a>
+      <a href="02_METHODS.html" target="_blank">🔬 Methods</a>
+      <a href="https://github.com" target="_blank">⭐ GitHub</a>
+    </div>
+  </div>
+
+  <div id="controls">
+    <input type="text" id="search" placeholder="Query H3 Index (15 chars)..." />
+    <button id="validateBtn">Validate H3</button>
+    <div class="zoom-container">
+      <span>Zoom</span>
+      <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1" />
+    </div>
+    <label class="debug-container">
+      <input type="checkbox" id="debugToggle" checked />
+      <span>H3 Grid Overlay</span>
+    </label>
+    <button id="resetView">Reset View</button>
+  </div>
+
+  <div id="sprint-telemetry">
+    <h4>H3 Spatial Telemetry</h4>
+    <div class="telemetry-row">
+      <span>Resolution:</span>
+      <span id="telRes" class="highlight">Res 15</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Active Cells:</span>
+      <span id="telCells" class="highlight">1,024</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Index Length:</span>
+      <span id="telLen" class="highlight">15 chars</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Validation Status:</span>
+      <span id="telStatus" style="color: var(--flora);">PASSED</span>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as h3 from 'h3-js';
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    let zoom = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+    let showGrid = true;
+
+    // Sample lat/lng for demonstration
+    const centerLat = 37.7749;
+    const centerLng = -122.4194;
+    const baseH3Index = h3.geoToH3(centerLat, centerLng, 15);
+
+    document.getElementById('telLen').textContent = `${baseH3Index.length} chars`;
+
+    const searchInput = document.getElementById('search');
+    searchInput.value = baseH3Index;
+
+    document.getElementById('validateBtn').addEventListener('click', () => {
+      const val = searchInput.value.trim();
+      const isValid = h3.h3IsValid(val) && val.length === 15;
+      const statusEl = document.getElementById('telStatus');
+      if (isValid) {
+        statusEl.textContent = 'VALID (15 chars)';
+        statusEl.style.color = 'var(--flora)';
+      } else {
+        statusEl.textContent = 'INVALID/LEN != 15';
+        statusEl.style.color = 'var(--danger)';
+      }
+    });
+
+    document.getElementById('zoomRange').addEventListener('input', (e) => {
+      zoom = parseFloat(e.target.value);
+    });
+
+    document.getElementById('debugToggle').addEventListener('change', (e) => {
+      showGrid = e.target.checked;
+    });
+
+    document.getElementById('resetView').addEventListener('click', () => {
+      zoom = 1;
+      offsetX = 0;
+      offsetY = 0;
+      document.getElementById('zoomRange').value = 1;
+    });
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX - offsetX;
+      startY = e.clientY - offsetY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      offsetX = e.clientX - startX;
+      offsetY = e.clientY - startY;
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    function draw() {
+      ctx.fillStyle = '#02050a';
+      ctx.fillRect(0, 0, width, height);
+
+      if (showGrid) {
+        ctx.save();
+        ctx.translate(width / 2 + offsetX, height / 2 + offsetY);
+        ctx.scale(zoom, zoom);
+
+        // Draw simulated h3 grid cells around center
+        const ring = h3.kRing(baseH3Index, 3);
+        document.getElementById('telCells').textContent = ring.length.toLocaleString();
+
+        ring.forEach((cell, idx) => {
+          // Pseudo coordinates for visualization
+          const angle = (idx / ring.length) * Math.PI * 2;
+          const dist = 60 + (idx % 4) * 35;
+          const cx = Math.cos(angle) * dist;
+          const cy = Math.sin(angle) * dist;
+
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (i * Math.PI) / 3;
+            const hx = cx + Math.cos(a) * 22;
+            const hy = cy + Math.sin(a) * 22;
+            if (i === 0) ctx.moveTo(hx, hy);
+            else ctx.lineTo(hx, hy);
+          }
+          ctx.closePath();
+
+          ctx.fillStyle = idx === 0 ? 'rgba(0, 225, 255, 0.2)' : 'rgba(0, 136, 255, 0.08)';
+          ctx.fill();
+          ctx.strokeStyle = idx === 0 ? '#00e1ff' : '#0088ff55';
+          ctx.lineWidth = 1 / zoom;
+          ctx.stroke();
+        });
+
+        ctx.restore();
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

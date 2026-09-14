@@ -1,41 +1,41 @@
--- Updated Schema & Ledger Definitions (Sprint 019: H3 Spatial Validation & Thermodynamic Blockchain)
+-- Updated Schema & Ledger Definitions for Sprint 020
+-- Target: 15-Character H3 Index Length Validation & Spatial Monad Stock Transitions
 
--- Enable TimescaleDB extension if not already present
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+BEGIN;
 
--- Spatial Indices and H3 Validation Metadata Ledger
-CREATE TABLE IF NOT EXISTS spatial_h3_validations (
+-- Spatial Validation Ledger & Audit Table
+CREATE TABLE IF NOT EXISTS spatial_validations (
     validation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    index_candidate VARCHAR(64) NOT NULL,
-    is_valid_length BOOLEAN NOT NULL,
-    validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    solar_compute_joules NUMERIC(18, 6) DEFAULT 0.000001
+    h3_index VARCHAR(64) NOT NULL,
+    is_valid BOOLEAN NOT NULL,
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    solar_epoch_cycle BIGINT NOT NULL,
+    entropy_delta NUMERIC(18, 10) DEFAULT 0.0000000000
 );
 
--- Convert to hypertable for time-series analytics on spatial validation requests
-SELECT create_hypertable('spatial_h3_validations', 'validated_at', if_not_exists => TRUE);
-
--- Thermodynamic Stock Ledger for Spatial Monads
-CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
+-- Thermodynamic Stock Transactions for Spatial Monads
+CREATE TABLE IF NOT EXISTS spatial_monad_stocks (
     stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    monad_name VARCHAR(128) NOT NULL,
-    mass_energy_joules NUMERIC(24, 8) NOT NULL,
-    solar_flux_absorbed NUMERIC(24, 8) NOT NULL,
-    entropy_delta NUMERIC(24, 8) NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    validation_id UUID REFERENCES spatial_validations(validation_id),
+    trophic_layer VARCHAR(32) NOT NULL,
+    energy_allocation NUMERIC(18, 8) NOT NULL CHECK (energy_allocation >= 0),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Blockchain Block Transaction Signatures
-CREATE TABLE IF NOT EXISTS blockchain_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL,
+-- Blockchain Block Transaction Signatures for Spatial State Transitions
+CREATE TABLE IF NOT EXISTS spatial_blockchain_ledger (
+    block_id BIGSERIAL PRIMARY KEY,
     previous_hash VARCHAR(64) NOT NULL,
-    block_hash VARCHAR(64) NOT NULL,
-    payload_ref UUID REFERENCES spatial_h3_validations(validation_id),
-    signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    current_hash VARCHAR(64) NOT NULL,
+    validation_id UUID REFERENCES spatial_validations(validation_id),
+    merkle_root VARCHAR(64) NOT NULL,
+    solar_signature VARCHAR(128) NOT NULL,
+    committed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_candidate ON spatial_h3_validations(index_candidate);
-CREATE INDEX IF NOT EXISTS idx_blockchain_block_height ON blockchain_transactions(block_height);
+-- Indexing for high-throughput spatial adjacency & validation queries
+CREATE INDEX IF NOT EXISTS idx_spatial_validations_h3 ON spatial_validations(h3_index);
+CREATE INDEX IF NOT EXISTS idx_spatial_monads_layer ON spatial_monad_stocks(trophic_layer);
+CREATE INDEX IF NOT EXISTS idx_spatial_blockchain_hash ON spatial_blockchain_ledger(current_hash);
+
+COMMIT;
