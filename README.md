@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 26%
-SPRINT_GOAL: Implement assertValidLatitudeDegrees boundary check enforcing [-90, 90] range in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 27%
+SPRINT_GOAL: Implement normalizeLongitudeDegrees boundary wrapping function enforcing [-180, 180) range in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -237,13 +237,13 @@ SPRINT_GOAL: Implement assertValidLatitudeDegrees boundary check enforcing [-90,
 - [x] Implement calculateH3BoundaryContactArea vertical interface cross-section calculator in `src/spatial/h3_adjacency.ts`
 - [x] Define `H3CellInterfaceMetrics` interface in `src/spatial/h3_types.ts`
 - [x] Implement `latLngToUnitVector3D` 3D Cartesian spherical projection in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertValidLatitudeDegrees` boundary check enforcing [-90, 90] range in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `normalizeLongitudeDegrees` angular wrapper into [-180, 180) range in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `normalizeAngleRadians` angular wrapper into [-pi, pi) range in `src/spatial/h3_adjacency.ts`
+- [x] Implement `assertValidLatitudeDegrees` boundary check enforcing [-90, 90] range in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `normalizeLongitudeDegrees` boundary wrapping function enforcing [-180, 180) range in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `normalizeAngleRadians` angular wrapper mapping radians into [-pi, pi) range in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeSphericalArcBearing` forward geodesic initial azimuth calculation between two lat/lng coordinates in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryUnitNormalVector` outward spherical unit normal vector calculator across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
 - [ ] Implement Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
 - [ ] Implement Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`

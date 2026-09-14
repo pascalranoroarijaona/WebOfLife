@@ -1,149 +1,179 @@
 -- ============================================================================
--- Web of Life: Planetary Thermodynamic Ledger & Geodesic Monad Schema
--- Sprint 053: Spatial Geodesic Invariant Enforcement & H3 Adjacency Stocks
+-- Web of Life: Planetary Simulation & Thermodynamic Blockchain Schema
+-- Sprint 054: Longitudinal Boundary Wrapping & Antimeridian Coordinate Normalization
 -- ============================================================================
 
+-- Extensions for spatial computations and cryptographic hashing
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "btree_gist";
+
+-- Enum types for spatial navigation and transport dynamics
+DO $$ BEGIN
+    CREATE TYPE hex_direction AS ENUM (
+        'DIRECTION_CENTER',
+        'DIRECTION_NORTH_EAST',
+        'DIRECTION_EAST',
+        'DIRECTION_SOUTH_EAST',
+        'DIRECTION_SOUTH_WEST',
+        'DIRECTION_WEST',
+        'DIRECTION_NORTH_WEST'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE antimeridian_crossing_type AS ENUM (
+        'EAST_TO_WEST',     -- +179.999 -> -179.999 (wrapped across 180.0)
+        'WEST_TO_EAST',     -- -180.000 -> +179.999 (wrapped across -180.0)
+        'STATIONARY_WRAPPED'-- Normalization of out-of-range accumulation
+    );
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ----------------------------------------------------------------------------
--- 1. GEODESIC GRID & H3 SPATIAL INDEXING
+-- Canonical H3 DGGS Cell Spatial Registry
+-- Enforces canonical half-open longitude range [-180.0, 180.0)
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_h3_cells (
-    h3_index VARCHAR(16) PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS h3_cell_registry (
+    h3_index VARCHAR(15) PRIMARY KEY,
     resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
-    centroid_lat DOUBLE PRECISION NOT NULL,
-    centroid_lng DOUBLE PRECISION NOT NULL,
-    boundary_geom GEOMETRY(Polygon, 4326),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_h3_latitude_geodesic_bounds CHECK (
-        centroid_lat IS NOT NULL 
-        AND NOT is_nan(centroid_lat) 
-        AND NOT is_infinite(centroid_lat) 
-        AND centroid_lat >= -90.0 
-        AND centroid_lat <= 90.0
-    ),
-    CONSTRAINT chk_h3_longitude_bounds CHECK (
-        centroid_lng IS NOT NULL 
-        AND NOT is_nan(centroid_lng) 
-        AND NOT is_infinite(centroid_lng) 
-        AND centroid_lng >= -180.0 
-        AND centroid_lng <= 180.0
-    )
+    latitude_deg DOUBLE PRECISION NOT NULL CHECK (latitude_deg >= -90.0 AND latitude_deg <= 90.0),
+    longitude_deg DOUBLE PRECISION NOT NULL CHECK (longitude_deg >= -180.0 AND longitude_deg < 180.0),
+    area_km2 DOUBLE PRECISION NOT NULL CHECK (area_km2 > 0.0),
+    boundary_polygon JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_lat ON spatial_h3_cells (centroid_lat);
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_geom ON spatial_h3_cells USING GIST (boundary_geom);
+CREATE INDEX IF NOT EXISTS idx_h3_cell_lat_lon 
+    ON h3_cell_registry (latitude_deg, longitude_deg);
+
+CREATE INDEX IF NOT EXISTS idx_h3_cell_res 
+    ON h3_cell_registry (resolution);
 
 -- ----------------------------------------------------------------------------
--- 2. H3 ADJACENCY DIRECTED TOPOLOGY GRAPH
+-- Coordinate Wrapping & Geodesic Advection Audit Log
+-- Records boundary wrapping operations and enforces mathematical invariance
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_h3_adjacencies (
-    origin_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
-    neighbor_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
-    direction_index INTEGER NOT NULL CHECK (direction_index BETWEEN 0 AND 5),
-    geodesic_distance_meters DOUBLE PRECISION NOT NULL CHECK (geodesic_distance_meters >= 0.0),
-    advection_conductance DOUBLE PRECISION NOT NULL DEFAULT 1.0 CHECK (advection_conductance >= 0.0),
-    PRIMARY KEY (origin_h3, neighbor_h3),
-    CONSTRAINT chk_non_self_adjacent CHECK (origin_h3 <> neighbor_h3)
+CREATE TABLE IF NOT EXISTS spatial_coordinate_normalizations (
+    normalization_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    raw_longitude_deg DOUBLE PRECISION NOT NULL,
+    canonical_longitude_deg DOUBLE PRECISION NOT NULL CHECK (canonical_longitude_deg >= -180.0 AND canonical_longitude_deg < 180.0),
+    raw_latitude_deg DOUBLE PRECISION NOT NULL CHECK (raw_latitude_deg >= -90.0 AND raw_latitude_deg <= 90.0),
+    canonical_latitude_deg DOUBLE PRECISION NOT NULL CHECK (canonical_latitude_deg >= -90.0 AND canonical_latitude_deg <= 90.0),
+    winding_number_k INTEGER NOT NULL,
+    crossed_antimeridian BOOLEAN NOT NULL DEFAULT FALSE,
+    crossing_type antimeridian_crossing_type,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_canonical_longitude_half_open 
+        CHECK (canonical_longitude_deg >= -180.0 AND canonical_longitude_deg < 180.0),
+    CONSTRAINT chk_winding_number_consistency
+        CHECK (raw_longitude_deg = canonical_longitude_deg + (winding_number_k * 360.0) 
+               OR abs(raw_longitude_deg - (canonical_longitude_deg + (winding_number_k * 360.0))) < 1e-9)
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_adjacencies_neighbor ON spatial_h3_adjacencies (neighbor_h3);
+CREATE INDEX IF NOT EXISTS idx_norm_canonical_lon 
+    ON spatial_coordinate_normalizations (canonical_longitude_deg);
+
+CREATE INDEX IF NOT EXISTS idx_norm_crossed_antimeridian 
+    ON spatial_coordinate_normalizations (crossed_antimeridian) 
+    WHERE crossed_antimeridian IS TRUE;
 
 -- ----------------------------------------------------------------------------
--- 3. THERMODYNAMIC CELL STOCKS (State Variables)
+-- Antimeridian Mass & Energy Transport Ledger (Thermodynamic Monad Stocks)
+-- Enforces 1st & 2nd Laws during continuous boundary advection
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_cell_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
-    epoch_tick BIGINT NOT NULL,
-    internal_energy_joules NUMERIC(38, 8) NOT NULL CHECK (internal_energy_joules >= 0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
-    entropy_joules_per_kelvin DOUBLE PRECISION NOT NULL,
-    mass_atmosphere_kg DOUBLE PRECISION NOT NULL CHECK (mass_atmosphere_kg >= 0.0),
-    mass_ocean_kg DOUBLE PRECISION NOT NULL CHECK (mass_ocean_kg >= 0.0),
-    biomass_carbon_kg DOUBLE PRECISION NOT NULL CHECK (biomass_carbon_kg >= 0.0),
-    monad_state_hash VARCHAR(64) NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_cell_stock_epoch UNIQUE (h3_index, epoch_tick)
+CREATE TABLE IF NOT EXISTS antimeridian_transport_ledger (
+    transport_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tick_number BIGINT NOT NULL,
+    origin_cell VARCHAR(15) NOT NULL REFERENCES h3_cell_registry(h3_index),
+    destination_cell VARCHAR(15) NOT NULL REFERENCES h3_cell_registry(h3_index),
+    crossing_type antimeridian_crossing_type NOT NULL,
+    advected_mass_kg DOUBLE PRECISION NOT NULL CHECK (advected_mass_kg >= 0.0),
+    advected_energy_joules DOUBLE PRECISION NOT NULL CHECK (advected_energy_joules >= 0.0),
+    entropy_generated_j_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_generated_j_per_k >= 0.0),
+    origin_lon_pre_wrap DOUBLE PRECISION NOT NULL,
+    dest_lon_post_wrap DOUBLE PRECISION NOT NULL CHECK (dest_lon_post_wrap >= -180.0 AND dest_lon_post_wrap < 180.0),
+    mass_conservation_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    energy_conservation_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_mass_conservation_zero 
+        CHECK (abs(mass_conservation_delta) < 1e-12),
+    CONSTRAINT chk_energy_conservation_zero 
+        CHECK (abs(energy_conservation_delta) < 1e-12),
+    CONSTRAINT chk_second_law_entropy 
+        CHECK (entropy_generated_j_per_k >= 0.0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_stocks_epoch ON thermodynamic_cell_stocks (epoch_tick);
-CREATE INDEX IF NOT EXISTS idx_thermo_stocks_h3 ON thermodynamic_cell_stocks (h3_index);
+CREATE INDEX IF NOT EXISTS idx_transport_tick 
+    ON antimeridian_transport_ledger (tick_number);
+
+CREATE INDEX IF NOT EXISTS idx_transport_origin_dest 
+    ON antimeridian_transport_ledger (origin_cell, destination_cell);
 
 -- ----------------------------------------------------------------------------
--- 4. SPATIAL MONAD INSOLATION & BOUNDARY FLUXES
--- Enforces strictly non-negative solar flux derived from latitude [-90, 90]
+-- Blockchain Transaction Ledger: Spatial State Monad Transitions
+-- Anchors thermodynamic spatial state proofs into consensus blocks
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS solar_insolation_fluxes (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    epoch_tick BIGINT NOT NULL,
-    subsolar_latitude DOUBLE PRECISION NOT NULL,
-    cell_latitude DOUBLE PRECISION NOT NULL,
-    solar_zenith_cos DOUBLE PRECISION NOT NULL CHECK (solar_zenith_cos >= 0.0 AND solar_zenith_cos <= 1.0),
-    solar_irradiance_flux_w_m2 DOUBLE PRECISION NOT NULL CHECK (solar_irradiance_flux_w_m2 >= 0.0),
-    net_energy_joules NUMERIC(38, 8) NOT NULL CHECK (net_energy_joules >= 0),
-    CONSTRAINT chk_flux_cell_lat CHECK (
-        cell_latitude IS NOT NULL 
-        AND cell_latitude >= -90.0 
-        AND cell_latitude <= 90.0
-    ),
-    CONSTRAINT chk_flux_subsolar_lat CHECK (
-        subsolar_latitude IS NOT NULL 
-        AND subsolar_latitude >= -90.0 
-        AND subsolar_latitude <= 90.0
-    ),
-    CONSTRAINT uq_solar_flux_cell_epoch UNIQUE (h3_index, epoch_tick)
-);
-
-CREATE INDEX IF NOT EXISTS idx_solar_flux_epoch ON solar_insolation_fluxes (epoch_tick);
-
--- ----------------------------------------------------------------------------
--- 5. INTER-CELL ADJACENCY FLUX TRANSACTIONS
--- Tracks conservation of energy & mass transfers across hex boundaries
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS adjacency_flux_transactions (
+CREATE TABLE IF NOT EXISTS spatial_block_transactions (
     transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    epoch_tick BIGINT NOT NULL,
-    origin_h3 VARCHAR(16) NOT NULL,
-    neighbor_h3 VARCHAR(16) NOT NULL,
-    mass_flux_transferred_kg DOUBLE PRECISION NOT NULL,
-    energy_transferred_joules NUMERIC(38, 8) NOT NULL,
-    entropy_production_joules_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_joules_per_k >= 0.0),
-    FOREIGN KEY (origin_h3, neighbor_h3) REFERENCES spatial_h3_adjacencies(origin_h3, neighbor_h3),
-    CONSTRAINT chk_entropy_non_negative CHECK (entropy_production_joules_per_k >= 0.0)
+    block_height BIGINT NOT NULL,
+    block_hash VARCHAR(64) NOT NULL,
+    previous_block_hash VARCHAR(64) NOT NULL,
+    h3_index VARCHAR(15) NOT NULL REFERENCES h3_cell_registry(h3_index),
+    pre_state_hash VARCHAR(64) NOT NULL,
+    post_state_hash VARCHAR(64) NOT NULL,
+    total_biomass_kg DOUBLE PRECISION NOT NULL CHECK (total_biomass_kg >= 0.0),
+    total_water_mass_kg DOUBLE PRECISION NOT NULL CHECK (total_water_mass_kg >= 0.0),
+    total_internal_energy_j DOUBLE PRECISION NOT NULL CHECK (total_internal_energy_j >= 0.0),
+    total_entropy_j_per_k DOUBLE PRECISION NOT NULL CHECK (total_entropy_j_per_k >= 0.0),
+    antimeridian_wrap_count INTEGER NOT NULL DEFAULT 0 CHECK (antimeridian_wrap_count >= 0),
+    merkle_root VARCHAR(64) NOT NULL,
+    cryptographic_signature BYTEA NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_adj_flux_epoch ON adjacency_flux_transactions (epoch_tick);
+CREATE INDEX IF NOT EXISTS idx_spatial_block_height 
+    ON spatial_block_transactions (block_height);
+
+CREATE INDEX IF NOT EXISTS idx_spatial_block_h3 
+    ON spatial_block_transactions (h3_index);
 
 -- ----------------------------------------------------------------------------
--- 6. THERMODYNAMIC BLOCKCHAIN LEDGER (Consensus & Verification)
+-- Automated Constraint Function: Coordinate Sanitization & Canonical Invariant
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_height BIGINT PRIMARY KEY,
-    epoch_tick BIGINT NOT NULL UNIQUE,
-    parent_block_hash VARCHAR(64) NOT NULL,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
-    state_merkle_root VARCHAR(64) NOT NULL,
-    flux_merkle_root VARCHAR(64) NOT NULL,
-    total_entropy_production DOUBLE PRECISION NOT NULL CHECK (total_entropy_production >= 0.0),
-    total_energy_delta_joules NUMERIC(38, 8) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE OR REPLACE FUNCTION sanitize_and_validate_longitude()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_raw DOUBLE PRECISION;
+    v_wrapped DOUBLE PRECISION;
+    v_normalized DOUBLE PRECISION;
+BEGIN
+    v_raw := NEW.longitude_deg;
+    
+    -- Dual-modulo projection: [ ((lon + 180) % 360) + 360 ] % 360 - 180
+    v_wrapped := (((v_raw + 180.0) % 360.0) + 360.0) % 360.0;
+    v_normalized := v_wrapped - 180.0;
+    
+    -- Negative-zero suppression
+    IF v_normalized = 0.0 THEN
+        v_normalized := 0.0;
+    END IF;
 
-CREATE TABLE IF NOT EXISTS blockchain_transactions (
-    tx_hash VARCHAR(64) PRIMARY KEY,
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height),
-    epoch_tick BIGINT NOT NULL,
-    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    signature VARCHAR(132) NOT NULL,
-    invariant_assertions_passed BOOLEAN NOT NULL DEFAULT TRUE,
-    payload_json JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_invariants_valid CHECK (invariant_assertions_passed = TRUE)
-);
+    NEW.longitude_deg := v_normalized;
+    
+    -- Strict domain assertion
+    IF NEW.longitude_deg < -180.0 OR NEW.longitude_deg >= 180.0 THEN
+        RAISE EXCEPTION 'Fatal invariant violation: Canonical longitude % out of bounds [-180, 180)', NEW.longitude_deg;
+    END IF;
 
-CREATE INDEX IF NOT EXISTS idx_blockchain_tx_block ON blockchain_transactions (block_height);
-CREATE INDEX IF NOT EXISTS idx_blockchain_tx_h3 ON blockchain_transactions (h3_index);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_sanitize_cell_longitude
+    BEFORE INSERT OR UPDATE OF longitude_deg ON h3_cell_registry
+    FOR EACH ROW
+    EXECUTE FUNCTION sanitize_and_validate_longitude();

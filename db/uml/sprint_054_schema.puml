@@ -1,0 +1,154 @@
+@startuml sprint_054_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam shadowing false
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam packageFontSize 13
+
+title Web of Life - Sprint 054: Longitudinal Boundary Wrapping & Antimeridian Coordinate Normalization
+
+package "src/spatial (Spatial DGGS & Topology)" {
+    class H3AdjacencyService <<Service>> {
+        + getNeighbors(cell: H3Index): H3Index[]
+        + getDirectionalNeighbor(cell: H3Index, dir: HexDir): H3Index
+        + computeGeodesicStep(coord: LatLon, delta: Vector2): LatLon
+        + latLonToCell(lat: number, lon: number, res: number): H3Index
+        + cellToLatLon(cell: H3Index): LatLon
+    }
+
+    class CoordinateNormalization <<Pure Math Utility>> {
+        + normalizeLongitudeDegrees(lonDeg: number): number
+        + computeWindingNumber(lonDeg: number): number
+        + isAntimeridianCrossing(lonA: number, lonB: number): boolean
+    }
+
+    interface LatLon {
+        + latitude: number
+        + longitude: number
+    }
+
+    enum HexDir {
+        DIRECTION_CENTER
+        DIRECTION_NORTH_EAST
+        DIRECTION_EAST
+        DIRECTION_SOUTH_EAST
+        DIRECTION_SOUTH_WEST
+        DIRECTION_WEST
+        DIRECTION_NORTH_WEST
+    }
+}
+
+package "src/monads (Thermodynamic State Monads)" {
+    class SpatialMonad<S> <<Monad>> {
+        - state: S
+        - coordinates: LatLon
+        - h3Index: string
+        + unit(state: S, coord: LatLon): SpatialMonad<S>
+        + bind<B>(f: (s: S, coord: LatLon) => SpatialMonad<B>): SpatialMonad<B>
+        + advect(velocityVector: Vector2, dt: number): SpatialMonad<S>
+        + getState(): S
+        + getCoordinates(): LatLon
+    }
+
+    class ThermodynamicStockTensor <<Entity>> {
+        + massBiomassKg: number
+        + massWaterKg: number
+        + internalEnergyJoules: number
+        + entropyJPerK: number
+        + assertConservation(prior: ThermodynamicStockTensor): boolean
+    }
+}
+
+package "Database Schema (Relational / Time-Series Ledger)" {
+    class h3_cell_registry <<Table>> {
+        + h3_index: VARCHAR(15) [PK]
+        + resolution: INTEGER
+        + latitude_deg: DOUBLE PRECISION
+        + longitude_deg: DOUBLE PRECISION [-180, 180)
+        + area_km2: DOUBLE PRECISION
+        + boundary_polygon: JSONB
+        + created_at: TIMESTAMPTZ
+        + updated_at: TIMESTAMPTZ
+    }
+
+    class spatial_coordinate_normalizations <<Table>> {
+        + normalization_id: UUID [PK]
+        + raw_longitude_deg: DOUBLE PRECISION
+        + canonical_longitude_deg: DOUBLE PRECISION [-180, 180)
+        + raw_latitude_deg: DOUBLE PRECISION
+        + canonical_latitude_deg: DOUBLE PRECISION
+        + winding_number_k: INTEGER
+        + crossed_antimeridian: BOOLEAN
+        + crossing_type: antimeridian_crossing_type
+        + created_at: TIMESTAMPTZ
+    }
+
+    class antimeridian_transport_ledger <<Table>> {
+        + transport_id: UUID [PK]
+        + tick_number: BIGINT
+        + origin_cell: VARCHAR(15) [FK]
+        + destination_cell: VARCHAR(15) [FK]
+        + crossing_type: antimeridian_crossing_type
+        + advected_mass_kg: DOUBLE PRECISION
+        + advected_energy_joules: DOUBLE PRECISION
+        + entropy_generated_j_per_k: DOUBLE PRECISION
+        + origin_lon_pre_wrap: DOUBLE PRECISION
+        + dest_lon_post_wrap: DOUBLE PRECISION
+        + mass_conservation_delta: DOUBLE PRECISION (== 0.0)
+        + energy_conservation_delta: DOUBLE PRECISION (== 0.0)
+        + created_at: TIMESTAMPTZ
+    }
+
+    class spatial_block_transactions <<Table>> {
+        + transaction_id: UUID [PK]
+        + block_height: BIGINT
+        + block_hash: VARCHAR(64)
+        + previous_block_hash: VARCHAR(64)
+        + h3_index: VARCHAR(15) [FK]
+        + pre_state_hash: VARCHAR(64)
+        + post_state_hash: VARCHAR(64)
+        + total_biomass_kg: DOUBLE PRECISION
+        + total_water_mass_kg: DOUBLE PRECISION
+        + total_internal_energy_j: DOUBLE PRECISION
+        + total_entropy_j_per_k: DOUBLE PRECISION
+        + antimeridian_wrap_count: INTEGER
+        + merkle_root: VARCHAR(64)
+        + cryptographic_signature: BYTEA
+        + timestamp: TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invocations
+H3AdjacencyService ..> CoordinateNormalization : invokes normalizeLongitudeDegrees()
+SpatialMonad ..> H3AdjacencyService : queries cell indexing
+SpatialMonad *-- ThermodynamicStockTensor : encapsulates
+H3AdjacencyService ..> LatLon : resolves coordinates
+
+CoordinateNormalization ..> spatial_coordinate_normalizations : logged by
+SpatialMonad ..> antimeridian_transport_ledger : records stock transfers
+SpatialMonad ..> spatial_block_transactions : commits state proofs
+h3_cell_registry "1" <-- "0..*" antimeridian_transport_ledger : origin / destination
+h3_cell_registry "1" <-- "0..*" spatial_block_transactions : anchors block
+
+note right of CoordinateNormalization
+  **Canonical Projection:**
+  f(λ) = (((λ + 180) % 360) + 360) % 360 - 180
+  
+  **Boundary Enforcements:**
+  - Range: [-180.0, 180.0)
+  - 180.0 ↦ -180.0
+  - -180.0 ↦ -180.0
+  - -0.0 ↦ +0.0
+  - Periodicity: f(λ + 360·k) = f(λ)
+end note
+
+note bottom of antimeridian_transport_ledger
+  **Thermodynamic Compliance:**
+  - 1st Law: ΔM = 0, ΔU = 0 across boundary
+  - 2nd Law: ΔS_universe >= 0
+  - Eliminates artificial potential gradients
+end note
+
+@enduml
