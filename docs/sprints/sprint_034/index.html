@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@3.7.2"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 034: H3 Token Non-Hexadecimal Symbol Validation Error Throwing</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>SPRINT 034: H3 TOKEN NON-HEXADECIMAL VALIDATION</h1>
+  <h2>Thermodynamic Web of Life - Spatial Biome Engine</h2>
+  <p>Enforcing rigorous validation of H3 index tokens. Any non-hexadecimal symbol in H3 token strings throws an immediate diagnostic error, ensuring pristine geospatial monad topologies.</p>
+  <div class="social-links">
+    <a href="01_RFC.html">RFC 034</a>
+    <a href="02_METHODS.html">Methods</a>
+    <a href="https://github.com">GitHub Repository</a>
+  </div>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Enter H3 Index Token (e.g. 8928308280fffff)..." />
+  <div class="zoom-container">
+    <span>Zoom:</span>
+    <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1" />
+  </div>
+  <label class="debug-container">
+    <input type="checkbox" id="debugToggle" checked />
+    <span>H3 Grid Debug</span>
+  </label>
+  <button id="validateBtn">Validate Token</button>
+  <button id="resetViewBtn">Reset View</button>
+</div>
+
+<div id="sprint-telemetry">
+  <h4>H3 Validation Telemetry</h4>
+  <div class="telemetry-row"><span>Token Status:</span> <span id="telStatus" class="highlight">Ready</span></div>
+  <div class="telemetry-row"><span>Validated Hexes:</span> <span id="telHexCount" class="highlight">0</span></div>
+  <div class="telemetry-row"><span>Validation Errors:</span> <span id="telErrors" class="highlight" style="color:var(--danger)">0</span></div>
+  <div class="telemetry-row"><span>Resolution Tier:</span> <span id="telRes" class="highlight">3</span></div>
+</div>
+
+<script type="module">
+  import * as h3 from 'h3-js';
+
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const searchInput = document.getElementById('search');
+  const validateBtn = document.getElementById('validateBtn');
+  const zoomRange = document.getElementById('zoomRange');
+  const debugToggle = document.getElementById('debugToggle');
+  const resetViewBtn = document.getElementById('resetViewBtn');
+
+  const telStatus = document.getElementById('telStatus');
+  const telHexCount = document.getElementById('telHexCount');
+  const telErrors = document.getElementById('telErrors');
+  const telRes = document.getElementById('telRes');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  let zoom = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let validatedCount = 0;
+  let errorCount = 0;
+
+  // Base sample h3 index at res 3 around equator/prime meridian
+  const sampleIndex = h3.geoToH3(0, 0, 3);
+  const ring = h3.kRing(sampleIndex, 3);
+
+  function validateH3Token(token) {
+    if (!token || typeof token !== 'string') {
+      throw new Error(`Invalid H3 Token: token must be a non-empty string.`);
+    }
+    // Check non-hexadecimal characters (H3 tokens must be hex 0-9, a-f)
+    const nonHexRegex = /[^0-9a-fA-F]/;
+    if (nonHexRegex.test(token)) {
+      throw new Error(`H3 Token Validation Error: Non-hexadecimal symbol detected in token "${token}".`);
+    }
+    // Verify using h3-js isValidCell if available or length check
+    if (h3.isValidCell && !h3.isValidCell(token)) {
+      throw new Error(`H3 Token Validation Error: "${token}" is not a valid H3 cell index.`);
+    }
+    return true;
+  }
+
+  function handleValidation(tokenVal) {
+    try {
+      validateH3Token(tokenVal);
+      telStatus.textContent = 'Valid H3 Token';
+      telStatus.style.color = 'var(--flora)';
+      validatedCount++;
+      telHexCount.textContent = validatedCount;
+    } catch (err) {
+      errorCount++;
+      telErrors.textContent = errorCount;
+      telStatus.textContent = err.message;
+      telStatus.style.color = 'var(--danger)';
+      console.warn(err);
+    }
+  }
+
+  validateBtn.addEventListener('click', () => {
+    handleValidation(searchInput.value.trim());
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      handleValidation(searchInput.value.trim());
+    }
+  });
+
+  zoomRange.addEventListener('input', (e) => {
+    zoom = parseFloat(e.target.value);
+  });
+
+  resetViewBtn.addEventListener('click', () => {
+    zoom = 1;
+    offsetX = 0;
+    offsetY = 0;
+    zoomRange.value = 1;
+  });
+
+  // Render Loop
+  let angle = 0;
+  function animate() {
+    ctx.fillStyle = '#02050a';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.translate(width / 2 + offsetX, height / 2 + offsetY);
+    ctx.scale(zoom, zoom);
+
+    if (debugToggle.checked) {
+      // Draw simulated thermodynamic grid nodes
+      ring.forEach((cell, idx) => {
+        // Simple procedural offset for demo canvas representation
+        const a = (idx / ring.length) * Math.PI * 2 + angle;
+        const dist = 120 + Math.sin(idx + angle * 2) * 20;
+        const x = Math.cos(a) * dist;
+        const y = Math.sin(a) * dist;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 18, 0, Math.PI * 2);
+        ctx.fillStyle = idx === 0 ? 'rgba(0, 225, 255, 0.25)' : 'rgba(0, 136, 255, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = idx === 0 ? '#00e1ff' : '#315064';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#c8f5f2';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(cell.substring(0, 6) + '...', x, y + 3);
+      });
+    }
+
+    ctx.restore();
+
+    angle += 0.005;
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>

@@ -26,20 +26,20 @@ SPRINT_GOAL: Implement invalid character error throwing when H3 token contains n
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
-- [ ] Implement `CSRMatrix` interface & constructor (`src/biosphere/trophic_matrix.ts`)
-- [ ] Implement `csrMultiplyVector` energy flux propagator (`src/biosphere/trophic_matrix.ts`)
-- [ ] Implement Gauss-Seidel steady-state biomass solver (`src/biosphere/trophic_solver.ts`)
-- [ ] Implement spectral radius and residual checks ($\epsilon < 10^{-6}$) (`src/biosphere/trophic_solver.ts`)
-- [ ] Implement C:N:P elemental stoichiometric constraint checker (`src/biosphere/redfield_ratio.ts`)
-- [ ] Implement nutrient limitation penalty modifier (`src/biosphere/redfield_ratio.ts`)
+- [ ] Implement `CSRMatrix` interface holding `values: number[]`, `columnIndices: number[]`, and `rowOffsets: number[]` (`src/biosphere/trophic_matrix.ts`)
+- [ ] Implement `csrMultiplyVector` energy flux propagator across trophic interaction networks (`src/biosphere/trophic_matrix.ts`)
+- [ ] Implement Gauss-Seidel steady-state biomass solver updating node biomass stocks (`src/biosphere/trophic_solver.ts`)
+- [ ] Implement spectral radius and relative residual convergence checks ($\epsilon < 10^{-6}$) (`src/biosphere/trophic_solver.ts`)
+- [ ] Implement C:N:P elemental stoichiometric constraint checker matching atomic baseline (`src/biosphere/redfield_ratio.ts`)
+- [ ] Implement nutrient limitation penalty modifier scaling primary productivity (`src/biosphere/redfield_ratio.ts`)
 - [ ] Holling Type II predator ingestion rate function with handling time parameters (`src/biosphere/holling_kinetics.ts`)
 - [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds (`src/biosphere/holling_kinetics.ts`)
-- [ ] Implement adjacency-weighted hyphal transport arrays (`src/biosphere/mycorrhizal_flows.ts`)
-- [ ] Implement fungal metabolic maintenance cost deductions (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Implement adjacency-weighted hyphal transport arrays mapping carbon-for-nutrient exchange (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Implement fungal metabolic maintenance cost deductions based on soil respiration (`src/biosphere/mycorrhizal_flows.ts`)
 - [ ] Shannon-Wiener entropy metric calculation across spatial H3 node communities (`src/biosphere/diversity_metrics.ts`)
 - [ ] Simpson's dominance and evenness index calculator (`src/biosphere/diversity_metrics.ts`)
 - [ ] Stochastic Extinction, Bottleneck, and Minimum Viable Population engine (`src/biosphere/population_genetics.ts`)
-- [ ] Implement dual-pool Soil Organic Matter tracking (`src/geobiome/soil_matrix.ts`)
+- [ ] Implement dual-pool Soil Organic Matter tracking (Active and Passive SOM pools) (`src/geobiome/soil_matrix.ts`)
 - [ ] Implement microbial necromass and temperature-dependent decomposition kinetics (`src/geobiome/soil_matrix.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
@@ -67,3 +67,5 @@ SPRINT_GOAL: Implement invalid character error throwing when H3 token contains n
 - [ ] SQLite schema definitions for append-only temporal vortex blocks (`db/schema.sql`)
 - [ ] Multi-objective Pareto scoring function integrating human wellbeing, biospheric diversity, and planetary explorability (`src/optimization/pareto_objective.ts`)
 - [ ] Multi-Objective AI Optimization Objective function integrating wellbeing, diversity, and explorability (`src/optimization/ai_symbiosis.ts`)
+
+<!-- BACKLOG_END -->

@@ -1,0 +1,69 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "Spatial Indexing Infrastructure" {
+  class H3ValidationError {
+    +name: string
+    +token: string
+    +constructor(token: string, message: string)
+  }
+
+  class H3GridValidator {
+    +{static} validateH3Token(token: string): void
+  }
+
+  class SpatialMonad {
+    -token: string
+    -matterMass: number
+    -freeEnergy: number
+    +validate(): void
+    +transferEnergy(target: SpatialMonad, joules: number): void
+  }
+}
+
+package "Thermodynamic Blockchain & Ledger" {
+  class ThermodynamicStock {
+    +stockId: UUID
+    +tokenId: string
+    +monadType: string
+    +matterMass: number
+    +freeEnergy: number
+    +updateState(): void
+  }
+
+  class ThermodynamicFlow {
+    +flowId: UUID
+    +sourceStockId: UUID
+    +targetStockId: UUID
+    +joulesTransferred: number
+    +entropyGenerated: number
+    +execute(): void
+  }
+
+  class BlockchainBlock {
+    +blockHash: string
+    +previousBlockHash: string
+    +merkleRoot: string
+    +stateEntropyTotal: number
+    +minedAt: DateTime
+    +verifyIntegrity(): boolean
+  }
+
+  class BlockTransaction {
+    +transactionId: UUID
+    +blockHash: string
+    +flowId: UUID
+    +signature: string
+    +isCommitted: boolean
+  }
+}
+
+H3ValidationError ..> H3GridValidator : throws
+SpatialMonad --> H3GridValidator : validates via
+SpatialMonad "1" *-- "1" ThermodynamicStock : contains
+ThermodynamicStock "1" --> "*" ThermodynamicFlow : sources/targets
+ThermodynamicFlow "1" *-- "1" BlockTransaction : recorded in
+BlockchainBlock "1" o-- "*" BlockTransaction : bundles
+@enduml
