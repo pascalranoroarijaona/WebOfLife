@@ -1,8 +1,6 @@
-/**
- * Sprint 001-013: Comprehensive Spatial Monad and Thermodynamic Stock Register
- */
-import { H3GridManager, H3GridValidator } from "../spatial/h3_grid.js";
-import { GeoCoordinate, H3ErrorCode } from "../spatial/h3_types.js";
+import { guardH3Payload, H3GridParser, H3Validator, H3Error, H3ErrorCode } from '../spatial/h3_grid';
+
+export { H3ErrorCode };
 
 export interface ThermodynamicStock {
   carbonKg: number;
@@ -11,85 +9,45 @@ export interface ThermodynamicStock {
 }
 
 export class SpatialMonad<T> {
-  private value: T | null;
-  private entropyState: boolean;
+  private value: T | null = null;
   private historyStack: T[] = [];
 
-  constructor(val: T | null = null, entropyState: boolean = false) {
-    this.value = val;
-    this.entropyState = entropyState;
-    if (val !== null) {
-      this.historyStack.push(val);
-    }
+  constructor(private stock: T | null = null, private readonly h3Index: string | null = null) {
+    this.value = stock;
   }
 
-  public static of<T>(cell: T | null | undefined): SpatialMonad<T> {
-    if (cell === null || cell === undefined) {
-      return SpatialMonad.empty<T>();
-    }
-    return new SpatialMonad<T>(cell, false);
+  public static fromPayload(payload: unknown): SpatialMonad<string> {
+    guardH3Payload(payload);
+    return new SpatialMonad<string>(payload as string, payload as string);
   }
 
-  public static unit<T>(val: T): SpatialMonad<T> {
-    return SpatialMonad.of(val);
+  public static of<U>(val: U): SpatialMonad<U> {
+    return new SpatialMonad<U>(val, typeof val === 'string' ? val : null);
   }
 
-  public static empty<T>(): SpatialMonad<T> {
-    return new SpatialMonad<T>(null, true);
+  public static fromGeo(coord: { lat: number; lng: number }, resolution: number, initialStock: ThermodynamicStock): SpatialMonad<ThermodynamicStock> {
+    const idx = H3GridParser.fromGeo(coord, resolution);
+    return new SpatialMonad<ThermodynamicStock>(initialStock, idx);
   }
 
-  public static fromGeo(
-    coord: GeoCoordinate,
-    resolution: number,
-    initialStock: ThermodynamicStock
-  ): SpatialMonad<ThermodynamicStock & { h3Index: string }> {
-    const indexStr = H3GridManager.fromGeo(coord, resolution);
-    return new SpatialMonad({ h3Index: indexStr, ...initialStock });
+  public map<U>(fn: (index: string) => U): SpatialMonad<U> {
+    if (this.h3Index === null && typeof this.stock !== 'string') {
+      throw new Error('SpatialMonad violation: Attempted to map over an uninitialized or null spatial index.');
+    }
+    const target = this.h3Index ?? (this.stock as unknown as string);
+    const resolvedStock = fn(target);
+    return new SpatialMonad<U>(resolvedStock, target);
   }
 
-  public chain<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U> {
-    if (this.entropyState || this.value === null) {
-      return SpatialMonad.empty<U>();
-    }
-    try {
-      return fn(this.value);
-    } catch {
-      return SpatialMonad.empty<U>();
-    }
-  }
-
-  public bind<U>(fn: (val: T) => U | SpatialMonad<U>): SpatialMonad<U> {
-    if (this.entropyState || this.value === null) {
-      return SpatialMonad.empty<U>();
-    }
-    try {
-      const res = fn(this.value);
-      if (res instanceof SpatialMonad) {
-        return res;
-      }
-      return SpatialMonad.of(res);
-    } catch {
-      return SpatialMonad.empty<U>();
-    }
-  }
-
-  public map<U>(fn: (val: T) => U): SpatialMonad<U> {
-    if (this.entropyState || this.value === null) {
-      return SpatialMonad.empty<U>();
-    }
-    try {
-      const mapped = fn(this.value);
-      return SpatialMonad.of(mapped);
-    } catch {
-      return SpatialMonad.empty<U>();
-    }
+  public getStock(): T | null {
+    return this.stock;
   }
 
   public extract(): T {
-    if (this.value === null) {
-      throw new Error("[Entropy Leak Prevented] Cannot extract null value from SpatialMonad.");
+    if (this.stock === null) {
+      throw new Error('Cannot extract null stock from SpatialMonad');
     }
-    return this.value;
+    return this.stock;
   }
 
   public unwrapStock(): T {
@@ -97,62 +55,83 @@ export class SpatialMonad<T> {
   }
 
   public getIndex(): string {
-    if (this.value && typeof this.value === 'object' && 'h3Index' in this.value) {
-      return (this.value as any).h3Index;
-    }
-    if (typeof this.value === 'string') {
-      return this.value;
-    }
-    return '';
+    return this.h3Index ?? '';
   }
 
   public isCorrupted(): boolean {
-    return this.entropyState;
-  }
-
-  public getStock(): T | null {
-    return this.value;
+    return this.stock === null || (typeof this.stock === 'string' && this.stock.trim() === '');
   }
 
   public isRight(): boolean {
-    return !this.entropyState && this.value !== null;
+    if (typeof this.stock === 'string') {
+      return /^[0-9a-fA-F]{15}$/.test(this.stock);
+    }
+    return this.stock !== null;
   }
 
   public getOrThrow(): T {
     if (!this.isRight()) {
-      throw new Error("[Entropy Leak Prevented] Monad is in Left/Empty state.");
+      throw new Error('[Entropy Leak Prevented] Invalid spatial monad state');
     }
-    return this.value!;
+    return this.stock as T;
   }
 
-  public run(action: () => void): void {
-    try {
-      action();
-      if (this.value !== null) {
-        this.historyStack.push(this.value);
-      }
-    } catch {
-      this.entropyState = true;
+  public run(fn: () => void): void {
+    if (this.value !== null) {
+      this.historyStack.push(this.value);
     }
+    fn();
   }
 
   public setValue(val: T): void {
     this.value = val;
-    this.entropyState = false;
-    this.historyStack.push(val);
+    this.stock = val;
   }
 
   public getValue(): T | null {
-    return this.value;
+    return this.value ?? this.stock;
   }
 
   public rollback(): boolean {
-    if (this.historyStack.length > 1) {
-      this.historyStack.pop();
-      this.value = this.historyStack[this.historyStack.length - 1];
+    if (this.historyStack.length > 0) {
+      this.value = this.historyStack.pop()!;
+      this.stock = this.value;
       return true;
     }
     return false;
+  }
+}
+
+export class H3ValidationMonad<M, E> {
+  private constructor(
+    private readonly state: { h3Index: string; matter: M; energy: E } | null,
+    private readonly error: H3Error | null,
+    private readonly validator: H3Validator
+  ) {}
+
+  public static unit<M, E>(state: { h3Index: string; matter: M; energy: E }, validator: H3Validator): H3ValidationMonad<M, E> {
+    return new H3ValidationMonad(state, null, validator);
+  }
+
+  public bind<U>(fn: (state: { h3Index: string; matter: M; energy: E }) => { h3Index: string; matter: M; energy: E }): H3ValidationMonad<M, E> {
+    if (this.error || !this.state) {
+      return this;
+    }
+    try {
+      const nextState = fn(this.state);
+      this.validator.assertValid(nextState.h3Index);
+      return new H3ValidationMonad(nextState, null, this.validator);
+    } catch (err: any) {
+      const h3Err = err instanceof H3Error ? err : new H3Error(H3ErrorCode.INVALID_CHARACTER, err.message);
+      return new H3ValidationMonad(null, h3Err, this.validator);
+    }
+  }
+
+  public match<R>(onSuccess: (state: { h3Index: string; matter: M; energy: E }) => R, onError: (err: H3Error) => R): R {
+    if (this.error || !this.state) {
+      return onError(this.error ?? new H3Error(H3ErrorCode.NULL_INDEX, 'Unknown error'));
+    }
+    return onSuccess(this.state);
   }
 }
 
@@ -160,10 +139,10 @@ export class SpatialMonadStockRegister {
   private validIndices: string[] = [];
   private rejectedCount = 0;
 
-  constructor(private validator: { validateIndex(idx: string): boolean }) {}
+  constructor(private readonly manager: { validateIndex(idx: string): boolean }) {}
 
   public ingestIndex(index: string): boolean {
-    if (this.validator.validateIndex(index)) {
+    if (this.manager.validateIndex(index)) {
       this.validIndices.push(index);
       return true;
     } else {
@@ -178,50 +157,5 @@ export class SpatialMonadStockRegister {
 
   public getRejectedCount(): number {
     return this.rejectedCount;
-  }
-}
-
-export class H3ValidationMonad<M, E> {
-  private constructor(
-    private readonly state: { h3Index: string; matter: M; energy: E } | null,
-    private readonly error: { code: H3ErrorCode; message: string } | null,
-    private readonly validator: any
-  ) {}
-
-  public static unit<M, E>(
-    state: { h3Index: string; matter: M; energy: E },
-    validator: any
-  ): H3ValidationMonad<M, E> {
-    const isValid = validator.validate ? validator.validate(state.h3Index) : validator.isValidIndex(state.h3Index);
-    if (!isValid) {
-      return new H3ValidationMonad(null, { code: H3ErrorCode.INVALID_CHARACTER, message: "Invalid H3 Index" }, validator);
-    }
-    return new H3ValidationMonad(state, null, validator);
-  }
-
-  public bind<U>(fn: (state: { h3Index: string; matter: M; energy: E }) => { h3Index: string; matter: M; energy: E }): H3ValidationMonad<M, E> {
-    if (this.error || !this.state) {
-      return this;
-    }
-    try {
-      const nextState = fn(this.state);
-      const isValid = this.validator.validate ? this.validator.validate(nextState.h3Index) : this.validator.isValidIndex(nextState.h3Index);
-      if (!isValid) {
-        return new H3ValidationMonad(null, { code: H3ErrorCode.INVALID_CHARACTER, message: "Invalid H3 Index" }, this.validator);
-      }
-      return new H3ValidationMonad(nextState, null, this.validator);
-    } catch {
-      return new H3ValidationMonad(null, { code: H3ErrorCode.INVALID_CHARACTER, message: "Error in bind" }, this.validator);
-    }
-  }
-
-  public match<R>(
-    onSuccess: (state: { h3Index: string; matter: M; energy: E }) => R,
-    onError: (err: { code: H3ErrorCode; message: string }) => R
-  ): R {
-    if (this.error || !this.state) {
-      return onError(this.error || { code: H3ErrorCode.INVALID_CHARACTER, message: "Unknown error" });
-    }
-    return onSuccess(this.state);
   }
 }

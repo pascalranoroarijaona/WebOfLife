@@ -12,6 +12,9 @@ export class H3SpatialCell {
         this.resolution = resolution;
         this.baseCell = baseCell;
     }
+    get h3Index() {
+        return this.index;
+    }
     getEdgeNeighbors() {
         return [
             `${this.index}_nbr1`,
@@ -60,7 +63,7 @@ export class H3AdjacencyEngine {
     executeDiffusionStep(centerState, neighborMap, diffusionRate = 0.05, _deltaT = 1.0) {
         let carbonDelta = 0;
         let waterDelta = 0;
-        for (const [nbrId, nbrState] of neighborMap.entries()) {
+        for (const [_, nbrState] of neighborMap.entries()) {
             const fluxC = (nbrState.carbonMass - centerState.carbonMass) * diffusionRate;
             const fluxW = (nbrState.waterMass - centerState.waterMass) * diffusionRate;
             carbonDelta += fluxC;

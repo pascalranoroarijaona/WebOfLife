@@ -1,0 +1,43 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life - Spatial Subsystem (Sprint 014)" {
+    
+    interface SpatialGuardContract {
+        + validateH3Index(payload: unknown): asserts payload is string
+    }
+
+    class H3ValidationResult {
+        + readonly isValid: boolean
+        + readonly error?: string
+    }
+
+    class H3Grid {
+        - resolution: number
+        + guardH3Payload(payload: string | null | undefined): string
+        + latLngToCell(lat: number, lng: number, res: number): string
+        + cellToBoundary(h3Index: string): Array<[number, number]>
+        + getResolution(h3Index: string): number
+    }
+
+    class SpatialMonad {
+        - monadId: string
+        - h3Index: string | null
+        - entropyState: number
+        + bindPayload(payload: unknown): void
+        + evaluateThermodynamicState(): void
+    }
+
+    class ThermodynamicLedger {
+        - blockNumber: number
+        + recordStateTransition(monadId: string, signature: string, energyDelta: number): void
+    }
+
+    SpatialGuardContract <|.. H3Grid
+    H3Grid ..> H3ValidationResult : returns
+    SpatialMonad --> H3Grid : uses guard
+    SpatialMonad --> ThermodynamicLedger : commits state
+}
+
+@enduml

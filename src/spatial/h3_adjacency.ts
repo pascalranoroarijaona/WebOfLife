@@ -14,6 +14,10 @@ export class H3SpatialCell implements IH3CellData {
     public readonly baseCell: number
   ) {}
 
+  public get h3Index(): string {
+    return this.index;
+  }
+
   public getEdgeNeighbors(): string[] {
     return [
       `${this.index}_nbr1`,
@@ -74,7 +78,7 @@ export class H3AdjacencyEngine {
     let carbonDelta = 0;
     let waterDelta = 0;
 
-    for (const [nbrId, nbrState] of neighborMap.entries()) {
+    for (const [_, nbrState] of neighborMap.entries()) {
       const fluxC = (nbrState.carbonMass - centerState.carbonMass) * diffusionRate;
       const fluxW = (nbrState.waterMass - centerState.waterMass) * diffusionRate;
       carbonDelta += fluxC;

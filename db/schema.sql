@@ -1,50 +1,35 @@
--- Updated Schema & Ledger Definitions: Sprint 13 Spatial Guard Clauses & Thermodynamic Monads
+-- Updated Schema & Ledger Definitions - Sprint 014: Spatial Ingress & Thermodynamic Guard Clauses
 
-BEGIN;
-
--- Spatial Nodes Table representing H3 Grid cells with thermodynamic energy reserves
-CREATE TABLE IF NOT EXISTS spatial_nodes (
-    h3_index VARCHAR(15) PRIMARY KEY,
-    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    energy_stock NUMERIC(18, 8) NOT NULL DEFAULT 0.00000000 CHECK (energy_stock >= 0),
-    entropy_level NUMERIC(12, 8) NOT NULL DEFAULT 0.00000000,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+CREATE TABLE IF NOT EXISTS spatial_monad_stocks (
+    monad_id VARCHAR(64) PRIMARY KEY,
+    h3_index VARCHAR(15),
+    is_validated BOOLEAN NOT NULL DEFAULT FALSE,
+    entropy_state DECIMAL(18, 6) NOT NULL DEFAULT 0.000000,
+    solar_energy_input DECIMAL(18, 6) NOT NULL DEFAULT 0.000000,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Spatial Payload Validation Logs (Tracking Guard Clause Interceptions for Second Law Entropy Management)
-CREATE TABLE IF NOT EXISTS spatial_payload_audit_logs (
-    log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE IF NOT EXISTS spatial_guard_audit_log (
+    log_id SERIAL PRIMARY KEY,
+    monad_id VARCHAR(64) REFERENCES spatial_monad_stocks(monad_id),
     raw_payload TEXT,
-    rejection_reason VARCHAR(255) NOT NULL,
-    thermodynamic_state VARCHAR(50) NOT NULL DEFAULT 'TRAPPED_ERROR',
-    intercepted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    validation_status VARCHAR(32) NOT NULL,
+    error_message TEXT,
+    thermodynamic_penalty DECIMAL(18, 6) DEFAULT 0.000000,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Thermodynamic Stock Transactions Ledger (Blockchain Anchored)
-CREATE TABLE IF NOT EXISTS spatial_stock_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_h3_index VARCHAR(15) REFERENCES spatial_nodes(h3_index) ON DELETE SET NULL,
-    target_h3_index VARCHAR(15) REFERENCES spatial_nodes(h3_index) ON DELETE SET NULL,
-    energy_delta NUMERIC(18, 8) NOT NULL,
-    entropy_delta NUMERIC(12, 8) NOT NULL,
-    block_signature VARCHAR(64) NOT NULL,
-    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
+    tx_hash VARCHAR(64) PRIMARY KEY,
+    block_number BIGINT NOT NULL,
+    monad_id VARCHAR(64) REFERENCES spatial_monad_stocks(monad_id),
+    signature TEXT NOT NULL,
+    energy_delta DECIMAL(18, 6) NOT NULL,
+    state_transition_type VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Blockchain Blocks Ledger for Spatial Monad State Transitions
-CREATE TABLE IF NOT EXISTS spatial_blockchain_blocks (
-    block_height SERIAL PRIMARY KEY,
-    previous_block_signature VARCHAR(64),
-    current_block_signature VARCHAR(64) UNIQUE NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
-    transaction_count INTEGER NOT NULL DEFAULT 0,
-    forged_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Indexing for high-performance spatial monad traversals
-CREATE INDEX IF NOT EXISTS idx_spatial_nodes_resolution ON spatial_nodes(resolution);
-CREATE INDEX IF NOT EXISTS idx_spatial_transactions_sig ON spatial_stock_transactions(block_signature);
-
-COMMIT;
+CREATE INDEX IF NOT EXISTS idx_spatial_monad_h3 ON spatial_monad_stocks(h3_index);
+CREATE INDEX IF NOT EXISTS idx_audit_validation ON spatial_guard_audit_log(validation_status);
+CREATE INDEX IF NOT EXISTS idx_blockchain_block ON blockchain_transactions(block_number);
