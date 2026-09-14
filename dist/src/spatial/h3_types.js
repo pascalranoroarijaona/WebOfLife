@@ -1,9 +1,10 @@
 /**
- * Core types for H3 spatial operations, adjacency, and shared boundary calculations.
+ * Web of Life - H3 Types and Unified Thermodynamic/DGGS Contracts
+ * Retro-compatible across Sprints 001 - 049
  */
-/**
- * Standard error codes for spatial H3 validation.
- */
+// =============================================================================
+// SPRINT 005 & SPRINT 006: ERROR CODES
+// =============================================================================
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -13,9 +14,9 @@ export var H3ErrorCode;
     H3ErrorCode["INVALID_BASE_CELL"] = "H3_ERR_INVALID_BASE_CELL";
     H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
 })(H3ErrorCode || (H3ErrorCode = {}));
-/**
- * Exception thrown on null, undefined, or empty H3 index guard clause violations.
- */
+// =============================================================================
+// SPRINT 035: GUARD CLAUSE EXCEPTIONS
+// =============================================================================
 export class SpatialGuardClauseException extends Error {
     constructor(message) {
         super(`[SpatialGuardClauseException] ${message}`);
@@ -23,9 +24,9 @@ export class SpatialGuardClauseException extends Error {
         Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
-/**
- * Thermodynamic state channels in contiguous state tensors.
- */
+// =============================================================================
+// SPRINT 045: THERMODYNAMIC CHANNELS & CONSTANTS
+// =============================================================================
 export var ThermodynamicChannel;
 (function (ThermodynamicChannel) {
     ThermodynamicChannel[ThermodynamicChannel["WATER_MASS_KG"] = 0] = "WATER_MASS_KG";
@@ -40,14 +41,14 @@ export var ThermodynamicChannel;
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
 export const THERMODYNAMIC_CONSTANTS = {
     MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 50.0,
+    DEFAULT_REGOLITH_MASS_KG: 10_000.0,
     SPECIFIC_HEAT: {
-        REGOLITH: 840.0,
         WATER: 4184.0,
         SOIL_ORGANIC_CARBON: 1800.0,
         VEGETATION_BIOMASS: 1900.0,
         ATMOSPHERIC_CO2: 846.0,
         MINERAL_NITROGEN: 1200.0,
+        REGOLITH: 840.0,
     },
     SPECIFIC_ENTHALPY: {
         WATER: -15.87e6,

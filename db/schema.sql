@@ -1,169 +1,167 @@
--- ============================================================================
--- Web of Life: Planetary Thermodynamic Blockchain & Spatial Ledger Schema
--- Sprint 048: Geometric Interface Contact & Lateral Thermodynamic Fluxes
--- ============================================================================
+-- Web of Life: Thermodynamic Blockchain & DGGS Spatial Ledger Schema
+-- Sprint 049: Topological Pentagon Cell Validation via H3 Index Decomposition
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ----------------------------------------------------------------------------
--- 1. Discrete Global Grid: H3 Spatial Topography & Cell Metadata
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- ENUMERATIONS AND DOMAINS
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS spatial_h3_cells (
-    h3_index            VARCHAR(16) PRIMARY KEY,
-    resolution          SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    is_pentagon         BOOLEAN NOT NULL DEFAULT FALSE,
-    centroid_lat        DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lon        DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
-    centroid_geom       GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
-                            ST_SetSRID(ST_MakePoint(centroid_lon, centroid_lat), 4326)
-                        ) STORED,
-    cell_area_m2        DOUBLE PRECISION NOT NULL CHECK (cell_area_m2 > 0.0),
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TYPE h3_cell_mode AS ENUM (
+    'RESERVED',
+    'HEXAGON',
+    'DELETED'
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_resolution ON spatial_h3_cells(resolution);
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_geom ON spatial_h3_cells USING GIST(centroid_geom);
+CREATE DOMAIN h3_resolution AS SMALLINT
+    CHECK (VALUE >= 0 AND VALUE <= 15);
 
--- ----------------------------------------------------------------------------
--- 2. Geometric Interface Contact Edges (RFC-048)
--- ----------------------------------------------------------------------------
+CREATE DOMAIN h3_coordination_num AS SMALLINT
+    CHECK (VALUE IN (5, 6));
 
-CREATE TABLE IF NOT EXISTS spatial_h3_shared_boundaries (
-    boundary_id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    origin_h3               VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
-    neighbor_h3             VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
-    is_adjacent             BOOLEAN NOT NULL DEFAULT TRUE,
-    vertex_a_lat            DOUBLE PRECISION NOT NULL CHECK (vertex_a_lat BETWEEN -90.0 AND 90.0),
-    vertex_a_lon            DOUBLE PRECISION NOT NULL CHECK (vertex_a_lon BETWEEN -180.0 AND 180.0),
-    vertex_b_lat            DOUBLE PRECISION NOT NULL CHECK (vertex_b_lat BETWEEN -90.0 AND 90.0),
-    vertex_b_lon            DOUBLE PRECISION NOT NULL CHECK (vertex_b_lon BETWEEN -180.0 AND 180.0),
-    vertex_a_geom           GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
-                                ST_SetSRID(ST_MakePoint(vertex_a_lon, vertex_a_lat), 4326)
-                            ) STORED,
-    vertex_b_geom           GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
-                                ST_SetSRID(ST_MakePoint(vertex_b_lon, vertex_b_lat), 4326)
-                            ) STORED,
-    shared_boundary_geom    GEOMETRY(LineString, 4326) GENERATED ALWAYS AS (
-                                ST_MakeLine(
-                                    ST_SetSRID(ST_MakePoint(vertex_a_lon, vertex_a_lat), 4326),
-                                    ST_SetSRID(ST_MakePoint(vertex_b_lon, vertex_b_lat), 4326)
-                                )
-                            ) STORED,
-    shared_length_meters    DOUBLE PRECISION NOT NULL CHECK (shared_length_meters >= 0.0),
-    geodesic_distance_m     DOUBLE PRECISION NOT NULL CHECK (geodesic_distance_m > 0.0),
-    symmetric_pair_hash     BYTEA GENERATED ALWAYS AS (
-                                digest(
-                                    LEAST(origin_h3, neighbor_h3) || ':' || GREATEST(origin_h3, neighbor_h3),
-                                    'sha256'
-                                )
-                            ) STORED,
-    computed_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_non_self_adjacency CHECK (origin_h3 <> neighbor_h3),
-    CONSTRAINT uq_origin_neighbor_pair UNIQUE (origin_h3, neighbor_h3)
+-- ============================================================================
+-- 1. SPATIAL TOPOLOGY: H3 CELLS AND 12 ICOSAHEDRAL SINGULARITIES
+-- ============================================================================
+
+CREATE TABLE h3_cells (
+    h3_index BIGINT PRIMARY KEY,
+    h3_index_hex VARCHAR(16) GENERATED ALWAYS AS (
+        to_hex(h3_index)
+    ) STORED,
+    mode SMALLINT NOT NULL DEFAULT 1 CHECK (mode = 1),
+    resolution h3_resolution NOT NULL,
+    base_cell_num SMALLINT NOT NULL CHECK (base_cell_num >= 0 AND base_cell_num <= 121),
+    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    coordination_number h3_coordination_num NOT NULL DEFAULT 6,
+    perimeter_correction_factor NUMERIC(18, 12) NOT NULL DEFAULT 1.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Invariant: Pentagon base cells must strictly belong to the 12 icosahedral vertices
+    CONSTRAINT check_pentagon_base_cell CHECK (
+        (is_pentagon = FALSE AND coordination_number = 6) OR
+        (is_pentagon = TRUE AND coordination_number = 5 AND 
+         base_cell_num IN (4, 14, 24, 38, 42, 58, 63, 72, 83, 87, 97, 107))
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_shared_boundaries_origin ON spatial_h3_shared_boundaries(origin_h3);
-CREATE INDEX IF NOT EXISTS idx_h3_shared_boundaries_neighbor ON spatial_h3_shared_boundaries(neighbor_h3);
-CREATE INDEX IF NOT EXISTS idx_h3_shared_boundaries_pair_hash ON spatial_h3_shared_boundaries(symmetric_pair_hash);
-CREATE INDEX IF NOT EXISTS idx_h3_shared_boundaries_geom ON spatial_h3_shared_boundaries USING GIST(shared_boundary_geom);
+CREATE INDEX idx_h3_cells_pentagon ON h3_cells (resolution, is_pentagon);
+CREATE INDEX idx_h3_cells_base_cell ON h3_cells (base_cell_num);
 
--- ----------------------------------------------------------------------------
--- 3. Lateral Thermodynamic Transport Conductance & Flux Time-Series
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 2. TOPOLOGICAL ADJACENCY AND BOUNDARY FACETS
+-- ============================================================================
 
-CREATE TYPE transport_flux_type AS ENUM (
-    'THERMAL_FOURIER',
-    'FICKIAN_GEOCHEMICAL',
-    'BAROCLINIC_MOISTURE',
-    'MASS_ADVECTION',
-    'ECOLOGICAL_MIGRATION'
+CREATE TABLE h3_adjacency_facets (
+    facet_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_h3 BIGINT NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    target_h3 BIGINT NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    directional_axis SMALLINT NOT NULL CHECK (directional_axis >= 1 AND directional_axis <= 6),
+    face_length_meters NUMERIC(16, 6) NOT NULL CHECK (face_length_meters > 0),
+    conductance NUMERIC(16, 8) NOT NULL CHECK (conductance >= 0),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    CONSTRAINT uq_source_direction UNIQUE (source_h3, directional_axis),
+    CONSTRAINT uq_directed_facet UNIQUE (source_h3, target_h3),
+    CONSTRAINT chk_no_self_adjacency CHECK (source_h3 <> target_h3)
 );
 
-CREATE TABLE IF NOT EXISTS lateral_transport_conductance (
-    conductance_id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    boundary_id             UUID NOT NULL REFERENCES spatial_h3_shared_boundaries(boundary_id) ON DELETE CASCADE,
-    flux_type               transport_flux_type NOT NULL,
-    conductivity_tensor     DOUBLE PRECISION NOT NULL CHECK (conductivity_tensor >= 0.0),
-    effective_conductance   DOUBLE PRECISION NOT NULL CHECK (effective_conductance >= 0.0), -- C_ij = sigma_ij * L_ij / D_ij
-    calibrated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_boundary_flux_type UNIQUE (boundary_id, flux_type)
+CREATE INDEX idx_adjacency_source ON h3_adjacency_facets(source_h3);
+CREATE INDEX idx_adjacency_target ON h3_adjacency_facets(target_h3);
+
+-- ============================================================================
+-- 3. THERMODYNAMIC STATE AND MONAD STOCKS
+-- ============================================================================
+
+CREATE TABLE cell_thermodynamic_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index BIGINT NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    epoch_step BIGINT NOT NULL,
+    mass_water_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (mass_water_kg >= 0),
+    mass_carbon_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (mass_carbon_kg >= 0),
+    internal_energy_joules NUMERIC(28, 8) NOT NULL DEFAULT 0.0,
+    entropy_production_rate NUMERIC(24, 12) NOT NULL DEFAULT 0.0 CHECK (entropy_production_rate >= 0),
+    chemical_potential_water NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
+    temperature_kelvin NUMERIC(10, 4) NOT NULL CHECK (temperature_kelvin > 0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_cell_epoch UNIQUE (h3_index, epoch_step)
 );
 
-CREATE TABLE IF NOT EXISTS lateral_thermodynamic_fluxes (
-    flux_id                 UUID DEFAULT uuid_generate_v4(),
-    block_height            BIGINT NOT NULL,
-    timestamp               TIMESTAMPTZ NOT NULL,
-    origin_h3               VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    neighbor_h3             VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    flux_type               transport_flux_type NOT NULL,
-    potential_origin        DOUBLE PRECISION NOT NULL, -- Psi_i (e.g. Temperature T_i, Concentration C_i, Pressure P_i)
-    potential_neighbor      DOUBLE PRECISION NOT NULL, -- Psi_j
-    extensive_flux_value    DOUBLE PRECISION NOT NULL, -- Phi_{i->j} = -C_ij * (Psi_j - Psi_i)
-    extensive_flux_unit     VARCHAR(16) NOT NULL,      -- 'W', 'kg/s', 'mol/s', etc.
-    entropy_production_rate DOUBLE PRECISION NOT NULL CHECK (entropy_production_rate >= -1e-12), -- S_prod >= 0
-    PRIMARY KEY (block_height, flux_id, timestamp),
-    CONSTRAINT chk_flux_non_self CHECK (origin_h3 <> neighbor_h3)
+CREATE INDEX idx_stocks_epoch_cell ON cell_thermodynamic_stocks(epoch_step, h3_index);
+
+-- ============================================================================
+-- 4. DIRECTED FLUX LEDGER: FIRST LAW ADVECTION AND CONDUCTION
+-- ============================================================================
+
+CREATE TABLE directed_boundary_fluxes (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    epoch_step BIGINT NOT NULL,
+    facet_id UUID NOT NULL REFERENCES h3_adjacency_facets(facet_id) ON DELETE RESTRICT,
+    source_h3 BIGINT NOT NULL,
+    target_h3 BIGINT NOT NULL,
+    mass_flux_water_kg NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    mass_flux_carbon_kg NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    heat_flux_enthalpy_joules NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
+    local_entropy_generated NUMERIC(20, 12) NOT NULL DEFAULT 0.0 CHECK (local_entropy_generated >= 0),
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexing for rapid physical gradient and lateral transport audits
-CREATE INDEX IF NOT EXISTS idx_lateral_fluxes_origin_time ON lateral_thermodynamic_fluxes(origin_h3, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_lateral_fluxes_block_height ON lateral_thermodynamic_fluxes(block_height);
+CREATE INDEX idx_fluxes_epoch_facet ON directed_boundary_fluxes(epoch_step, facet_id);
 
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Blockchain Ledger: Conservation & Entropy Verification
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 5. BLOCKCHAIN LEDGER & PROOF OF TOPOLOGICAL CONSERVATION
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_height            BIGINT PRIMARY KEY,
-    block_hash              BYTEA NOT NULL UNIQUE,
-    parent_hash             BYTEA NOT NULL,
-    state_merkle_root       BYTEA NOT NULL,
-    flux_merkle_root        BYTEA NOT NULL,
-    global_internal_energy  DOUBLE PRECISION NOT NULL, -- Total internal energy U (Joules)
-    global_entropy          DOUBLE PRECISION NOT NULL, -- Total entropy S (J/K)
-    entropy_delta           DOUBLE PRECISION NOT NULL CHECK (entropy_delta >= -1e-12), -- Second Law: dS >= 0
-    net_flux_residual       DOUBLE PRECISION NOT NULL, -- First Law verification: sum(Phi_ij) == 0 within machine epsilon
-    is_conservative         BOOLEAN GENERATED ALWAYS AS (ABS(net_flux_residual) < 1e-9) STORED,
-    timestamp               TIMESTAMPTZ NOT NULL,
-    validator_node_id       TEXT NOT NULL,
-    signature               BYTEA NOT NULL
+CREATE TABLE topology_audit_blocks (
+    block_height BIGINT PRIMARY KEY,
+    previous_block_hash CHAR(64) NOT NULL,
+    merkle_state_root CHAR(64) NOT NULL,
+    resolution h3_resolution NOT NULL,
+    total_cells_count BIGINT NOT NULL,
+    total_pentagons_count SMALLINT NOT NULL CHECK (total_pentagons_count = 12),
+    total_active_facets BIGINT NOT NULL,
+    global_water_mass_kg NUMERIC(32, 8) NOT NULL,
+    global_carbon_mass_kg NUMERIC(32, 8) NOT NULL,
+    global_energy_joules NUMERIC(36, 8) NOT NULL,
+    divergence_max_abs_error NUMERIC(24, 16) NOT NULL CHECK (divergence_max_abs_error <= 1e-12),
+    net_entropy_production NUMERIC(28, 12) NOT NULL CHECK (net_entropy_production >= 0),
+    block_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    block_hash CHAR(64) NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS thermodynamic_block_transactions (
-    tx_id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height            BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height) ON DELETE CASCADE,
-    tx_index                INTEGER NOT NULL,
-    origin_h3               VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    neighbor_h3             VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    boundary_length_meters  DOUBLE PRECISION NOT NULL CHECK (boundary_length_meters >= 0.0),
-    transferred_mass_kg     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    transferred_energy_j    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    entropy_generated_j_k   DOUBLE PRECISION NOT NULL CHECK (entropy_generated_j_k >= -1e-12),
-    tx_hash                 BYTEA NOT NULL UNIQUE,
-    CONSTRAINT uq_block_tx_index UNIQUE (block_height, tx_index)
-);
+-- ============================================================================
+-- 6. TOPOLOGICAL INVARIANT AUDIT VIEWS
+-- ============================================================================
 
-CREATE INDEX IF NOT EXISTS idx_thermo_tx_origin_neighbor ON thermodynamic_block_transactions(origin_h3, neighbor_h3);
-CREATE INDEX IF NOT EXISTS idx_thermo_tx_block_height ON thermodynamic_block_transactions(block_height);
-
--- ----------------------------------------------------------------------------
--- 5. Thermodynamic Anti-Symmetry & Conservation Audit Views
--- ----------------------------------------------------------------------------
-
-CREATE OR REPLACE VIEW view_lateral_flux_antisymmetry_audit AS
+-- Audit View: Validate pentagon coordination truncation (exactly 5 neighbors per pentagon)
+CREATE OR REPLACE VIEW v_pentagon_coordination_integrity AS
 SELECT 
-    f1.block_height,
-    f1.flux_type,
-    f1.origin_h3,
-    f1.neighbor_h3,
-    f1.extensive_flux_value AS flux_forward,
-    f2.extensive_flux_value AS flux_reverse,
-    (f1.extensive_flux_value + f2.extensive_flux_value) AS net_antisymmetry_error
-FROM lateral_thermodynamic_fluxes f1
-JOIN lateral_thermodynamic_fluxes f2
-    ON  f1.block_height = f2.block_height
-    AND f1.flux_type    = f2.flux_type
-    AND f1.origin_h3    = f2.neighbor_h3
-    AND f1.neighbor_h3  = f2.origin_h3;
+    c.h3_index,
+    c.base_cell_num,
+    c.resolution,
+    c.is_pentagon,
+    c.coordination_number,
+    COUNT(f.facet_id) AS active_facet_count
+FROM h3_cells c
+LEFT JOIN h3_adjacency_facets f ON c.h3_index = f.source_h3 AND f.is_active = TRUE
+GROUP BY c.h3_index, c.base_cell_num, c.resolution, c.is_pentagon, c.coordination_number
+HAVING 
+    (c.is_pentagon = TRUE AND COUNT(f.facet_id) <> 5) OR
+    (c.is_pentagon = FALSE AND COUNT(f.facet_id) <> 6);
+
+-- Audit View: Advection Divergence per Epoch across Boundary Stencils
+CREATE OR REPLACE VIEW v_flux_divergence_conservation AS
+SELECT
+    epoch_step,
+    SUM(mass_flux_water_kg) AS water_divergence_kg,
+    SUM(mass_flux_carbon_kg) AS carbon_divergence_kg,
+    SUM(heat_flux_enthalpy_joules) AS enthalpy_divergence_joules
+FROM (
+    SELECT epoch_step, source_h3 AS cell_id, -mass_flux_water_kg AS mass_flux_water_kg, -mass_flux_carbon_kg AS mass_flux_carbon_kg, -heat_flux_enthalpy_joules AS heat_flux_enthalpy_joules
+    FROM directed_boundary_fluxes
+    UNION ALL
+    SELECT epoch_step, target_h3 AS cell_id, mass_flux_water_kg, mass_flux_carbon_kg, heat_flux_enthalpy_joules
+    FROM directed_boundary_fluxes
+) combined_flux
+GROUP BY epoch_step;

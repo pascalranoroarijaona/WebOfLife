@@ -1,0 +1,173 @@
+@startuml sprint_049_schema
+!theme plain
+skinparam roundcorner 6
+skinparam monochrome false
+skinparam handwriten false
+skinparam classAttributeIconSize 0
+
+title Web of Life: Sprint 049 - Topological Pentagon Cell Validation & Spatial Advection Monad
+
+package "Spatial Core Topology Domain" {
+
+  interface IH3TopologyValidator {
+    + isPentagon(h3Index: string | bigint): boolean
+    + getBaseCell(h3Index: string | bigint): number
+    + getResolution(h3Index: string | bigint): number
+    + getCoordinationNumber(h3Index: string | bigint): 5 | 6
+    + decompose(h3Index: string | bigint): H3CellDecomposition
+  }
+
+  class H3CellDecomposition <<ValueObject>> {
+    + mode: number
+    + reserved: number
+    + resolution: number
+    + baseCell: number
+    + digits: readonly number[]
+    + isPentagon: boolean
+  }
+
+  class H3TopologyValidator {
+    - {static} PENTAGON_BASE_CELLS: ReadonlySet<number>
+    - {static} H3_MODE_MASK: bigint
+    - {static} H3_RES_MASK: bigint
+    - {static} H3_BASE_CELL_MASK: bigint
+    - {static} H3_DIGIT_MASK: bigint
+    + {static} getInstance(): H3TopologyValidator
+    + isPentagon(h3Index: string | bigint): boolean
+    + getBaseCell(h3Index: string | bigint): number
+    + getResolution(h3Index: string | bigint): number
+    + getCoordinationNumber(h3Index: string | bigint): 5 | 6
+    + decompose(h3Index: string | bigint): H3CellDecomposition
+    + validateIndex(h3Index: bigint): void
+  }
+
+  class H3AdjacencyCoordinator {
+    - validator: IH3TopologyValidator
+    + getNeighbors(cell: string | bigint): string[]
+    + getFacetStencil(cell: string | bigint): FluxStencil
+    + computeEdgeCorrection(isPentagon: boolean): number
+  }
+
+  class FluxStencil <<ValueObject>> {
+    + originCell: bigint
+    + coordinationNumber: 5 | 6
+    + neighborCells: bigint[]
+    + directionalAxes: number[]
+    + edgeConductances: number[]
+  }
+
+  IH3TopologyValidator <|.. H3TopologyValidator
+  H3TopologyValidator ..> H3CellDecomposition : produces
+  H3AdjacencyCoordinator o-- IH3TopologyValidator
+  H3AdjacencyCoordinator ..> FluxStencil : generates
+}
+
+package "Thermodynamic Monad Layer" {
+
+  class SpatialMonad<H3GridState> {
+    + state: H3GridState
+    + epochStep: bigint
+    + bind<B>(fn: (state: H3GridState) => SpatialMonad<B>): SpatialMonad<B>
+    + extract(): H3GridState
+  }
+
+  class SpatialAdvectionStep {
+    - adjacency: H3AdjacencyCoordinator
+    + execute(monad: SpatialMonad<H3GridState>): SpatialMonad<H3GridState>
+    - solveBoundaryFlux(stencil: FluxStencil): BoundaryFluxVector
+    - assertFirstLawConservation(deltaStocks: StockDeltaMap): void
+  }
+
+  class BoundaryFluxVector <<ValueObject>> {
+    + waterMassFluxKg: number[]
+    + carbonMassFluxKg: number[]
+    + enthalpyFluxWatts: number[]
+    + localEntropyProductionRate: number[]
+  }
+
+  SpatialAdvectionStep o-- H3AdjacencyCoordinator
+  SpatialAdvectionStep ..> SpatialMonad : transforms
+  SpatialAdvectionStep ..> BoundaryFluxVector : computes
+}
+
+package "Relational & Time-Series Persistence (PostgreSQL)" {
+
+  class "h3_cells" as DbH3Cell <<Table>> {
+    + h3_index: BIGINT <<PK>>
+    + h3_index_hex: VARCHAR(16)
+    + mode: SMALLINT = 1
+    + resolution: SMALLINT (0..15)
+    + base_cell_num: SMALLINT (0..121)
+    + is_pentagon: BOOLEAN
+    + coordination_number: SMALLINT (5 | 6)
+    + perimeter_correction_factor: NUMERIC(18,12)
+    -- Constraints --
+    * PENT_CHECK: is_pentagon == (coordination == 5)
+    * BASE_CHECK: pentagons in {4,14,24,38,42,58,63,72,83,87,97,107}
+  }
+
+  class "h3_adjacency_facets" as DbFacet <<Table>> {
+    + facet_id: UUID <<PK>>
+    + source_h3: BIGINT <<FK>>
+    + target_h3: BIGINT <<FK>>
+    + directional_axis: SMALLINT (1..6)
+    + face_length_meters: NUMERIC(16,6)
+    + conductance: NUMERIC(16,8)
+    + is_active: BOOLEAN
+  }
+
+  class "cell_thermodynamic_stocks" as DbStock <<Table>> {
+    + stock_id: UUID <<PK>>
+    + h3_index: BIGINT <<FK>>
+    + epoch_step: BIGINT
+    + mass_water_kg: NUMERIC(24,8)
+    + mass_carbon_kg: NUMERIC(24,8)
+    + internal_energy_joules: NUMERIC(28,8)
+    + entropy_production_rate: NUMERIC(24,12)
+    + temperature_kelvin: NUMERIC(10,4)
+  }
+
+  class "directed_boundary_fluxes" as DbFlux <<Table>> {
+    + flux_id: UUID <<PK>>
+    + epoch_step: BIGINT
+    + facet_id: UUID <<FK>>
+    + source_h3: BIGINT
+    + target_h3: BIGINT
+    + mass_flux_water_kg: NUMERIC(20,10)
+    + heat_flux_enthalpy_joules: NUMERIC(24,8)
+    + local_entropy_generated: NUMERIC(20,12)
+  }
+
+  class "topology_audit_blocks" as DbBlock <<Table>> {
+    + block_height: BIGINT <<PK>>
+    + previous_block_hash: CHAR(64)
+    + merkle_state_root: CHAR(64)
+    + total_cells_count: BIGINT
+    + total_pentagons_count: SMALLINT = 12
+    + divergence_max_abs_error: NUMERIC(24,16) <= 1e-12
+    + net_entropy_production: NUMERIC(28,12) >= 0
+    + block_hash: CHAR(64) <<Unique>>
+  }
+
+  DbH3Cell "1" <-- "5..6" DbFacet : source_h3
+  DbH3Cell "1" <-- "5..6" DbFacet : target_h3
+  DbH3Cell "1" <-- "*" DbStock : h3_index
+  DbFacet "1" <-- "*" DbFlux : facet_id
+}
+
+note right of H3TopologyValidator
+  **First Law Conservation Guard**:
+  Pentagon cell truncation eliminates
+  the phantom 6th edge ($k = 5$),
+  preventing asymmetric mass leakage
+  and preserving $\sum \nabla \cdot \mathbf{F} = 0$.
+end note
+
+note bottom of DbBlock
+  **Thermodynamic Blockchain Proof**:
+  - Global Pentagons $\equiv 12$
+  - Divergence error $\le 10^{-12}$
+  - Net Entropy Production $\ge 0$
+end note
+
+@enduml

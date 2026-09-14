@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 26%
-SPRINT_GOAL: Implement calculateH3SharedBoundaryLength geometric interface contact calculator in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 27%
+SPRINT_GOAL: Implement isPentagonCell topology validator using H3 cell index decomposition in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -26,8 +26,10 @@ SPRINT_GOAL: Implement calculateH3SharedBoundaryLength geometric interface conta
 - [x] Implement applyThermodynamicOverrides helper for partial cell state mutations in `src/spatial/h3_state_tensor.ts`
 - [x] Implement calculateHaversineDistance geodesic metric helper between cell centroids in `src/spatial/h3_adjacency.ts`
 - [x] Implement calculateH3EdgeLengthMeters spherical geodesic edge scaling function in `src/spatial/h3_adjacency.ts`
-- [ ] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
-- [ ] Implement calculateH3BoundaryContactArea interface calculator in `src/spatial/h3_adjacency.ts`
+- [x] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
+- [ ] Implement isPentagonCell topology validator using H3 cell index decomposition in `src/spatial/h3_adjacency.ts`
+- [ ] Implement calculateH3BoundaryContactArea vertical interface cross-section calculator in `src/spatial/h3_adjacency.ts`
+- [ ] Implement calculateInterCellInterfaceMetrics geometric coupling helper in `src/spatial/h3_adjacency.ts`
 - [ ] Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
 - [ ] Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation (`src/thermodynamics/radiative_balance.ts`)
