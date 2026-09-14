@@ -1,11 +1,17 @@
 /**
- * Discrete Global Grid System (H3 DGGS) Type Definitions
- * Specification: RFC-044 & Historical Multi-Sprint Retro-Compatibility
+ * Web of Life - Planetary Thermodynamic Spatial Types
+ * RFC-001 through RFC-045 Comprehensive Retro-Compatibility Layer
  */
 
 // =============================================================================
-// HISTORICAL ERROR CODES & RESOLUTION TIERS (Sprints 001 - 041)
+// HISTORICAL H3 TYPES & CONSTANTS (Sprints 001 - 044)
 // =============================================================================
+
+export type H3Index = string;
+export type H3Resolution = number;
+export type H3ResolutionTier =
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export enum H3ErrorCode {
   SUCCESS = 'H3_SUCCESS',
@@ -17,20 +23,12 @@ export enum H3ErrorCode {
 }
 
 export class SpatialGuardClauseException extends Error {
-  constructor(message: string = 'Spatial guard clause violation') {
+  constructor(message: string) {
     super(`[SpatialGuardClauseException] ${message}`);
     this.name = 'SpatialGuardClauseException';
     Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
   }
 }
-
-export type H3ResolutionTier =
-  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-
-export type H3Resolution = H3ResolutionTier;
-
-export type H3Index = string;
 
 export interface H3Cell {
   index: string;
@@ -39,8 +37,7 @@ export interface H3Cell {
 }
 
 export interface IH3TokenExtractor {
-  extractTokens?(text: string): string[];
-  parseTokens?(input: string): H3Index[];
+  extractTokens(text: string): string[];
 }
 
 export interface IH3GridQuery {
@@ -52,9 +49,7 @@ export interface IH3GridQuery {
 export interface IH3CellData {
   h3Index: string;
   resolution: number;
-  centroid?: { lat: number; lng: number };
-  boundary?: Array<{ lat: number; lng: number }>;
-  areaKm2?: number;
+  centroid: { lat: number; lng: number };
   solarIrradiance?: number;
   carbonStock?: number;
 }
@@ -62,13 +57,17 @@ export interface IH3CellData {
 export interface H3ValidationResult {
   isValid: boolean;
   errorCode?: string;
-  code?: H3ErrorCode;
-  message?: string;
   resolution?: number;
   baseCell?: number;
 }
 
-export type IH3ValidationResult = H3ValidationResult;
+export interface IH3ValidationResult {
+  isValid: boolean;
+  code: H3ErrorCode;
+  message: string;
+  resolution?: number;
+  baseCell?: number;
+}
 
 export interface IResolutionTierValidator {
   validateResolution(resolution: number): boolean;
@@ -76,76 +75,104 @@ export interface IResolutionTierValidator {
 }
 
 // =============================================================================
-// SPRINT 043 & 044 DGGS SPECIFICATIONS
+// SPRINT 045: THERMODYNAMIC OVERRIDES & TENSOR TYPES
 // =============================================================================
 
-export interface IH3CellCoordinates {
-  readonly latitude: number;
-  readonly longitude: number;
+/**
+ * Physical channel layout indices within H3StateTensor stride buffer.
+ */
+export enum ThermodynamicChannel {
+  TEMPERATURE_KELVIN = 0,
+  WATER_MASS_KG = 1,
+  SOIL_ORGANIC_CARBON_KG = 2,
+  VEGETATION_BIOMASS_KG = 3,
+  ATMOSPHERIC_CO2_KG = 4,
+  MINERAL_NITROGEN_KG = 5,
+  SENSIBLE_HEAT_JOULES = 6,
+  ALBEDO = 7,
+  CHANNEL_COUNT = 8,
 }
 
-export interface IThermodynamicAtmosphereStock {
-  readonly nitrogenMoles: number;    // N2
-  readonly oxygenMoles: number;      // O2
-  readonly co2Moles: number;         // CO2
-  readonly waterVaporMoles: number;  // H2O (g)
-  readonly surfacePressurePa: number; // Pa
-}
+/**
+ * Standard specific heat capacities (J / kg / K) and enthalpy reference values.
+ */
+export const THERMODYNAMIC_CONSTANTS = {
+  MIN_TEMPERATURE_KELVIN: 2.7315,
+  DEFAULT_REGOLITH_MASS_KG: 50_000.0,
+  SPECIFIC_HEAT: {
+    REGOLITH: 840.0,
+    WATER: 4184.0,
+    SOIL_ORGANIC_CARBON: 1800.0,
+    VEGETATION_BIOMASS: 1900.0,
+    ATMOSPHERIC_CO2: 846.0,
+    MINERAL_NITROGEN: 1200.0,
+  },
+  SPECIFIC_ENTHALPY: {
+    WATER: -15.87e6,
+    SOIL_ORGANIC_CARBON: -32.79e6,
+    VEGETATION_BIOMASS: -17.50e6,
+    ATMOSPHERIC_CO2: -8.94e6,
+    MINERAL_NITROGEN: -2.85e6,
+    REGOLITH: 0.0,
+  },
+} as const;
 
-export interface IThermodynamicHydrosphereStock {
-  readonly liquidWaterKg: number;    // H2O (l)
-  readonly iceKg: number;            // H2O (s)
-  readonly salinityPsu: number;       // PSU
-}
-
-export interface IThermodynamicLithosphereStock {
-  readonly soilOrganicCarbonKg: number;
-  readonly inorganicMineralKg: number;
-  readonly soilMoistureKg: number;
-}
-
-export interface IThermodynamicBiosphereStock {
-  readonly autotrophBiomassKg: number;
-  readonly heterotrophBiomassKg: number;
-  readonly detritusKg: number;
-}
-
-export interface IH3CellThermodynamicState {
-  // Common Temperature
-  readonly temperatureKelvin: number;
-
-  // Sprint 043 Properties
-  cellIndex?: string;
-  atmosphericCarbon?: number;
-  organicCarbon?: number;
-  biomassStocks?: Record<string, number>;
+/**
+ * Partial thermodynamic state representing target values or overrides
+ * for a single hexagonal cell.
+ */
+export interface CellThermodynamicOverride {
+  temperatureKelvin?: number;
   waterMassKg?: number;
-  enthalpyJoules?: number;
-
-  // Sprint 044 Properties
-  readonly h3Index?: string;
-  readonly resolution?: number;
-  readonly areaM2?: number;
-  readonly atmosphere?: IThermodynamicAtmosphereStock;
-  readonly hydrosphere?: IThermodynamicHydrosphereStock;
-  readonly lithosphere?: IThermodynamicLithosphereStock;
-  readonly biosphere?: IThermodynamicBiosphereStock;
-  readonly internalEnergyJoules?: number;
-  readonly entropyJoulesPerKelvin?: number;
+  soilOrganicCarbonKg?: number;
+  vegetationBiomassKg?: number;
+  atmosphericCo2Kg?: number;
+  mineralNitrogenKg?: number;
+  sensibleHeatJoules?: number;
+  albedo?: number;
 }
 
-export interface IH3CellStateOverrides {
-  readonly temperatureKelvin?: number;
-  readonly atmosphere?: Partial<IThermodynamicAtmosphereStock>;
-  readonly hydrosphere?: Partial<IThermodynamicHydrosphereStock>;
-  readonly lithosphere?: Partial<IThermodynamicLithosphereStock>;
-  readonly biosphere?: Partial<IThermodynamicBiosphereStock>;
-  readonly internalEnergyJoules?: number;
-  readonly entropyJoulesPerKelvin?: number;
+/**
+ * Map or dictionary associating H3 spatial index string to partial override parameters.
+ */
+export type H3ThermodynamicOverridesMap =
+  | Map<string, CellThermodynamicOverride>
+  | Record<string, CellThermodynamicOverride>;
+
+/**
+ * Auditing record detailing mass and energy delta per modified cell.
+ */
+export interface CellThermodynamicDeltaRecord {
+  h3Index: string;
+  cellIndex: number;
+  massDeltaKg: number;
+  energyDeltaJoules: number;
+  thermalEnergyDeltaJoules: number;
+  chemicalEnergyDeltaJoules: number;
+  overriddenFields: (keyof CellThermodynamicOverride)[];
 }
 
-export interface ISpatialMonad<T> {
-  readonly value: T;
-  map<B>(fn: (state: T) => B): ISpatialMonad<B>;
-  flatMap<B>(fn: (state: T) => ISpatialMonad<B>): ISpatialMonad<B>;
+/**
+ * Comprehensive ledger generated by applyThermodynamicOverrides.
+ */
+export interface ThermodynamicOverrideReport {
+  timestamp: number;
+  cellCountModified: number;
+  netMassDeltaKg: number;
+  netEnergyDeltaJoules: number;
+  netThermalEnergyDeltaJoules: number;
+  netChemicalEnergyDeltaJoules: number;
+  cellReports: CellThermodynamicDeltaRecord[];
+}
+
+/**
+ * Behavioral configuration options for applying overrides.
+ */
+export interface OverrideOptions {
+  strictThermodynamicBounds?: boolean;
+  minTemperatureKelvin?: number;
+  allowMassDestruction?: boolean;
+  recomputeSensibleHeat?: boolean;
+  regolithMassKg?: number;
+  includeChemicalEnthalpy?: boolean;
 }

@@ -1,5 +1,5 @@
 {
-  "current_sprint": 45,
+  "current_sprint": 46,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -220,6 +220,11 @@
       "sprint": 44,
       "goal": "Implement createDefaultH3CellThermodynamicState factory returning baseline STP thermodynamic state in src/spatial/h3_state_tensor.ts.",
       "timestamp": "2026-09-14T12:40:35.209451+00:00"
+    },
+    {
+      "sprint": 45,
+      "goal": "Implement applyThermodynamicOverrides helper for partial cell state mutations in src/spatial/h3_state_tensor.ts.",
+      "timestamp": "2026-09-14T12:51:56.858310+00:00"
     }
   ]
 }

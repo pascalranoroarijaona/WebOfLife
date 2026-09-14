@@ -1,0 +1,154 @@
+```Code snippet
+@startuml sprint_045_schema
+!pragma layout smetana
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 6
+skinparam componentStyle uml2
+
+skinparam class {
+    BackgroundColor #F8FAFC
+    BorderColor #334155
+    ArrowColor #0F172A
+    HeaderBackgroundColor #E2E8F0
+}
+
+package "Domain :: Spatial & Tensor Architecture" {
+    class H3StateTensor {
+        - _cellCount: int
+        - _stride: int
+        - _indices: Map<string, int>
+        - _buffer: Float64Array
+        + getCellOffset(h3Index: string): int
+        + getChannelValue(cellOffset: int, channel: int): double
+        + setChannelValue(cellOffset: int, channel: int, value: double): void
+        + getBuffer(): Float64Array
+        + clone(): H3StateTensor
+    }
+
+    interface CellThermodynamicOverride {
+        + temperatureKelvin?: double
+        + waterMassKg?: double
+        + soilOrganicCarbonKg?: double
+        + vegetationBiomassKg?: double
+        + atmosphericCo2Kg?: double
+        + mineralNitrogenKg?: double
+        + sensibleHeatJoules?: double
+        + albedo?: double
+    }
+
+    interface OverrideOptions {
+        + strictThermodynamicBounds: boolean
+        + minTemperatureKelvin: double
+        + allowMassDestruction: boolean
+        + recomputeSensibleHeat: boolean
+    }
+
+    interface CellThermodynamicDeltaRecord {
+        + h3Index: string
+        + cellIndex: int
+        + massDeltaKg: double
+        + energyDeltaJoules: double
+        + overriddenFields: string[]
+    }
+
+    interface ThermodynamicOverrideReport {
+        + timestamp: long
+        + cellCountModified: int
+        + netMassDeltaKg: double
+        + netEnergyDeltaJoules: double
+        + cellReports: CellThermodynamicDeltaRecord[]
+    }
+
+    class ThermodynamicOverridePipeline <<utility>> {
+        + applyThermodynamicOverrides(tensor: H3StateTensor, overrides: Map<string, CellThermodynamicOverride>, options?: OverrideOptions): ThermodynamicOverrideReport
+        - validateBounds(override: CellThermodynamicOverride, options: OverrideOptions): void
+        - calculateSensibleHeat(massKg: double, tempK: double): double
+        - auditDeltas(preState: double[], postState: double[]): CellThermodynamicDeltaRecord
+    }
+}
+
+package "Monadic State & Ledgering" {
+    class SpatialMonad<A> {
+        - tensor: H3StateTensor
+        - historyLedger: ThermodynamicOverrideReport[]
+        + static of(tensor: H3StateTensor): SpatialMonad<H3StateTensor>
+        + bind<B>(fn: (t: H3StateTensor) => SpatialMonad<B>): SpatialMonad<B>
+        + applyOverrides(overrides: Map<string, CellThermodynamicOverride>, options?: OverrideOptions): SpatialMonad<H3StateTensor>
+        + extract(): H3StateTensor
+        + getLedger(): ThermodynamicOverrideReport[]
+    }
+
+    class ThermodynamicLedger {
+        + recordBoundaryTransaction(tx: BoundaryOverrideTransaction): void
+        + commitBlock(block: ThermodynamicBlock): void
+        + verifyConservation(report: ThermodynamicOverrideReport): boolean
+    }
+}
+
+package "Blockchain & Persistence Schema" {
+    class ThermodynamicBlock <<Entity>> {
+        + blockHeight: bigint
+        + blockHash: string
+        + parentHash: string
+        + merkleRoot: string
+        + stateTensorRoot: string
+        + epochTimestamp: DateTime
+        + globalEntropyProductionJk: double
+        + netBoundaryMassDeltaKg: double
+        + netBoundaryEnergyDeltaJoules: double
+        + validatorSignature: string
+    }
+
+    class BoundaryOverrideTransaction <<Entity>> {
+        + transactionId: UUID
+        + blockHeight: bigint
+        + txHash: string
+        + originActor: string
+        + mutationType: string
+        + strictBounds: boolean
+        + minTemperatureKelvin: double
+        + allowMassDestruction: boolean
+        + recomputedSensibleHeat: boolean
+        + signature: string
+    }
+
+    class CellThermodynamicDeltaRecordEntity <<Entity>> {
+        + recordId: bigint
+        + reportId: UUID
+        + h3Index: string
+        + cellIndex: int
+        + preMassKg: double
+        + postMassKg: double
+        + massDeltaKg: double
+        + preEnergyJoules: double
+        + postEnergyJoules: double
+        + energyDeltaJoules: double
+        + overriddenFields: JSONB
+        + deltaSignature: string
+    }
+}
+
+' Relationships & Invariant Flows
+SpatialMonad --> H3StateTensor : encapsulates
+SpatialMonad ..> ThermodynamicOverridePipeline : delegates to
+ThermodynamicOverridePipeline ..> H3StateTensor : mutates in-place
+ThermodynamicOverridePipeline ..> CellThermodynamicOverride : consumes
+ThermodynamicOverridePipeline ..> OverrideOptions : configured by
+ThermodynamicOverridePipeline ..> ThermodynamicOverrideReport : generates
+ThermodynamicOverrideReport *-- CellThermodynamicDeltaRecord : contains
+
+ThermodynamicLedger --> ThermodynamicBlock : seals
+ThermodynamicBlock "1" o-- "0..*" BoundaryOverrideTransaction : aggregates
+BoundaryOverrideTransaction "1" o-- "1" ThermodynamicOverrideReport : documents
+ThermodynamicOverrideReport "1" o-- "1..*" CellThermodynamicDeltaRecordEntity : persists
+
+note bottom of ThermodynamicOverridePipeline
+  <b>Thermodynamic Invariants</b>
+  1. First Law: ΔM_boundary = ∑ ΔM_cell, ΔU_boundary = ∑ ΔU_cell
+  2. Second Law: T_cell >= T_min (default 2.7315 K)
+  3. Positive Mass: S_m >= 0 (water, biomass, carbon, etc.)
+  4. Sensible Heat recalculated: U_sensible = m * cp * T
+end note
+
+@enduml

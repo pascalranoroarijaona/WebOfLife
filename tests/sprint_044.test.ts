@@ -13,7 +13,7 @@ import {
   computeAtmosphericInternalEnergy,
   computeReferenceEntropy,
   SpatialMonad,
-  H3CellThermodynamicState,
+  DefaultH3CellState,
 } from '../src/spatial/h3_state_tensor.js';
 
 describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
@@ -178,7 +178,7 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
     assert.ok(energyDensityMonad.value > 0);
 
     // Monad flatMap: adiabatic temperature perturbation
-    const perturbedMonad = monad.flatMap((s: H3CellThermodynamicState) => {
+    const perturbedMonad = monad.flatMap((s: DefaultH3CellState) => {
       const updatedState = createDefaultH3CellThermodynamicState(s.h3Index, {
         temperatureKelvin: s.temperatureKelvin + 5.0,
       });

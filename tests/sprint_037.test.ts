@@ -185,12 +185,24 @@ describe('Sprint 037: H3_CANONICAL_INDEX_PATTERN & Spatial Validation Suite', ()
 
     // Verify system mass conservation: sum(source_initial + target_initial) === sum(source_final + target_final)
     const initialTotalMass =
-      initialStocksSource.waterKg + initialStocksSource.carbonKg + initialStocksSource.mineralKg + initialStocksSource.oxygenKg +
-      initialStocksTarget.waterKg + initialStocksTarget.carbonKg + initialStocksTarget.mineralKg + initialStocksTarget.oxygenKg;
+      (initialStocksSource.waterKg ?? 0) +
+      (initialStocksSource.carbonKg ?? 0) +
+      (initialStocksSource.mineralKg ?? 0) +
+      (initialStocksSource.oxygenKg ?? 0) +
+      (initialStocksTarget.waterKg ?? 0) +
+      (initialStocksTarget.carbonKg ?? 0) +
+      (initialStocksTarget.mineralKg ?? 0) +
+      (initialStocksTarget.oxygenKg ?? 0);
 
     const finalTotalMass =
-      result.source.getStocks().waterKg + result.source.getStocks().carbonKg + result.source.getStocks().mineralKg + result.source.getStocks().oxygenKg +
-      result.target.getStocks().waterKg + result.target.getStocks().carbonKg + result.target.getStocks().mineralKg + result.target.getStocks().oxygenKg;
+      (result.source.getStocks().waterKg ?? 0) +
+      (result.source.getStocks().carbonKg ?? 0) +
+      (result.source.getStocks().mineralKg ?? 0) +
+      (result.source.getStocks().oxygenKg ?? 0) +
+      (result.target.getStocks().waterKg ?? 0) +
+      (result.target.getStocks().carbonKg ?? 0) +
+      (result.target.getStocks().mineralKg ?? 0) +
+      (result.target.getStocks().oxygenKg ?? 0);
 
     assert.ok(Math.abs(initialTotalMass - finalTotalMass) < 1e-12);
   });

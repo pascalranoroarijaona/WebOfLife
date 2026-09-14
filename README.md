@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 23%
-SPRINT_GOAL: Implement createDefaultH3CellThermodynamicState factory returning baseline STP thermodynamic state in src/spatial/h3_state_tensor.ts.
+Roadmap Completion: 24%
+SPRINT_GOAL: Implement applyThermodynamicOverrides helper for partial cell state mutations in src/spatial/h3_state_tensor.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -228,7 +228,7 @@ SPRINT_GOAL: Implement createDefaultH3CellThermodynamicState factory returning b
 - [x] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
 - [x] Define `H3CellThermodynamicState` interface with scalar thermodynamic properties in `src/spatial/h3_state_tensor.ts`
 - [x] Implement `validateH3CellThermodynamicState` predicate enforcing non-negative stocks and positive temperature in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement createDefaultH3CellThermodynamicState factory returning baseline STP thermodynamic state in `src/spatial/h3_state_tensor.ts`
+- [x] Implement `createDefaultH3CellThermodynamicState` factory returning baseline STP thermodynamic state in `src/spatial/h3_state_tensor.ts`
 - [ ] Implement applyThermodynamicOverrides helper for partial cell state mutations in `src/spatial/h3_state_tensor.ts`
 - [ ] Implement calculateHaversineDistance geodesic metric helper between cell centroids in `src/spatial/h3_adjacency.ts`
 - [ ] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
@@ -236,6 +236,7 @@ SPRINT_GOAL: Implement createDefaultH3CellThermodynamicState factory returning b
 - [ ] Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation (`src/thermodynamics/radiative_balance.ts`)
 - [ ] Tetens saturation vapor pressure and Clausius-Clapeyron phase transitions (`src/thermodynamics/phase_change.ts`)
+- [ ] Implement calculateEvaporationExergyLoss mass-enthalpy dissipation calculator in `src/thermodynamics/phase_change.ts`
 - [ ] Gouy-Stodola rate computation and Exergy destruction accounting (`src/thermodynamics/exergy.ts`)
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures (`src/thermodynamics/carnot.ts`)
 - [ ] Surface albedo endmember profiles for snow, ice, ocean, and canopy in `src/thermodynamics/albedo.ts`
@@ -256,6 +257,7 @@ SPRINT_GOAL: Implement createDefaultH3CellThermodynamicState factory returning b
 - [ ] Rubisco Arrhenius activation and deactivation temperature-response function in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Michaelis-Menten affinity constants calculation for CO2 and O2 in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Mechanistic Farquhar-von Caemmerer-Berry photosynthesis and assimilation monad (`src/biosphere/photosynthesis.ts`)
+- [ ] Ball-Berry-Woodward stomatal conductance and transpiration coupling (`src/biosphere/stomatal_conductance.ts`)
 - [ ] Allometric metabolic scaling and Kleiber's Law basal respiration calculator (`src/biosphere/allometry.ts`)
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication (`src/biosphere/trophic_matrix.ts`)
 - [ ] Gauss-Seidel steady-state biomass solver updating node biomass stocks (`src/biosphere/trophic_solver.ts`)

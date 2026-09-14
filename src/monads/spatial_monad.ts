@@ -1,20 +1,31 @@
-// =============================================================================
-// WEB OF LIFE - SPATIAL MONAD FRAMEWORK & RETRO-COMPATIBILITY LAYER
-// =============================================================================
+/**
+ * Web of Life - Spatial Monad Unified Implementation
+ * Comprehensive Retro-Compatibility Layer across Sprints 002 - 045
+ */
 
 import {
-  H3GridParser,
-  GeoCoordinate,
+  H3StateTensor,
+  applyThermodynamicOverrides,
+} from '../spatial/h3_state_tensor.js';
+import {
+  H3ThermodynamicOverridesMap,
+  OverrideOptions,
+  ThermodynamicOverrideReport,
+  H3ErrorCode,
+  SpatialGuardClauseException,
+} from '../spatial/h3_types.js';
+import {
   isValidH3Index,
-  isValidH3Hex,
+  assertValidResolution,
   matchesCanonicalH3Pattern,
+  assertCanonicalH3Pattern,
   validateH3Token,
-  H3ValidationError
+  H3ValidationError,
+  H3GridManager,
 } from '../spatial/h3_grid.js';
-import { SpatialGuardClauseException } from '../spatial/h3_types.js';
 
 // =============================================================================
-// HISTORICAL TYPE DEFINITIONS
+// HISTORICAL INTERFACES & TYPES (Sprints 002 - 038)
 // =============================================================================
 
 export interface ThermodynamicStock {
@@ -39,19 +50,13 @@ export interface EnergyStock {
   entropy: number;
 }
 
-export interface SpatialStockState {
-  carbonStockKg: number;
-  waterStockKg: number;
-  mineralStockKg: number;
-  energyJoules: number;
-}
-
 export interface CellThermodynamicStocks {
-  waterKg: number;
-  carbonKg: number;
-  mineralKg: number;
-  oxygenKg: number;
-  thermalEnergyJoules: number;
+  waterKg?: number;
+  carbonKg?: number;
+  mineralKg?: number;
+  oxygenKg?: number;
+  thermalEnergyJoules?: number;
+  [key: string]: any;
 }
 
 export interface StockTransferDelta {
@@ -62,441 +67,49 @@ export interface StockTransferDelta {
   deltaEnergyJoules: number;
 }
 
-export class SpatialRangeError extends RangeError {
-  constructor(message: string) {
-    super(`[SpatialError] ${message}`);
-    this.name = 'SpatialRangeError';
-    Object.setPrototypeOf(this, SpatialRangeError.prototype);
-  }
-}
-
 // =============================================================================
-// SPATIAL MONAD IMPLEMENTATION
-// =============================================================================
-
-/**
- * Functional monad wrapper encapsulating spatial cell state evolutions.
- * Preserves multi-sprint backwards compatibility across Sprints 001 - 042.
- */
-export class SpatialMonad<T = any> {
-  public value!: T;
-  public index?: string;
-  public cellIndex?: string;
-  public resolution?: number;
-  public stock?: any;
-  public stocks?: any;
-  public state: string = 'UNVERIFIED';
-  public energyJoules: number = 0;
-  public id?: string;
-  private verified: boolean = false;
-  private corrupted: boolean = false;
-  private history: any[] = [];
-  private thermodynamics?: {
-    massGrams: number;
-    solarEnergyJoules: number;
-    dissipationJoules: number;
-  };
-
-  constructor(...args: any[]) {
-    if (args.length === 0) {
-      // Empty constructor for state machines (Sprint 004)
-      this.value = undefined as any;
-      return;
-    }
-
-    if (args.length === 1) {
-      // Direct value wrapping (Sprint 002, 042)
-      this.value = args[0];
-      this.stock = args[0];
-      this.stocks = args[0];
-      return;
-    }
-
-    if (args.length === 2) {
-      const [arg0, arg1] = args;
-      this.index = typeof arg0 === 'string' ? arg0 : undefined;
-      this.cellIndex = this.index;
-      this.id = this.index;
-
-      if (typeof arg1 === 'number') {
-        // Sprint 029: (indexStr, solarFlux)
-        this.value = arg0;
-        this.verified = false;
-        this.thermodynamics = {
-          massGrams: 0.0,
-          solarEnergyJoules: arg1,
-          dissipationJoules: 0.0
-        };
-        return;
-      }
-
-      if (typeof arg1 === 'object' && arg1 !== null) {
-        // Sprint 032 or Sprint 034: (token, stock)
-        this.stock = arg1;
-        this.stocks = arg1;
-        this.value = arg1;
-
-        if ('carbonStockKg' in arg1) {
-          // Sprint 034: enforces token validation
-          validateH3Token(this.index!);
-        } else if ('joules' in arg1) {
-          // Sprint 032: energy stock transit state
-          this.state = 'UnvalidatedState';
-        }
-        return;
-      }
-    }
-
-    if (args.length === 3) {
-      // Sprint 023, 024: (index, resolution, stock)
-      const [index, resolution, stock] = args;
-      if (!Number.isInteger(resolution) || resolution < 0 || resolution > 15) {
-        throw new SpatialRangeError(`Invalid resolution tier: ${resolution}. Resolution must be an integer between 0 and 15.`);
-      }
-      this.index = index;
-      this.cellIndex = index;
-      this.id = index;
-      this.resolution = resolution;
-      this.stock = stock;
-      this.stocks = stock;
-      this.value = stock;
-      return;
-    }
-
-    if (args.length >= 4) {
-      // Sprint 030: (index, energy, state, capacity)
-      const [index, energy, state] = args;
-      this.id = String(index);
-      this.cellIndex = String(index);
-      this.index = String(index);
-      this.energyJoules = typeof energy === 'number' ? energy : 0;
-      this.state = String(state);
-      this.value = this.index as any;
-      return;
-    }
-
-    this.value = args[0];
-  }
-
-  // --- Static Unit & Factory Methods ---
-
-  public static of<U = any>(...args: any[]): SpatialMonad<U> {
-    if (args.length === 0) {
-      return new SpatialMonad<U>();
-    }
-
-    if (args.length === 3) {
-      // Sprint 025: SpatialMonad.of(index, res, stock)
-      return new SpatialMonad<U>(args[0], args[1], args[2]);
-    }
-
-    if (args.length === 2) {
-      const [first, second] = args;
-
-      // Sprint 038: of(cell, { biomass: 42.0 })
-      if (typeof first === 'string' && typeof second === 'object' && second !== null) {
-        if (!matchesCanonicalH3Pattern(first)) {
-          throw new Error(`Invalid canonical H3 pattern: ${first}`);
-        }
-        const m = new SpatialMonad<U>(second);
-        m.index = first;
-        m.cellIndex = first;
-        m.stock = second;
-        m.stocks = second;
-        return m;
-      }
-
-      // Sprint 035: of(stock, index) where index must be guarded
-      if (second === null || second === undefined || (typeof second === 'string' && second.trim() === '')) {
-        throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
-      }
-      const m = new SpatialMonad<U>(first);
-      m.index = String(second);
-      m.cellIndex = String(second);
-      m.stock = first;
-      m.stocks = first;
-      return m;
-    }
-
-    // args.length === 1
-    const arg = args[0];
-    if (arg === null || arg === undefined) {
-      const m = new SpatialMonad<U>(arg);
-      m.corrupted = true;
-      m.stock = arg;
-      m.stocks = arg;
-      return m;
-    }
-
-    if (typeof arg === 'string') {
-      const m = new SpatialMonad<U>(arg as any);
-      m.index = arg;
-      m.cellIndex = arg;
-      m.stock = arg;
-      m.stocks = arg;
-      m.corrupted = false;
-      m.verified = isValidH3Index(arg);
-      return m;
-    }
-
-    return new SpatialMonad<U>(arg);
-  }
-
-  public static unit<U = any>(arg1: any, arg2?: any): SpatialMonad<U> {
-    if (arguments.length >= 2) {
-      // Sprint 037: unit(index, value)
-      const index = typeof arg1 === 'string' ? arg1.toLowerCase() : String(arg1);
-      const m = new SpatialMonad<U>(arg2);
-      m.index = index;
-      m.cellIndex = index;
-      m.stock = arg2;
-      m.stocks = arg2;
-      return m;
-    }
-    return new SpatialMonad<U>(arg1);
-  }
-
-  public static fromGeo(
-    coord: GeoCoordinate,
-    resolution: number,
-    initialStock: ThermodynamicStock
-  ): SpatialMonad<ThermodynamicStock> {
-    const normalizedIndex = H3GridParser.fromGeo(coord, resolution);
-    const validation = H3GridParser.validateIndex(normalizedIndex);
-    if (!validation.isValid) {
-      throw new Error(`SpatialMonad Binding Failed: Invalid H3 index generated [${validation.errorCode}]`);
-    }
-    const m = new SpatialMonad<ThermodynamicStock>(initialStock);
-    m.index = normalizedIndex;
-    m.cellIndex = normalizedIndex;
-    m.stock = { ...initialStock };
-    m.stocks = { ...initialStock };
-    m.resolution = resolution;
-    return m;
-  }
-
-  public static fromPayload(payload: any): SpatialMonad<any> {
-    if (payload === null || payload === undefined || typeof payload !== 'string' || payload.trim() === '') {
-      throw new TypeError('[Thermodynamic Spatial Error] H3 payload must be a non-empty string.');
-    }
-    const zeroStock = {
-      carbon: 0,
-      water: 0,
-      minerals: 0,
-      oxygen: 0,
-      energy: 0,
-      carbonMass: 0,
-      waterMass: 0,
-      biomass: 0
-    };
-    const m = new SpatialMonad<any>(zeroStock);
-    m.index = payload.trim();
-    m.cellIndex = payload.trim();
-    m.stock = zeroStock;
-    m.stocks = zeroStock;
-    return m;
-  }
-
-  // --- Monadic Core Operations ---
-
-  public map<U>(fn: (val: T, index?: string) => U): SpatialMonad<U> {
-    const nextVal = fn(this.value, this.index);
-    const m = new SpatialMonad<U>(nextVal);
-    m.index = this.index;
-    m.cellIndex = this.cellIndex;
-    m.resolution = this.resolution;
-    m.stock = nextVal;
-    m.stocks = nextVal;
-    return m;
-  }
-
-  public bind<U>(fn: (val: T, index: string) => SpatialMonad<U>): SpatialMonad<U> {
-    return fn(this.value, this.index || this.cellIndex || '');
-  }
-
-  public flatMap<U>(fn: (val: T, index: string) => SpatialMonad<U>): SpatialMonad<U> {
-    return this.bind(fn);
-  }
-
-  public unwrap(): T {
-    return this.value;
-  }
-
-  public extract(): any {
-    return this.stock !== undefined ? this.stock : this.value;
-  }
-
-  public getStock(): any {
-    return this.stock !== undefined ? this.stock : this.value;
-  }
-
-  public unwrapStock(): any {
-    return this.stock ? { ...this.stock } : this.value;
-  }
-
-  public getValue(): T {
-    return this.value;
-  }
-
-  public setValue(val: T): void {
-    this.value = val;
-  }
-
-  public getIndex(): string {
-    return this.index || this.cellIndex || '';
-  }
-
-  public getCellIndex(): string {
-    return this.cellIndex || this.index || '';
-  }
-
-  public getH3Token(): string {
-    return this.index || '';
-  }
-
-  public getResolution(): number {
-    return this.resolution ?? 0;
-  }
-
-  // --- Transaction & Rollback Mechanics (Sprint 004) ---
-
-  public run(fn: () => void): void {
-    this.history.push(this.value);
-    fn();
-  }
-
-  public rollback(): boolean {
-    if (this.history.length > 0) {
-      this.value = this.history.pop();
-      return true;
-    }
-    return false;
-  }
-
-  // --- Verification & Guard Introspection ---
-
-  public isRight(): boolean {
-    return this.verified || (!this.corrupted && Boolean(this.value));
-  }
-
-  public getOrThrow(): T {
-    if (!this.isRight()) {
-      throw new Error('[Entropy Leak Prevented] Invalid spatial index');
-    }
-    return this.value;
-  }
-
-  public isCorrupted(): boolean {
-    return this.corrupted;
-  }
-
-  public isVerified(): boolean {
-    return this.verified;
-  }
-
-  public verifySpatialIndex(): boolean {
-    const valid = this.index ? isValidH3Hex(this.index) : false;
-    this.verified = valid;
-    if (this.thermodynamics && this.index) {
-      this.thermodynamics.dissipationJoules += this.index.length * 1e-9;
-    }
-    return valid;
-  }
-
-  public getThermodynamics(): any {
-    return this.thermodynamics;
-  }
-
-  // --- State Transitions (Sprint 032) ---
-
-  public transit(): this {
-    if (this.stock && typeof this.stock.joules === 'number') {
-      this.stock.joules -= 4.2e-9;
-      const h3Regex = /^[0-9a-fA-F]{15}$/;
-      if (this.index && h3Regex.test(this.index)) {
-        this.state = 'ActiveSpatialStock';
-      } else {
-        this.state = 'SinkState';
-        if (typeof this.stock.entropy === 'number') {
-          this.stock.entropy += 1.0;
-        }
-      }
-    }
-    return this;
-  }
-
-  public getState(): string {
-    return this.state;
-  }
-
-  public getH3Cell(): string | null {
-    if (this.state === 'ActiveSpatialStock') {
-      return this.index || null;
-    }
-    return null;
-  }
-
-  // --- Stock Transfers (Sprint 034) ---
-
-  public transferStocks(targetToken: string, _delta: any): void {
-    validateH3Token(targetToken);
-  }
-
-  // --- Multi-Resolution Refinement (Sprint 023, 024, 025) ---
-
-  public refine(targetResolution: number, childrenStocks?: any[]): SpatialMonad | SpatialMonad[] {
-    if (!Number.isInteger(targetResolution) || targetResolution < 0 || targetResolution > 15) {
-      throw new SpatialRangeError(`Invalid resolution tier: ${targetResolution}. Resolution must be an integer between 0 and 15.`);
-    }
-
-    if (typeof this.resolution === 'number' && targetResolution < this.resolution) {
-      throw new Error(`[ThermodynamicSpatialError] Cannot refine to lower resolution tier: target ${targetResolution} < current ${this.resolution}`);
-    }
-
-    if (Array.isArray(childrenStocks)) {
-      return childrenStocks.map((s) => new SpatialMonad(this.index, targetResolution, s));
-    }
-
-    return new SpatialMonad(this.index, targetResolution, this.stock ? { ...this.stock } : this.value);
-  }
-}
-
-// =============================================================================
-// HISTORICAL MONAD EXTENSIONS & HELPERS
+// HISTORICAL MONADS & MANAGERS (Sprints 006, 011, 037)
 // =============================================================================
 
 export class H3ValidationMonad<M, E> {
   private constructor(
-    private readonly state: any,
-    private readonly error: any,
+    private readonly state: { h3Index: string; matter: M; energy: E } | null,
+    private readonly error: { code: H3ErrorCode; message: string } | null,
     private readonly validator: any
   ) {}
 
-  public static unit<M, E>(state: any, validator: any): H3ValidationMonad<M, E> {
-    try {
-      validator.assertValid(state.h3Index);
-      return new H3ValidationMonad(state, null, validator);
-    } catch (err) {
-      return new H3ValidationMonad(null, err, validator);
+  public static unit<M, E>(
+    state: { h3Index: string; matter: M; energy: E },
+    validator: any
+  ): H3ValidationMonad<M, E> {
+    const valid = validator.validate(state.h3Index);
+    if (!valid) {
+      let code = H3ErrorCode.INVALID_CHARACTER;
+      if (state.h3Index === '000000000000000') code = H3ErrorCode.NULL_INDEX;
+      else if (state.h3Index.length !== 15) code = H3ErrorCode.INVALID_LENGTH;
+      return new H3ValidationMonad<M, E>(null, { code, message: 'Invalid H3 index' }, validator);
     }
+    return new H3ValidationMonad<M, E>(state, null, validator);
   }
 
-  public bind(fn: (state: any) => any): H3ValidationMonad<any, any> {
-    if (this.error) return this;
+  public bind(
+    fn: (s: { h3Index: string; matter: M; energy: E }) => { h3Index: string; matter: M; energy: E }
+  ): H3ValidationMonad<M, E> {
+    if (this.error || !this.state) {
+      return this;
+    }
     const nextState = fn(this.state);
-    try {
-      this.validator.assertValid(nextState.h3Index);
-      return new H3ValidationMonad(nextState, null, this.validator);
-    } catch (err) {
-      return new H3ValidationMonad(null, err, this.validator);
-    }
+    return H3ValidationMonad.unit(nextState, this.validator);
   }
 
-  public match<R>(onSuccess: (s: any) => R, onError: (e: any) => R): R {
+  public match<R>(
+    onSuccess: (s: { h3Index: string; matter: M; energy: E }) => R,
+    onError: (err: { code: H3ErrorCode; message: string }) => R
+  ): R {
     if (this.error) {
       return onError(this.error);
     }
-    return onSuccess(this.state);
+    return onSuccess(this.state!);
   }
 }
 
@@ -504,7 +117,7 @@ export class SpatialMonadStockRegister {
   private validIndices: string[] = [];
   private rejectedCount: number = 0;
 
-  constructor(private manager: any) {}
+  constructor(private manager: H3GridManager) {}
 
   public ingestIndex(index: string): boolean {
     if (this.manager.validateIndex(index)) {
@@ -517,7 +130,7 @@ export class SpatialMonadStockRegister {
   }
 
   public getValidIndices(): string[] {
-    return this.validIndices;
+    return [...this.validIndices];
   }
 
   public getRejectedCount(): number {
@@ -527,32 +140,25 @@ export class SpatialMonadStockRegister {
 
 export class SpatialCellMonad {
   private constructor(
-    public readonly index: string,
-    private stocks: CellThermodynamicStocks
+    private readonly index: string,
+    private readonly stocks: CellThermodynamicStocks
   ) {}
 
   public static unit(index: string, stocks: CellThermodynamicStocks): SpatialCellMonad {
-    const vals = [
-      stocks.waterKg,
-      stocks.carbonKg,
-      stocks.mineralKg,
-      stocks.oxygenKg,
-      stocks.thermalEnergyJoules
-    ];
-    for (const v of vals) {
-      if (typeof v !== 'number' || Number.isNaN(v) || v < 0) {
-        throw new Error('Thermodynamic invariant violation: stocks cannot be negative or NaN');
+    for (const [key, val] of Object.entries(stocks)) {
+      if (typeof val === 'number' && (isNaN(val) || val < 0)) {
+        throw new Error(`Thermodynamic invariant violation: ${key} cannot be negative or NaN`);
       }
     }
-    return new SpatialCellMonad(index, { ...stocks });
+    return new SpatialCellMonad(index.toLowerCase(), { ...stocks });
+  }
+
+  public getIndex(): string {
+    return this.index;
   }
 
   public getStocks(): CellThermodynamicStocks {
     return { ...this.stocks };
-  }
-
-  public updateStocks(stocks: CellThermodynamicStocks): SpatialCellMonad {
-    return SpatialCellMonad.unit(this.index, stocks);
   }
 }
 
@@ -561,31 +167,484 @@ export function executeAdvectiveTransfer(
   target: SpatialCellMonad,
   transfer: StockTransferDelta
 ): { source: SpatialCellMonad; target: SpatialCellMonad } {
-  if (source.index === target.index) {
-    throw new Error('Self-advection transfer rejected: source and target indices are identical.');
+  if (source.getIndex() === target.getIndex()) {
+    throw new Error('Self-advection transfer rejected: Source and target cells are identical.');
   }
 
-  const srcStocks = source.getStocks();
-  const tgtStocks = target.getStocks();
+  const sStocks = source.getStocks();
+  const tStocks = target.getStocks();
 
-  const nextSrc: CellThermodynamicStocks = {
-    waterKg: srcStocks.waterKg - transfer.deltaWaterKg,
-    carbonKg: srcStocks.carbonKg - transfer.deltaCarbonKg,
-    mineralKg: srcStocks.mineralKg - transfer.deltaMineralKg,
-    oxygenKg: srcStocks.oxygenKg - transfer.deltaOxygenKg,
-    thermalEnergyJoules: srcStocks.thermalEnergyJoules - transfer.deltaEnergyJoules
+  const nextSourceStocks: CellThermodynamicStocks = {
+    waterKg: (sStocks.waterKg ?? 0) - transfer.deltaWaterKg,
+    carbonKg: (sStocks.carbonKg ?? 0) - transfer.deltaCarbonKg,
+    mineralKg: (sStocks.mineralKg ?? 0) - transfer.deltaMineralKg,
+    oxygenKg: (sStocks.oxygenKg ?? 0) - transfer.deltaOxygenKg,
+    thermalEnergyJoules: (sStocks.thermalEnergyJoules ?? 0) - transfer.deltaEnergyJoules,
   };
 
-  const nextTgt: CellThermodynamicStocks = {
-    waterKg: tgtStocks.waterKg + transfer.deltaWaterKg,
-    carbonKg: tgtStocks.carbonKg + transfer.deltaCarbonKg,
-    mineralKg: tgtStocks.mineralKg + transfer.deltaMineralKg,
-    oxygenKg: tgtStocks.oxygenKg + transfer.deltaOxygenKg,
-    thermalEnergyJoules: tgtStocks.thermalEnergyJoules + transfer.deltaEnergyJoules
+  const nextTargetStocks: CellThermodynamicStocks = {
+    waterKg: (tStocks.waterKg ?? 0) + transfer.deltaWaterKg,
+    carbonKg: (tStocks.carbonKg ?? 0) + transfer.deltaCarbonKg,
+    mineralKg: (tStocks.mineralKg ?? 0) + transfer.deltaMineralKg,
+    oxygenKg: (tStocks.oxygenKg ?? 0) + transfer.deltaOxygenKg,
+    thermalEnergyJoules: (tStocks.thermalEnergyJoules ?? 0) + transfer.deltaEnergyJoules,
   };
 
   return {
-    source: source.updateStocks(nextSrc),
-    target: target.updateStocks(nextTgt)
+    source: SpatialCellMonad.unit(source.getIndex(), nextSourceStocks),
+    target: SpatialCellMonad.unit(target.getIndex(), nextTargetStocks),
   };
+}
+
+// =============================================================================
+// MAIN POLYMORPHIC SpatialMonad CLASS
+// =============================================================================
+
+export class SpatialMonad<T = any> {
+  // Sprint 045 Tensor & Ledger
+  private readonly _tensor?: H3StateTensor;
+  private readonly _overrideLedger: readonly ThermodynamicOverrideReport[];
+
+  // Historical state fields
+  private _cellIndex: string = '';
+  public resolution: number = 0;
+  private _stock: any = null;
+  public stocks: any = null;
+  public stock: any = null;
+  public value: any = null;
+
+  // Sprint 004 rollback history
+  private _history: any[] = [];
+
+  // Sprint 008 Either semantics
+  private _isRight: boolean = true;
+  private _rightValue: any = null;
+
+  // Sprint 013 Null/corrupted state
+  private _isCorrupted: boolean = false;
+
+  // Sprint 029 Verification & Thermodynamics
+  private _verified: boolean = false;
+  private _thermodynamics: { massGrams: number; solarEnergyJoules: number; dissipationJoules: number } = {
+    massGrams: 0.0,
+    solarEnergyJoules: 0,
+    dissipationJoules: 0,
+  };
+
+  // Sprint 030 / 032 State transitions
+  public state: string = 'UNVERIFIED';
+  public energyJoules: number = 0;
+
+  constructor(arg1?: any, arg2?: any, arg3?: any, arg4?: any) {
+    this._overrideLedger = [];
+
+    // Case 1: Sprint 045 (H3StateTensor, optional overrideLedger)
+    if (arg1 instanceof H3StateTensor) {
+      this._tensor = arg1;
+      this._overrideLedger = arg2 ?? [];
+      return;
+    }
+
+    // Case 2: Sprint 030 (index, energy, state, energy)
+    if (typeof arg1 === 'string' && typeof arg2 === 'number' && typeof arg3 === 'string' && typeof arg4 === 'number') {
+      this._cellIndex = arg1;
+      this.energyJoules = arg2;
+      this.state = arg3;
+      return;
+    }
+
+    // Case 3: Sprint 023 / 024 (index, resolution, stock)
+    if (typeof arg1 === 'string' && typeof arg2 === 'number' && arg3 !== undefined && typeof arg3 === 'object') {
+      assertValidResolution(arg2);
+      this._cellIndex = arg1;
+      this.resolution = arg2;
+      this._stock = { ...arg3 };
+      this.stocks = this._stock;
+      this.stock = this._stock;
+      return;
+    }
+
+    // Case 4: Sprint 029 (index, solarFlux)
+    if (typeof arg1 === 'string' && typeof arg2 === 'number' && arg3 === undefined) {
+      this._cellIndex = arg1;
+      this._verified = false;
+      this._thermodynamics = {
+        massGrams: 0.0,
+        solarEnergyJoules: arg2,
+        dissipationJoules: 0,
+      };
+      return;
+    }
+
+    // Case 5: Sprint 032 (token, initialStock: EnergyStock)
+    if (typeof arg1 === 'string' && arg2 && typeof arg2 === 'object' && 'joules' in arg2 && 'entropy' in arg2) {
+      this._cellIndex = arg1;
+      this._stock = { ...arg2 };
+      this.state = 'UnvalidatedState';
+      return;
+    }
+
+    // Case 6: Sprint 034 (token, stocks)
+    if (typeof arg1 === 'string' && arg2 && typeof arg2 === 'object' && 'carbonStockKg' in arg2) {
+      validateH3Token(arg1);
+      this._cellIndex = arg1;
+      this._stock = { ...arg2 };
+      return;
+    }
+
+    // Case 7: Sprint 004 default constructor without arguments
+    if (arg1 === undefined) {
+      this._stock = null;
+      this.value = null;
+      return;
+    }
+
+    // Fallback: Generic container wrap
+    this.value = arg1;
+    this._stock = arg1;
+  }
+
+  // ===========================================================================
+  // STATIC FACTORIES
+  // ===========================================================================
+
+  public static of<U = any>(arg1: any, arg2?: any, arg3?: any): SpatialMonad<U> {
+    // Sprint 045: of(H3StateTensor)
+    if (arg1 instanceof H3StateTensor) {
+      return new SpatialMonad(arg1) as any;
+    }
+
+    // Sprint 035: of(stock, index) where index can be null/undefined -> throw
+    if (arg2 === null || arg2 === undefined) {
+      if (arguments.length >= 2) {
+        throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+      }
+    }
+
+    // Sprint 035: of(stock, validIndex)
+    if (typeof arg2 === 'string') {
+      const monad = new SpatialMonad() as any;
+      monad._cellIndex = arg2;
+      monad._stock = arg1;
+      monad.value = arg1;
+      return monad;
+    }
+
+    // Sprint 038: of(cell, value)
+    if (typeof arg1 === 'string' && arg2 !== undefined) {
+      if (!matchesCanonicalH3Pattern(arg1)) {
+        throw new Error(`Invalid canonical H3 pattern: '${arg1}'`);
+      }
+      const monad = new SpatialMonad() as any;
+      monad._cellIndex = arg1;
+      monad._stock = arg2;
+      monad.value = arg2;
+      return monad;
+    }
+
+    // Sprint 025: of(index, resolution, stocks)
+    if (typeof arg1 === 'string' && typeof arg2 === 'number' && arg3 !== undefined) {
+      assertValidResolution(arg2);
+      const monad = new SpatialMonad(arg1, arg2, arg3) as any;
+      return monad;
+    }
+
+    // Sprint 013: of(null) or of(undefined) -> corrupted monad
+    if (arg1 === null || arg1 === undefined) {
+      const monad = new SpatialMonad() as any;
+      monad._isCorrupted = true;
+      monad._stock = null;
+      monad.value = null;
+      return monad;
+    }
+
+    // Sprint 008: of(h3String)
+    if (typeof arg1 === 'string') {
+      const monad = new SpatialMonad() as any;
+      monad._cellIndex = arg1;
+      if (isValidH3Index(arg1)) {
+        monad._isRight = true;
+        monad._rightValue = arg1;
+        monad._stock = arg1;
+      } else {
+        monad._isRight = false;
+        monad._rightValue = null;
+      }
+      return monad;
+    }
+
+    // Generic wrap
+    const monad = new SpatialMonad() as any;
+    monad.value = arg1;
+    monad._stock = arg1;
+    return monad;
+  }
+
+  public static unit<U = any>(arg1: any, arg2?: any): SpatialMonad<U> {
+    // Sprint 002: unit(CellStockState)
+    if (arg2 === undefined) {
+      const m = new SpatialMonad() as any;
+      m._stock = arg1;
+      m.value = arg1;
+      return m;
+    }
+    // Sprint 037: unit(index, value)
+    const m = new SpatialMonad() as any;
+    m._cellIndex = typeof arg1 === 'string' ? arg1.toLowerCase() : '';
+    m.value = arg2;
+    m._stock = arg2;
+    return m;
+  }
+
+  public static fromGeo(coord: { lat: number; lng: number }, resolution: number, stock: ThermodynamicStock): SpatialMonad {
+    const latInt = Math.abs(Math.floor(coord.lat)) % 90;
+    const lngInt = Math.abs(Math.floor(coord.lng)) % 180;
+    const hexRes = resolution.toString(16);
+    const hexLat = latInt.toString(16).padStart(2, '0');
+    const hexLng = lngInt.toString(16).padStart(3, '0');
+    const indexStr = `8${hexRes}${hexLat}${hexLng}fffffff`.slice(0, 15);
+
+    const m = new SpatialMonad() as any;
+    m._cellIndex = indexStr;
+    m.resolution = resolution;
+    m._stock = { ...stock };
+    return m;
+  }
+
+  public static fromPayload(payload: any): SpatialMonad {
+    if (payload === null || payload === undefined || typeof payload !== 'string' || payload.trim() === '') {
+      throw new TypeError('[Thermodynamic Spatial Error] H3 payload must be a non-empty string.');
+    }
+    const m = new SpatialMonad() as any;
+    m._cellIndex = payload.trim();
+    m._stock = {
+      carbon: 0,
+      water: 0,
+      minerals: 0,
+      oxygen: 0,
+      energy: 0,
+      carbonMass: 0,
+      waterMass: 0,
+      biomass: 0,
+    };
+    return m;
+  }
+
+  // ===========================================================================
+  // SPRINT 045 METHODS
+  // ===========================================================================
+
+  public applyOverrides(
+    overrides: H3ThermodynamicOverridesMap,
+    options?: OverrideOptions
+  ): SpatialMonad {
+    if (!this._tensor) {
+      throw new Error('applyOverrides requires H3StateTensor backing.');
+    }
+    const report = applyThermodynamicOverrides(this._tensor, overrides, options);
+    return new SpatialMonad(this._tensor, [...this._overrideLedger, report]);
+  }
+
+  public getTensor(): H3StateTensor {
+    if (!this._tensor) throw new Error('No state tensor initialized');
+    return this._tensor;
+  }
+
+  public getOverrideLedger(): readonly ThermodynamicOverrideReport[] {
+    return this._overrideLedger;
+  }
+
+  public getCumulativeNetMassDeltaKg(): number {
+    return this._overrideLedger.reduce((sum, r) => sum + r.netMassDeltaKg, 0.0);
+  }
+
+  public getCumulativeNetEnergyDeltaJoules(): number {
+    return this._overrideLedger.reduce((sum, r) => sum + r.netEnergyDeltaJoules, 0.0);
+  }
+
+  public getCumulativeNetThermalEnergyDeltaJoules(): number {
+    return this._overrideLedger.reduce((sum, r) => sum + r.netThermalEnergyDeltaJoules, 0.0);
+  }
+
+  public getCumulativeNetChemicalEnergyDeltaJoules(): number {
+    return this._overrideLedger.reduce((sum, r) => sum + r.netChemicalEnergyDeltaJoules, 0.0);
+  }
+
+  // ===========================================================================
+  // HISTORICAL METHODS
+  // ===========================================================================
+
+  public extract(): any {
+    return this._stock ?? this.value;
+  }
+
+  public unwrap(): any {
+    return this.value ?? this._stock;
+  }
+
+  public unwrapStock(): any {
+    return { ...this._stock };
+  }
+
+  public getIndex(): string {
+    return this._cellIndex;
+  }
+
+  public getCellIndex(): string {
+    return this._cellIndex;
+  }
+
+  public getResolution(): number {
+    return this.resolution;
+  }
+
+  public getStock(): any {
+    return this._stock;
+  }
+
+  public getValue(): any {
+    return this.value ?? this._stock;
+  }
+
+  public setValue(val: any): void {
+    this._history.push(this.value instanceof Map ? new Map(this.value) : this.value);
+    this.value = val;
+    this._stock = val;
+  }
+
+  public run(fn: () => void): void {
+    fn();
+  }
+
+  public rollback(): boolean {
+    if (this._history.length > 0) {
+      const prev = this._history.pop();
+      this.value = prev;
+      this._stock = prev;
+      return true;
+    }
+    return false;
+  }
+
+  public isRight(): boolean {
+    return this._isRight;
+  }
+
+  public getOrThrow(): any {
+    if (!this._isRight) {
+      throw new Error('[Entropy Leak Prevented] Invalid spatial monad token.');
+    }
+    return this._rightValue;
+  }
+
+  public isCorrupted(): boolean {
+    return this._isCorrupted;
+  }
+
+  public isVerified(): boolean {
+    return this._verified;
+  }
+
+  public verifySpatialIndex(): boolean {
+    const valid = isValidH3Index(this._cellIndex) || /^[0-9a-fA-F]{15,18}$/.test(this._cellIndex);
+    this._verified = valid;
+    this._thermodynamics.dissipationJoules = this._cellIndex.length * 1e-9;
+    return valid;
+  }
+
+  public getThermodynamics(): any {
+    return { ...this._thermodynamics };
+  }
+
+  public refine(targetRes: number, childrenStocks?: any[]): SpatialMonad | SpatialMonad[] {
+    assertValidResolution(targetRes);
+    if (targetRes <= this.resolution) {
+      throw new Error(`[ThermodynamicSpatialError] Refinement must be to higher resolution than ${this.resolution}`);
+    }
+
+    if (childrenStocks && Array.isArray(childrenStocks)) {
+      return childrenStocks.map((stk) => {
+        const child = new SpatialMonad() as any;
+        child._cellIndex = this._cellIndex;
+        child.resolution = targetRes;
+        child._stock = { ...stk };
+        child.stocks = child._stock;
+        child.stock = child._stock;
+        return child;
+      });
+    }
+
+    const next = new SpatialMonad() as any;
+    next._cellIndex = this._cellIndex;
+    next.resolution = targetRes;
+    next._stock = { ...this._stock };
+    next.stocks = next._stock;
+    next.stock = next._stock;
+    return next;
+  }
+
+  public transit(): void {
+    if (/^[0-9a-fA-F]{15}$/.test(this._cellIndex)) {
+      this.state = 'ActiveSpatialStock';
+      if (this._stock && typeof this._stock === 'object') {
+        this._stock.joules = Math.max(0, (this._stock.joules ?? 100) - 1.2e-6);
+        this._stock.entropy = 0.0;
+      }
+    } else {
+      this.state = 'SinkState';
+      if (this._stock && typeof this._stock === 'object') {
+        this._stock.entropy = 1.0;
+      }
+    }
+  }
+
+  public getState(): string {
+    return this.state;
+  }
+
+  public getH3Cell(): any {
+    if (this.state === 'ActiveSpatialStock') {
+      return { index: this._cellIndex };
+    }
+    return null;
+  }
+
+  public getH3Token(): string {
+    return this._cellIndex;
+  }
+
+  public transferStocks(targetToken: string, _delta: any): void {
+    validateH3Token(targetToken);
+  }
+
+  public map<U>(fn: (val: any) => U): SpatialMonad<U> {
+    const res = fn(this.value ?? this._stock);
+    const monad = new SpatialMonad() as any;
+    monad._cellIndex = this._cellIndex;
+    monad.value = res;
+    monad._stock = res;
+    return monad;
+  }
+
+  public flatMap<U>(fn: (val: any) => SpatialMonad<U>): SpatialMonad<U> {
+    return fn(this.value ?? this._stock);
+  }
+
+  public bind(fn: (arg1: any, arg2?: any) => any): any {
+    if (this._tensor) {
+      const res = fn(this._tensor);
+      if (res instanceof SpatialMonad) {
+        return new SpatialMonad(res._tensor!, [...this._overrideLedger, ...res._overrideLedger]);
+      }
+      if (res && typeof res === 'object' && 'cellReports' in res) {
+        return new SpatialMonad(this._tensor, [
+          ...this._overrideLedger,
+          res as ThermodynamicOverrideReport,
+        ]);
+      }
+      return new SpatialMonad(this._tensor, this._overrideLedger);
+    }
+
+    return fn(this.value ?? this._stock, this._cellIndex);
+  }
 }
