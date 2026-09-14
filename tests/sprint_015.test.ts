@@ -62,7 +62,7 @@ describe('Sprint 015: Null-Check Guard Clauses for H3 String Payloads', () => {
   it('H3Grid should correctly register and track valid tokens while rejecting null noise', () => {
     const grid = new H3Grid();
     const token = grid.registerPayload('8928308280fffff');
-    assert.strictEqual(grid.size(), 1);
+    assert.strictEqual(grid.size, 1);
     assert.strictEqual(grid.hasIndex('8928308280fffff'), true);
     assert.strictEqual(grid.hasIndex(null), false);
   });

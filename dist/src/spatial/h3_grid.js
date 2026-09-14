@@ -1,6 +1,6 @@
 // =============================================================================
 // WEB OF LIFE - H3 GRID COORDINATE UTILITIES & VALIDATION ENGINES
-// Cumulative Retro-Compatibility: Sprints 001 - 053
+// Cumulative Retro-Compatibility: Sprints 001 - 057
 // =============================================================================
 import * as h3 from 'h3-js';
 import { H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
@@ -8,7 +8,7 @@ import { assertValidLatitudeDegrees, calculateH3EdgeLengthMeters, } from './h3_a
 export { H3ErrorCode };
 export { SpatialMonad } from '../monads/spatial_monad.js';
 // =============================================================================
-// SPRINT 053: GEODESIC CONVERSIONS & SYNTHETIC INDEX
+// GEODESIC CONVERSIONS & SYNTHETIC INDEX
 // =============================================================================
 export function degreesToRadians(coord) {
     assertValidLatitudeDegrees(coord.latDeg);
@@ -27,10 +27,10 @@ export function normalizeLongitudeDegrees(lonDeg) {
     if (!Number.isFinite(lonDeg)) {
         throw new RangeError(`Longitude must be a finite number: received ${lonDeg}`);
     }
-    let normalized = ((lonDeg + 180.0) % 360.0) - 180.0;
-    if (normalized <= -180.0)
-        normalized += 360.0;
-    return normalized;
+    let normalized = ((lonDeg + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
+    if (normalized === -180.0 || Math.abs(lonDeg % 360.0) === 180.0)
+        normalized = -180.0;
+    return Object.is(normalized, -0) ? 0.0 : normalized;
 }
 export function createGeodesicCoordinate(latDeg, lonDeg) {
     assertValidLatitudeDegrees(latDeg);
@@ -192,7 +192,7 @@ export class H3ValidationError extends SpatialGridError {
     code;
     token;
     constructor(messageOrToken, message) {
-        super(message ? `H3ValidationError [Token: "${messageOrToken}"]: ${message}` : messageOrToken);
+        super(message ? `H3ValidationError [Token: "${messageOrToken}"]: ${message}` : (messageOrToken ?? 'Invalid canonical H3 index token'));
         this.name = 'H3ValidationError';
         if (message) {
             this.token = messageOrToken;
@@ -233,10 +233,10 @@ export function assertCanonicalH3Pattern(token) {
 }
 export function validateH3Token(token) {
     if (!token || typeof token !== 'string') {
-        throw new InvalidH3TokenError(token ?? '');
+        throw new H3ValidationError(token ?? '', 'Token must be non-empty string');
     }
     if (!/^[0-9a-fA-F]+$/.test(token)) {
-        throw new InvalidH3TokenError(token);
+        throw new H3ValidationError(token, 'Contains non-hexadecimal characters');
     }
 }
 export function guardH3Payload(payload) {
@@ -275,7 +275,7 @@ export function isValidH3Resolution(r) {
 }
 export function assertH3Resolution(r) {
     if (!isValidH3Resolution(r)) {
-        throw new ThermodynamicSpatialError(r);
+        throw new RangeError(`[SpatialError] Invalid H3 resolution tier: ${r}. Must be integer between 0 and 15.`);
     }
 }
 export function assertValidH3Resolution(r) {
@@ -598,7 +598,7 @@ export class H3Grid {
         this._cells.set(p, {});
         return p;
     }
-    size() {
+    get size() {
         return this._cells.size;
     }
     get size_prop() {

@@ -179,7 +179,7 @@ export function computeCompositeHeatCapacity(dryAirKg, liquidWaterKg, iceKg, vap
         vaporKg * 1850.0 +
         regolithKg * 840.0);
 }
-export function computeInternalEnergy(heatCapacityJK, tempK, liquidWaterKg = 0, vaporKg = 0) {
+export function computeInternalEnergy(heatCapacityJK, tempK, _liquidWaterKg = 0, vaporKg = 0) {
     const sensible = heatCapacityJK * tempK;
     const latent = vaporKg * 2.501e6;
     return sensible + latent;
@@ -522,9 +522,6 @@ export function createDefaultH3CellThermodynamicState(h3Index, overrides = {}) {
 // =============================================================================
 // SPRINT 045: Continuous Float64 State Tensor & Overrides Engine
 // =============================================================================
-/**
- * High-performance contiguous Float64Array state tensor for H3 hexagonal spatial cells.
- */
 export class H3StateTensor {
     _cellCount;
     _indices;

@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 29%
-SPRINT_GOAL: Implement assertValidCoordinatePair coordinate boundary assertion helper in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 30%
+SPRINT_GOAL: Implement computeSphericalArcBearing forward geodesic initial azimuth calculation between two lat/lng coordinates in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -240,7 +240,7 @@ SPRINT_GOAL: Implement assertValidCoordinatePair coordinate boundary assertion h
 - [x] Implement `assertValidLatitudeDegrees` boundary check enforcing [-90, 90] range in `src/spatial/h3_adjacency.ts`
 - [x] Implement `normalizeLongitudeDegrees` boundary wrapping function enforcing [-180, 180) range in `src/spatial/h3_adjacency.ts`
 - [x] Implement `normalizeAngleRadians` angular wrapper mapping radians into [-pi, pi) range in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertValidCoordinatePair` coordinate boundary assertion helper in `src/spatial/h3_adjacency.ts`
+- [x] Implement `assertValidCoordinatePair` coordinate boundary assertion helper in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeSphericalArcBearing` forward geodesic initial azimuth calculation between two lat/lng coordinates in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryUnitNormalVector` outward spherical unit normal vector calculator across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`

@@ -1,0 +1,195 @@
+```Code snippet
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam classBorderThickness 1.5
+skinparam classHeaderBackgroundColor #E8EEF5
+skinparam classBorderColor #2B4C7E
+skinparam fontName "JetBrains Mono", "Courier New", monospace
+skinparam fontSize 11
+
+title Web of Life - Sprint 057: Geodesic Azimuth Vectorization & Directional Advection Architecture
+
+package "src::spatial (Topology & Trigonometry)" {
+    
+    enum GeodesicBoundaryCondition {
+        STANDARD_GEODESIC
+        ANTIPODAL_SINGULARITY
+        NORTH_POLE_ORIGIN
+        SOUTH_POLE_ORIGIN
+        ANTIMERIDIAN_CROSSING
+        COINCIDENT_ZERO_DISPLACEMENT
+    }
+
+    interface LatLngPoint {
+        +lat: number
+        +lng: number
+    }
+
+    interface TangentPlaneVector {
+        +uEast: number
+        +vNorth: number
+    }
+
+    interface GeodesicBearingResult {
+        +initialAzimuthRad: number
+        +initialAzimuthDeg: number
+        +distanceMeters: number
+        +unitVector: TangentPlaneVector
+        +boundaryState: GeodesicBoundaryCondition
+    }
+
+    class SphericalGeodesicCalculator <<stateless>> {
+        +{static} MEAN_EARTH_RADIUS_METERS: number = 6371008.8
+        +{static} EPSILON: number = 1e-14
+        +{static} computeSphericalArcBearing(origin: LatLngPoint, destination: LatLngPoint): number
+        +{static} computeDetailedBearing(origin: LatLngPoint, destination: LatLngPoint): GeodesicBearingResult
+        +{static} computeGreatCircleDistance(origin: LatLngPoint, destination: LatLngPoint): number
+        -{static} normalizeAzimuth(rawRad: number): number
+        -{static} clampTrig(val: number): number
+    }
+
+    class H3AdjacencyGraph {
+        -hexGraph: Map<bigint, H3Cell>
+        -edgeBearings: Map<string, GeodesicBearingResult>
+        -boundaryLengths: Map<string, number>
+        +computeEdgeAzimuthVector(originH3: bigint, destH3: bigint): GeodesicBearingResult
+        +getAdvectiveNormal(originH3: bigint, destH3: bigint): TangentPlaneVector
+        +getOutflowNeighbors(originH3: bigint): List<bigint>
+    }
+
+    class H3Cell {
+        +h3Index: bigint
+        +resolution: number
+        +centroid: LatLngPoint
+        +surfaceAreaM2: number
+    }
+
+    class GeodesicEdge {
+        +edgeId: string
+        +originH3: bigint
+        +destH3: bigint
+        +boundaryLengthMeters: number
+        +bearing: GeodesicBearingResult
+    }
+}
+
+package "src::monads (Thermodynamic Flow & Transport)" {
+
+    enum StockType {
+        MASS_CARBON_KG
+        SENSIBLE_HEAT_JOULES
+        LIQUID_WATER_KG
+        TROPHIC_BIOMASS_KG
+        ENTROPY_J_K
+    }
+
+    class ConservedThermodynamicStock {
+        +stockType: StockType
+        +quantity: number
+        +temperatureKelvin: number
+        +computeEntropy(): number
+    }
+
+    class SpatialMonad<T> {
+        -state: T
+        -epochHeight: bigint
+        +map<U>(fn: (val: T) => U): SpatialMonad<U>
+        +flatMap<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+        +advectConserved(velocityField: TangentPlaneVector, graph: H3AdjacencyGraph, dt: number): SpatialMonad<T>
+        +enforceThermodynamicInvariants(): boolean
+    }
+
+    class AdvectionTensor {
+        +edgeId: string
+        +stockType: StockType
+        +velocityProjection: number
+        +routingCoefficient: number
+        +fluxMassKg: number
+        +heatFluxJoules: number
+        +entropyGeneratedJK: number
+        +computeFlux(speed: TangentPlaneVector, normal: TangentPlaneVector, stock: ConservedThermodynamicStock, dt: number): void
+    }
+}
+
+package "src::blockchain (Thermodynamic Ledger & Consensus)" {
+
+    class BlockchainBlock {
+        +blockHeight: bigint
+        +blockHash: Uint8Array
+        +parentHash: Uint8Array
+        +stateRootHash: Uint8Array
+        +advectionMerkleRoot: Uint8Array
+        +totalConservedMassKg: number
+        +totalSensibleHeatJoules: number
+        +systemEntropyJK: number
+        +entropyDeltaJK: number
+        +firstLawEpsilonResidual: number
+        +validatorNodeId: string
+        +signature: Uint8Array
+        +verifyFirstLaw(): boolean
+        +verifySecondLaw(): boolean
+    }
+
+    class GeodesicAdvectionTransaction {
+        +txHash: Uint8Array
+        +blockHeight: bigint
+        +originH3: bigint
+        +destH3: bigint
+        +initialAzimuthDeg: number
+        +distanceMeters: number
+        +stockTransferred: ConservedThermodynamicStock
+        +entropyGenerated: number
+        +witnessSignature: Uint8Array
+    }
+
+    class ThermodynamicLedgerState {
+        -blockChain: List<BlockchainBlock>
+        -pendingTransactions: List<GeodesicAdvectionTransaction>
+        +commitBlock(block: BlockchainBlock): void
+        +recordAdvection(tx: GeodesicAdvectionTransaction): void
+    }
+}
+
+' Relationships & Invocations
+SphericalGeodesicCalculator ..> LatLngPoint : consumes
+SphericalGeodesicCalculator ..> GeodesicBearingResult : produces
+SphericalGeodesicCalculator ..> GeodesicBoundaryCondition : classifies
+
+H3AdjacencyGraph o-- H3Cell : aggregates
+H3AdjacencyGraph o-- GeodesicEdge : indexes
+H3AdjacencyGraph ..> SphericalGeodesicCalculator : invokes
+
+GeodesicEdge *-- GeodesicBearingResult : embeds
+GeodesicBearingResult *-- TangentPlaneVector : contains
+
+SpatialMonad --> H3AdjacencyGraph : uses for geodesics
+SpatialMonad o-- ConservedThermodynamicStock : wraps
+SpatialMonad ..> AdvectionTensor : generates
+
+AdvectionTensor ..> GeodesicBearingResult : projects along
+AdvectionTensor ..> ConservedThermodynamicStock : conserves
+
+BlockchainBlock "1" *-- "many" GeodesicAdvectionTransaction : commits in Merkle Tree
+ThermodynamicLedgerState o-- BlockchainBlock : sequences
+GeodesicAdvectionTransaction ..> ConservedThermodynamicStock : balance delta
+GeodesicAdvectionTransaction ..> GeodesicEdge : references
+
+note right of SphericalGeodesicCalculator
+  **Forward Azimuth Formula:**
+  y = sin(Δλ) * cos(φ2)
+  x = cos(φ1)*sin(φ2) - sin(φ1)*cos(φ2)*cos(Δλ)
+  θ = atan2(y, x) normalized to [0, 2π)
+  **Tangent Plane Normal:**
+  n_ij = (sin θ, cos θ) = (uEast, vNorth)
+end note
+
+note bottom of SpatialMonad
+  **Thermodynamic Guardrails:**
+  First Law: Σ Φ_ij = Σ Φ_ji (machine ε < 1e-14)
+  Second Law: dS_total/dt = Σ Φ_heat * (1/T_j - 1/T_i) ≥ 0
+end note
+
+@enduml

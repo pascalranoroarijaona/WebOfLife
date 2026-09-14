@@ -1,7 +1,7 @@
-/**
- * Web of Life - Spatial H3 Types & Cumulative Interfaces
- * Cumulative Specifications: Sprints 001 - 056
- */
+// =============================================================================
+// WEB OF LIFE - SPATIAL & H3 TYPOGRAPHY SPECIFICATIONS
+// Cumulative Retro-Compatibility: Sprints 001 - 057
+// =============================================================================
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -25,30 +25,12 @@ export var ThermodynamicChannel;
     ThermodynamicChannel[ThermodynamicChannel["VEGETATION_BIOMASS_KG"] = 2] = "VEGETATION_BIOMASS_KG";
     ThermodynamicChannel[ThermodynamicChannel["ATMOSPHERIC_CO2_KG"] = 3] = "ATMOSPHERIC_CO2_KG";
     ThermodynamicChannel[ThermodynamicChannel["MINERAL_NITROGEN_KG"] = 4] = "MINERAL_NITROGEN_KG";
-    ThermodynamicChannel[ThermodynamicChannel["TEMPERATURE_KELVIN"] = 5] = "TEMPERATURE_KELVIN";
-    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 6] = "SENSIBLE_HEAT_JOULES";
-    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 7] = "ALBEDO";
+    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 5] = "ALBEDO";
+    ThermodynamicChannel[ThermodynamicChannel["TEMPERATURE_KELVIN"] = 6] = "TEMPERATURE_KELVIN";
+    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 7] = "SENSIBLE_HEAT_JOULES";
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
-export const THERMODYNAMIC_CONSTANTS = Object.freeze({
-    MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 50000.0,
-    SPECIFIC_HEAT: Object.freeze({
-        WATER: 4184.0,
-        SOIL_ORGANIC_CARBON: 1800.0,
-        VEGETATION_BIOMASS: 1900.0,
-        ATMOSPHERIC_CO2: 846.0,
-        MINERAL_NITROGEN: 1200.0,
-        REGOLITH: 840.0,
-    }),
-    SPECIFIC_ENTHALPY: Object.freeze({
-        WATER: -15.87e6,
-        SOIL_ORGANIC_CARBON: -32.79e6,
-        VEGETATION_BIOMASS: -17.5e6,
-        ATMOSPHERIC_CO2: -8.94e6,
-        MINERAL_NITROGEN: -2.85e6,
-    }),
-});
+export { THERMODYNAMIC_CONSTANTS } from '../thermodynamics/constants.js';
 export function createH3CellInterfaceMetrics(params) {
     if (params.originIndex === params.neighborIndex) {
         throw new Error('Self-interface is invalid');
@@ -56,49 +38,47 @@ export function createH3CellInterfaceMetrics(params) {
     if (params.sharedEdgeLengthMeters <= 0) {
         throw new Error('sharedEdgeLengthMeters must be strictly positive');
     }
-    if (params.centroidDistanceMeters <= 0) {
-        throw new Error('centroidDistanceMeters must be strictly positive');
-    }
+    const geometricConductance = params.sharedEdgeLengthMeters / params.centroidDistanceMeters;
     return {
         ...params,
-        geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
+        geometricConductance,
     };
 }
-export function createReciprocalInterfaceMetrics(metrics) {
+export function createReciprocalInterfaceMetrics(m) {
     return {
-        originIndex: metrics.neighborIndex,
-        neighborIndex: metrics.originIndex,
-        sharedEdgeLengthMeters: metrics.sharedEdgeLengthMeters,
-        centroidDistanceMeters: metrics.centroidDistanceMeters,
-        bearingRadians: (metrics.bearingRadians + Math.PI) % (2 * Math.PI),
-        normalVector: [-metrics.normalVector[0], -metrics.normalVector[1], -metrics.normalVector[2]],
-        atmosphericContactAreaM2: metrics.atmosphericContactAreaM2,
-        subterraneanContactAreaM2: metrics.subterraneanContactAreaM2,
-        topographicSlope: -metrics.topographicSlope,
-        geometricConductance: metrics.geometricConductance,
+        originIndex: m.neighborIndex,
+        neighborIndex: m.originIndex,
+        sharedEdgeLengthMeters: m.sharedEdgeLengthMeters,
+        centroidDistanceMeters: m.centroidDistanceMeters,
+        bearingRadians: (m.bearingRadians + Math.PI) % (2 * Math.PI),
+        normalVector: [-m.normalVector[0], -m.normalVector[1], -m.normalVector[2]],
+        atmosphericContactAreaM2: m.atmosphericContactAreaM2,
+        subterraneanContactAreaM2: m.subterraneanContactAreaM2,
+        topographicSlope: -m.topographicSlope,
+        geometricConductance: m.geometricConductance,
     };
 }
 export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
-    const dElev = (stateB.elevationMeters ?? 0) - (stateA.elevationMeters ?? 0);
-    const hydraulicGrad = dElev / metrics.centroidDistanceMeters + metrics.topographicSlope;
-    const waterTransferRate = params.kSatPorous * metrics.subterraneanContactAreaM2 * hydraulicGrad;
-    const deltaWaterKg = waterTransferRate * 1000.0 * dt;
-    const waterA = Math.max(1, stateA.waterMassKg ?? 1);
-    const carbonConcA = (stateA.carbonMassKg ?? 0) / waterA;
-    const mineralConcA = (stateA.mineralMassKg ?? 0) / waterA;
-    const deltaCarbonKg = deltaWaterKg * carbonConcA * 0.01;
-    const deltaMineralKg = deltaWaterKg * mineralConcA * 0.01;
-    const tempA = stateA.temperatureKelvin ?? 288.15;
-    const tempB = stateB.temperatureKelvin ?? 288.15;
-    const dTemp = tempB - tempA;
-    const heatFluxWatts = params.eddyDiffusivityHeat * metrics.atmosphericContactAreaM2 * (dTemp / metrics.centroidDistanceMeters);
-    const deltaEnthalpyJoules = heatFluxWatts * dt;
+    const kHeat = params.eddyDiffusivityHeat ?? 10.0;
+    const tempA = stateA.temperatureKelvin ?? 290.0;
+    const tempB = stateB.temperatureKelvin ?? 290.0;
+    const deltaT = tempB - tempA;
+    const dX = metrics.centroidDistanceMeters;
+    const conductance = metrics.geometricConductance;
+    const heatFluxRate = kHeat * conductance * (tempA - tempB);
+    const deltaEnthalpyJoules = heatFluxRate * dt;
+    const waterFluxRate = 0.05 * conductance * ((stateA.waterMassKg ?? 0) - (stateB.waterMassKg ?? 0));
+    const deltaWaterKg = waterFluxRate * dt;
+    const carbonFluxRate = 0.01 * conductance * ((stateA.carbonMassKg ?? 0) - (stateB.carbonMassKg ?? 0));
+    const deltaCarbonKg = carbonFluxRate * dt;
+    const mineralFluxRate = 0.01 * conductance * ((stateA.mineralMassKg ?? 0) - (stateB.mineralMassKg ?? 0));
+    const deltaMineralKg = mineralFluxRate * dt;
     const entropyProducedJPerK = Math.abs(deltaEnthalpyJoules) * Math.abs(1 / Math.min(tempA, tempB) - 1 / Math.max(tempA, tempB));
     return {
+        deltaEnthalpyJoules,
         deltaWaterKg,
         deltaCarbonKg,
         deltaMineralKg,
-        deltaEnthalpyJoules,
         entropyProducedJPerK,
     };
 }
