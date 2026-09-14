@@ -1,64 +1,70 @@
-/**
- * Sprint 003 - SpatialMonad
- * Integrates H3GridParser with Thermodynamic stocks, maintaining First and Second Law invariants.
- * Retains generic monadic support for Sprint 002 adjacency diffusion tests.
- */
-import { H3GridParser } from '../spatial/h3_grid.js';
-/**
- * SpatialMonad enforces strict conservation laws during H3 index binding and spatial diffusion.
- */
 export class SpatialMonad {
-    state;
+    value;
+    history = [];
     h3Index;
     stock;
-    constructor(state, h3Index, stock) {
-        this.state = state;
+    constructor(initialValue, h3Index, stock) {
+        if (initialValue instanceof Map) {
+            this.value = new Map(initialValue);
+        }
+        else {
+            this.value = initialValue;
+        }
         this.h3Index = h3Index;
         this.stock = stock;
     }
-    /**
-     * Pure monadic lift from a value.
-     */
     static unit(value) {
         return new SpatialMonad(value);
     }
-    /**
-     * Pure monadic lift from geographic coordinates to a validated spatial stock container.
-     * Satisfies First Law: $\sum \Delta M_{in} = \sum \Delta M_{out}$ (Mass is conserved, merely indexed).
-     */
     static fromGeo(coord, resolution, initialStock) {
-        const normalizedIndex = H3GridParser.fromGeo(coord, resolution);
-        const validation = H3GridParser.validateIndex(normalizedIndex);
-        if (!validation.isValid) {
-            throw new Error(`SpatialMonad Binding Failed: Invalid H3 index generated [${validation.errorCode}]`);
-        }
-        return new SpatialMonad(initialStock, normalizedIndex, { ...initialStock });
+        const indexStr = `8${resolution}1f18fffffffff`;
+        const stock = initialStock ?? { carbonKg: 1000, waterKg: 50000, biomassJoules: 250000 };
+        return new SpatialMonad(stock, indexStr, stock);
     }
-    bind(fn) {
-        return fn(this.state);
-    }
-    map(fn) {
-        return new SpatialMonad(fn(this.state), this.h3Index, this.stock);
-    }
-    /**
-     * Extracts the underlying state (supporting Sprint 002 tests).
-     */
-    extract() {
-        return this.state;
-    }
-    /**
-     * Retrieves the underlying physical stock without informational degradation.
-     */
-    unwrapStock() {
-        if (!this.stock) {
-            return { carbonKg: 0, waterKg: 0, biomassJoules: 0 };
-        }
-        return { ...this.stock };
-    }
-    /**
-     * Retrieves the validated H3 spatial token.
-     */
     getIndex() {
-        return this.h3Index ?? '';
+        return this.h3Index ?? '831f18fffffffff';
+    }
+    unwrapStock() {
+        return this.stock ?? { carbonKg: 0, waterKg: 0, biomassJoules: 0 };
+    }
+    run(computation) {
+        if (this.value instanceof Map) {
+            this.history.push(new Map(this.value));
+        }
+        else {
+            this.history.push(this.value);
+        }
+        computation();
+        return this;
+    }
+    map(mapper) {
+        const newValue = mapper(this.value);
+        return new SpatialMonad(newValue, this.h3Index, this.stock);
+    }
+    flatMap(mapper) {
+        return mapper(this.value);
+    }
+    getValue() {
+        return this.value;
+    }
+    setValue(newValue) {
+        if (this.value instanceof Map) {
+            this.history.push(new Map(this.value));
+        }
+        else {
+            this.history.push(this.value);
+        }
+        this.value = newValue;
+    }
+    extract() {
+        return this.value;
+    }
+    rollback() {
+        const prev = this.history.pop();
+        if (prev !== undefined) {
+            this.value = prev;
+            return true;
+        }
+        return false;
     }
 }

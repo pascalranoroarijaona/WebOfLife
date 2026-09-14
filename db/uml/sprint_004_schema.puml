@@ -1,0 +1,98 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 004: Uber H3 Geospatial Partitioning & Thermodynamics
+
+package "src.spatial" {
+  interface IH3CellData {
+    +h3Index: string
+    +resolution: number
+    +centroid: { lat: number, lng: number }
+    +boundary: Array<{ lat: number, lng: number }>
+    +areaKm2: number
+  }
+
+  interface IH3GridQuery {
+    +resolution: number
+    +baseIndexes?: string[]
+    +bounds?: { north: number, south: number, east: number, west: number }
+  }
+
+  abstract class "BaseSpatialGrid<T>" {
+    #resolution: number
+    #cells: Map<string, T>
+    +--
+    {abstract} +initializeGrid(query: IH3GridQuery): void
+    {abstract} +getCell(h3Index: string): T | undefined
+    {abstract} +getAdjacentCells(h3Index: string): string[]
+  }
+
+  class H3GridEngine {
+    -adjacencyManager: H3AdjacencyManager
+    +--
+    +initializeGrid(query: IH3GridQuery): void
+    +getCell(h3Index: string): IH3CellData | undefined
+    +getAdjacentCells(h3Index: string): string[]
+    +calculateTrophicGradient(cellA: string, cellB: string): number
+  }
+
+  BaseSpatialGrid <|-- H3GridEngine
+  H3GridEngine --> IH3CellData : manages >
+  H3GridEngine --> IH3GridQuery : consumes >
+}
+
+package "src.monads" {
+  class "SpatialMonad<T>" {
+    -state: T
+    -entropy: number
+    +--
+    +map<U>(fn: (val: T) => U): SpatialMonad<U>
+    +chain<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+    +propagateState(inflow: number, outflow: number, dissipation: number): void
+  }
+}
+
+package "Database Schema" {
+  class h3_spatial_cells {
+    +h3_index: VARCHAR(15) <<PK>>
+    +resolution: INTEGER
+    +centroid_lat: DOUBLE PRECISION
+    +centroid_lng: DOUBLE PRECISION
+    +boundary_polygon: JSONB
+    +area_km2: DOUBLE PRECISION
+  }
+
+  class h3_adjacencies {
+    +source_index: VARCHAR(15) <<FK>>
+    +neighbor_index: VARCHAR(15) <<FK>>
+    +edge_distance_km: DOUBLE PRECISION
+  }
+
+  class spatial_monad_stocks {
+    +time: TIMESTAMPTZ <<PK>>
+    +h3_index: VARCHAR(15) <<PK, FK>>
+    +biomass_stock: DOUBLE PRECISION
+    +energy_stock: DOUBLE PRECISION
+    +entropy_stock: DOUBLE PRECISION
+    +solar_irradiance_input: DOUBLE PRECISION
+  }
+
+  class thermodynamic_transactions {
+    +transaction_id: UUID <<PK>>
+    +block_number: BIGINT
+    +timestamp: TIMESTAMPTZ
+    +source_h3: VARCHAR(15) <<FK>>
+    +target_h3: VARCHAR(15) <<FK>>
+    +energy_transferred: DOUBLE PRECISION
+    +entropy_generated: DOUBLE PRECISION
+    +transaction_signature: VARCHAR(128)
+  }
+}
+
+H3GridEngine "1" o-- "*" SpatialMonad : wraps cell states >
+h3_spatial_cells "1" -- "*" h3_adjacencies : has neighbors >
+h3_spatial_cells "1" -- "*" spatial_monad_stocks : tracks time-series >
+h3_spatial_cells "1" -- "*" thermodynamic_transactions : source/target >
+
+@enduml
