@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@3.7.2"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 029: Hexadecimal Character Set Verification Helper Regex</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+  <canvas id="simCanvas"></canvas>
+
+  <div id="topbar">
+    <h1>Sprint 029: Hexadecimal Character Set Verification Helper Regex</h1>
+    <h2>Thermodynamic Web of Life Simulation</h2>
+    <p>
+      Validating H3 Index Hex Strings via <span class="highlight">Strict Regex Rules</span> (`/^[0-9a-fA-F]+$/`).
+      Ensures zero silent data corruption in spatial adjacency graphs across biomes.
+    </p>
+    <div class="social-links">
+      <a href="01_RFC.md" target="_blank">📄 RFC</a>
+      <a href="02_METHODS.md" target="_blank">🔬 Methods</a>
+      <a href="https://github.com" target="_blank">⭐ GitHub</a>
+    </div>
+  </div>
+
+  <div id="sprint-telemetry">
+    <h4>Hex Regex Telemetry</h4>
+    <div class="telemetry-row"><span>Regex Pattern:</span><strong id="reg-pat">/^[0-9a-fA-F]+$/</strong></div>
+    <div class="telemetry-row"><span>Tested Samples:</span><strong id="reg-tested">0</strong></div>
+    <div class="telemetry-row"><span>Valid Indices:</span><strong id="reg-valid" style="color:var(--flora);">0</strong></div>
+    <div class="telemetry-row"><span>Invalid Corrupted:</span><strong id="reg-invalid" style="color:var(--danger);">0</strong></div>
+    <div class="telemetry-row"><span>Regex Status:</span><strong id="reg-status" style="color:var(--sun);">ACTIVE</strong></div>
+  </div>
+
+  <div id="controls">
+    <input type="text" id="search" placeholder="Test H3 Hex String (e.g., 8928308280fffff)..." />
+    <button id="testBtn">Verify Hex</button>
+    <button id="resetBtn">Reset Sim</button>
+    <div class="zoom-container">
+      <span>Zoom:</span>
+      <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1" />
+    </div>
+    <label class="debug-container">
+      <input type="checkbox" id="debugToggle" checked />
+      <span>Debug Hex Grid</span>
+    </label>
+  </div>
+
+  <script type="module">
+    import * as h3 from 'h3-js';
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const searchInput = document.getElementById('search');
+    const testBtn = document.getElementById('testBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const zoomRange = document.getElementById('zoomRange');
+    const debugToggle = document.getElementById('debugToggle');
+
+    const regTestedEl = document.getElementById('reg-tested');
+    const regValidEl = document.getElementById('reg-valid');
+    const regInvalidEl = document.getElementById('reg-invalid');
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    // Sprint 029 Hex Regex Rule
+    const H3_HEX_REGEX = /^[0-9a-fA-F]+$/;
+
+    let stats = {
+      tested: 0,
+      valid: 0,
+      invalid: 0
+    };
+
+    let sampleHexes = [
+      '8928308280fffff',
+      '85283473fffffff',
+      '87283471cffffff',
+      'INVALID_H3_XYZ',
+      'ZZZ999_CORRUPT',
+      '88283082a5fffff'
+    ];
+
+    function verifyHex(str) {
+      stats.tested++;
+      const isValid = H3_HEX_REGEX.test(str);
+      if (isValid) {
+        stats.valid++;
+      } else {
+        stats.invalid++;
+      }
+      regTestedEl.textContent = stats.tested;
+      regValidEl.textContent = stats.valid;
+      regInvalidEl.textContent = stats.invalid;
+      return isValid;
+    }
+
+    testBtn.addEventListener('click', () => {
+      const val = searchInput.value.trim();
+      if (val) {
+        verifyHex(val);
+      }
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        testBtn.click();
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      stats = { tested: 0, valid: 0, invalid: 0 };
+      regTestedEl.textContent = '0';
+      regValidEl.textContent = '0';
+      regInvalidEl.textContent = '0';
+      searchInput.value = '';
+    });
+
+    // Pre-test sample hexes
+    sampleHexes.forEach(h => verifyHex(h));
+
+    let zoom = 1.0;
+    zoomRange.addEventListener('input', (e) => {
+      zoom = parseFloat(e.target.value);
+    });
+
+    let angle = 0;
+    function animate() {
+      angle += 0.005;
+      ctx.fillStyle = '#02050a';
+      ctx.fillRect(0, 0, width, height);
+
+      if (debugToggle.checked) {
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.scale(zoom, zoom);
+        ctx.rotate(angle * 0.2);
+
+        // Draw simulated thermodynamic H3 hex clusters
+        const radius = 60;
+        for (let i = 0; i < 6; i++) {
+          const a = (i * Math.PI) / 3;
+          const x = Math.cos(a) * 120;
+          const y = Math.sin(a) * 120;
+
+          ctx.beginPath();
+          for (let v = 0; v < 6; v++) {
+            const va = (v * Math.PI) / 3;
+            const vx = x + radius * Math.cos(va);
+            const vy = y + radius * Math.sin(va);
+            if (v === 0) ctx.moveTo(vx, vy);
+            else ctx.lineTo(vx, vy);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = i % 2 === 0 ? '#00e1ff33' : '#ffaa0033';
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(0, 225, 255, 0.03)' : 'rgba(255, 170, 0, 0.03)';
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#c8f5f2';
+          ctx.font = '10px Courier New';
+          ctx.fillText(`h3_${i}_hex`, x - 30, y);
+        }
+
+        ctx.restore();
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

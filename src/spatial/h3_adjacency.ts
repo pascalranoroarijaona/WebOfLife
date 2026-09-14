@@ -50,7 +50,7 @@ export class H3AdjacencyEngine {
 
   public parseIndex(h3Str: string): H3SpatialCell {
     const validated = H3GridManager.guardPayload(h3Str);
-    if (!H3GridManager.prototype.validateIndex(validated)) {
+    if (!H3GridManager.validateIndex(validated)) {
       throw new Error("Invalid H3 index format.");
     }
     if (this.cache.has(validated)) {

@@ -1,0 +1,80 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 029 Architecture & Thermodynamic Blockchain Schema
+
+package "Spatial Layer (src/spatial)" {
+    class H3GridManager {
+        + H3_HEX_REGEX: RegExp
+        + isValidH3Hex(indexStr: string): boolean
+        + verifySpatialMesh(monad: SpatialMonad): boolean
+    }
+
+    class H3HexRegexValidator {
+        - pattern: /^[0-9a-fA-F]+$/
+        + test(value: string): boolean
+    }
+
+    H3GridManager --> H3HexRegexValidator : uses
+}
+
+package "Monads Layer (src/monads)" {
+    class SpatialMonad {
+        + monadId: string
+        + h3IndexStr: string
+        + resolution: string
+        + state: ThermodynamicState
+        + entropyJoules: number
+        + transitionToVerified(): void
+    }
+}
+
+package "Database & Blockchain Layer (db/schema.sql)" {
+    class Block {
+        + blockId: int64
+        + previousHash: string
+        + merkleRoot: string
+        + solarFluxJoules: decimal
+        + dissipationJoules: decimal
+        + netMatterDelta: decimal
+        + timestamp: timestamp
+        + signature: string
+    }
+
+    class SpatialMonadRecord {
+        + monadId: uuid
+        + blockId: int64
+        + h3IndexStr: string
+        + resolution: string
+        + state: ThermodynamicState
+        + entropyJoulesK: decimal
+        + createdAt: timestamp
+        + updatedAt: timestamp
+    }
+
+    class ThermodynamicStockTransaction {
+        + transactionId: int64
+        + monadId: uuid
+        + blockId: int64
+        + sourceState: ThermodynamicState
+        + targetState: ThermodynamicState
+        + energyDeltaJoules: decimal
+        + solarInputFlux: decimal
+        + executed_at: timestamp
+    }
+}
+
+enum ThermodynamicState {
+    S_UNV
+    S_VAL
+    DISSIPATED
+    CONSERVED
+}
+
+SpatialMonad --> H3GridManager : validates via
+SpatialMonadRecord --> Block : anchored in
+ThermodynamicStockTransaction --> SpatialMonadRecord : tracks transition
+SpatialMonadRecord --> ThermodynamicState : has state
+
+@enduml

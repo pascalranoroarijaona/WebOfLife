@@ -39,7 +39,7 @@ export class H3AdjacencyEngine {
     cache = new Map();
     parseIndex(h3Str) {
         const validated = H3GridManager.guardPayload(h3Str);
-        if (!H3GridManager.prototype.validateIndex(validated)) {
+        if (!H3GridManager.validateIndex(validated)) {
             throw new Error("Invalid H3 index format.");
         }
         if (this.cache.has(validated)) {
