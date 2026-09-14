@@ -1,0 +1,64 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 027 Architecture: H3 Spatial Resolution Boundary & Thermodynamic Monads
+
+class H3ResolutionValidator {
+  + isValidH3Resolution(resolution: number): boolean
+  + assertValidH3Resolution(resolution: number): void
+}
+
+interface SpatialResolutionContract {
+  + getResolution(): number
+  + validateTierBoundary(): boolean
+}
+
+class SpatialMonad {
+  - monadId: string
+  - h3Index: string
+  - resolution: number
+  - carbonStock: number
+  - nitrogenStock: number
+  - waterStock: number
+  - trophicEnergy: number
+  - solarInputFlux: number
+  + getResolution(): number
+  + validateTierBoundary(): boolean
+  + transitStock(target: SpatialMonad, delta: ThermodynamicTransaction): void
+}
+
+class ThermodynamicStockTransaction {
+  - transactionId: string
+  - timestamp: Date
+  - sourceMonadId: string
+  - targetMonadId: string
+  - sourceResolution: number
+  - targetResolution: number
+  - matterDeltaCarbon: number
+  - matterDeltaNitrogen: number
+  - matterDeltaWater: number
+  - energyDelta: number
+  - entropyGenerated: number
+  - blockchainTxSignature: string
+  + verifyConservationLaw(): boolean
+}
+
+class BlockchainBlockLedger {
+  - blockHeight: number
+  - blockHash: string
+  - previousBlockHash: string
+  - merkleRoot: string
+  - solarEpochTimestamp: Date
+  - transactionCount: number
+  - validated: boolean
+  + appendBlock(txs: ThermodynamicStockTransaction[]): void
+}
+
+SpatialResolutionContract <|.. SpatialMonad
+SpatialMonad --> H3ResolutionValidator : enforces tier [0-15]
+SpatialMonad "1" *-- "0..*" ThermodynamicStockTransaction : records flow
+ThermodynamicStockTransaction --> BlockchainBlockLedger : anchored in
+
+@enduml
