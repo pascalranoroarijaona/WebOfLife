@@ -1,0 +1,162 @@
+@startuml sprint_048_schema
+!theme plain
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+title Web of Life - Architecture & Data Contract Class Diagram (Sprint 048)
+subtitle Geometric Interface Contact Calculator (calculateH3SharedBoundaryLength) & Lateral Thermodynamic Transport
+
+package "src::spatial" {
+    interface IH3BoundaryCalculator {
+        +calculateSharedBoundary(origin: string, neighbor: string): H3SharedBoundary
+        +calculateSharedBoundaryLength(origin: string, neighbor: string): number
+    }
+
+    interface H3SharedBoundary {
+        +vertexA: readonly [number, number]
+        +vertexB: readonly [number, number]
+        +lengthMeters: readonly number
+        +isAdjacent: readonly boolean
+    }
+
+    class H3GridCoordinateSystem {
+        +cellToBoundary(h3Index: string): Array<[number, number]>
+        +areNeighborCells(origin: string, neighbor: string): boolean
+        +cellToLatLng(h3Index: string): [number, number]
+        +getResolution(h3Index: string): number
+        +isPentagon(h3Index: string): boolean
+    }
+
+    class H3AdjacencyGraph {
+        -coordSystem: H3GridCoordinateSystem
+        -earthRadiusMeters: number
+        -coordinateToleranceRad: number
+        +calculateH3SharedBoundaryLength(origin: string, neighbor: string): number
+        +getH3SharedBoundary(origin: string, neighbor: string): H3SharedBoundary
+        -detectCoincidentVertices(polyA: Array<[number, number]>, polyB: Array<[number, number]>): Array<[number, number]>
+        -calculateGreatCircleArc(p1: [number, number], p2: [number, number]): number
+    }
+
+    IH3BoundaryCalculator <|.. H3AdjacencyGraph
+    H3AdjacencyGraph --> H3SharedBoundary : produces
+    H3AdjacencyGraph o-- H3GridCoordinateSystem : composes
+}
+
+package "src::monads" {
+    class SpatialMonad<TState> {
+        -cellIndex: string
+        -state: TState
+        +map<R>(fn: (state: TState) => R): SpatialMonad<R>
+        +flatMap<R>(fn: (state: TState) => SpatialMonad<R>): SpatialMonad<R>
+        +exchangeLateralFlux(neighbor: SpatialMonad<TState>, operator: LateralAdvectionDiffusionOperator): [SpatialMonad<TState>, SpatialMonad<TState>]
+    }
+
+    class LateralAdvectionDiffusionOperator {
+        -boundaryCalculator: IH3BoundaryCalculator
+        -conductivityTensor: number
+        +computeConductance(origin: string, neighbor: string, distanceMeters: number): number
+        +computeFlux(psiOrigin: number, psiNeighbor: number, conductance: number): number
+        +computeEntropyProduction(tempOrigin: number, tempNeighbor: number, conductance: number): number
+    }
+
+    SpatialMonad ..> LateralAdvectionDiffusionOperator : parameterized by
+    LateralAdvectionDiffusionOperator o-- IH3BoundaryCalculator : depends on
+}
+
+package "db::schema (Relational & Thermodynamic Ledger)" {
+    class "spatial_h3_cells" as SpatialH3CellEntity <<Table>> {
+        +h3_index: VARCHAR(16) [PK]
+        +resolution: SMALLINT
+        +is_pentagon: BOOLEAN
+        +centroid_lat: DOUBLE PRECISION
+        +centroid_lon: DOUBLE PRECISION
+        +cell_area_m2: DOUBLE PRECISION
+    }
+
+    class "spatial_h3_shared_boundaries" as SharedBoundaryEntity <<Table>> {
+        +boundary_id: UUID [PK]
+        +origin_h3: VARCHAR(16) [FK]
+        +neighbor_h3: VARCHAR(16) [FK]
+        +is_adjacent: BOOLEAN
+        +vertex_a_lat: DOUBLE PRECISION
+        +vertex_a_lon: DOUBLE PRECISION
+        +vertex_b_lat: DOUBLE PRECISION
+        +vertex_b_lon: DOUBLE PRECISION
+        +shared_length_meters: DOUBLE PRECISION
+        +geodesic_distance_m: DOUBLE PRECISION
+        +symmetric_pair_hash: BYTEA
+    }
+
+    class "lateral_transport_conductance" as ConductanceEntity <<Table>> {
+        +conductance_id: UUID [PK]
+        +boundary_id: UUID [FK]
+        +flux_type: transport_flux_type
+        +conductivity_tensor: DOUBLE PRECISION
+        +effective_conductance: DOUBLE PRECISION
+    }
+
+    class "lateral_thermodynamic_fluxes" as LateralFluxEntity <<Table>> {
+        +flux_id: UUID [PK]
+        +block_height: BIGINT [FK]
+        +timestamp: TIMESTAMPTZ
+        +origin_h3: VARCHAR(16) [FK]
+        +neighbor_h3: VARCHAR(16) [FK]
+        +flux_type: transport_flux_type
+        +potential_origin: DOUBLE PRECISION
+        +potential_neighbor: DOUBLE PRECISION
+        +extensive_flux_value: DOUBLE PRECISION
+        +entropy_production_rate: DOUBLE PRECISION
+    }
+
+    class "thermodynamic_blocks" as ThermoBlockEntity <<Table>> {
+        +block_height: BIGINT [PK]
+        +block_hash: BYTEA
+        +parent_hash: BYTEA
+        +state_merkle_root: BYTEA
+        +flux_merkle_root: BYTEA
+        +global_internal_energy: DOUBLE PRECISION
+        +global_entropy: DOUBLE PRECISION
+        +entropy_delta: DOUBLE PRECISION
+        +net_flux_residual: DOUBLE PRECISION
+        +is_conservative: BOOLEAN
+        +signature: BYTEA
+    }
+
+    class "thermodynamic_block_transactions" as ThermoTxEntity <<Table>> {
+        +tx_id: UUID [PK]
+        +block_height: BIGINT [FK]
+        +tx_index: INTEGER
+        +origin_h3: VARCHAR(16) [FK]
+        +neighbor_h3: VARCHAR(16) [FK]
+        +boundary_length_meters: DOUBLE PRECISION
+        +transferred_mass_kg: DOUBLE PRECISION
+        +transferred_energy_j: DOUBLE PRECISION
+        +entropy_generated_j_k: DOUBLE PRECISION
+        +tx_hash: BYTEA
+    }
+
+    SpatialH3CellEntity "1" <-- "0..*" SharedBoundaryEntity : origin_h3
+    SpatialH3CellEntity "1" <-- "0..*" SharedBoundaryEntity : neighbor_h3
+    SharedBoundaryEntity "1" <-- "1..*" ConductanceEntity : boundary_id
+    ConductanceEntity "1" <-- "0..*" LateralFluxEntity : regulates
+    ThermoBlockEntity "1" <-- "0..*" LateralFluxEntity : commits
+    ThermoBlockEntity "1" <-- "0..*" ThermoTxEntity : includes
+    SpatialH3CellEntity "1" <-- "0..*" ThermoTxEntity : origin_h3
+    SpatialH3CellEntity "1" <-- "0..*" ThermoTxEntity : neighbor_h3
+}
+
+"H3SharedBoundary" ..> SharedBoundaryEntity : persists to
+"LateralAdvectionDiffusionOperator" ..> ConductanceEntity : calibrates
+"LateralAdvectionDiffusionOperator" ..> LateralFluxEntity : calculates
+"SpatialMonad" ..> ThermoTxEntity : transactions recorded as
+
+note right of H3AdjacencyGraph
+    <b>Thermodynamic Invariants:</b>
+    1. Symmetry: L_ij = L_ji >= 0
+    2. Zero Boundary: L_ii = 0
+    3. Anti-symmetric Flux: Phi_ij = -Phi_ji
+    4. Second Law: S_prod = 0.5 * C_ij * (Psi_j - Psi_i)^2 / (T_i * T_j) >= 0
+end note
+
+@enduml

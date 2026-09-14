@@ -49,10 +49,10 @@ export class InvalidLengthError extends Error {
         Object.setPrototypeOf(this, InvalidLengthError.prototype);
     }
 }
-export class InvalidH3TokenError extends Error {
+export class InvalidH3TokenError extends H3ValidationError {
     constructor(token) {
-        super(`Invalid H3 token contains non-hexadecimal symbols: "${token}"`);
-        this.name = 'InvalidH3TokenError';
+        super(token, `Invalid H3 token contains non-hexadecimal symbols: "${token}"`);
+        this.name = 'H3ValidationError';
         Object.setPrototypeOf(this, InvalidH3TokenError.prototype);
     }
 }
@@ -142,10 +142,10 @@ export function validateH3Index(index) {
 }
 export function validateH3Token(token) {
     if (!token || typeof token !== 'string') {
-        throw new H3ValidationError(token, 'H3 token must be a non-empty string.');
+        throw new H3ValidationError(token, `H3ValidationError [Token: "${token}"]: H3 token must be a non-empty string.`);
     }
     if (!/^[0-9a-fA-F]+$/.test(token)) {
-        throw new InvalidH3TokenError(token);
+        throw new H3ValidationError(token, `H3ValidationError [Token: "${token}"]: H3 token contains non-hexadecimal symbols: "${token}"`);
     }
 }
 export function guardH3Payload(payload) {

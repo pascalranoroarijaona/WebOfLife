@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 25%
-SPRINT_GOAL: Implement calculateH3EdgeLengthMeters spherical geodesic edge scaling function in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 26%
+SPRINT_GOAL: Implement calculateH3SharedBoundaryLength geometric interface contact calculator in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -25,7 +25,7 @@ SPRINT_GOAL: Implement calculateH3EdgeLengthMeters spherical geodesic edge scali
 - [x] Implement `createDefaultH3CellThermodynamicState` factory returning baseline STP thermodynamic state in `src/spatial/h3_state_tensor.ts`
 - [x] Implement applyThermodynamicOverrides helper for partial cell state mutations in `src/spatial/h3_state_tensor.ts`
 - [x] Implement calculateHaversineDistance geodesic metric helper between cell centroids in `src/spatial/h3_adjacency.ts`
-- [ ] Implement calculateH3EdgeLengthMeters spherical geodesic edge scaling function in `src/spatial/h3_adjacency.ts`
+- [x] Implement calculateH3EdgeLengthMeters spherical geodesic edge scaling function in `src/spatial/h3_adjacency.ts`
 - [ ] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
 - [ ] Implement calculateH3BoundaryContactArea interface calculator in `src/spatial/h3_adjacency.ts`
 - [ ] Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`

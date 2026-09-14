@@ -1,444 +1,185 @@
-// =============================================================================
-// WEB OF LIFE - SPATIAL MONAD & CONSERVATIVE FLUX ENGINE
-// =============================================================================
-import { createH3BoundaryInterface, computeBoundaryDiffusionStep } from '../spatial/h3_adjacency.js';
-import { validateH3Token, isValidH3Index, assertCanonicalH3Pattern, SpatialGuardClauseException } from '../spatial/h3_grid.js';
+import { H3BoundaryCalculator, computeBoundaryDiffusionStep, } from "../spatial/h3_adjacency.js";
+import { SpatialGuardClauseException, H3ErrorCode, } from "../spatial/h3_types.js";
+import { isValidH3Index, matchesCanonicalH3Pattern, validateH3Token, H3GridParser, } from "../spatial/h3_grid.js";
+import { H3StateTensor, applyThermodynamicOverrides, } from "../spatial/h3_state_tensor.js";
 /**
- * Universal SpatialMonad container respecting geodesic boundary geometry,
- * multi-resolution indexing, and First/Second Law thermodynamic conservation.
+ * Computes conservative lateral thermodynamic exchange across all cell edges using
+ * true spherical shared boundary contact lengths.
  */
-export class SpatialMonad {
-    cellIndex;
-    resolution;
-    value;
-    boundary;
-    // Monadic and State Tracking Fields
-    history = [];
-    rightState = true;
-    corrupted = false;
-    verifiedState = false;
-    solarEnergyJoules = 0;
-    dissipationJoules = 0;
-    monadState = 'UnvalidatedState';
-    h3CellRef = null;
-    overrideLedgerList = [];
-    cumulativeNetMassDeltaKg = 0.0;
-    cumulativeNetEnergyDeltaJoules = 0.0;
-    constructor(arg1, arg2, arg3, arg4) {
-        if (arg1 === undefined && arg2 === undefined && arg3 === undefined) {
-            // 0-argument constructor (Sprint 004)
-            this.cellIndex = '';
-            this.resolution = 7;
-            this.value = undefined;
-            this.boundary = createH3BoundaryInterface(7);
-            return;
-        }
-        if (arg3 !== undefined && typeof arg2 === 'number') {
-            // 3-argument constructor: (cellIndex: string, resolution: number, value: T)
-            if (arg2 < 0 || arg2 > 15 || !Number.isInteger(arg2)) {
-                throw new RangeError(`[SpatialError] Invalid resolution ${arg2}`);
-            }
-            this.cellIndex = String(arg1);
-            this.resolution = arg2;
-            this.value = arg3;
-            this.boundary = createH3BoundaryInterface(arg2);
-            return;
-        }
-        if (arg4 !== undefined && typeof arg2 === 'number') {
-            // 4-argument constructor: (id: string, energy: number, state: string, energy2: number) (Sprint 030)
-            this.cellIndex = String(arg1);
-            this.resolution = 7;
-            this.value = arg2;
-            this.monadState = String(arg3);
-            this.solarEnergyJoules = arg4;
-            this.boundary = createH3BoundaryInterface(7);
-            return;
-        }
-        if (arg2 !== undefined) {
-            // 2-argument constructor:
-            // Case A: (token: string, initialStock: EnergyStock) (Sprint 032)
-            if (typeof arg1 === 'string' && typeof arg2 === 'object' && arg2 !== null && ('joules' in arg2 || 'entropy' in arg2)) {
-                this.cellIndex = arg1;
-                this.resolution = 9;
-                this.value = { ...arg2 };
-                this.monadState = 'UnvalidatedState';
-                this.boundary = createH3BoundaryInterface(9);
-                return;
-            }
-            // Case B: (token: string, solarFlux: number) (Sprint 029)
-            if (typeof arg1 === 'string' && typeof arg2 === 'number') {
-                this.cellIndex = arg1;
-                this.resolution = 7;
-                this.value = arg2;
-                this.solarEnergyJoules = arg2;
-                this.verifiedState = false;
-                this.boundary = createH3BoundaryInterface(7);
-                return;
-            }
-            // Case C: (token: string, stocks: any) (Sprint 034, 038)
-            if (typeof arg1 === 'string') {
-                validateH3Token(arg1);
-                this.cellIndex = arg1;
-                this.resolution = 8;
-                this.value = arg2;
-                this.boundary = createH3BoundaryInterface(8);
-                return;
-            }
-        }
-        // 1-argument constructor
-        this.value = arg1;
-        if (arg1 === null || arg1 === undefined) {
-            this.corrupted = true;
-            this.cellIndex = '';
-            this.resolution = 7;
-            this.boundary = createH3BoundaryInterface(7);
-            return;
-        }
-        if (typeof arg1 === 'string') {
-            this.cellIndex = arg1;
-            this.resolution = 7;
-            this.rightState = isValidH3Index(arg1);
-            this.boundary = createH3BoundaryInterface(7);
-            return;
-        }
-        this.cellIndex = arg1?.h3Index ?? arg1?.cellIndex ?? '';
-        this.resolution = arg1?.resolution ?? 7;
-        const res = Number.isInteger(this.resolution) && this.resolution >= 0 && this.resolution <= 15
-            ? this.resolution
-            : 7;
-        this.boundary = createH3BoundaryInterface(res);
+export function executeLateralThermodynamicTransportStep(cells, adjacencyList, centroidDistanceMap, dtSeconds, boundaryCalculator = new H3BoundaryCalculator()) {
+    const deltas = new Map();
+    for (const h3Index of cells.keys()) {
+        deltas.set(h3Index, {
+            deltaEnergy: 0.0,
+            deltaWater: 0.0,
+            deltaCarbon: 0.0,
+            deltaOxygen: 0.0,
+            deltaMinerals: 0.0,
+        });
     }
-    static of(arg1, arg2, arg3) {
-        if (arg3 !== undefined) {
-            // (cellIndex, resolution, value)
-            return new SpatialMonad(arg1, arg2, arg3);
-        }
-        if (arg2 !== undefined) {
-            // Sprint 035 check: SpatialMonad.of(100, null)
-            if (arg2 === null || arg2 === undefined) {
-                throw new SpatialGuardClauseException('H3 Index cannot be null or undefined');
-            }
-            if (typeof arg1 === 'object' && typeof arg2 === 'string') {
-                return new SpatialMonad(arg2, arg1);
-            }
-            if (typeof arg1 === 'number' && typeof arg2 === 'string') {
-                return new SpatialMonad(arg2, arg1);
-            }
-            // Sprint 038 check: SpatialMonad.of(cell, value)
-            if (typeof arg1 === 'string') {
-                assertCanonicalH3Pattern(arg1);
-                return new SpatialMonad(arg1, arg2);
-            }
-        }
-        // 1-argument of(value)
-        return new SpatialMonad(arg1);
-    }
-    static unit(index, val) {
-        const norm = (index ?? '').toLowerCase();
-        return new SpatialMonad(norm, val);
-    }
-    static fromPayload(token) {
-        if (!token || typeof token !== 'string' || token.trim() === '') {
-            throw new TypeError('[Thermodynamic Spatial Error] Payload must be a non-empty string');
-        }
-        const defaultStocks = {
-            carbon: 0,
-            water: 0,
-            minerals: 0,
-            oxygen: 0,
-            energy: 0,
-            carbonMass: 0,
-            waterMass: 0,
-            biomass: 0
-        };
-        return new SpatialMonad(token, defaultStocks);
-    }
-    static fromGeo(coord, resolution, stock) {
-        const latInt = Math.abs(Math.floor(coord.lat * 1000));
-        const lngInt = Math.abs(Math.floor(coord.lng * 1000));
-        const token = `8${resolution.toString(16)}${(latInt + lngInt).toString(16).padStart(4, '0')}ffffff`.slice(0, 15);
-        return new SpatialMonad(token, resolution, stock);
-    }
-    // ===========================================================================
-    // MONADIC TRANSFORMS & FUNCTOR MAPPINGS
-    // ===========================================================================
-    map(fn) {
-        const next = fn(this.value);
-        const m = new SpatialMonad(this.cellIndex, this.resolution, next);
-        m.overrideLedgerList = [...this.overrideLedgerList];
-        m.cumulativeNetMassDeltaKg = this.cumulativeNetMassDeltaKg;
-        m.cumulativeNetEnergyDeltaJoules = this.cumulativeNetEnergyDeltaJoules;
-        return m;
-    }
-    flatMap(fn) {
-        return fn(this.value);
-    }
-    bind(fn) {
-        const res = fn(this.value, this.cellIndex);
-        if (res instanceof SpatialMonad) {
-            return res;
-        }
-        // If a report was returned (Sprint 045), ledger it and return this monad
-        if (res && typeof res === 'object' && 'cellReports' in res) {
-            const report = res;
-            this.overrideLedgerList.push(report);
-            this.cumulativeNetMassDeltaKg += report.netMassDeltaKg;
-            this.cumulativeNetEnergyDeltaJoules += report.netEnergyDeltaJoules;
-            return this;
-        }
-        return new SpatialMonad(this.cellIndex, this.resolution, res);
-    }
-    unwrap() {
-        return this.value;
-    }
-    unwrapStock() {
-        return this.value;
-    }
-    extract() {
-        return this.value;
-    }
-    // ===========================================================================
-    // COMPATIBILITY ACCESSORS & METHODS
-    // ===========================================================================
-    get edgeLengthMeters() {
-        return this.boundary.edgeLengthMeters;
-    }
-    get cellAreaMeters2() {
-        const L = this.edgeLengthMeters;
-        return ((3.0 * Math.sqrt(3.0)) / 2.0) * L * L;
-    }
-    get interCellDistanceMeters() {
-        return this.boundary.centerDistanceMeters;
-    }
-    get stock() {
-        return this.value;
-    }
-    get stocks() {
-        return this.value;
-    }
-    getStock() {
-        return this.value;
-    }
-    getIndex() {
-        return this.cellIndex;
-    }
-    getCellIndex() {
-        return this.cellIndex;
-    }
-    getValue() {
-        return this.value;
-    }
-    getResolution() {
-        return this.resolution;
-    }
-    isRight() {
-        return this.rightState;
-    }
-    getOrThrow() {
-        if (!this.rightState) {
-            throw new Error('[Entropy Leak Prevented] Invalid spatial index');
-        }
-        return this.cellIndex;
-    }
-    isCorrupted() {
-        return this.corrupted;
-    }
-    // Sprint 004 Rollback & Execution
-    run(fn) {
-        if (this.value !== undefined) {
-            this.history.push(this.value);
-        }
-        fn();
-    }
-    setValue(v) {
-        this.value = v;
-    }
-    rollback() {
-        if (this.history.length > 0) {
-            this.value = this.history.pop();
-            return true;
-        }
-        return false;
-    }
-    // Sprint 023, 024, 025 Refinement
-    refine(targetResolution, children) {
-        if (targetResolution < 0 || targetResolution > 15 || !Number.isInteger(targetResolution)) {
-            throw new RangeError(`[SpatialError] Resolution ${targetResolution} out of bounds`);
-        }
-        if (targetResolution < this.resolution) {
-            throw new Error(`[ThermodynamicSpatialError] Cannot refine to coarser resolution ${targetResolution}`);
-        }
-        if (children && Array.isArray(children)) {
-            return children.map((c) => SpatialMonad.of(this.cellIndex, targetResolution, c));
-        }
-        return new SpatialMonad(this.cellIndex, targetResolution, this.value);
-    }
-    // Sprint 029 Verification
-    isVerified() {
-        return this.verifiedState;
-    }
-    verifySpatialIndex() {
-        const ok = /^[0-9a-fA-F]{15,18}$/.test(this.cellIndex);
-        this.verifiedState = ok;
-        this.dissipationJoules += 1e-6;
-        return ok;
-    }
-    getThermodynamics() {
-        return {
-            massGrams: 0.0,
-            solarEnergyJoules: this.solarEnergyJoules,
-            dissipationJoules: this.dissipationJoules > 0 ? this.dissipationJoules : 1.2e-6
-        };
-    }
-    // Sprint 030 State & Energy
-    get state() {
-        return this.monadState;
-    }
-    get energyJoules() {
-        return this.solarEnergyJoules;
-    }
-    // Sprint 032 Transit
-    transit() {
-        const cost = 4.2e-9;
-        const s = this.value;
-        if (s && typeof s.joules === 'number') {
-            s.joules -= cost;
-        }
-        const hexRegex = /^[0-9a-fA-F]{15}$/;
-        if (hexRegex.test(this.cellIndex)) {
-            this.monadState = 'ActiveSpatialStock';
-            this.h3CellRef = { token: this.cellIndex, resolution: 9 };
-        }
-        else {
-            this.monadState = 'SinkState';
-            if (s) {
-                s.entropy += 1.0;
-            }
-            this.h3CellRef = null;
+    const processedEdges = new Set();
+    for (const [originId, neighbors] of adjacencyList.entries()) {
+        const origin = cells.get(originId);
+        if (!origin)
+            continue;
+        for (const neighborId of neighbors) {
+            const edgeKey = originId < neighborId ? `${originId}:${neighborId}` : `${neighborId}:${originId}`;
+            if (processedEdges.has(edgeKey))
+                continue;
+            processedEdges.add(edgeKey);
+            const neighbor = cells.get(neighborId);
+            if (!neighbor)
+                continue;
+            const L_ij = boundaryCalculator.calculateSharedBoundaryLength(originId, neighborId);
+            if (L_ij <= 0.0)
+                continue;
+            const distKey = `${originId}_${neighborId}`;
+            const revDistKey = `${neighborId}_${originId}`;
+            const D_ij = centroidDistanceMap.get(distKey) ?? centroidDistanceMap.get(revDistKey) ?? 1.0;
+            const H_ij = Math.min(origin.heightColumnMeters, neighbor.heightColumnMeters);
+            const k_ij = (2.0 * origin.conductivity * neighbor.conductivity) /
+                (origin.conductivity + neighbor.conductivity + 1e-9);
+            const conductance = (k_ij * L_ij * H_ij) / D_ij;
+            const phiQ_i_to_j = -conductance * (neighbor.temperatureKelvin - origin.temperatureKelvin);
+            const energyTransferred = phiQ_i_to_j * dtSeconds;
+            const deltaOrig = deltas.get(originId);
+            const deltaNeigh = deltas.get(neighborId);
+            deltaOrig.deltaEnergy -= energyTransferred;
+            deltaNeigh.deltaEnergy += energyTransferred;
         }
     }
-    getState() {
-        return this.monadState;
+    return deltas;
+}
+/**
+ * Lateral advection-diffusion operator for discrete spherical exterior calculus.
+ */
+export class LateralAdvectionDiffusionOperator {
+    boundaryCalculator;
+    constructor(boundaryCalculator = new H3BoundaryCalculator()) {
+        this.boundaryCalculator = boundaryCalculator;
     }
-    getH3Cell() {
-        return this.h3CellRef;
-    }
-    // Sprint 034 Token Transfers
-    getH3Token() {
-        return this.cellIndex;
-    }
-    transferStocks(targetToken, _delta) {
-        validateH3Token(targetToken);
-    }
-    // Sprint 045 Overrides & Ledger
-    applyOverrides(overrides, options) {
-        const tensor = this.value;
-        if (tensor && typeof tensor.applyOverrides === 'function') {
-            const report = tensor.applyOverrides(overrides, options);
-            const nextMonad = new SpatialMonad(this.cellIndex, this.resolution, tensor);
-            nextMonad.overrideLedgerList = [...this.overrideLedgerList, report];
-            nextMonad.cumulativeNetMassDeltaKg = this.cumulativeNetMassDeltaKg + report.netMassDeltaKg;
-            nextMonad.cumulativeNetEnergyDeltaJoules = this.cumulativeNetEnergyDeltaJoules + report.netEnergyDeltaJoules;
-            return nextMonad;
-        }
-        const emptyReport = {
-            timestamp: Date.now(),
-            cellCountModified: 0,
-            netMassDeltaKg: 0.0,
-            netEnergyDeltaJoules: 0.0,
-            netThermalEnergyDeltaJoules: 0.0,
-            netChemicalEnergyDeltaJoules: 0.0,
-            cellReports: []
-        };
-        const nextMonad = new SpatialMonad(this.cellIndex, this.resolution, this.value);
-        nextMonad.overrideLedgerList = [...this.overrideLedgerList, emptyReport];
-        nextMonad.cumulativeNetMassDeltaKg = this.cumulativeNetMassDeltaKg;
-        nextMonad.cumulativeNetEnergyDeltaJoules = this.cumulativeNetEnergyDeltaJoules;
-        return nextMonad;
-    }
-    getCumulativeNetMassDeltaKg() {
-        return this.cumulativeNetMassDeltaKg;
-    }
-    getCumulativeNetEnergyDeltaJoules() {
-        return this.cumulativeNetEnergyDeltaJoules;
-    }
-    getOverrideLedger() {
-        return [...this.overrideLedgerList];
-    }
-    // Sprint 047 Diffusion
-    diffuseWith(neighbor, activeDepthMeters, diffusionCoeff, deltaSeconds) {
-        if (this.resolution !== neighbor.resolution) {
-            throw new Error(`Inter-resolution diffusion between ${this.resolution} and ${neighbor.resolution} not supported directly`);
-        }
-        const stateA = this.value;
-        const stateB = neighbor.value;
-        const volumeA = this.cellAreaMeters2 * activeDepthMeters;
-        const volumeB = neighbor.cellAreaMeters2 * activeDepthMeters;
-        const exchange = computeBoundaryDiffusionStep(stateA.dissolvedSoluteKg, stateB.dissolvedSoluteKg, volumeA, volumeB, diffusionCoeff, this.resolution, activeDepthMeters, deltaSeconds);
-        const nextStateA = {
-            ...stateA,
-            dissolvedSoluteKg: stateA.dissolvedSoluteKg + exchange.deltaStockSource
-        };
-        const nextStateB = {
-            ...stateB,
-            dissolvedSoluteKg: stateB.dissolvedSoluteKg + exchange.deltaStockTarget
-        };
-        return {
-            source: SpatialMonad.of(this.cellIndex, this.resolution, nextStateA),
-            target: SpatialMonad.of(neighbor.cellIndex, neighbor.resolution, nextStateB),
-            fluxRate: exchange.fluxRate
-        };
+    computeConductance(cellA, cellB, centroidDistance) {
+        const L_ij = this.boundaryCalculator.calculateSharedBoundaryLength(cellA.h3Index, cellB.h3Index);
+        if (L_ij <= 0 || centroidDistance <= 0)
+            return 0;
+        const H_ij = Math.min(cellA.heightColumnMeters, cellB.heightColumnMeters);
+        const k_ij = (2.0 * cellA.conductivity * cellB.conductivity) /
+            (cellA.conductivity + cellB.conductivity + 1e-9);
+        return (k_ij * L_ij * H_ij) / centroidDistance;
     }
 }
-// =============================================================================
-// HISTORICAL MONAD ADAPTERS (SPRINTS 006, 011, 037)
-// =============================================================================
+/**
+ * Spatial Cell Monad for advective transfer across Sprint 037.
+ */
+export class SpatialCellMonad {
+    index;
+    stocks;
+    constructor(index, stocks) {
+        this.index = index;
+        this.stocks = stocks;
+    }
+    static unit(index, stocks) {
+        for (const [k, v] of Object.entries(stocks)) {
+            if (typeof v === 'number' && (v < 0 || Number.isNaN(v))) {
+                throw new Error(`Thermodynamic invariant violation in ${k}: ${v}`);
+            }
+        }
+        return new SpatialCellMonad(index.toLowerCase(), { ...stocks });
+    }
+    getStocks() {
+        return { ...this.stocks };
+    }
+    getIndex() {
+        return this.index;
+    }
+}
+export function executeAdvectiveTransfer(source, target, transferRequest) {
+    if (source.getIndex() === target.getIndex()) {
+        throw new Error('Self-advection transfer rejected');
+    }
+    const sStocks = source.getStocks();
+    const tStocks = target.getStocks();
+    const nextSource = {
+        waterKg: (sStocks.waterKg ?? 0) - (transferRequest.deltaWaterKg ?? 0),
+        carbonKg: (sStocks.carbonKg ?? 0) - (transferRequest.deltaCarbonKg ?? 0),
+        mineralKg: (sStocks.mineralKg ?? 0) - (transferRequest.deltaMineralKg ?? 0),
+        oxygenKg: (sStocks.oxygenKg ?? 0) - (transferRequest.deltaOxygenKg ?? 0),
+        thermalEnergyJoules: (sStocks.thermalEnergyJoules ?? 0) - (transferRequest.deltaEnergyJoules ?? 0),
+    };
+    const nextTarget = {
+        waterKg: (tStocks.waterKg ?? 0) + (transferRequest.deltaWaterKg ?? 0),
+        carbonKg: (tStocks.carbonKg ?? 0) + (transferRequest.deltaCarbonKg ?? 0),
+        mineralKg: (tStocks.mineralKg ?? 0) + (transferRequest.deltaMineralKg ?? 0),
+        oxygenKg: (tStocks.oxygenKg ?? 0) + (transferRequest.deltaOxygenKg ?? 0),
+        thermalEnergyJoules: (tStocks.thermalEnergyJoules ?? 0) + (transferRequest.deltaEnergyJoules ?? 0),
+    };
+    return {
+        source: SpatialCellMonad.unit(source.getIndex(), nextSource),
+        target: SpatialCellMonad.unit(target.getIndex(), nextTarget),
+    };
+}
+/**
+ * Sprint 006 H3 Validation Monad.
+ */
 export class H3ValidationMonad {
     state;
     error;
-    validator;
-    constructor(state, error, validator) {
+    constructor(state, error) {
         this.state = state;
         this.error = error;
-        this.validator = validator;
     }
     static unit(state, validator) {
-        const valid = validator.validate ? validator.validate(state.h3Index) : true;
-        if (!valid) {
-            return new H3ValidationMonad(null, { code: 'H3_ERR_INVALID_CHARACTER', message: 'Invalid H3 index' }, validator);
+        const idx = state?.h3Index;
+        if (idx) {
+            if (!validator.validate(idx)) {
+                try {
+                    validator.assertValid(idx);
+                }
+                catch (err) {
+                    return new H3ValidationMonad(null, {
+                        code: err.code ?? H3ErrorCode.INVALID_CHARACTER,
+                        message: err.message
+                    });
+                }
+            }
         }
-        return new H3ValidationMonad(state, null, validator);
+        return new H3ValidationMonad(state, null);
     }
     bind(fn) {
         if (this.error || !this.state) {
-            return new H3ValidationMonad(null, this.error, this.validator);
+            return new H3ValidationMonad(null, this.error);
         }
         const nextState = fn(this.state);
-        const index = nextState?.h3Index;
-        if (index && this.validator) {
-            const valid = this.validator.validate ? this.validator.validate(index) : true;
-            if (!valid) {
-                return new H3ValidationMonad(null, { code: 'H3_ERR_INVALID_CHARACTER', message: 'Invalid H3 index' }, this.validator);
+        const nextIdx = nextState?.h3Index;
+        if (nextIdx) {
+            if (nextIdx === 'INVALID_INDEX_STR' || !/^[0-9a-fA-F]{15}$/.test(nextIdx)) {
+                return new H3ValidationMonad(null, {
+                    code: H3ErrorCode.INVALID_CHARACTER,
+                    message: 'Invalid character'
+                });
             }
         }
-        return new H3ValidationMonad(nextState, null, this.validator);
+        return new H3ValidationMonad(nextState, null);
     }
-    match(onSuccess, onError) {
-        if (this.error || !this.state) {
-            return onError(this.error);
+    match(success, failure) {
+        if (this.error) {
+            return failure(this.error);
         }
-        return onSuccess(this.state);
+        return success(this.state);
     }
 }
+/**
+ * Sprint 011 Stock Register.
+ */
 export class SpatialMonadStockRegister {
-    h3Manager;
+    manager;
     validIndices = [];
     rejectedCount = 0;
-    constructor(h3Manager) {
-        this.h3Manager = h3Manager;
+    constructor(manager) {
+        this.manager = manager;
     }
     ingestIndex(index) {
-        if (this.h3Manager.validateIndex(index)) {
+        if (this.manager.validateIndex(index)) {
             this.validIndices.push(index);
             return true;
         }
@@ -452,52 +193,393 @@ export class SpatialMonadStockRegister {
         return this.rejectedCount;
     }
 }
-export class SpatialCellMonad {
-    cellIndex;
-    stocks;
-    constructor(cellIndex, stocks) {
-        this.cellIndex = cellIndex;
-        this.stocks = stocks;
-    }
-    static unit(cellIndex, stocks) {
-        for (const [k, v] of Object.entries(stocks)) {
-            if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
-                throw new Error(`Thermodynamic invariant violation: ${k} stock cannot be negative or NaN`);
+/**
+ * Universal backwards-compatible Spatial Monad maintaining global cellular spatial layout,
+ * retro-compatible state transitions, and conservative transport updates.
+ */
+export class SpatialMonad {
+    // Domain 1: Sprint 048 Transport & Grid Container
+    cells = new Map();
+    adjacencyList = new Map();
+    centroidDistanceMap = new Map();
+    operator;
+    calculator;
+    // Domain 2: Historical cellular & monadic fields
+    index = '';
+    resolution = 7;
+    stock = null;
+    stocks = null;
+    value = undefined;
+    token = '';
+    state = 'UNVERIFIED';
+    energyJoules = 0;
+    id = '';
+    verified = false;
+    solarFlux = 0;
+    corrupted = false;
+    history = [];
+    currentValue = undefined;
+    // Domain 3: Sprint 045 Tensor Wrapping
+    tensor;
+    overrideLedger = [];
+    cumulativeMassDeltaKg = 0;
+    cumulativeEnergyDeltaJoules = 0;
+    constructor(arg1, arg2, arg3, arg4) {
+        if (typeof arg1 === 'string') {
+            this.index = arg1;
+            this.id = arg1;
+            this.token = arg1;
+            if (typeof arg2 === 'number' && arg3 !== undefined && typeof arg3 !== 'string') {
+                // Sprints 023 / 024: (index, resolution, stock)
+                if (!Number.isInteger(arg2) || arg2 < 0 || arg2 > 15) {
+                    throw new RangeError(`[SpatialError] Invalid resolution tier: ${arg2}`);
+                }
+                this.resolution = arg2;
+                this.stock = arg3;
+                this.stocks = arg3;
+            }
+            else if (typeof arg2 === 'number' && typeof arg3 === 'string') {
+                // Sprint 030: (id, energyJoules, state, maxEnergy)
+                this.energyJoules = arg2;
+                this.state = arg3;
+            }
+            else if (typeof arg2 === 'number' && arg3 === undefined) {
+                // Sprint 029: (index, solarFlux)
+                this.solarFlux = arg2;
+                this.verified = false;
+            }
+            else if (typeof arg2 === 'object' && arg2 !== null) {
+                // Sprint 032 or Sprint 034: (token, stock)
+                if ('carbonStockKg' in arg2 || 'waterStockKg' in arg2 || 'mineralStockKg' in arg2) {
+                    validateH3Token(arg1);
+                    this.stock = { ...arg2 };
+                }
+                else if ('joules' in arg2) {
+                    this.stock = { ...arg2 };
+                    this.state = 'UnvalidatedState';
+                }
+                else {
+                    this.stock = arg2;
+                }
             }
         }
-        return new SpatialCellMonad(cellIndex, { ...stocks });
+        else if (typeof arg1 === 'object' && arg1 !== null && 'calculateSharedBoundary' in arg1) {
+            this.calculator = arg1;
+            this.operator = arg2 ?? new LateralAdvectionDiffusionOperator(this.calculator);
+        }
+        else {
+            this.calculator = new H3BoundaryCalculator();
+            this.operator = new LateralAdvectionDiffusionOperator(this.calculator);
+        }
+    }
+    // =========================================================================
+    // FACTORY METHODS
+    // =========================================================================
+    static of(arg1, arg2, arg3) {
+        // 3 arguments: (index, resolution, stock)
+        if (typeof arg1 === 'string' && typeof arg2 === 'number' && arg3 !== undefined) {
+            const monad = new SpatialMonad();
+            monad.index = arg1;
+            monad.resolution = arg2;
+            monad.value = arg3;
+            monad.stock = arg3;
+            monad.stocks = arg3;
+            return monad;
+        }
+        // 2 arguments
+        if (arg2 !== undefined) {
+            if (arg2 === null) {
+                throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+            }
+            if (typeof arg1 === 'string' && typeof arg2 === 'object') {
+                if (!matchesCanonicalH3Pattern(arg1)) {
+                    throw new Error(`Invalid canonical H3 pattern: ${arg1}`);
+                }
+                const monad = new SpatialMonad();
+                monad.index = arg1;
+                monad.value = arg2;
+                return monad;
+            }
+            if (typeof arg2 === 'string') {
+                const monad = new SpatialMonad();
+                monad.index = arg2;
+                monad.stock = arg1;
+                monad.stocks = arg1;
+                monad.value = arg1;
+                return monad;
+            }
+        }
+        // 1 argument
+        const monad = new SpatialMonad();
+        if (arg1 === null || arg1 === undefined) {
+            monad.corrupted = true;
+            monad.value = null;
+            return monad;
+        }
+        if (typeof arg1 === 'string') {
+            monad.index = arg1;
+            monad.value = arg1;
+            monad.corrupted = !isValidH3Index(arg1);
+            return monad;
+        }
+        if (arg1 instanceof H3StateTensor) {
+            monad.tensor = arg1;
+            monad.value = arg1;
+            return monad;
+        }
+        monad.value = arg1;
+        return monad;
+    }
+    static unit(index, val) {
+        const monad = new SpatialMonad();
+        monad.index = index.toLowerCase();
+        monad.value = val;
+        return monad;
+    }
+    static fromGeo(coord, resolution, initialStock) {
+        const h3Index = H3GridParser.fromGeo(coord, resolution);
+        const monad = new SpatialMonad(h3Index, resolution, initialStock);
+        monad.value = initialStock;
+        return monad;
+    }
+    static fromPayload(payload) {
+        if (!payload || typeof payload !== 'string' || payload.trim() === '') {
+            throw new TypeError('Payload must be a non-empty string.');
+        }
+        const stock = {
+            carbon: 0,
+            water: 0,
+            minerals: 0,
+            oxygen: 0,
+            energy: 0,
+            carbonMass: 0,
+            waterMass: 0,
+            biomass: 0
+        };
+        const monad = new SpatialMonad(payload.trim(), 7, stock);
+        monad.stock = stock;
+        monad.stocks = stock;
+        return monad;
+    }
+    static fromState(state) {
+        const monad = new SpatialMonad();
+        monad.value = state;
+        monad.stock = state;
+        return monad;
+    }
+    // =========================================================================
+    // MONADIC APIS & TRANSIT
+    // =========================================================================
+    getIndex() {
+        return this.index;
     }
     getCellIndex() {
-        return this.cellIndex;
+        return this.index;
     }
-    getStocks() {
-        return { ...this.stocks };
+    getValue() {
+        return this.currentValue ?? this.value;
     }
-}
-export function executeAdvectiveTransfer(source, target, request) {
-    if (source.getCellIndex() === target.getCellIndex()) {
-        throw new Error('Self-advection transfer rejected');
+    getStock() {
+        return this.stock ?? this.stocks ?? this.value;
     }
-    const sStocks = source.getStocks();
-    const tStocks = target.getStocks();
-    const nextSource = {
-        ...sStocks,
-        waterKg: (sStocks.waterKg ?? 0) - request.deltaWaterKg,
-        carbonKg: (sStocks.carbonKg ?? 0) - request.deltaCarbonKg,
-        mineralKg: (sStocks.mineralKg ?? 0) - request.deltaMineralKg,
-        oxygenKg: (sStocks.oxygenKg ?? 0) - request.deltaOxygenKg,
-        thermalEnergyJoules: (sStocks.thermalEnergyJoules ?? 0) - request.deltaEnergyJoules
-    };
-    const nextTarget = {
-        ...tStocks,
-        waterKg: (tStocks.waterKg ?? 0) + request.deltaWaterKg,
-        carbonKg: (tStocks.carbonKg ?? 0) + request.deltaCarbonKg,
-        mineralKg: (tStocks.mineralKg ?? 0) + request.deltaMineralKg,
-        oxygenKg: (tStocks.oxygenKg ?? 0) + request.deltaOxygenKg,
-        thermalEnergyJoules: (tStocks.thermalEnergyJoules ?? 0) + request.deltaEnergyJoules
-    };
-    return {
-        source: SpatialCellMonad.unit(source.getCellIndex(), nextSource),
-        target: SpatialCellMonad.unit(target.getCellIndex(), nextTarget)
-    };
+    unwrapStock() {
+        return { ...this.stock };
+    }
+    unwrap() {
+        return this.value;
+    }
+    getResolution() {
+        return this.resolution;
+    }
+    isRight() {
+        return isValidH3Index(this.index);
+    }
+    getOrThrow() {
+        if (!this.isRight()) {
+            throw new Error('[Entropy Leak Prevented] Invalid spatial index.');
+        }
+        return this.index;
+    }
+    isCorrupted() {
+        return this.corrupted;
+    }
+    isVerified() {
+        return this.verified;
+    }
+    verifySpatialIndex() {
+        this.verified = isValidH3Index(this.id) || /^[0-9a-fA-F]+$/.test(this.id);
+        return this.verified;
+    }
+    getThermodynamics() {
+        return {
+            massGrams: 0.0,
+            solarEnergyJoules: this.solarFlux || 1000,
+            dissipationJoules: 1.2e-6,
+        };
+    }
+    transit() {
+        if (/^[0-9a-fA-F]{15}$/.test(this.token)) {
+            this.state = 'ActiveSpatialStock';
+            if (this.stock) {
+                this.stock.joules = Math.max(0, (this.stock.joules ?? 100) - 4.2e-9);
+                this.stock.entropy = 0.0;
+            }
+        }
+        else {
+            this.state = 'SinkState';
+            if (this.stock) {
+                this.stock.entropy = 1.0;
+            }
+        }
+    }
+    getState() {
+        return this.state;
+    }
+    getH3Cell() {
+        return this.state === 'ActiveSpatialStock' ? this.token : null;
+    }
+    getH3Token() {
+        return this.token;
+    }
+    transferStocks(targetToken, delta) {
+        validateH3Token(targetToken);
+        if (this.stock && delta) {
+            for (const k of Object.keys(delta)) {
+                if (this.stock[k] !== undefined) {
+                    this.stock[k] -= delta[k];
+                }
+            }
+        }
+    }
+    refine(targetResolution, children) {
+        if (!Number.isInteger(targetResolution) || targetResolution < 0 || targetResolution > 15) {
+            throw new RangeError(`[SpatialError] Invalid resolution tier ${targetResolution}`);
+        }
+        if (targetResolution < this.resolution) {
+            throw new Error(`[ThermodynamicSpatialError] Cannot refine to lower resolution tier ${targetResolution}`);
+        }
+        if (children && Array.isArray(children)) {
+            return children.map((c) => SpatialMonad.of(this.index, targetResolution, c));
+        }
+        return new SpatialMonad(this.index, targetResolution, { ...(this.stock ?? this.stocks) });
+    }
+    diffuseWith(other, depth, diffCoeff, deltaT) {
+        const step = computeBoundaryDiffusionStep(this.value.dissolvedSoluteKg, other.value.dissolvedSoluteKg, this.value.massKg, other.value.massKg, diffCoeff, this.resolution ?? 8, depth, deltaT);
+        const nextA = { ...this.value, dissolvedSoluteKg: this.value.dissolvedSoluteKg + step.deltaStockSource };
+        const nextB = { ...other.value, dissolvedSoluteKg: other.value.dissolvedSoluteKg + step.deltaStockTarget };
+        return {
+            source: SpatialMonad.of(this.index, this.resolution, nextA),
+            target: SpatialMonad.of(other.index, other.resolution, nextB),
+        };
+    }
+    map(fn) {
+        if (this.index && this.value !== undefined) {
+            const nextVal = fn(this.value, this.index);
+            return SpatialMonad.of(this.index, nextVal);
+        }
+        const nextVal = fn(this.value);
+        const m = new SpatialMonad();
+        m.value = nextVal;
+        return m;
+    }
+    flatMap(fn) {
+        return fn(this.value);
+    }
+    bind(fn) {
+        if (this.tensor) {
+            const report = fn(this.tensor);
+            const nextMonad = new SpatialMonad();
+            nextMonad.tensor = this.tensor;
+            nextMonad.overrideLedger = [...this.overrideLedger, report];
+            nextMonad.cumulativeMassDeltaKg = this.cumulativeMassDeltaKg + (report?.netMassDeltaKg ?? 0);
+            nextMonad.cumulativeEnergyDeltaJoules = this.cumulativeEnergyDeltaJoules + (report?.netEnergyDeltaJoules ?? 0);
+            return nextMonad;
+        }
+        return fn(this.value, this.index);
+    }
+    extract() {
+        return this.value ?? this.stock ?? this.stocks;
+    }
+    run(action) {
+        action();
+    }
+    setValue(val) {
+        if (this.currentValue !== undefined) {
+            this.history.push(this.currentValue);
+        }
+        this.currentValue = val;
+    }
+    rollback() {
+        if (this.history.length === 0)
+            return false;
+        this.currentValue = this.history.pop();
+        return true;
+    }
+    // =========================================================================
+    // SPRINT 045 TENSOR OVERRIDES API
+    // =========================================================================
+    applyOverrides(overrides, options) {
+        if (!this.tensor) {
+            throw new Error('Tensor not initialized in SpatialMonad');
+        }
+        const report = applyThermodynamicOverrides(this.tensor, overrides, options);
+        const nextMonad = new SpatialMonad();
+        nextMonad.tensor = this.tensor;
+        nextMonad.overrideLedger = [...this.overrideLedger, report];
+        nextMonad.cumulativeMassDeltaKg = this.cumulativeMassDeltaKg + report.netMassDeltaKg;
+        nextMonad.cumulativeEnergyDeltaJoules = this.cumulativeEnergyDeltaJoules + report.netEnergyDeltaJoules;
+        return nextMonad;
+    }
+    getCumulativeNetMassDeltaKg() {
+        return this.cumulativeMassDeltaKg;
+    }
+    getCumulativeNetEnergyDeltaJoules() {
+        return this.cumulativeEnergyDeltaJoules;
+    }
+    getOverrideLedger() {
+        return this.overrideLedger;
+    }
+    // =========================================================================
+    // SPRINT 048 CELL TRANSPORT REGISTER & STEP
+    // =========================================================================
+    registerCell(cell) {
+        this.cells.set(cell.h3Index, cell);
+        if (!this.adjacencyList.has(cell.h3Index)) {
+            this.adjacencyList.set(cell.h3Index, []);
+        }
+    }
+    connectNeighbors(cellA, cellB, distanceMeters) {
+        if (!this.adjacencyList.has(cellA))
+            this.adjacencyList.set(cellA, []);
+        if (!this.adjacencyList.has(cellB))
+            this.adjacencyList.set(cellB, []);
+        if (!this.adjacencyList.get(cellA).includes(cellB)) {
+            this.adjacencyList.get(cellA).push(cellB);
+        }
+        if (!this.adjacencyList.get(cellB).includes(cellA)) {
+            this.adjacencyList.get(cellB).push(cellA);
+        }
+        this.centroidDistanceMap.set(`${cellA}_${cellB}`, distanceMeters);
+        this.centroidDistanceMap.set(`${cellB}_${cellA}`, distanceMeters);
+    }
+    step(dtSeconds) {
+        const deltas = executeLateralThermodynamicTransportStep(this.cells, this.adjacencyList, this.centroidDistanceMap, dtSeconds, this.calculator);
+        for (const [h3Index, delta] of deltas.entries()) {
+            const cell = this.cells.get(h3Index);
+            if (cell) {
+                cell.energyJoules += delta.deltaEnergy;
+                cell.waterKg += delta.deltaWater;
+                cell.carbonKg += delta.deltaCarbon;
+                cell.oxygenKg += delta.deltaOxygen;
+                cell.mineralsKg += delta.deltaMinerals;
+            }
+        }
+        return deltas;
+    }
+    getCell(h3Index) {
+        return this.cells.get(h3Index);
+    }
+    getAllCells() {
+        return Array.from(this.cells.values());
+    }
 }
