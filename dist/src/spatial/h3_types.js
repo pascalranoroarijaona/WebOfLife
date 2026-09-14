@@ -1,10 +1,13 @@
-/**
- * @file src/spatial/h3_types.ts
- * @description H3 Spatial Types and Resolution Tier Definitions.
- * Includes complete backward compatibility for Sprints 001-032.
- */
-export const MIN_H3_RESOLUTION = 0;
-export const MAX_H3_RESOLUTION = 15;
+// =============================================================================
+// WEB OF LIFE - SPATIAL GUARD CLAUSE EXCEPTION & TYPES (SPRINT 035)
+// =============================================================================
+export class SpatialGuardClauseException extends Error {
+    constructor(message) {
+        super(`[SpatialGuardClauseException] ${message}`);
+        this.name = 'SpatialGuardClauseException';
+        Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
+    }
+}
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";

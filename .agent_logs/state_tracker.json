@@ -1,5 +1,5 @@
 {
-  "current_sprint": 35,
+  "current_sprint": 36,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -170,6 +170,11 @@
       "sprint": 34,
       "goal": "Implement invalid character error throwing when H3 token contains non-hexadecimal symbols in `src/spatial/h3_grid.ts`.",
       "timestamp": "2026-09-14T08:08:55.275217+00:00"
+    },
+    {
+      "sprint": 35,
+      "goal": "Implement explicit null/undefined exception throwing for guard clause violations in `src/spatial/h3_grid.ts`.",
+      "timestamp": "2026-09-14T08:50:19.775911+00:00"
     }
   ]
 }

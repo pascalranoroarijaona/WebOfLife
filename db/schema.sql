@@ -1,67 +1,36 @@
--- ============================================================================
--- Web of Life Database, UML & Thermodynamic Blockchain Architecture
--- Sprint 034: H3 Token Non-Hexadecimal Symbol Validation Schema & Ledger
--- ============================================================================
+-- Updated Schema & Ledger Definitions for Sprint 035
+-- Focus: Spatial Integrity, Thermodynamic Monad Stocks, and Guard Clause Exceptions
 
--- Enable TimescaleDB extension for time-series thermodynamic flow tracking
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ----------------------------------------------------------------------------
--- 1. Spatial Indexing & H3 Validation Ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE spatial_h3_tokens (
-    token_id VARCHAR(64) PRIMARY KEY,
-    is_valid BOOLEAN NOT NULL DEFAULT FALSE,
-    validation_error VARCHAR(255),
+-- Enum for spatial guard clause violation severity & states
+CREATE TYPE spatial_guard_status AS ENUM ('VALID', 'NULL_VIOLATION', 'UNDEFINED_VIOLATION', 'MALFORMED_INDEX');
+
+-- Spatial Monad Stock Table (Thermodynamic allocation bins tied to H3 indexes)
+CREATE TABLE spatial_monad_stocks (
+    monad_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index VARCHAR(64) NOT NULL,
     resolution INT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    entropy_delta NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    energy_joules NUMERIC(20, 6) NOT NULL CHECK (energy_joules >= 0.000000),
+    entropy_s NUMERIC(20, 6) NOT NULL CHECK (entropy_s >= 0.000000),
+    guard_status spatial_guard_status NOT NULL DEFAULT 'VALID',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Hypertable for tracking spatial validation attempts and entropy metrics
-SELECT create_hypertable('spatial_h3_tokens', 'created_at', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 2. Thermodynamic Monad Stocks
--- ----------------------------------------------------------------------------
-CREATE TABLE thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    token_id VARCHAR(64) REFERENCES spatial_h3_tokens(token_id),
-    monad_type VARCHAR(64) NOT NULL, -- e.g., 'SpatialMonad', 'BiomassMonad', 'EnergyMonad'
-    matter_mass NUMERIC(18, 8) NOT NULL CHECK (matter_mass >= 0), -- First Law conservation
-    free_energy NUMERIC(18, 8) NOT NULL, -- Second Law metric
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- Thermodynamic Stock Transactions & Block Signatures Ledger
+CREATE TABLE thermodynamic_ledger_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    previous_hash VARCHAR(64) NOT NULL,
+    current_hash VARCHAR(64) NOT NULL,
+    monad_id UUID REFERENCES spatial_monad_stocks(monad_id) ON DELETE CASCADE,
+    solar_input_watts NUMERIC(16, 4) NOT NULL,
+    entropy_delta NUMERIC(16, 4) NOT NULL,
+    exception_flag VARCHAR(128),
+    transaction_signature VARCHAR(128) NOT NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Stock Flows
--- ----------------------------------------------------------------------------
-CREATE TABLE thermodynamic_flows (
-    flow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
-    target_stock_id UUID REFERENCES thermodynamic_stocks(stock_id),
-    joules_transferred NUMERIC(18, 8) NOT NULL,
-    entropy_generated NUMERIC(18, 8) NOT NULL CHECK (entropy_generated >= 0),
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-SELECT create_hypertable('thermodynamic_flows', 'executed_at', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Blockchain Block Transaction Signatures
--- ----------------------------------------------------------------------------
-CREATE TABLE blockchain_blocks (
-    block_hash VARCHAR(128) PRIMARY KEY,
-    previous_block_hash VARCHAR(128) REFERENCES blockchain_blocks(block_hash),
-    merkle_root VARCHAR(128) NOT NULL,
-    state_entropy_total NUMERIC(18, 8) NOT NULL,
-    mined_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE block_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_hash VARCHAR(128) REFERENCES blockchain_blocks(block_hash),
-    flow_id UUID REFERENCES thermodynamic_flows(flow_id),
-    signature VARCHAR(256) NOT NULL,
-    is_committed BOOLEAN NOT NULL DEFAULT TRUE
-);
+-- Indexing for fast H3 and spatial lookups
+CREATE INDEX idx_spatial_monads_h3 ON spatial_monad_stocks(h3_index);
+CREATE INDEX idx_thermodynamic_ledger_hash ON thermodynamic_ledger_blocks(current_hash);

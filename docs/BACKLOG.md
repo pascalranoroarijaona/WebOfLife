@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 21%
-SPRINT_GOAL: Implement invalid character error throwing when H3 token contains non-hexadecimal symbols in `src/spatial/h3_grid.ts`.
+SPRINT_GOAL: Implement explicit null/undefined exception throwing for guard clause violations in `src/spatial/h3_grid.ts`.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -12,9 +12,10 @@ SPRINT_GOAL: Implement invalid character error throwing when H3 token contains n
 - [x] Implement 15-character length validation helper function (`src/spatial/h3_grid.ts`)
 - [x] Implement resolution tier (0-15) boundary check function (`src/spatial/h3_grid.ts`)
 - [x] Implement hexadecimal character set validation helper regex pattern check function (`src/spatial/h3_grid.ts`)
-- [ ] Implement invalid character error throwing when H3 token contains non-hexadecimal symbols (`src/spatial/h3_grid.ts`)
-- [ ] Implement string matching test using `/^[0-9a-fA-F]{15}$/` for H3 token payloads (`src/spatial/h3_grid.ts`)
-- [ ] Implement unit test suite verifying hexadecimal string validation constraints (`tests/sprint_031.test.ts`)
+- [ ] Implement explicit null/undefined exception throwing for guard clause violations (`src/spatial/h3_grid.ts`)
+- [ ] Implement string length boundary validation helper returning explicit boolean flags (`src/spatial/h3_grid.ts`)
+- [ ] Implement dedicated regex matching utility using `/^[0-9a-fA-F]{15}$/` (`src/spatial/h3_grid.ts`)
+- [ ] Implement standalone unit test verifying hexadecimal string validation constraints (`tests/sprint_035.test.ts`)
 - [ ] Implement Uber H3 spatial ring generation utility functions (`src/spatial/h3_grid.ts`)
 - [ ] Implement Uber H3 edge-neighbor mapping functions (`src/spatial/h3_grid.ts`)
 - [ ] Spatial-Thermodynamic State Tensor Routing (`src/spatial/tensor_router.ts`)
@@ -34,8 +35,9 @@ SPRINT_GOAL: Implement invalid character error throwing when H3 token contains n
 - [ ] Implement nutrient limitation penalty modifier scaling primary productivity (`src/biosphere/redfield_ratio.ts`)
 - [ ] Holling Type II predator ingestion rate function with handling time parameters (`src/biosphere/holling_kinetics.ts`)
 - [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds (`src/biosphere/holling_kinetics.ts`)
-- [ ] Implement adjacency-weighted hyphal transport arrays mapping carbon-for-nutrient exchange (`src/biosphere/mycorrhizal_flows.ts`)
-- [ ] Implement fungal metabolic maintenance cost deductions based on soil respiration (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Implement fungal sink strength calculation function $S_f = \frac{C_{\text{received}}}{N_{\text{transferred}} + P_{\text{transferred}}}$ for mycorrhizal networks (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Implement spatial hyphal network conductivity matrix mapping carbon translocation efficiency (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Add fungal maintenance respiration penalty function factoring in temperature-dependent soil enzyme activation energies (`src/biosphere/mycorrhizal_flows.ts`)
 - [ ] Shannon-Wiener entropy metric calculation across spatial H3 node communities (`src/biosphere/diversity_metrics.ts`)
 - [ ] Simpson's dominance and evenness index calculator (`src/biosphere/diversity_metrics.ts`)
 - [ ] Stochastic Extinction, Bottleneck, and Minimum Viable Population engine (`src/biosphere/population_genetics.ts`)

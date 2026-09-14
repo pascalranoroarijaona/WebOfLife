@@ -1,0 +1,53 @@
+```Code snippet
+@startuml
+skinparam monochrome true
+skinparam packageStyle rectangle
+
+package "Web of Life - Spatial & Thermodynamic Architecture (Sprint 035)" {
+
+    class SpatialGuardClauseException {
+        +message: string
+        +name: string
+        +constructor(message: string)
+    }
+
+    class H3GridManager {
+        +validateIndex(index: string | null | undefined): string
+        +getResolution(index: string | null | undefined): number
+    }
+
+    class SpatialMonad {
+        +monadId: string
+        +h3Index: string
+        +resolution: number
+        +energyJoules: number
+        +entropyS: number
+        +guardStatus: SpatialGuardStatus
+        +validateState(): void
+    }
+
+    class ThermodynamicLedgerBlock {
+        +blockId: string
+        +previousHash: string
+        +currentHash: string
+        +solarInputWatts: number
+        +entropyDelta: number
+        +exceptionFlag: string
+        +transactionSignature: string
+        +signBlock(): string
+    }
+
+    enum SpatialGuardStatus {
+        VALID
+        NULL_VIOLATION
+        UNDEFINED_VIOLATION
+        MALFORMED_INDEX
+    }
+
+    H3GridManager ..> SpatialGuardClauseException : throws >
+    H3GridManager --> SpatialMonad : manages >
+    SpatialMonad --> SpatialGuardStatus : has >
+    ThermodynamicLedgerBlock --> SpatialMonad : records transaction >
+}
+
+@enduml

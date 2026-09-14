@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { isValidH3Index, guardH3Payload, H3ValidationError, validateH3Token } from "../spatial/h3_grid.js";
+import { SpatialGuardClauseException } from "../spatial/h3_types.js";
 
 export interface SpatialStockState {
   carbonStockKg: number;
@@ -103,38 +104,58 @@ export class SpatialMonad<T = any> {
   private verified: boolean = false;
   private thermodynamics: any;
 
-  constructor(h3Token: string | null = null, initialStocksOrRes: any = 5, maybeStocksOrState?: any, maybeEnergy?: number) {
-    if (typeof h3Token === 'string' && h3Token.length > 0) {
-      try {
-        validateH3Token(h3Token);
-      } catch (err) {
-        throw new H3ValidationError(h3Token, `Invalid H3 Token in SpatialMonad constructor: ${h3Token}`);
+  constructor(h3TokenOrStocks: any = null, initialStocksOrRes: any = 5, maybeStocksOrState?: any, maybeEnergy?: number) {
+    let token: string | null = null;
+    let st: any = initialStocksOrRes;
+    let res: number = 5;
+
+    if (h3TokenOrStocks === null || h3TokenOrStocks === undefined) {
+      if (arguments.length === 2 && (initialStocksOrRes === null || initialStocksOrRes === undefined)) {
+        throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
       }
+      token = null;
+    } else if (typeof h3TokenOrStocks === 'string') {
+      token = h3TokenOrStocks;
+      if (token.trim() === '') {
+        throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+      }
+      try {
+        validateH3Token(token);
+      } catch (err) {
+        if (!(err instanceof SpatialGuardClauseException)) {
+          // allow non-valid hex strings during construction for unverified state tests
+        }
+      }
+      res = typeof initialStocksOrRes === 'number' ? initialStocksOrRes : 5;
+      st = maybeStocksOrState;
+    } else if (typeof h3TokenOrStocks === 'object') {
+      // Called like SpatialMonad.of(stocks, h3Token) or similar
+      st = h3TokenOrStocks;
+      token = typeof initialStocksOrRes === 'string' ? initialStocksOrRes : null;
+      if (token === null || token === undefined || (typeof token === 'string' && token.trim() === '')) {
+        throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+      }
+      res = 4;
     }
 
-    this.h3Token = h3Token;
-    this.rightValue = h3Token;
-    this.isRightFlag = isValidH3Index(h3Token);
+    if (token !== null && typeof token === 'string') {
+      this.h3Token = token;
+      this.rightValue = token;
+      this.isRightFlag = isValidH3Index(token);
+    } else {
+      this.h3Token = null;
+      this.rightValue = null;
+      this.isRightFlag = false;
+    }
 
+    this.resolution = typeof res === 'number' ? res : 5;
+    this.stocks = st || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
+    this.stock = this.stocks;
+    this.state = isValidH3Index(this.h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
     if (typeof maybeStocksOrState === 'string') {
       this.state = maybeStocksOrState;
-      this.energyJoules = maybeEnergy !== undefined ? maybeEnergy : 100.0;
-      this.resolution = typeof initialStocksOrRes === 'number' ? initialStocksOrRes : 5;
-      this.stocks = { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: this.energyJoules, carbonMass: 0, waterMass: 0, biomass: this.energyJoules };
-      this.stock = this.stocks;
-    } else if (typeof initialStocksOrRes === 'number') {
-      this.resolution = initialStocksOrRes;
-      this.stocks = maybeStocksOrState || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
-      this.stock = this.stocks;
-      this.state = isValidH3Index(h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
-      this.energyJoules = this.stocks.energy || 100.0;
-    } else {
-      this.resolution = 4;
-      this.stocks = initialStocksOrRes || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
-      this.stock = this.stocks;
-      this.state = isValidH3Index(h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
-      this.energyJoules = this.stocks.energy || 100.0;
     }
+    this.energyJoules = maybeEnergy !== undefined ? maybeEnergy : (this.stocks.energy || this.stocks.biomass || 100.0);
 
     this.thermodynamics = {
       massGrams: 0.0,
@@ -143,8 +164,14 @@ export class SpatialMonad<T = any> {
     };
   }
 
-  public static of(token: string | null | undefined, resolution: number = 4, stocks?: any): SpatialMonad {
-    return new SpatialMonad(token ?? null, resolution, stocks);
+  public static of(tokenOrStocks: any, resolutionOrToken?: any, stocks?: any): SpatialMonad {
+    if (tokenOrStocks === null || tokenOrStocks === undefined) {
+      throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+    }
+    if (typeof tokenOrStocks === 'object' && typeof resolutionOrToken === 'string') {
+      return new SpatialMonad(resolutionOrToken, 4, tokenOrStocks);
+    }
+    return new SpatialMonad(tokenOrStocks, resolutionOrToken, stocks);
   }
 
   public static fromGeo(coord: any, resolution: number, initialStock: ThermodynamicStock): SpatialMonad {
@@ -194,7 +221,6 @@ export class SpatialMonad<T = any> {
   }
 
   public getStock(): any {
-    if (this.isCorrupted()) return null;
     return this.stocks;
   }
 

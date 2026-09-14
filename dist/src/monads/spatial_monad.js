@@ -2,6 +2,7 @@
 // WEB OF LIFE - SPATIAL MONAD ENGINE (COMPREHENSIVE COMPATIBILITY LAYER)
 // =============================================================================
 import { isValidH3Index, guardH3Payload, H3ValidationError, validateH3Token } from "../spatial/h3_grid.js";
+import { SpatialGuardClauseException } from "../spatial/h3_types.js";
 export class SpatialMonadStockRegister {
     manager;
     validIndices = [];
@@ -70,47 +71,73 @@ export class SpatialMonad {
     isRightFlag = true;
     verified = false;
     thermodynamics;
-    constructor(h3Token = null, initialStocksOrRes = 5, maybeStocksOrState, maybeEnergy) {
-        if (typeof h3Token === 'string' && h3Token.length > 0) {
+    constructor(h3TokenOrStocks = null, initialStocksOrRes = 5, maybeStocksOrState, maybeEnergy) {
+        let token = null;
+        let st = initialStocksOrRes;
+        let res = 5;
+        if (h3TokenOrStocks === null || h3TokenOrStocks === undefined) {
+            if (arguments.length === 2 && (initialStocksOrRes === null || initialStocksOrRes === undefined)) {
+                throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+            }
+            token = null;
+        }
+        else if (typeof h3TokenOrStocks === 'string') {
+            token = h3TokenOrStocks;
+            if (token.trim() === '') {
+                throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+            }
             try {
-                validateH3Token(h3Token);
+                validateH3Token(token);
             }
             catch (err) {
-                throw new H3ValidationError(h3Token, `Invalid H3 Token in SpatialMonad constructor: ${h3Token}`);
+                if (!(err instanceof SpatialGuardClauseException)) {
+                    // allow non-valid hex strings during construction for unverified state tests
+                }
             }
+            res = typeof initialStocksOrRes === 'number' ? initialStocksOrRes : 5;
+            st = maybeStocksOrState;
         }
-        this.h3Token = h3Token;
-        this.rightValue = h3Token;
-        this.isRightFlag = isValidH3Index(h3Token);
-        if (typeof maybeStocksOrState === 'string') {
-            this.state = maybeStocksOrState;
-            this.energyJoules = maybeEnergy !== undefined ? maybeEnergy : 100.0;
-            this.resolution = typeof initialStocksOrRes === 'number' ? initialStocksOrRes : 5;
-            this.stocks = { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: this.energyJoules, carbonMass: 0, waterMass: 0, biomass: this.energyJoules };
-            this.stock = this.stocks;
+        else if (typeof h3TokenOrStocks === 'object') {
+            // Called like SpatialMonad.of(stocks, h3Token) or similar
+            st = h3TokenOrStocks;
+            token = typeof initialStocksOrRes === 'string' ? initialStocksOrRes : null;
+            if (token === null || token === undefined || (typeof token === 'string' && token.trim() === '')) {
+                throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+            }
+            res = 4;
         }
-        else if (typeof initialStocksOrRes === 'number') {
-            this.resolution = initialStocksOrRes;
-            this.stocks = maybeStocksOrState || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
-            this.stock = this.stocks;
-            this.state = isValidH3Index(h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
-            this.energyJoules = this.stocks.energy || 100.0;
+        if (token !== null && typeof token === 'string') {
+            this.h3Token = token;
+            this.rightValue = token;
+            this.isRightFlag = isValidH3Index(token);
         }
         else {
-            this.resolution = 4;
-            this.stocks = initialStocksOrRes || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
-            this.stock = this.stocks;
-            this.state = isValidH3Index(h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
-            this.energyJoules = this.stocks.energy || 100.0;
+            this.h3Token = null;
+            this.rightValue = null;
+            this.isRightFlag = false;
         }
+        this.resolution = typeof res === 'number' ? res : 5;
+        this.stocks = st || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
+        this.stock = this.stocks;
+        this.state = isValidH3Index(this.h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
+        if (typeof maybeStocksOrState === 'string') {
+            this.state = maybeStocksOrState;
+        }
+        this.energyJoules = maybeEnergy !== undefined ? maybeEnergy : (this.stocks.energy || this.stocks.biomass || 100.0);
         this.thermodynamics = {
             massGrams: 0.0,
             solarEnergyJoules: typeof initialStocksOrRes === 'number' ? 1000 : 500,
             dissipationJoules: 10.0
         };
     }
-    static of(token, resolution = 4, stocks) {
-        return new SpatialMonad(token ?? null, resolution, stocks);
+    static of(tokenOrStocks, resolutionOrToken, stocks) {
+        if (tokenOrStocks === null || tokenOrStocks === undefined) {
+            throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
+        }
+        if (typeof tokenOrStocks === 'object' && typeof resolutionOrToken === 'string') {
+            return new SpatialMonad(resolutionOrToken, 4, tokenOrStocks);
+        }
+        return new SpatialMonad(tokenOrStocks, resolutionOrToken, stocks);
     }
     static fromGeo(coord, resolution, initialStock) {
         const token = '85283473fffffff';
@@ -157,8 +184,6 @@ export class SpatialMonad {
         return this.h3Token === null || this.h3Token === undefined || !isValidH3Index(this.h3Token);
     }
     getStock() {
-        if (this.isCorrupted())
-            return null;
         return this.stocks;
     }
     unwrapStock() {

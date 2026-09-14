@@ -1,37 +1,13 @@
-/**
- * @file src/spatial/h3_types.ts
- * @description H3 Spatial Types and Resolution Tier Definitions.
- * Includes complete backward compatibility for Sprints 001-032.
- */
+// =============================================================================
+// WEB OF LIFE - SPATIAL GUARD CLAUSE EXCEPTION & TYPES (SPRINT 035)
+// =============================================================================
 
-export type H3Resolution = 
-  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 
-  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-
-export type H3ResolutionTier = H3Resolution;
-export type Resolution = H3Resolution;
-export type H3Index = string;
-
-export const MIN_H3_RESOLUTION = 0;
-export const MAX_H3_RESOLUTION = 15;
-
-export interface H3SpatialConstraint {
-  resolution: H3Resolution;
-  index: string;
-}
-
-export interface GeoCoordinate {
-  lat: number;
-  lng: number;
-}
-
-export interface SpatialCell {
-  index: string;
-  resolution: number;
-  center: GeoCoordinate;
-  boundary: GeoCoordinate[];
-  stocks: Map<string, number>;
-  localEntropy: number;
+export class SpatialGuardClauseException extends Error {
+  constructor(message: string) {
+    super(`[SpatialGuardClauseException] ${message}`);
+    this.name = 'SpatialGuardClauseException';
+    Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
+  }
 }
 
 export enum H3ErrorCode {
@@ -49,28 +25,4 @@ export enum H3ErrorCode {
   ERR_H3_OUT_OF_RANGE = 0x06
 }
 
-export interface H3ValidationResult {
-  isValid?: boolean;
-  code?: H3ErrorCode;
-  errorCode?: H3ErrorCode | string;
-  message?: string;
-  resolution?: number;
-  baseCell?: number;
-  valid?: boolean;
-}
-
-export interface IH3GridQuery {
-  resolution: number;
-  baseIndexes?: string[];
-  bounds?: { north: number; south: number; east: number; west: number };
-}
-
-export interface IH3PayloadValidator {
-  isValidPayload(token: string): boolean;
-  assertValidPayload(token: string): void;
-}
-
-export interface IH3GridService {
-  validateIndex(h3Index: string): H3ValidationResult;
-  assertValidIndex(h3Index: string): void;
-}
+export type H3ResolutionTier = number;
