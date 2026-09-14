@@ -1,5 +1,5 @@
 {
-  "current_sprint": 61,
+  "current_sprint": 62,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -300,6 +300,11 @@
       "sprint": 60,
       "goal": "Implement projectVectorOntoSphereTangentSpace removing radial projection component along origin vector in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-14T22:13:44.288667+00:00"
+    },
+    {
+      "sprint": 61,
+      "goal": "Implement computeBoundarySegmentVector3D calculating unnormalized displacement vector between spherical boundary vertices in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-14T22:25:14.801449+00:00"
     }
   ]
 }

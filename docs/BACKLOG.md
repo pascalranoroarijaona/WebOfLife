@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 30%
-SPRINT_GOAL: Implement projectVectorOntoSphereTangentSpace removing radial projection component along origin vector in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 31%
+SPRINT_GOAL: Implement computeBoundarySegmentVector3D calculating unnormalized displacement vector between spherical boundary vertices in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -38,7 +38,8 @@ SPRINT_GOAL: Implement projectVectorOntoSphereTangentSpace removing radial proje
 - [x] Implement `computeSphericalArcBearing` forward geodesic initial azimuth calculation between two lat/lng coordinates in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeSphericalGreatCircleNormal3D` computing normalized cross product of two unit vectors representing great circle plane normal in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `projectVectorOntoSphereTangentSpace` removing radial projection component along origin vector in `src/spatial/h3_adjacency.ts`
+- [x] Implement `projectVectorOntoSphereTangentSpace` removing radial projection component along origin vector in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundarySegmentVector3D` calculating unnormalized displacement vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryOutwardNormal3D` computing outward spherical unit normal vector across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`

@@ -1,0 +1,148 @@
+@startuml sprint_061_schema
+!theme plain
+skinparam monochrome false
+skinparam classAttributeIconSize 0
+skinparam boxPadding 10
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 061 Architectural UML Diagram\nSpherical Boundary Segment Displacement & Thermodynamic Monad Transactions
+
+package "Spatial Subsystem: DGGS & H3 Adjacency" {
+    interface Vector3D {
+        +x: Double
+        +y: Double
+        +z: Double
+    }
+
+    interface BoundarySegment3D {
+        +start: Vector3D
+        +end: Vector3D
+        +displacement: Vector3D
+        +chordLength: Double
+    }
+
+    class H3AdjacencyGraph {
+        +computeBoundarySegmentVector3D(v1: Vector3D, v2: Vector3D): Vector3D
+        +buildBoundarySegment(start: Vector3D, end: Vector3D): BoundarySegment3D
+        +computeFacetNormal(v1: Vector3D, v2: Vector3D): Vector3D
+        +integrateClosedContour(vertices: List<Vector3D>): Vector3D
+    }
+
+    class SpatialCellEntity {
+        +h3Index: String
+        +resolution: Short
+        +centroid: Vector3D
+        +areaM2: Double
+        +isPentagon: Boolean
+    }
+
+    class SpatialBoundarySegmentEntity {
+        +segmentId: UUID
+        +startVertexId: UUID
+        +endVertexId: UUID
+        +cellLeft: String
+        +cellRight: String
+        +displacementVector: Vector3D
+        +chordLength: Double
+        +arcLengthRad: Double
+    }
+
+    SpatialBoundarySegmentEntity ..|> BoundarySegment3D
+    SpatialBoundarySegmentEntity --> Vector3D : contains displacement
+    SpatialCellEntity "1" o-- "5..6" SpatialBoundarySegmentEntity : bounds
+    H3AdjacencyGraph ..> Vector3D : manipulates
+    H3AdjacencyGraph ..> BoundarySegment3D : constructs
+}
+
+package "Thermodynamics Subsystem: Monads & Interfacial Fluxes" {
+    class CellMonadStateTensor {
+        +stateId: UUID
+        +h3Index: String
+        +epochHeight: Long
+        +internalEnergyJoules: Double
+        +entropyJPerK: Double
+        +temperatureKelvin: Double
+        +dicMoles: Double
+        +waterVaporKg: Double
+        +biomassCarbonKg: Double
+        +enthalpyJoules: Double
+        +stateHash: ByteArray
+        +verifyInvariants(): Boolean
+    }
+
+    class InterfacialFluxTensor {
+        +fluxId: UUID
+        +segmentId: UUID
+        +epochHeight: Long
+        +enthalpyFluxWatts: Double
+        +dicFluxMolPerS: Double
+        +moistureFluxKgPerS: Double
+        +entropyGenerationRateWPerK: Double
+        +isConservative: Boolean
+        +fluxSignature: ByteArray
+        +verifySecondLaw(): Boolean
+    }
+
+    SpatialCellEntity "1" *-- "1..*" CellMonadStateTensor : historical states
+    SpatialBoundarySegmentEntity "1" *-- "1..*" InterfacialFluxTensor : edge transport
+}
+
+package "Blockchain Subsystem: Thermodynamic Consensus Ledger" {
+    enum TransactionType {
+        ADVECTION
+        DIFFUSION
+        INSOLATION
+        BIO_UPTAKE
+        PHASE_CHANGE
+    }
+
+    class ThermodynamicTransaction {
+        +txId: UUID
+        +blockHeight: Long
+        +txType: TransactionType
+        +sourceCell: String
+        +destinationCell: String
+        +segmentId: UUID
+        +deltaInternalEnergy: Double
+        +deltaEntropy: Double
+        +deltaDic: Double
+        +deltaMoisture: Double
+        +deltaBiomass: Double
+        +witnessProof: ByteArray
+    }
+
+    class ThermodynamicBlock {
+        +blockHeight: Long
+        +previousBlockHash: ByteArray
+        +blockHash: ByteArray
+        +merkleStateRoot: ByteArray
+        +merkleFluxRoot: ByteArray
+        +totalEnthalpyBalance: Double
+        +totalEntropyGenerated: Double
+        +closedLoopFluxDivergence: Double
+        +timestamp: Instant
+        +proposerValidator: String
+        +validatorSignature: ByteArray
+        +verifyBlockProof(): Boolean
+    }
+
+    ThermodynamicBlock "1" *-- "1..*" ThermodynamicTransaction : packages
+    ThermodynamicTransaction --> SpatialBoundarySegmentEntity : traverses edge
+    ThermodynamicTransaction --> CellMonadStateTensor : state update witness
+}
+
+note right of H3AdjacencyGraph
+  <b>Antisymmetry Invariant:</b>
+  L_BA = -L_AB
+  <b>First Law Conservative Parity:</b>
+  Phi_{i -> j} = -Phi_{j -> i}
+  <b>Stokesian Closed Loop Invariant:</b>
+  sum_{k=1}^N L_{k, k+1} == (0,0,0)
+end note
+
+note bottom of InterfacialFluxTensor
+  <b>Second Law Inequality:</b>
+  dot{S}_{gen, AB} = F_{Q, AB} * (1/T_j - 1/T_i) >= 0
+end note
+
+@enduml

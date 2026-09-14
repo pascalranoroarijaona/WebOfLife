@@ -1,6 +1,6 @@
 // =============================================================================
 // WEB OF LIFE - SPATIAL MONAD & CONSERVATIVE DYNAMICS ADAPTER
-// Unified Retro-Compatibility Suite (Sprints 002 - 060)
+// Unified Retro-Compatibility Suite (Sprints 002 - 061)
 // =============================================================================
 import { projectVectorOntoSphereTangentSpace, projectVectorOntoSphereTangentSpaceDetailed, computeAdvectiveEdgeTransfer, } from '../spatial/h3_adjacency.js';
 import { computeInterfaceAdvectiveTransfer, assertH3Resolution, guardH3Payload, H3ValidationError, H3ErrorCode, isValidH3Index, } from '../spatial/h3_grid.js';
@@ -245,6 +245,10 @@ export class SpatialMonad {
     // Value getter
     get value() {
         return this.valueStore;
+    }
+    // Legacy Sprint 002 extraction method
+    extract() {
+        return this.valueStore ?? this.stock ?? this.stocks;
     }
     // Factory methods
     static of(arg1, arg2, arg3) {

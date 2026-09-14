@@ -1,6 +1,6 @@
 // =============================================================================
 // WEB OF LIFE - SPATIAL MONAD & CONSERVATIVE DYNAMICS ADAPTER
-// Unified Retro-Compatibility Suite (Sprints 002 - 060)
+// Unified Retro-Compatibility Suite (Sprints 002 - 061)
 // =============================================================================
 
 import {
@@ -329,7 +329,7 @@ export function applyPlanetaryInsolationStep(monad: SpatialMonad, subsolarVector
 }
 
 // =============================================================================
-// 2. POLYMORPHIC SPATIAL MONAD (Sprints 002 - 060 Unified Implementation)
+// 2. POLYMORPHIC SPATIAL MONAD (Sprints 002 - 061 Unified Implementation)
 // =============================================================================
 
 export interface CellNodeData {
@@ -415,6 +415,11 @@ export class SpatialMonad<T = any> {
   // Value getter
   public get value(): T {
     return this.valueStore as T;
+  }
+
+  // Legacy Sprint 002 extraction method
+  public extract(): any {
+    return this.valueStore ?? this.stock ?? this.stocks;
   }
 
   // Factory methods
