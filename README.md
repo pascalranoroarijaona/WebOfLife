@@ -204,6 +204,41 @@ python agent_orchestrator.py --wipe
 ## 5. Master Planetary Research Roadmap
 
 <!-- BACKLOG_START -->
+<!-- Verified, Groomed, and Prioritized Backlog -->
+Roadmap Completion: 18%
+SPRINT_GOAL: Implement Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices in src/biosphere/trophic.ts.
+
+### Phase 1: Foundational Thermodynamics & Spatial Core
+- [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
+- [x] First Law mass conservation net flow calculations and hierarchical structure tree (`src/earth_pod.ts`)
+- [x] Planetary Mega-POD bootstrap mechanism and baseline simulation tick loops (`src/earth_pod.ts`, `src/main.ts`)
+- [ ] Uber H3 Geospatial Partitioning Engine (`src/spatial/h3_grid.ts`)
+- [ ] Exergy & Entropy Generation Accounting and Gouy-Stodola theorem validation (`src/thermodynamics/exergy.ts`)
+- [ ] Dynamic Albedo & Radiation Balance Feedback (`src/thermodynamics/albedo.ts`)
+- [ ] Biogeochemical Mass-Conservation Reservoirs for C, N, P, and Water (`src/monads/biogeochemical_cycles.ts`)
+
+### Phase 2: Biosphere & Ecological Dynamics
+- [ ] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
+- [ ] Functional Response Curves (Holling Type II/III) for consumer-prey dynamics (`src/biosphere/kinetics.ts`)
+- [ ] Stoichiometric Nutritional Constraint Engine (C:N:P elemental limits) (`src/biosphere/stoichiometry.ts`)
+- [ ] Common Mycorrhizal Network (CMN) Interface and subterranean hyphae graphs (`src/biosphere/mycorrhizal.ts`)
+- [ ] Carbon-for-Mineral Exchange Kinetics in plant-fungal symbioses (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Shannon-Wiener and Simpson Biodiversity Index calculators (`src/biosphere/diversity_metrics.ts`)
+- [ ] Stochastic Extinction, Bottleneck, and Minimum Viable Population engine (`src/biosphere/population_genetics.ts`)
+- [ ] Soil Microbiome, Detritus, and Necromass decomposition pools (`src/geobiome/soil_matrix.ts`)
+
+### Phase 3: Technosphere & Industrial Metabolism
+- [ ] Direct Air Capture (DAC) thermodynamic solvent regeneration and energy penalties (`src/technosphere/dac.ts`)
+- [ ] Mineral Sequestration Kinetics (basalt/peridotite carbonation) (`src/technosphere/dac.ts`)
+- [ ] Semiconductor Manufacturing & Critical Mineral supply chain tracking (`src/technosphere/semiconductors.ts`)
+- [ ] Industrial Energy Grids balancing variable renewable generation and thermal loss (`src/technosphere/energy_grid.ts`)
+- [ ] Heavy Metal, Xenobiotic, and Thermal Waste Pollution stock tracking (`src/technosphere/industrial_metabolism.ts`)
+
+### Phase 4: Blockchain Ledger & AI Symbiosis
+- [ ] Thermodynamic Vortex Block Chaining (`src/ledger/vortex_ledger.ts`)
+- [ ] Proof of Ecological Work (PoEW) validation middleware (`src/ledger/poew.ts`)
+- [ ] SQLite schema definitions for append-only temporal vortex blocks (`db/schema.sql`)
+- [ ] Multi-Objective AI Optimization Objective function integrating wellbeing, diversity, and explorability (`src/optimization/ai_symbiosis.ts`)
 
 <!-- BACKLOG_END -->
 

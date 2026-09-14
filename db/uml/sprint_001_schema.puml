@@ -1,0 +1,78 @@
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 001: Trophic Graphs & Thermodynamic Ledger
+
+package "Biosphere Trophic Domain" {
+    enum TrophicLevel {
+        PRIMARY_PRODUCER
+        PRIMARY_CONSUMER
+        SECONDARY_CONSUMER
+        APEX_PREDATOR
+        DECOMPOSER
+    }
+
+    interface EnergyPacket {
+        +joules: number
+        +sourceNodeId: string
+        +timestamp: number
+    }
+
+    interface TrophicNode {
+        +id: string
+        +name: string
+        +level: TrophicLevel
+        +biomassJoules: number
+        +metabolicRate: number
+        +absorbEnergy(packet: EnergyPacket): void
+        +dissipateHeat(): number
+    }
+
+    class TrophicEdge {
+        +predatorId: string
+        +preyId: string
+        +efficiencyRate: number
+        +transfer(preyNode: TrophicNode, predatorNode: TrophicNode): void
+    }
+
+    class DirectedAcyclicTrophicGraph {
+        -nodes: Map<string, TrophicNode>
+        -edges: TrophicEdge[]
+        +addNode(node: TrophicNode): void
+        +addEdge(edge: TrophicEdge): void
+        -validateAcyclic(predatorId: string, preyId: string): void
+        +stepEcosystemTick(): void
+    }
+
+    class "TrophicStateMonad<T>" as TrophicStateMonad {
+        -value: T
+        {static} +unit<T>(val: T): TrophicStateMonad<T>
+        +bind<U>(fn: (val: T) => TrophicStateMonad<U>): TrophicStateMonad<U>
+        +inspect(): T
+    }
+}
+
+package "Blockchain & Persistence Layer" {
+    class ThermodynamicLedgerBlock {
+        +blockId: string
+        +blockIndex: number
+        +previousHash: string
+        +hash: string
+        +nonce: number
+        +solarInputTotal: number
+        +metabolicHeatTotal: number
+        +biomassTotal: number
+        +timestamp: number
+    }
+}
+
+TrophicNode --> TrophicLevel : uses
+EnergyPacket <-- TrophicNode : consumes
+TrophicEdge --> TrophicNode : connects
+DirectedAcyclicTrophicGraph *-- TrophicNode : contains
+DirectedAcyclicTrophicGraph *-- TrophicEdge : contains
+TrophicStateMonad ..> TrophicNode : wraps state
+ThermodynamicLedgerBlock --> DirectedAcyclicTrophicGraph : records metrics
+
+@enduml
