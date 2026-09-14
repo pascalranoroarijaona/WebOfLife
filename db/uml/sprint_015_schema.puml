@@ -1,0 +1,42 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class SpatialMonad {
+  +id: String
+  +energyLevel: Decimal
+  +processState(): void
+}
+
+class H3Grid {
+  -gridResolution: Integer
+  +validateH3String(payload: unknown): String
+  +processPayload(payload: String): SpatialMonad
+}
+
+class H3GuardClause {
+  +validate(payload: unknown): String
+  +checkNullOrUndefined(payload: unknown): void
+  +checkStringFormat(payload: unknown): void
+}
+
+class H3ValidationResult {
+  +isValid: Boolean
+  +payload: String
+  +error: String
+}
+
+class ThermodynamicBlockchainBlock {
+  +blockId: Long
+  +previousHash: String
+  +currentHash: String
+  +trophicEnergyStock: Decimal
+  +verifyIntegrity(): Boolean
+}
+
+SpatialMonad <|-- H3Grid : extends
+H3Grid --> H3GuardClause : composition
+H3GuardClause ..> H3ValidationResult : generates
+ThermodynamicBlockchainBlock "1" *-- "many" SpatialMonad : anchors
+
+@enduml

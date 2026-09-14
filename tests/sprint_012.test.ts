@@ -17,11 +17,11 @@ describe('Sprint 012 - H3 String Payload Null-Check Guard Clauses', () => {
 
   it('should throw thermodynamic spatial errors on null or undefined payloads', () => {
     assert.throws((): void => {
-      guardH3Payload(null);
+      guardH3Payload(null as unknown as string);
     }, /\[Thermodynamic Spatial Error\]/);
 
     assert.throws((): void => {
-      guardH3Payload(undefined);
+      guardH3Payload(undefined as unknown as string);
     }, /\[Thermodynamic Spatial Error\]/);
 
     assert.throws((): void => {
