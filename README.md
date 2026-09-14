@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 28%
-SPRINT_GOAL: Implement latLngToUnitVector3D 3D Cartesian spherical projection in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 26%
+SPRINT_GOAL: Implement assertValidLatitudeDegrees boundary check enforcing [-90, 90] range in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -236,9 +236,13 @@ SPRINT_GOAL: Implement latLngToUnitVector3D 3D Cartesian spherical projection in
 - [x] Implement isPentagonCell topology validator using H3 cell index decomposition in `src/spatial/h3_adjacency.ts`
 - [x] Implement calculateH3BoundaryContactArea vertical interface cross-section calculator in `src/spatial/h3_adjacency.ts`
 - [x] Define `H3CellInterfaceMetrics` interface in `src/spatial/h3_types.ts`
-- [ ] Implement `latLngToUnitVector3D` 3D Cartesian spherical projection in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeSphericalArcBearing` geodesic azimuth calculation in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryUnitNormalVector` spherical unit normal vector calculator in `src/spatial/h3_adjacency.ts`
+- [x] Implement `latLngToUnitVector3D` 3D Cartesian spherical projection in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `assertValidLatitudeDegrees` boundary check enforcing [-90, 90] range in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `normalizeLongitudeDegrees` angular wrapper into [-180, 180) range in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `normalizeAngleRadians` angular wrapper into [-pi, pi) range in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeSphericalArcBearing` forward geodesic initial azimuth calculation between two lat/lng coordinates in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryUnitNormalVector` outward spherical unit normal vector calculator across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
 - [ ] Implement Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
@@ -248,7 +252,7 @@ SPRINT_GOAL: Implement latLngToUnitVector3D 3D Cartesian spherical projection in
 - [ ] Logarithmic CO2 radiative forcing function with band overlap in `src/thermodynamics/radiative_balance.ts`
 - [ ] Tetens saturation vapor pressure and Clausius-Clapeyron phase transitions in `src/thermodynamics/phase_change.ts`
 - [ ] Implement calculateEvaporationExergyLoss mass-enthalpy dissipation calculator in `src/thermodynamics/phase_change.ts`
-- [ ] Gouy-Stodola rate computation and Exergy destruction accounting in `src/thermodynamics/exergy.ts`
+- [ ] Define ExergyDestructionReport interface and Gouy-Stodola rate computation in `src/thermodynamics/exergy.ts`
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures in `src/thermodynamics/carnot.ts`
 - [ ] Surface albedo endmember profiles for snow, ice, ocean, and canopy in `src/thermodynamics/albedo.ts`
 - [ ] Temperature-dependent sigmoidal ice-fraction melting function in `src/thermodynamics/albedo.ts`
@@ -264,14 +268,15 @@ SPRINT_GOAL: Implement latLngToUnitVector3D 3D Cartesian spherical projection in
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
-- [ ] Define `ElementalBiomassPool` interface and Redfield stoichiometric ratios in `src/biosphere/stoichiometry_types.ts`
+- [ ] Define `BiomassStoichiometryVector` interface with Redfield canonical ratios in `src/biosphere/stoichiometry_types.ts`
 - [ ] Implement Liebig's Law of the Minimum and Droop cell quota limitation operators in `src/biosphere/stoichiometric_limitation.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper in `src/biosphere/biomass_energy.ts`
-- [ ] Plant Functional Type (PFT) enum and Leaf Trait profile interfaces in `src/biosphere/traits.ts`
-- [ ] Rubisco Arrhenius activation and deactivation temperature-response function in `src/biosphere/photosynthesis_kinetics.ts`
+- [ ] Plant Functional Type (PFT) enum and `CanopyTraitProfile` interface in `src/biosphere/traits.ts`
+- [ ] Implement canopy light extinction via Beer-Lambert formulation with sunlit/shaded leaf partitioning in `src/biosphere/canopy_radiation.ts`
+- [ ] Rubisco Arrhenius activation and peaked deactivation temperature-response function in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Michaelis-Menten affinity constants calculation for CO2 and O2 in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Farquhar-von Caemmerer-Berry (FvCB) $C_3$/$C_4$ assimilation monad in `src/biosphere/photosynthesis_fvcb.ts`
-- [ ] Ball-Berry-Woodward stomatal conductance and transpiration coupling in `src/biosphere/stomatal_conductance.ts`
+- [ ] Ball-Berry-Woodward and Medlyn stomatal conductance coupling in `src/biosphere/stomatal_conductance.ts`
 - [ ] Allometric metabolic scaling and Kleiber's Law basal respiration calculator in `src/biosphere/allometry.ts`
 - [ ] Holling Type II predator ingestion rate function with handling time parameters in `src/biosphere/holling_kinetics.ts`
 - [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds in `src/biosphere/holling_kinetics.ts`
@@ -279,6 +284,7 @@ SPRINT_GOAL: Implement latLngToUnitVector3D 3D Cartesian spherical projection in
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication in `src/biosphere/trophic_matrix.ts`
 - [ ] Gauss-Seidel steady-state biomass solver updating node biomass stocks in `src/biosphere/trophic_solver.ts`
 - [ ] Spectral radius and relative residual convergence checks in `src/biosphere/trophic_solver.ts`
+- [ ] Define `HyphalNode` and directed `HyphalEdge` graph structure in `src/biosphere/mycorrhizal_types.ts`
 - [ ] Mutualistic carbon-for-nutrient exchange and fungal sink strength calculation in `src/biosphere/mycorrhizal_network.ts`
 - [ ] Spatial hyphal network conductivity matrix mapping carbon translocation efficiency in `src/biosphere/hyphal_transport.ts`
 - [ ] Fungal maintenance respiration penalty function factoring in temperature-dependent soil enzyme activation energies in `src/biosphere/mycorrhizal_decay.ts`

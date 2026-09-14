@@ -1,97 +1,69 @@
-/**
- * Web of Life - Discrete Global Grid System (DGGS) Types
- * Unified contract preserving all historical invariants across Sprints 001-052.
- */
-
-import { THERMODYNAMIC_CONSTANTS } from '../thermodynamics/constants.js';
-
-export { THERMODYNAMIC_CONSTANTS };
-
-/**
- * Immutable 3D Cartesian Unit Vector [x, y, z] on the unit sphere S^2.
- * Invariant: Math.abs(x*x + y*y + z*z - 1.0) < 1e-12
- */
-export type UnitVector3D = readonly [x: number, y: number, z: number];
-
-/**
- * Mutable or readable Cartesian 3D point representation.
- */
-export interface CartesianPoint3D {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-}
-
-/**
- * Complete spatial metric descriptor for a single H3 DGGS cell.
- */
-export interface CellSpatialGeometry {
-  readonly h3Index: string;
-  readonly latDeg: number;
-  readonly lngDeg: number;
-  readonly unitVector: UnitVector3D;
-  readonly surfaceAreaM2: number;
-}
-
-/**
- * Advective directional exchange edge between adjacent H3 cells.
- */
-export interface AdvectiveEdgeFlux {
-  readonly sourceH3: string;
-  readonly targetH3: string;
-  readonly chordLengthM: number;
-  readonly normalUnitVector: UnitVector3D;
-  readonly massFluxKgPerSec: number;
-  readonly heatFluxWatts: number;
-}
-
-/**
- * Physical stock state of a biophysical cell.
- */
-export interface BiophysicalStocks {
-  readonly thermalEnergyJoules: number;
-  readonly carbonDioxideKg: number;
-  readonly biomassCarbonKg: number;
-  readonly atmosphericWaterKg: number;
-  readonly oxygenKg: number;
-}
-
-/**
- * Comprehensive per-cell state incorporating geometry and thermodynamic stocks.
- */
-export interface CellBiophysicalState {
-  readonly h3Index: string;
-  readonly latDeg: number;
-  readonly lngDeg: number;
-  readonly areaM2: number;
-  readonly albedo: number;
-  readonly lai: number;
-  readonly tauAtm: number;
-  readonly stocks: BiophysicalStocks;
-}
-
-/**
- * Planetary grid simulation state encompassing all discrete cells and stellar forcing.
- */
-export interface PlanetaryGridState {
-  readonly timeStepSeconds: number;
-  readonly subsolarVector: UnitVector3D;
-  readonly cells: ReadonlyMap<string, CellBiophysicalState>;
-}
-
 // =============================================================================
-// HISTORICAL RFC CONSTANTS, ENUMS & INTERFACES (SPRINTS 001 - 051)
+// WEB OF LIFE - H3 SPATIAL INDEXING & GEODESIC TYPES
+// Cumulative Retro-Compatibility: Sprints 001 - 053
 // =============================================================================
 
-export type LatLngCoord = [number, number];
+export type H3Index = string;
+export type Resolution = number;
+export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+export type H3Resolution = H3ResolutionTier;
 
-export interface IH3CellInfo {
-  h3Index: string;
-  resolution: number;
-  centerLatLng: LatLngCoord;
-  boundaryVertices: LatLngCoord[];
-  isPentagon: boolean;
-  areaM2: number;
+export interface GeodesicCoordinate {
+  readonly latDeg: number;
+  readonly lonDeg: number;
+}
+
+export interface SphericalCoordinateRad {
+  readonly phiRad: number;
+  readonly lambdaRad: number;
+}
+
+export interface AdjacencyVector {
+  readonly sourceIndex: H3Index;
+  readonly neighborIndex: H3Index;
+  readonly distanceMeters: number;
+  readonly azimuthDegrees: number;
+  readonly interfaceLengthMeters: number;
+}
+
+/**
+ * Universal CellThermodynamicState accommodating both sprint_053 simple transport
+ * and historical multi-layer state variables.
+ */
+export interface CellThermodynamicState {
+  energyJoules?: number;
+  waterKg?: number;
+  carbonKg?: number;
+  oxygenKg?: number;
+  mineralKg?: number;
+  temperatureKelvin?: number;
+  conductivity?: number;
+  heightColumnMeters?: number;
+  h3Index?: string;
+  mineralsKg?: number;
+  waterMassKg?: number;
+  carbonMassKg?: number;
+  mineralMassKg?: number;
+  dissolvedOxygenKg?: number;
+  enthalpyJoules?: number;
+  elevationMeters?: number;
+  soilDepthMeters?: number;
+  cellIndex?: string;
+  centroid?: { lat: number; lng: number };
+  internalEnergyJoules?: number;
+  waterVaporMassKg?: number;
+  dissolvedCarbonKg?: number;
+  dissolvedNutrientsKg?: number;
+  biomassKg?: number;
+  entropyJoulesPerKelvin?: number;
+}
+
+export interface DiffusiveFluxExchange {
+  readonly deltaEnergyJoules: number;
+  readonly deltaWaterKg: number;
+  readonly deltaCarbonKg: number;
+  readonly deltaOxygenKg: number;
+  readonly deltaMineralKg: number;
 }
 
 export enum H3ErrorCode {
@@ -100,7 +72,7 @@ export enum H3ErrorCode {
   INVALID_CHARACTER = 'H3_ERR_INVALID_CHARACTER',
   INVALID_RESOLUTION = 'H3_ERR_INVALID_RESOLUTION',
   INVALID_BASE_CELL = 'H3_ERR_INVALID_BASE_CELL',
-  NULL_INDEX = 'H3_ERR_NULL_INDEX'
+  NULL_INDEX = 'H3_ERR_NULL_INDEX',
 }
 
 export class SpatialGuardClauseException extends Error {
@@ -111,8 +83,47 @@ export class SpatialGuardClauseException extends Error {
   }
 }
 
-export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-export type H3Resolution = H3ResolutionTier;
+export interface IVerticalStratum {
+  zBaseMeters: number;
+  zTopMeters: number;
+}
+
+export interface IH3BoundaryContactAreaOptions {
+  applyRadialExpansion?: boolean;
+}
+
+export type UnitVector3D = [number, number, number];
+
+export interface CellSpatialGeometry {
+  h3Index: string;
+  latDeg: number;
+  lngDeg: number;
+  unitVector: UnitVector3D;
+  surfaceAreaM2: number;
+}
+
+export interface CellBiophysicalState {
+  h3Index: string;
+  latDeg: number;
+  lngDeg: number;
+  areaM2: number;
+  albedo: number;
+  lai: number;
+  tauAtm: number;
+  stocks: {
+    thermalEnergyJoules: number;
+    carbonDioxideKg: number;
+    biomassCarbonKg: number;
+    atmosphericWaterKg: number;
+    oxygenKg: number;
+  };
+}
+
+export interface PlanetaryGridState {
+  timeStepSeconds: number;
+  subsolarVector: UnitVector3D;
+  cells: Map<string, CellBiophysicalState>;
+}
 
 export enum ThermodynamicChannel {
   WATER_MASS_KG = 0,
@@ -120,11 +131,31 @@ export enum ThermodynamicChannel {
   VEGETATION_BIOMASS_KG = 2,
   ATMOSPHERIC_CO2_KG = 3,
   MINERAL_NITROGEN_KG = 4,
-  SENSIBLE_HEAT_JOULES = 5,
+  ALBEDO = 5,
   TEMPERATURE_KELVIN = 6,
-  ALBEDO = 7,
+  SENSIBLE_HEAT_JOULES = 7,
   CHANNEL_COUNT = 8,
 }
+
+export const THERMODYNAMIC_CONSTANTS = {
+  MIN_TEMPERATURE_KELVIN: 2.7315,
+  DEFAULT_REGOLITH_MASS_KG: 1000.0,
+  SPECIFIC_HEAT: {
+    REGOLITH: 840.0,
+    WATER: 4184.0,
+    SOIL_ORGANIC_CARBON: 1800.0,
+    VEGETATION_BIOMASS: 1900.0,
+    ATMOSPHERIC_CO2: 846.0,
+    MINERAL_NITROGEN: 1200.0,
+  },
+  SPECIFIC_ENTHALPY: {
+    WATER: -15.87e6,
+    SOIL_ORGANIC_CARBON: -32.79e6,
+    VEGETATION_BIOMASS: -17.50e6,
+    ATMOSPHERIC_CO2: -8.94e6,
+    MINERAL_NITROGEN: -2.85e6,
+  },
+} as const;
 
 export interface CellThermodynamicOverride {
   waterMassKg?: number;
@@ -132,9 +163,22 @@ export interface CellThermodynamicOverride {
   vegetationBiomassKg?: number;
   atmosphericCo2Kg?: number;
   mineralNitrogenKg?: number;
-  sensibleHeatJoules?: number;
-  temperatureKelvin?: number;
   albedo?: number;
+  temperatureKelvin?: number;
+  sensibleHeatJoules?: number;
+}
+
+export type H3ThermodynamicOverridesMap =
+  | Map<string, CellThermodynamicOverride>
+  | Record<string, CellThermodynamicOverride>;
+
+export interface OverrideOptions {
+  strictThermodynamicBounds?: boolean;
+  minTemperatureKelvin?: number;
+  recomputeSensibleHeat?: boolean;
+  regolithMassKg?: number;
+  includeChemicalEnthalpy?: boolean;
+  allowMassDestruction?: boolean;
 }
 
 export interface CellThermodynamicDeltaRecord {
@@ -157,29 +201,6 @@ export interface ThermodynamicOverrideReport {
   cellReports: CellThermodynamicDeltaRecord[];
 }
 
-export type H3ThermodynamicOverridesMap =
-  | Map<string, CellThermodynamicOverride>
-  | Record<string, CellThermodynamicOverride>;
-
-export interface OverrideOptions {
-  strictThermodynamicBounds?: boolean;
-  minTemperatureKelvin?: number;
-  recomputeSensibleHeat?: boolean;
-  regolithMassKg?: number;
-  includeChemicalEnthalpy?: boolean;
-  allowMassDestruction?: boolean;
-}
-
-export interface IVerticalStratum {
-  zBaseMeters: number;
-  zTopMeters: number;
-}
-
-export interface IH3BoundaryContactAreaOptions {
-  applyRadialExpansion?: boolean;
-  [key: string]: any;
-}
-
 export interface H3CellInterfaceMetrics {
   originIndex: string;
   neighborIndex: string;
@@ -193,9 +214,17 @@ export interface H3CellInterfaceMetrics {
   geometricConductance: number;
 }
 
-export function createH3CellInterfaceMetrics(
-  params: Omit<H3CellInterfaceMetrics, 'geometricConductance'>
-): H3CellInterfaceMetrics {
+export function createH3CellInterfaceMetrics(params: {
+  originIndex: string;
+  neighborIndex: string;
+  sharedEdgeLengthMeters: number;
+  centroidDistanceMeters: number;
+  bearingRadians: number;
+  normalVector: [number, number, number];
+  atmosphericContactAreaM2: number;
+  subterraneanContactAreaM2: number;
+  topographicSlope: number;
+}): H3CellInterfaceMetrics {
   if (params.originIndex === params.neighborIndex) {
     throw new Error('Self-interface is invalid');
   }
@@ -205,16 +234,13 @@ export function createH3CellInterfaceMetrics(
   if (params.centroidDistanceMeters <= 0) {
     throw new Error('centroidDistanceMeters must be strictly positive');
   }
-  const geometricConductance = params.sharedEdgeLengthMeters / params.centroidDistanceMeters;
   return {
     ...params,
-    geometricConductance,
+    geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
   };
 }
 
-export function createReciprocalInterfaceMetrics(
-  metrics: H3CellInterfaceMetrics
-): H3CellInterfaceMetrics {
+export function createReciprocalInterfaceMetrics(metrics: H3CellInterfaceMetrics): H3CellInterfaceMetrics {
   return {
     originIndex: metrics.neighborIndex,
     neighborIndex: metrics.originIndex,
@@ -229,40 +255,6 @@ export function createReciprocalInterfaceMetrics(
   };
 }
 
-export interface CellThermodynamicState {
-  cellIndex?: string;
-  h3Index?: string;
-  centroid?: { lat: number; lng: number };
-  waterMassKg?: number;
-  carbonMassKg?: number;
-  mineralMassKg?: number;
-  dissolvedOxygenKg?: number;
-  enthalpyJoules?: number;
-  elevationMeters?: number;
-  temperatureKelvin?: number;
-  soilDepthMeters?: number;
-  internalEnergyJoules?: number;
-  waterVaporMassKg?: number;
-  dissolvedCarbonKg?: number;
-  dissolvedNutrientsKg?: number;
-  biomassKg?: number;
-  entropyJoulesPerKelvin?: number;
-  heightColumnMeters?: number;
-  conductivity?: number;
-  energyJoules?: number;
-  waterKg?: number;
-  carbonKg?: number;
-  oxygenKg?: number;
-  mineralsKg?: number;
-  index?: string;
-  carbonMass?: number;
-  waterMass?: number;
-  mineralNutrients?: number;
-  thermalEnergy?: number;
-  volumeM3?: number;
-  temperatureK?: number;
-}
-
 export interface FluxComputationParams {
   kSatPorous?: number;
   manningN?: number;
@@ -275,40 +267,42 @@ export function computeInterfaceFlux(
   metrics: H3CellInterfaceMetrics,
   dt: number,
   params: FluxComputationParams
-): {
-  deltaWaterKg: number;
-  deltaEnthalpyJoules: number;
-  deltaCarbonKg: number;
-  deltaMineralKg: number;
-  entropyProducedJPerK: number;
-} {
-  const tA = stateA.temperatureKelvin ?? 288.15;
-  const tB = stateB.temperatureKelvin ?? 288.15;
-  const deltaT = tA - tB;
-  const eddyHeat = params.eddyDiffusivityHeat ?? 15.0;
+) {
+  const dist = metrics.centroidDistanceMeters;
+  const areaSub = metrics.subterraneanContactAreaM2;
+  const areaAtm = metrics.atmosphericContactAreaM2;
 
-  const heatFluxWatts = eddyHeat * (metrics.atmosphericContactAreaM2 / metrics.centroidDistanceMeters) * deltaT;
-  const deltaEnthalpy = heatFluxWatts * dt;
-
-  const elevA = stateA.elevationMeters ?? 0;
-  const elevB = stateB.elevationMeters ?? 0;
-  const headDiff = elevA - elevB;
   const kSat = params.kSatPorous ?? 1e-4;
-  const waterFlowRate = kSat * (metrics.subterraneanContactAreaM2 / metrics.centroidDistanceMeters) * headDiff * 1000;
-  const deltaWater = waterFlowRate * dt;
+  const waterA = stateA.waterMassKg ?? stateA.waterKg ?? 0;
+  const waterB = stateB.waterMassKg ?? stateB.waterKg ?? 0;
+  const waterGrad = (waterA - waterB) / dist;
+  const deltaWater = kSat * waterGrad * areaSub * dt * 0.01;
 
-  const concCarbon = ((stateA.carbonMassKg ?? 0) + (stateB.carbonMassKg ?? 0)) / ((stateA.waterMassKg ?? 1) + (stateB.waterMassKg ?? 1));
-  const concMineral = ((stateA.mineralMassKg ?? 0) + (stateB.mineralMassKg ?? 0)) / ((stateA.waterMassKg ?? 1) + (stateB.waterMassKg ?? 1));
-  const deltaCarbon = deltaWater * concCarbon * 0.1;
-  const deltaMineral = deltaWater * concMineral * 0.1;
+  const carbonA = stateA.carbonMassKg ?? stateA.carbonKg ?? 0;
+  const carbonB = stateB.carbonMassKg ?? stateB.carbonKg ?? 0;
+  const carbonGrad = (carbonA - carbonB) / dist;
+  const deltaCarbon = kSat * carbonGrad * areaSub * dt * 0.01;
 
-  const entropyProduced = deltaEnthalpy * (1 / tB - 1 / tA);
+  const mineralA = stateA.mineralMassKg ?? stateA.mineralKg ?? stateA.mineralsKg ?? 0;
+  const mineralB = stateB.mineralMassKg ?? stateB.mineralKg ?? stateB.mineralsKg ?? 0;
+  const mineralGrad = (mineralA - mineralB) / dist;
+  const deltaMineral = kSat * mineralGrad * areaSub * dt * 0.01;
+
+  const tA = stateA.temperatureKelvin ?? 290.0;
+  const tB = stateB.temperatureKelvin ?? 290.0;
+  const heatCond = params.eddyDiffusivityHeat ?? 15.0;
+  const deltaEnthalpy = heatCond * (areaAtm / dist) * (tA - tB) * dt;
+
+  let entropyProduced = 0;
+  if (tA > 0 && tB > 0 && Math.abs(deltaEnthalpy) > 0) {
+    entropyProduced = Math.abs(deltaEnthalpy) * Math.abs(1 / Math.min(tA, tB) - 1 / Math.max(tA, tB));
+  }
 
   return {
-    deltaWaterKg: deltaWater,
-    deltaEnthalpyJoules: deltaEnthalpy,
-    deltaCarbonKg: deltaCarbon,
-    deltaMineralKg: deltaMineral,
-    entropyProducedJPerK: Math.max(0, entropyProduced),
+    deltaWaterKg: -deltaWater,
+    deltaCarbonKg: -deltaCarbon,
+    deltaMineralKg: -deltaMineral,
+    deltaEnthalpyJoules: -deltaEnthalpy,
+    entropyProducedJPerK: entropyProduced,
   };
 }

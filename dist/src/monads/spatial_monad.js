@@ -1,6 +1,6 @@
 /**
  * Web of Life - Spatial Monad & Thermodynamic Grid Engine
- * Unified monadic container preserving backward-compatibility across Sprints 001-052.
+ * Unified monadic container preserving backward-compatibility across Sprints 001-053.
  */
 import * as h3 from 'h3-js';
 import { H3ErrorCode, } from '../spatial/h3_types.js';
@@ -34,6 +34,7 @@ export class SpatialMonad {
     _overrideLedger = [];
     id = '';
     energyJoules = 0;
+    state = '';
     constructor(...args) {
         if (args.length === 0) {
             this._state = undefined;
@@ -45,19 +46,17 @@ export class SpatialMonad {
         else if (args.length === 2) {
             const [arg1, arg2] = args;
             if (typeof arg2 === 'number') {
-                // Sprint 029: new SpatialMonad(token, solarFlux)
                 this._h3Index = String(arg1);
                 this._solarEnergy = arg2;
                 this._isVerified = false;
             }
             else if (arg2 && typeof arg2 === 'object' && ('joules' in arg2 || 'entropy' in arg2)) {
-                // Sprint 032: new SpatialMonad(token, EnergyStock)
                 this._h3Index = String(arg1);
                 this._stock = { ...arg2 };
                 this._state = 'UnvalidatedState';
+                this.state = 'UnvalidatedState';
             }
             else if (arg2 && typeof arg2 === 'object' && 'carbonStockKg' in arg2) {
-                // Sprint 034: new SpatialMonad(token, stock)
                 validateH3Token(arg1);
                 this._h3Index = String(arg1);
                 this._stock = { ...arg2 };
@@ -69,7 +68,6 @@ export class SpatialMonad {
             }
         }
         else if (args.length === 3) {
-            // Sprint 023 / 024: new SpatialMonad(index, resolution, stock)
             const [index, res, stock] = args;
             if (res < 0 || res > 15 || !Number.isInteger(res)) {
                 throw new RangeError(`[SpatialError] Invalid resolution tier: ${res}`);
@@ -80,9 +78,9 @@ export class SpatialMonad {
             this._state = stock;
         }
         else if (args.length >= 4) {
-            // Sprint 030: new SpatialMonad(id, energy, state, energy)
             this.id = String(args[0]);
-            this.energyJoules = args[1];
+            this.energyJoules = Number(args[1]);
+            this.state = String(args[2]);
             this._state = args[2];
         }
     }
@@ -98,7 +96,6 @@ export class SpatialMonad {
         else if (args.length === 2) {
             const [arg1, arg2] = args;
             if (typeof arg1 === 'string' && typeof arg2 === 'object' && arg2 !== null) {
-                // Sprint 038: of(canonicalIndex, value)
                 if (!matchesCanonicalH3Pattern(arg1)) {
                     throw new Error(`Invalid canonical H3 pattern: ${arg1}`);
                 }
@@ -108,7 +105,6 @@ export class SpatialMonad {
                 return monad;
             }
             else if (typeof arg2 === 'string' || arg2 === null || arg2 === undefined) {
-                // Sprint 035: of(stock, index)
                 if (arg2 === null || arg2 === undefined || (typeof arg2 === 'string' && arg2.trim() === '')) {
                     const { SpatialGuardClauseException } = require('../spatial/h3_types.js');
                     throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
@@ -123,7 +119,6 @@ export class SpatialMonad {
             return monad;
         }
         else if (args.length >= 3) {
-            // Sprint 025 / 047: of(token, res, stock)
             const [token, res, stock] = args;
             const monad = new SpatialMonad(stock);
             monad._h3Index = String(token);
@@ -182,7 +177,6 @@ export class SpatialMonad {
         if (result instanceof SpatialMonad) {
             return result;
         }
-        // If returning a report (sprint_045)
         if (result && typeof result === 'object' && 'cellCountModified' in result) {
             const m = new SpatialMonad(this._state);
             m._h3Index = this._h3Index;
@@ -402,7 +396,7 @@ export class SpatialMonad {
                 const cellB = this._cellRegistry.get(edge.target);
                 if (!cellB)
                     continue;
-                const deltaT = cellA.temperatureKelvin - cellB.temperatureKelvin;
+                const deltaT = (cellA.temperatureKelvin ?? 288.15) - (cellB.temperatureKelvin ?? 288.15);
                 const cond = 1.8;
                 const area = (cellA.heightColumnMeters ?? 50) * 1000;
                 const heatFlow = cond * (area / edge.dist) * deltaT * dt;

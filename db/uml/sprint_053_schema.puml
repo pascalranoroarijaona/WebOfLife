@@ -1,0 +1,157 @@
+```Code snippet
+@startuml sprint_053_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam handwritten false
+
+title Web of Life — Geodesic Invariant & Thermodynamic Spatial Ledger (Sprint 053)
+
+package "Spatial Geodesic Domain" {
+    class GeodesicCoordinate <<ValueObject>> {
+        - latDeg: double
+        - lngDeg: double
+        + constructor(latDeg: double, lngDeg: double)
+        + getLatitude(): double
+        + getLongitude(): double
+    }
+
+    class H3AdjacencyResolver {
+        + assertValidLatitudeDegrees(latDeg: double): void
+        + getRingAdjacencies(h3Index: string, ring: int): string[]
+        + computeAdjacencyFlux(origin: string, target: string): AdjacencyVector
+        + validateGeodesicProjections(originLat: double, targetLat: double): boolean
+    }
+
+    class SpatialH3Cell {
+        + h3Index: string
+        + resolution: int
+        + isPentagon: boolean
+        + centroidLat: double
+        + centroidLng: double
+        + boundaryPolygon: Polygon
+        + validateLatitude(): void
+    }
+
+    class H3AdjacencyEdge {
+        + originH3: string
+        + neighborH3: string
+        + directionIndex: int
+        + geodesicDistanceMeters: double
+        + advectionConductance: double
+    }
+}
+
+package "Thermodynamic State & Monads" {
+    interface Monad<T> {
+        + bind<U>(fn: (val: T) => Monad<U>): Monad<U>
+        + unit(val: T): Monad<T>
+    }
+
+    class SpatialMonad<ThermodynamicState> {
+        - state: ThermodynamicState
+        - coordinate: GeodesicCoordinate
+        + bind<U>(fn: (s: ThermodynamicState) => SpatialMonad<U>): SpatialMonad<U>
+        + computeAdjacencyFlux(resolver: H3AdjacencyResolver): SpatialMonad<ThermodynamicState>
+        + applySolarInsolation(hourAngle: double, declination: double): SpatialMonad<ThermodynamicState>
+        + getState(): ThermodynamicState
+    }
+
+    class ThermodynamicState {
+        + epochTick: long
+        + internalEnergyJoules: BigNumber
+        + temperatureKelvin: double
+        + entropyJoulesPerKelvin: double
+        + massAtmosphereKg: double
+        + massOceanKg: double
+        + biomassCarbonKg: double
+        + computeEntropyDelta(): double
+        + getMonadStateHash(): string
+    }
+
+    class SolarInsolationFlux {
+        + fluxId: UUID
+        + h3Index: string
+        + epochTick: long
+        + subsolarLat: double
+        + cellLat: double
+        + solarZenithCos: double
+        + irradianceFluxWm2: double
+        + netEnergyJoules: BigNumber
+        + assertBoundaryCondition(): void
+    }
+
+    class AdjacencyFluxTransaction {
+        + transactionId: UUID
+        + epochTick: long
+        + originH3: string
+        + neighborH3: string
+        + massFluxKg: double
+        + energyTransferredJoules: BigNumber
+        + entropyProduction: double
+    }
+}
+
+package "Blockchain Ledger & Verification" {
+    class Block {
+        + blockHeight: long
+        + epochTick: long
+        + parentBlockHash: string
+        + blockHash: string
+        + stateMerkleRoot: string
+        + fluxMerkleRoot: string
+        + totalEntropyProduction: double
+        + totalEnergyDeltaJoules: BigNumber
+        + verifyFirstLawBalance(): boolean
+        + verifySecondLawEntropy(): boolean
+    }
+
+    class BlockchainTransaction {
+        + txHash: string
+        + blockHeight: long
+        + epochTick: long
+        + h3Index: string
+        + signature: string
+        + invariantAssertionsPassed: boolean
+        + payloadJson: JSON
+    }
+}
+
+' Relationships & Invariant Enforcement
+GeodesicCoordinate ..> H3AdjacencyResolver : validates via assertValidLatitudeDegrees()
+H3AdjacencyResolver --> SpatialH3Cell : resolves coordinates
+SpatialH3Cell "1" *-- "6" H3AdjacencyEdge : connects neighbors
+SpatialMonad ..|> Monad
+SpatialMonad o-- GeodesicCoordinate : parameterized by
+SpatialMonad *-- ThermodynamicState : wraps state
+SpatialMonad ..> H3AdjacencyResolver : invokes assertions
+
+SolarInsolationFlux --> SpatialH3Cell : indexed to
+ThermodynamicState "1" -- "*" SolarInsolationFlux : driven by
+H3AdjacencyEdge "1" -- "*" AdjacencyFluxTransaction : propagates flow
+
+Block "1" *-- "*" BlockchainTransaction : aggregates
+BlockchainTransaction --> SpatialH3Cell : targets cell
+BlockchainTransaction ..> ThermodynamicState : commits state hash
+
+note right of H3AdjacencyResolver
+  **assertValidLatitudeDegrees(latDeg)**
+  Enforces invariant:
+  1. typeof latDeg === 'number'
+  2. Number.isFinite(latDeg)
+  3. -90.0 <= latDeg <= 90.0
+  Throws RangeError if boundary violated.
+  Prevents unphysical solar flux (1st Law)
+  and polar entropy singularity (2nd Law).
+end note
+
+note bottom of SolarInsolationFlux
+  $S(\phi, t) = S_0 \cdot \max(0, \cos \theta_z(\phi, \delta, h))$
+  Requiring $\phi \in [-90, 90]$ guarantees
+  $S(\phi, t) \ge 0$, enforcing First Law of
+  Thermodynamics ($\Delta U = Q - W$).
+end note
+
+@enduml

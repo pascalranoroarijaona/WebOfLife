@@ -1,194 +1,149 @@
 -- ============================================================================
--- Web of Life: Planetary Thermodynamic Blockchain & Spatial Grid Schema
--- Sprint 052: 3D Cartesian Spherical Unit Vector Projection & Solar Insolation
+-- Web of Life: Planetary Thermodynamic Ledger & Geodesic Monad Schema
+-- Sprint 053: Spatial Geodesic Invariant Enforcement & H3 Adjacency Stocks
 -- ============================================================================
 
--- Extensions for spatial and cryptographic integrity
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- ----------------------------------------------------------------------------
--- 1. Discrete Global Grid System (DGGS) Cells & Cartesian Vectors
+-- 1. GEODESIC GRID & H3 SPATIAL INDEXING
 -- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS dggs_cells (
-    h3_index             BIGINT PRIMARY KEY,
-    h3_index_hex         VARCHAR(16) NOT NULL UNIQUE,
-    resolution           SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    latitude_deg         NUMERIC(10, 7) NOT NULL CHECK (latitude_deg >= -90.0 AND latitude_deg <= 90.0),
-    longitude_deg        NUMERIC(10, 7) NOT NULL CHECK (longitude_deg >= -180.0 AND longitude_deg <= 180.0),
-    
-    -- 3D Cartesian Unit Vector Components on S^2 (||u|| = 1.0)
-    u_x                  DOUBLE PRECISION NOT NULL,
-    u_y                  DOUBLE PRECISION NOT NULL,
-    u_z                  DOUBLE PRECISION NOT NULL,
-    
-    surface_area_m2      DOUBLE PRECISION NOT NULL CHECK (surface_area_m2 > 0.0),
-    is_pentagon          BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    -- Numerical tolerance invariant: | ||u||^2 - 1.0 | <= 1e-6
-    CONSTRAINT chk_unit_vector_norm 
-        CHECK ((u_x * u_x + u_y * u_y + u_z * u_z) BETWEEN 0.999999 AND 1.000001)
+CREATE TABLE IF NOT EXISTS spatial_h3_cells (
+    h3_index VARCHAR(16) PRIMARY KEY,
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    centroid_lat DOUBLE PRECISION NOT NULL,
+    centroid_lng DOUBLE PRECISION NOT NULL,
+    boundary_geom GEOMETRY(Polygon, 4326),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_h3_latitude_geodesic_bounds CHECK (
+        centroid_lat IS NOT NULL 
+        AND NOT is_nan(centroid_lat) 
+        AND NOT is_infinite(centroid_lat) 
+        AND centroid_lat >= -90.0 
+        AND centroid_lat <= 90.0
+    ),
+    CONSTRAINT chk_h3_longitude_bounds CHECK (
+        centroid_lng IS NOT NULL 
+        AND NOT is_nan(centroid_lng) 
+        AND NOT is_infinite(centroid_lng) 
+        AND centroid_lng >= -180.0 
+        AND centroid_lng <= 180.0
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_dggs_cells_res ON dggs_cells(resolution);
-CREATE INDEX IF NOT EXISTS idx_dggs_cells_vector ON dggs_cells(u_x, u_y, u_z);
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_lat ON spatial_h3_cells (centroid_lat);
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_geom ON spatial_h3_cells USING GIST (boundary_geom);
 
 -- ----------------------------------------------------------------------------
--- 2. Hexagonal Adjacency Topology & Chord Metric Invariant
+-- 2. H3 ADJACENCY DIRECTED TOPOLOGY GRAPH
 -- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS dggs_cell_adjacencies (
-    origin_h3            BIGINT NOT NULL REFERENCES dggs_cells(h3_index) ON DELETE RESTRICT,
-    destination_h3       BIGINT NOT NULL REFERENCES dggs_cells(h3_index) ON DELETE RESTRICT,
-    direction_index      SMALLINT NOT NULL CHECK (direction_index BETWEEN 0 AND 5),
-    
-    -- Precomputed Geodesic & Chord Metrics
-    chord_distance       DOUBLE PRECISION NOT NULL CHECK (chord_distance > 0.0 AND chord_distance <= 2.0),
-    angular_distance_rad DOUBLE PRECISION NOT NULL CHECK (angular_distance_rad > 0.0 AND angular_distance_rad <= PI()),
-    geodesic_length_m    DOUBLE PRECISION NOT NULL CHECK (geodesic_length_m > 0.0),
-    
-    -- Tangent normal vector (t_ij = (u_j - u_i) / ||u_j - u_i||)
-    tangent_x            DOUBLE PRECISION NOT NULL,
-    tangent_y            DOUBLE PRECISION NOT NULL,
-    tangent_z            DOUBLE PRECISION NOT NULL,
-
-    PRIMARY KEY (origin_h3, destination_h3),
-    CONSTRAINT chk_distinct_neighbors CHECK (origin_h3 <> destination_h3),
-    CONSTRAINT chk_tangent_unit_norm 
-        CHECK ((tangent_x * tangent_x + tangent_y * tangent_y + tangent_z * tangent_z) BETWEEN 0.999999 AND 1.000001)
+CREATE TABLE IF NOT EXISTS spatial_h3_adjacencies (
+    origin_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
+    neighbor_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
+    direction_index INTEGER NOT NULL CHECK (direction_index BETWEEN 0 AND 5),
+    geodesic_distance_meters DOUBLE PRECISION NOT NULL CHECK (geodesic_distance_meters >= 0.0),
+    advection_conductance DOUBLE PRECISION NOT NULL DEFAULT 1.0 CHECK (advection_conductance >= 0.0),
+    PRIMARY KEY (origin_h3, neighbor_h3),
+    CONSTRAINT chk_non_self_adjacent CHECK (origin_h3 <> neighbor_h3)
 );
 
-CREATE INDEX IF NOT EXISTS idx_adjacencies_dest ON dggs_cell_adjacencies(destination_h3);
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_adjacencies_neighbor ON spatial_h3_adjacencies (neighbor_h3);
 
 -- ----------------------------------------------------------------------------
--- 3. Ephemeris & Subsolar Vector Coordinates (Blockchain State Anchor)
+-- 3. THERMODYNAMIC CELL STOCKS (State Variables)
 -- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS ephemeris_epochs (
-    epoch_timestamp      BIGINT PRIMARY KEY, -- UNIX seconds
-    subsolar_u_x         DOUBLE PRECISION NOT NULL,
-    subsolar_u_y         DOUBLE PRECISION NOT NULL,
-    subsolar_u_z         DOUBLE PRECISION NOT NULL,
-    solar_constant_w_m2  DOUBLE PRECISION NOT NULL DEFAULT 1361.0 CHECK (solar_constant_w_m2 > 0.0),
-    solar_declination_rad DOUBLE PRECISION NOT NULL,
-    right_ascension_rad  DOUBLE PRECISION NOT NULL,
-
-    CONSTRAINT chk_subsolar_unit_norm 
-        CHECK ((subsolar_u_x * subsolar_u_x + subsolar_u_y * subsolar_u_y + subsolar_u_z * subsolar_u_z) BETWEEN 0.999999 AND 1.000001)
+CREATE TABLE IF NOT EXISTS thermodynamic_cell_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE RESTRICT,
+    epoch_tick BIGINT NOT NULL,
+    internal_energy_joules NUMERIC(38, 8) NOT NULL CHECK (internal_energy_joules >= 0),
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
+    entropy_joules_per_kelvin DOUBLE PRECISION NOT NULL,
+    mass_atmosphere_kg DOUBLE PRECISION NOT NULL CHECK (mass_atmosphere_kg >= 0.0),
+    mass_ocean_kg DOUBLE PRECISION NOT NULL CHECK (mass_ocean_kg >= 0.0),
+    biomass_carbon_kg DOUBLE PRECISION NOT NULL CHECK (biomass_carbon_kg >= 0.0),
+    monad_state_hash VARCHAR(64) NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_cell_stock_epoch UNIQUE (h3_index, epoch_tick)
 );
 
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Planetary Cell State Tensor (Time-Series Monad Store)
--- ----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_thermo_stocks_epoch ON thermodynamic_cell_stocks (epoch_tick);
+CREATE INDEX IF NOT EXISTS idx_thermo_stocks_h3 ON thermodynamic_cell_stocks (h3_index);
 
-CREATE TABLE IF NOT EXISTS cell_thermodynamic_states (
-    state_id             BIGSERIAL PRIMARY KEY,
-    h3_index             BIGINT NOT NULL REFERENCES dggs_cells(h3_index) ON DELETE RESTRICT,
-    epoch_timestamp      BIGINT NOT NULL REFERENCES ephemeris_epochs(epoch_timestamp) ON DELETE RESTRICT,
-    
-    -- Local Thermodynamic Stock Variables
-    cos_zenith           DOUBLE PRECISION NOT NULL CHECK (cos_zenith >= 0.0 AND cos_zenith <= 1.0),
-    albedo               DOUBLE PRECISION NOT NULL CHECK (albedo >= 0.0 AND albedo <= 1.0),
-    atm_transmissivity   DOUBLE PRECISION NOT NULL CHECK (atm_transmissivity >= 0.0 AND atm_transmissivity <= 1.0),
-    
-    -- Insolation Flux Density & Energy Integral
-    solar_flux_density   DOUBLE PRECISION NOT NULL CHECK (solar_flux_density >= 0.0), -- W/m^2
-    solar_influx_joules  DOUBLE PRECISION NOT NULL CHECK (solar_influx_joules >= 0.0), -- J over dt
-    
-    -- State Variables
-    internal_energy_j    DOUBLE PRECISION NOT NULL,
-    temperature_kelvin   DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
-    entropy_j_per_k      DOUBLE PRECISION NOT NULL,
-    
-    CONSTRAINT uq_cell_epoch UNIQUE (h3_index, epoch_timestamp)
+-- ----------------------------------------------------------------------------
+-- 4. SPATIAL MONAD INSOLATION & BOUNDARY FLUXES
+-- Enforces strictly non-negative solar flux derived from latitude [-90, 90]
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS solar_insolation_fluxes (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
+    epoch_tick BIGINT NOT NULL,
+    subsolar_latitude DOUBLE PRECISION NOT NULL,
+    cell_latitude DOUBLE PRECISION NOT NULL,
+    solar_zenith_cos DOUBLE PRECISION NOT NULL CHECK (solar_zenith_cos >= 0.0 AND solar_zenith_cos <= 1.0),
+    solar_irradiance_flux_w_m2 DOUBLE PRECISION NOT NULL CHECK (solar_irradiance_flux_w_m2 >= 0.0),
+    net_energy_joules NUMERIC(38, 8) NOT NULL CHECK (net_energy_joules >= 0),
+    CONSTRAINT chk_flux_cell_lat CHECK (
+        cell_latitude IS NOT NULL 
+        AND cell_latitude >= -90.0 
+        AND cell_latitude <= 90.0
+    ),
+    CONSTRAINT chk_flux_subsolar_lat CHECK (
+        subsolar_latitude IS NOT NULL 
+        AND subsolar_latitude >= -90.0 
+        AND subsolar_latitude <= 90.0
+    ),
+    CONSTRAINT uq_solar_flux_cell_epoch UNIQUE (h3_index, epoch_tick)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cell_states_epoch ON cell_thermodynamic_states(epoch_timestamp);
-CREATE INDEX IF NOT EXISTS idx_cell_states_h3 ON cell_thermodynamic_states(h3_index);
+CREATE INDEX IF NOT EXISTS idx_solar_flux_epoch ON solar_insolation_fluxes (epoch_tick);
 
 -- ----------------------------------------------------------------------------
--- 5. Thermodynamic Advective Inter-Cell Flows & Entropy Production Ledger
+-- 5. INTER-CELL ADJACENCY FLUX TRANSACTIONS
+-- Tracks conservation of energy & mass transfers across hex boundaries
 -- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS inter_cell_flux_ledger (
-    flux_id              BIGSERIAL PRIMARY KEY,
-    epoch_timestamp      BIGINT NOT NULL REFERENCES ephemeris_epochs(epoch_timestamp) ON DELETE RESTRICT,
-    origin_h3            BIGINT NOT NULL REFERENCES dggs_cells(h3_index) ON DELETE RESTRICT,
-    destination_h3       BIGINT NOT NULL REFERENCES dggs_cells(h3_index) ON DELETE RESTRICT,
-    
-    -- Advective Transfer Quantities
-    mass_flux_kg_per_s   DOUBLE PRECISION NOT NULL,
-    heat_flux_watts      DOUBLE PRECISION NOT NULL,
-    
-    -- Thermodynamic Invariants: Second Law Enforcement (dS/dt >= 0)
-    entropy_prod_rate    DOUBLE PRECISION NOT NULL CHECK (entropy_prod_rate >= 0.0),
-    gibbs_free_energy_j  DOUBLE PRECISION NOT NULL,
-
-    CONSTRAINT fk_flux_adjacency FOREIGN KEY (origin_h3, destination_h3) 
-        REFERENCES dggs_cell_adjacencies(origin_h3, destination_h3) ON DELETE RESTRICT
+CREATE TABLE IF NOT EXISTS adjacency_flux_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    epoch_tick BIGINT NOT NULL,
+    origin_h3 VARCHAR(16) NOT NULL,
+    neighbor_h3 VARCHAR(16) NOT NULL,
+    mass_flux_transferred_kg DOUBLE PRECISION NOT NULL,
+    energy_transferred_joules NUMERIC(38, 8) NOT NULL,
+    entropy_production_joules_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_joules_per_k >= 0.0),
+    FOREIGN KEY (origin_h3, neighbor_h3) REFERENCES spatial_h3_adjacencies(origin_h3, neighbor_h3),
+    CONSTRAINT chk_entropy_non_negative CHECK (entropy_production_joules_per_k >= 0.0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_flux_epoch ON inter_cell_flux_ledger(epoch_timestamp);
+CREATE INDEX IF NOT EXISTS idx_adj_flux_epoch ON adjacency_flux_transactions (epoch_tick);
 
 -- ----------------------------------------------------------------------------
--- 6. Thermodynamic Proof-of-Conservation Blockchain Integration
+-- 6. THERMODYNAMIC BLOCKCHAIN LEDGER (Consensus & Verification)
 -- ----------------------------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_height         BIGINT PRIMARY KEY,
-    block_hash           VARCHAR(64) NOT NULL UNIQUE,
-    parent_hash          VARCHAR(64) NOT NULL,
-    epoch_timestamp      BIGINT NOT NULL REFERENCES ephemeris_epochs(epoch_timestamp) ON DELETE RESTRICT,
-    
-    -- Cryptographic Accumulators
-    state_merkle_root    VARCHAR(64) NOT NULL,
-    flux_merkle_root     VARCHAR(64) NOT NULL,
-    
-    -- Thermodynamic Global Boundary Proofs
-    total_solar_influx_j DOUBLE PRECISION NOT NULL CHECK (total_solar_influx_j >= 0.0),
-    total_dissipation_j  DOUBLE PRECISION NOT NULL CHECK (total_dissipation_j >= 0.0),
-    net_energy_delta_j   DOUBLE PRECISION NOT NULL,
-    total_entropy_gen    DOUBLE PRECISION NOT NULL CHECK (total_entropy_gen >= 0.0),
-    
-    -- First Law Conservation Verification: Influx - Outflux - dU == 0
-    first_law_residual_j DOUBLE PRECISION NOT NULL,
-    is_conserved         BOOLEAN NOT NULL GENERATED ALWAYS AS (abs(first_law_residual_j) < 1e-4) STORED,
-    
-    validator_pubkey     VARCHAR(66) NOT NULL,
-    signature            VARCHAR(130) NOT NULL,
-    mined_at             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    block_height BIGINT PRIMARY KEY,
+    epoch_tick BIGINT NOT NULL UNIQUE,
+    parent_block_hash VARCHAR(64) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL UNIQUE,
+    state_merkle_root VARCHAR(64) NOT NULL,
+    flux_merkle_root VARCHAR(64) NOT NULL,
+    total_entropy_production DOUBLE PRECISION NOT NULL CHECK (total_entropy_production >= 0.0),
+    total_energy_delta_joules NUMERIC(38, 8) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_blocks_epoch ON blockchain_blocks(epoch_timestamp);
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
+    tx_hash VARCHAR(64) PRIMARY KEY,
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height),
+    epoch_tick BIGINT NOT NULL,
+    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
+    signature VARCHAR(132) NOT NULL,
+    invariant_assertions_passed BOOLEAN NOT NULL DEFAULT TRUE,
+    payload_json JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_invariants_valid CHECK (invariant_assertions_passed = TRUE)
+);
 
--- ----------------------------------------------------------------------------
--- 7. Automated Trigger: Dynamic Cartesian Vector Unit-Normalization
--- ----------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION trg_enforce_unit_vector_normalization()
-RETURNS TRIGGER AS $$
-DECLARE
-    v_norm DOUBLE PRECISION;
-BEGIN
-    v_norm := sqrt(NEW.u_x * NEW.u_x + NEW.u_y * NEW.u_y + NEW.u_z * NEW.u_z);
-    
-    IF v_norm = 0.0 THEN
-        RAISE EXCEPTION 'Unit vector norm cannot be zero for cell %', NEW.h3_index;
-    END IF;
-    
-    -- Normalize coordinates explicitly to mitigate floating-point drift
-    NEW.u_x := NEW.u_x / v_norm;
-    NEW.u_y := NEW.u_y / v_norm;
-    NEW.u_z := NEW.u_z / v_norm;
-    
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_normalize_cell_vector ON dggs_cells;
-CREATE TRIGGER trg_normalize_cell_vector
-    BEFORE INSERT OR UPDATE OF u_x, u_y, u_z ON dggs_cells
-    FOR EACH ROW
-    EXECUTE FUNCTION trg_enforce_unit_vector_normalization();
+CREATE INDEX IF NOT EXISTS idx_blockchain_tx_block ON blockchain_transactions (block_height);
+CREATE INDEX IF NOT EXISTS idx_blockchain_tx_h3 ON blockchain_transactions (h3_index);
