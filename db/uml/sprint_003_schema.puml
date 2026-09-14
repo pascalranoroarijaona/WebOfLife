@@ -1,0 +1,99 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 003: Spatial Grid & Thermodynamic Ledger Architecture
+
+package "src.spatial" {
+  interface GeoCoordinate {
+    +lat: number
+    +lng: number
+  }
+
+  interface H3ValidationResult {
+    +isValid: boolean
+    +errorCode?: string
+    +resolution?: number
+    +baseCell?: number
+  }
+
+  class H3GridParser {
+    +{static} validateIndex(h3Index: string | bigint): H3ValidationResult
+    +{static} fromGeo(coord: GeoCoordinate, resolution: number): string
+    +{static} parseString(h3Str: string): string
+  }
+
+  class H3AdjacencyGraph {
+    +getNeighbors(h3Index: string): string[]
+    +validateEdge(origin: string, destination: string): boolean
+  }
+}
+
+package "src.monads" {
+  class SpatialMonad {
+    -cellIndex: string
+    -validationResult: H3ValidationResult
+    +bindCoordinate(coord: GeoCoordinate, resolution: number): SpatialMonad
+    +mapStock(matterStock: number): SpatialMonad
+    +extract(): string
+  }
+}
+
+package "Database & Ledger Schema" {
+  class H3SpatialCellTable {
+    +cell_index: VARCHAR(15) {PK}
+    +resolution: SMALLINT
+    +base_cell: INT
+    +center_latitude: DECIMAL
+    +center_longitude: DECIMAL
+    +created_at: TIMESTAMP
+  }
+
+  class EarthPodTable {
+    +pod_id: UUID {PK}
+    +cell_index: VARCHAR(15) {FK}
+    +biomass_stock: DECIMAL
+    +carbon_stock: DECIMAL
+    +water_stock: DECIMAL
+    +informational_entropy: DECIMAL
+    +updated_at: TIMESTAMP
+  }
+
+  class ThermodynamicBlockTable {
+    +block_id: UUID {PK}
+    +block_height: BIGINT
+    +previous_hash: VARCHAR(64)
+    +merkle_root: VARCHAR(64)
+    +solar_input_joules: DECIMAL
+    +work_consumed_joules: DECIMAL
+    +entropy_delta: DECIMAL
+    +validator_signature: VARCHAR(128)
+    +created_at: TIMESTAMP
+  }
+
+  class ThermodynamicTransactionTable {
+    +tx_id: UUID {PK}
+    +block_id: UUID {FK}
+    +source_pod_id: UUID {FK}
+    +target_pod_id: UUID {FK}
+    +cell_index: VARCHAR(15) {FK}
+    +matter_flow_delta: DECIMAL
+    +energy_flow_joules: DECIMAL
+    +thermodynamic_law_compliance: VARCHAR
+    +tx_signature: VARCHAR
+    +created_at: TIMESTAMP
+  }
+}
+
+-- Relationships
+H3GridParser ..> GeoCoordinate : uses
+H3GridParser ..> H3ValidationResult : produces
+SpatialMonad --> H3GridParser : delegates parsing/validation
+H3AdjacencyGraph --> H3GridParser : references
+H3SpatialCellTable "1" -- "0..*" EarthPodTable : scopes
+ThermodynamicBlockTable "1" -- "0..*" ThermodynamicTransactionTable : contains
+ThermodynamicTransactionTable "0..*" -- "1" H3SpatialCellTable : anchors
+EarthPodTable "0..*" -- "0..*" ThermodynamicTransactionTable : participates in
+
+@enduml

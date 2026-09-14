@@ -1,87 +1,72 @@
 -- ============================================================================
--- WEB OF LIFE DATABASE & BLOCKCHAIN SCHEMA
--- Sprint 002: Uber H3 Spatial Indexing, Ring Generation, & Adjacency Mappings
+-- Web of Life Database Schema & Thermodynamic Ledger (Sprint 003)
 -- ============================================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ----------------------------------------------------------------------------
--- 1. SPATIAL & TOPOLOGICAL SCHEMAS (H3 Integration)
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 1. SPATIAL & H3 GRID TABLES
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS h3_spatial_cells (
-    index VARCHAR(15) PRIMARY KEY,
-    resolution INTEGER NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    base_cell INTEGER NOT NULL,
-    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    cell_index VARCHAR(15) PRIMARY KEY,
+    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    base_cell INT NOT NULL CHECK (base_cell >= 0 AND base_cell <= 121),
+    center_latitude DECIMAL(10, 8) NOT NULL,
+    center_longitude DECIMAL(11, 8) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS h3_edge_neighbors (
-    source_index VARCHAR(15) REFERENCES h3_spatial_cells(index) ON DELETE CASCADE,
-    neighbor_index VARCHAR(15) REFERENCES h3_spatial_cells(index) ON DELETE CASCADE,
-    edge_direction INTEGER NOT NULL CHECK (edge_direction >= 0 AND edge_direction < 6),
-    PRIMARY KEY (source_index, neighbor_index)
-);
+CREATE INDEX IF NOT EXISTS idx_h3_spatial_resolution ON h3_spatial_cells(resolution);
+CREATE INDEX IF NOT EXISTS idx_h3_spatial_base_cell ON h3_spatial_cells(base_cell);
 
-CREATE TABLE IF NOT EXISTS h3_k_rings (
-    center_index VARCHAR(15) REFERENCES h3_spatial_cells(index) ON DELETE CASCADE,
-    ring_k INTEGER NOT NULL CHECK (ring_k >= 0),
-    ring_indices TEXT[] NOT NULL, -- Array of H3 strings at distance k
-    PRIMARY KEY (center_index, ring_k)
-);
+-- ============================================================================
+-- 2. THERMODYNAMIC STOCKS & MONAD TABLES
+-- ============================================================================
 
--- ----------------------------------------------------------------------------
--- 2. THERMODYNAMIC MONAD STOCKS & FLUXES
--- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS thermodynamic_control_volumes (
-    volume_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index VARCHAR(15) REFERENCES h3_spatial_cells(index) ON DELETE CASCADE,
-    mass_stock NUMERIC(18, 6) NOT NULL CHECK (mass_stock >= 0),
-    energy_stock NUMERIC(18, 6) NOT NULL CHECK (energy_stock >= 0),
-    entropy_stock NUMERIC(18, 6) NOT NULL CHECK (entropy_stock >= 0),
-    solar_input_flux NUMERIC(18, 6) NOT NULL DEFAULT 0.0,
+CREATE TABLE IF NOT EXISTS earth_pods (
+    pod_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cell_index VARCHAR(15) NOT NULL REFERENCES h3_spatial_cells(cell_index),
+    biomass_stock DECIMAL(18, 6) NOT NULL DEFAULT 0.0 CHECK (biomass_stock >= 0),
+    carbon_stock DECIMAL(18, 6) NOT NULL DEFAULT 0.0 CHECK (carbon_stock >= 0),
+    water_stock DECIMAL(18, 6) NOT NULL DEFAULT 0.0 CHECK (water_stock >= 0),
+    informational_entropy DECIMAL(18, 6) NOT NULL DEFAULT 0.0,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS spatial_flux_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_volume_id UUID REFERENCES thermodynamic_control_volumes(volume_id),
-    target_volume_id UUID REFERENCES thermodynamic_control_volumes(volume_id),
-    mass_transferred NUMERIC(18, 6) NOT NULL,
-    energy_transferred NUMERIC(18, 6) NOT NULL,
-    entropy_generated NUMERIC(18, 6) NOT NULL,
-    h3_edge_direction INTEGER NOT NULL,
-    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+CREATE INDEX IF NOT EXISTS idx_earth_pods_cell ON earth_pods(cell_index);
 
--- ----------------------------------------------------------------------------
--- 3. BLOCKCHAIN LEDGER & TRANSACTION SIGNATURES
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 3. THERMODYNAMIC BLOCKCHAIN LEDGER TABLES
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_height BIGSERIAL PRIMARY KEY,
-    block_hash VARCHAR(64) UNIQUE NOT NULL,
-    previous_block_hash VARCHAR(64) NOT NULL,
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT UNIQUE NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
     merkle_root VARCHAR(64) NOT NULL,
-    state_root VARCHAR(64) NOT NULL,
+    solar_input_joules DECIMAL(24, 6) NOT NULL CHECK (solar_input_joules >= 0),
+    work_consumed_joules DECIMAL(24, 6) NOT NULL CHECK (work_consumed_joules >= 0),
+    entropy_delta DECIMAL(24, 6) NOT NULL,
     validator_signature VARCHAR(128) NOT NULL,
-    minted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS block_transactions (
-    tx_hash VARCHAR(64) PRIMARY KEY,
-    block_height BIGINT REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    spatial_flux_id UUID REFERENCES spatial_flux_transactions(transaction_id),
-    monad_state_pre BYTEA NOT NULL,
-    monad_state_post BYTEA NOT NULL,
-    proof_signature VARCHAR(128) NOT NULL
+CREATE INDEX IF NOT EXISTS idx_blocks_height ON thermodynamic_blocks(block_height);
+
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID NOT NULL REFERENCES thermodynamic_blocks(block_id),
+    source_pod_id UUID REFERENCES earth_pods(pod_id),
+    target_pod_id UUID REFERENCES earth_pods(pod_id),
+    cell_index VARCHAR(15) NOT NULL REFERENCES h3_spatial_cells(cell_index),
+    matter_flow_delta DECIMAL(18, 6) NOT NULL,
+    energy_flow_joules DECIMAL(18, 6) NOT NULL,
+    thermodynamic_law_compliance VARCHAR(32) NOT NULL DEFAULT 'FIRST_SECOND_LAWS_VERIFIED',
+    tx_signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for performance
-CREATE INDEX idx_h3_spatial_cells_res ON h3_spatial_cells(resolution);
-CREATE INDEX idx_flux_trans_source ON spatial_flux_transactions(source_volume_id);
-CREATE INDEX idx_flux_trans_target ON spatial_flux_transactions(target_volume_id);
-CREATE INDEX idx_block_height ON blockchain_blocks(block_height);
+CREATE INDEX IF NOT EXISTS idx_tx_block ON thermodynamic_transactions(block_id);
+CREATE INDEX IF NOT EXISTS idx_tx_cell ON thermodynamic_transactions(cell_index);
