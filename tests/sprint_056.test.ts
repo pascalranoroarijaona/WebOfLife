@@ -63,8 +63,9 @@ describe("Sprint 056: assertValidCoordinatePair & Geodesic Boundary Guard", () =
         () => assertValidCoordinatePair(90.01, 0),
         (err: unknown) => {
           assert(err instanceof CoordinateBoundaryError);
-          assert.strictEqual(err.latitude, 90.01);
-          assert.match(err.message, /Latitude must be within \[-90, \+90\] degrees/);
+          const cErr = err as CoordinateBoundaryError;
+          assert.strictEqual(cErr.latitude, 90.01);
+          assert.match(cErr.message, /Latitude must be within \[-90, \+90\] degrees/);
           return true;
         }
       );
@@ -73,7 +74,8 @@ describe("Sprint 056: assertValidCoordinatePair & Geodesic Boundary Guard", () =
         () => assertValidCoordinatePair(-90.01, 0),
         (err: unknown) => {
           assert(err instanceof CoordinateBoundaryError);
-          assert.strictEqual(err.latitude, -90.01);
+          const cErr = err as CoordinateBoundaryError;
+          assert.strictEqual(cErr.latitude, -90.01);
           return true;
         }
       );
@@ -84,8 +86,9 @@ describe("Sprint 056: assertValidCoordinatePair & Geodesic Boundary Guard", () =
         () => assertValidCoordinatePair(0, 180.01),
         (err: unknown) => {
           assert(err instanceof CoordinateBoundaryError);
-          assert.strictEqual(err.longitude, 180.01);
-          assert.match(err.message, /Longitude must be within \[-180, \+180\] degrees/);
+          const cErr = err as CoordinateBoundaryError;
+          assert.strictEqual(cErr.longitude, 180.01);
+          assert.match(cErr.message, /Longitude must be within \[-180, \+180\] degrees/);
           return true;
         }
       );

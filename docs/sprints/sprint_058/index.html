@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@3.7.2"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 035: Explicit Null/Undefined Exception Throwing for Guard Clause Violations in Spatial Indexes</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.15rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  color: #9fc7d8;
+}
+
+.telemetry-val {
+  color: white;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Sprint 035: Explicit Null/Undefined Exception Throwing for Guard Clause Violations in Spatial Indexes</h1>
+  <h2>Thermodynamic Web of Life - Spatial Robustness</h2>
+  <p>
+    Enforcing rigorous type safety across H3 spatial indexes. Guard clauses now throw explicit <span class="highlight">TypeError</span> and <span class="highlight">ReferenceError</span> exceptions when null, undefined, or malformed geometries are encountered during indexing and adjacency queries.
+  </p>
+  <div class="social-links">
+    <a href="01_RFC.md" target="_blank">📄 RFC</a>
+    <a href="02_METHODS.md" target="_blank">🔬 Methods</a>
+    <a href="05_ACADEMIC_PREPRINT.pdf" target="_blank">📑 Preprint</a>
+    <a href="gaia_sprint_summary.mp3" target="_blank">🎧 Gaia Audio</a>
+  </div>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search entity or H3 index..." />
+  <div class="zoom-container">
+    <span>Zoom</span>
+    <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="2" />
+  </div>
+  <label class="debug-container">
+    <input type="checkbox" id="debugToggle" checked />
+    <span>Spatial Mesh</span>
+  </label>
+  <button id="pauseBtn">Pause</button>
+  <button id="triggerErrorBtn" style="border-color: var(--danger); color: var(--danger);">Test Guard Clause</button>
+</div>
+
+<div id="sprint-telemetry">
+  <h4>Spatial Guard Telemetry</h4>
+  <div class="telemetry-row"><span>Indexed Entities:</span><span id="telEntities" class="telemetry-val">0</span></div>
+  <div class="telemetry-row"><span>H3 Cells Active:</span><span id="telCells" class="telemetry-val">0</span></div>
+  <div class="telemetry-row"><span>Guard Violations:</span><span id="telViolations" class="telemetry-val">0</span></div>
+  <div class="telemetry-row"><span>Last Exception:</span><span id="telException" class="telemetry-val" style="color: var(--sun);">None</span></div>
+</div>
+
+<script type="module">
+  import * as h3 from 'h3-js';
+
+  // Inline robust H3 spatial grid & index with strict guard clauses
+  class SpatialIndexError extends TypeError {}
+
+  export class H3SpatialGrid {
+    constructor(resolution = 4) {
+      this.resolution = resolution;
+      this.cells = new Map();
+      this.violations = 0;
+      this.lastExceptionName = 'None';
+    }
+
+    indexEntity(entityId, lat, lng) {
+      if (entityId === null || entityId === undefined) {
+        this.violations++;
+        this.lastExceptionName = 'TypeError: entityId is null/undefined';
+        throw new SpatialIndexError(`Guard Clause Violation: entityId cannot be null or undefined.`);
+      }
+      if (lat === null || lat === undefined || Number.isNaN(lat)) {
+        this.violations++;
+        this.lastExceptionName = 'TypeError: lat is invalid';
+        throw new SpatialIndexError(`Guard Clause Violation: latitude must be a valid number.`);
+      }
+      if (lng === null || lng === undefined || Number.isNaN(lng)) {
+        this.violations++;
+        this.lastExceptionName = 'TypeError: lng is invalid';
+        throw new SpatialIndexError(`Guard Clause Violation: longitude must be a valid number.`);
+      }
+
+      const cell = h3.geoToH3(lat, lng, this.resolution);
+      if (!this.cells.has(cell)) {
+        this.cells.set(cell, new Set());
+      }
+      this.cells.get(cell).add(entityId);
+      return cell;
+    }
+
+    getNeighbors(cell) {
+      if (!cell) {
+        this.violations++;
+        this.lastExceptionName = 'ReferenceError: cell is null';
+        throw new ReferenceError(`Guard Clause Violation: H3 cell reference cannot be null or undefined.`);
+      }
+      try {
+        return h3.kRing(cell, 1);
+      } catch (err) {
+        this.violations++;
+        this.lastExceptionName = 'Error: invalid H3 ring';
+        throw err;
+      }
+    }
+  }
+
+  // Visualization Setup
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  const grid = new H3SpatialGrid(3);
+  let paused = false;
+  let zoom = 2;
+  let showDebug = true;
+  let violationCountDisplay = 0;
+
+  // Populate initial mock entities across the globe
+  const entities = [
+    { id: 'Flora-Alpha', lat: 37.7749, lng: -122.4194, type: 'flora', energy: 120 },
+    { id: 'Fauna-Beta', lat: 34.0522, lng: -118.2437, type: 'fauna', energy: 85 },
+    { id: 'Fungi-Gamma', lat: 48.8566, lng: 2.3522, type: 'fungi', energy: 95 },
+    { id: 'Microbe-Delta', lat: -33.8688, lng: 151.2093, type: 'microbe', energy: 150 },
+    { id: 'Human-Epsilon', lat: 35.6762, lng: 139.6503, type: 'human', energy: 200 }
+  ];
+
+  entities.forEach(e => {
+    try {
+      grid.indexEntity(e.id, e.lat, e.lng);
+    } catch (err) {
+      console.warn(err);
+    }
+  });
+
+  // UI bindings
+  document.getElementById('pauseBtn').addEventListener('click', () => {
+    paused = !paused;
+    document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+  });
+
+  document.getElementById('zoomRange').addEventListener('input', (e) => {
+    zoom = parseFloat(e.target.value);
+  });
+
+  document.getElementById('debugToggle').addEventListener('change', (e) => {
+    showDebug = e.target.checked;
+  });
+
+  document.getElementById('triggerErrorBtn').addEventListener('click', () => {
+    try {
+      // Intentionally trigger guard clause violation
+      grid.indexEntity(null, 0, 0);
+    } catch (err) {
+      violationCountDisplay++;
+      document.getElementById('telViolations').textContent = grid.violations;
+      document.getElementById('telException').textContent = err.message.substring(0, 32) + '...';
+      console.info('Caught expected guard clause violation for test:', err.message);
+    }
+  });
+
+  // Simulation loop
+  let tick = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    if (paused) return;
+    tick++;
+
+    ctx.fillStyle = '#02050a';
+    ctx.fillRect(0, width < 0 ? 0 : 0, width, height);
+
+    // Render geographic coordinate plane
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    if (showDebug) {
+      ctx.strokeStyle = '#102331';
+      ctx.lineWidth = 1;
+      const gridSize = 60 * zoom;
+      for (let x = (tick * 0.2) % gridSize; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+    }
+
+    // Draw entities as glowing nodes mapped to pseudo-screen coords
+    entities.forEach((ent, i) => {
+      const x = centerX + (ent.lng * 3.5 * zoom) + Math.sin(tick * 0.02 + i) * 5;
+      const y = centerY - (ent.lat * 3.5 * zoom) + Math.cos(tick * 0.02 + i) * 5;
+
+      let color = '#00ff66';
+      if (ent.type === 'fauna') color = '#ff3366';
+      if (ent.type === 'fungi') color = '#c084fc';
+      if (ent.type === 'microbe') color = '#64d8ff';
+      if (ent.type === 'human') color = '#00e1ff';
+
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = color;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#c8f5f2';
+      ctx.font = '10px Courier New';
+      ctx.fillText(ent.id, x + 10, y + 3);
+    });
+
+    // Update Telemetry
+    document.getElementById('telEntities').textContent = entities.length;
+    document.getElementById('telCells').textContent = grid.cells.size;
+    document.getElementById('telViolations').textContent = grid.violations;
+    document.getElementById('telException').textContent = grid.lastExceptionName;
+  }
+
+  animate();
+</script>
+</body>
+</html>

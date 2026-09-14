@@ -42,21 +42,24 @@ describe("Sprint 056: assertValidCoordinatePair & Geodesic Boundary Guard", () =
         it("should reject latitude outside [-90, +90] beyond epsilon", () => {
             assert.throws(() => assertValidCoordinatePair(90.01, 0), (err) => {
                 assert(err instanceof CoordinateBoundaryError);
-                assert.strictEqual(err.latitude, 90.01);
-                assert.match(err.message, /Latitude must be within \[-90, \+90\] degrees/);
+                const cErr = err;
+                assert.strictEqual(cErr.latitude, 90.01);
+                assert.match(cErr.message, /Latitude must be within \[-90, \+90\] degrees/);
                 return true;
             });
             assert.throws(() => assertValidCoordinatePair(-90.01, 0), (err) => {
                 assert(err instanceof CoordinateBoundaryError);
-                assert.strictEqual(err.latitude, -90.01);
+                const cErr = err;
+                assert.strictEqual(cErr.latitude, -90.01);
                 return true;
             });
         });
         it("should reject longitude outside [-180, +180] in strict mode", () => {
             assert.throws(() => assertValidCoordinatePair(0, 180.01), (err) => {
                 assert(err instanceof CoordinateBoundaryError);
-                assert.strictEqual(err.longitude, 180.01);
-                assert.match(err.message, /Longitude must be within \[-180, \+180\] degrees/);
+                const cErr = err;
+                assert.strictEqual(cErr.longitude, 180.01);
+                assert.match(cErr.message, /Longitude must be within \[-180, \+180\] degrees/);
                 return true;
             });
             assert.throws(() => assertValidCoordinatePair(0, -180.01), (err) => {

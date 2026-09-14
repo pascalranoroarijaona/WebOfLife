@@ -1,0 +1,171 @@
+@startuml sprint_058_schema
+!theme plain
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "JetBrains Mono", "Courier New", monospace
+skinparam monochrome false
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 058: Spherical Boundary Midpoint & Adjacency Flux Architecture
+
+package "Domain Layer: Spatial & Geodesic Monads" {
+    interface LatLng {
+        +lat: number [-90, 90]
+        +lng: number [-180, 180)
+    }
+
+    interface H3BoundaryInterface {
+        +originHex: string
+        +neighborHex: string
+        +midpoint: LatLng
+        +distanceMeters: number
+        +normalAzimuthDegrees: number
+    }
+
+    class SphericalGeodesicCalculator <<Utility>> {
+        +computeGreatCircleDistance(c1: LatLng, c2: LatLng): number
+        +computeBoundaryMidpointLatLng(c1: LatLng, c2: LatLng): LatLng
+        +computeInitialBearing(c1: LatLng, c2: LatLng): number
+        -toCartesianNVector(coord: LatLng): Vector3D
+        -fromCartesianNVector(vec: Vector3D): LatLng
+        -normalizeLongitude(deg: number): number
+    }
+
+    class Vector3D <<ValueObject>> {
+        +x: number
+        +y: number
+        +z: number
+        +norm(): number
+        +add(v: Vector3D): Vector3D
+        +normalize(): Vector3D
+    }
+
+    class SpatialAdjacencyGraph {
+        -adjacencyMap: Map<string, string[]>
+        -boundaryCache: Map<string, H3BoundaryInterface>
+        +getNeighbors(h3Index: string): string[]
+        +getBoundary(hexA: string, hexB: string): H3BoundaryInterface
+        +computeInterCellFlux(stateA: H3CellState, stateB: H3CellState): InterCellFlux
+    }
+
+    class SpatialMonad<A> {
+        -run: (state: SpatialAdjacencyGraph) => [A, SpatialAdjacencyGraph]
+        +map<B>(fn: (val: A) => B): SpatialMonad<B>
+        +flatMap<B>(fn: (val: A) => SpatialMonad<B>): SpatialMonad<B>
+        +{static} of<T>(val: T): SpatialMonad<T>
+    }
+}
+
+package "Thermodynamic State & Transport Engine" {
+    class H3CellState <<Entity>> {
+        +h3Index: string
+        +centroid: LatLng
+        +temperatureKelvin: number
+        +carbonStockKg: number
+        +vaporStockKg: number
+        +biomassStockKg: number
+        +internalEnergyJoules: number
+        +entropyJoulesPerKelvin: number
+        +computeHash(): Buffer
+    }
+
+    class InterCellFlux <<ValueObject>> {
+        +originHex: string
+        +neighborHex: string
+        +midpoint: LatLng
+        +massFluxKgSec: number
+        +energyFluxWatts: number
+        +entropyProductionRateWK: number
+        +potentialGradientDelta: number
+        +assertFirstLawAntiSymmetry(opposite: InterCellFlux): boolean
+        +assertSecondLawEntropyGeneration(): boolean
+    }
+}
+
+package "Persistence & Thermodynamic Blockchain Ledger" {
+    class H3HexelRecord <<Table: h3_hexel_registry>> {
+        +h3_index: VARCHAR(15) [PK]
+        +resolution: SMALLINT
+        +centroid_lat: DOUBLE PRECISION
+        +centroid_lng: DOUBLE PRECISION
+        +centroid_geom: GEOMETRY(Point, 4326)
+        +cell_boundary: GEOMETRY(Polygon, 4326)
+    }
+
+    class BoundaryInterfaceRecord <<Table: h3_boundary_interfaces>> {
+        +interface_id: UUID [PK]
+        +origin_hex: VARCHAR(15) [FK]
+        +neighbor_hex: VARCHAR(15) [FK]
+        +midpoint_lat: DOUBLE PRECISION
+        +midpoint_lng: DOUBLE PRECISION
+        +midpoint_geom: GEOMETRY(Point, 4326)
+        +geodesic_distance_meters: DOUBLE PRECISION
+        +normal_azimuth_degrees: DOUBLE PRECISION
+        +interface_type: boundary_interface_type
+    }
+
+    class ThermodynamicStockRecord <<Hypertable: thermodynamic_hexel_stocks>> {
+        +time: TIMESTAMPTZ [PK]
+        +h3_index: VARCHAR(15) [PK, FK]
+        +internal_energy_joules: NUMERIC(28, 8)
+        +temperature_kelvin: DOUBLE PRECISION
+        +carbon_stock_kg: NUMERIC(24, 6)
+        +vapor_stock_kg: NUMERIC(24, 6)
+        +biomass_stock_kg: NUMERIC(24, 6)
+        +entropy_joules_per_kelvin: NUMERIC(28, 8)
+        +state_merkle_root: BYTEA
+    }
+
+    class InterHexelFluxRecord <<Hypertable: inter_hexel_flux_ledger>> {
+        +time: TIMESTAMPTZ [PK]
+        +flux_id: UUID [PK]
+        +interface_id: UUID [FK]
+        +origin_hex: VARCHAR(15)
+        +neighbor_hex: VARCHAR(15)
+        +mass_flux_kg_sec: NUMERIC(20, 8)
+        +energy_flux_watts: NUMERIC(24, 6)
+        +entropy_production_rate_w_k: NUMERIC(24, 8)
+        +potential_gradient_delta: DOUBLE PRECISION
+        +conservation_status: thermodynamic_conservation_status
+        +tx_hash: BYTEA
+    }
+
+    class ThermodynamicBlockRecord <<Table: thermodynamic_blockchain_blocks>> {
+        +block_height: BIGINT [PK]
+        +block_hash: BYTEA [UQ]
+        +parent_hash: BYTEA
+        +epoch_timestamp: TIMESTAMPTZ
+        +merkle_root_stocks: BYTEA
+        +merkle_root_fluxes: BYTEA
+        +global_internal_energy_joules: NUMERIC(38, 8)
+        +global_entropy_joules_per_kelvin: NUMERIC(38, 8)
+        +net_first_law_residual_joules: NUMERIC(20, 10)
+        +validator_signature: BYTEA
+    }
+}
+
+' Domain Relationships
+H3BoundaryInterface o-- LatLng : embeds midpoint
+SphericalGeodesicCalculator ..> LatLng : computes
+SphericalGeodesicCalculator ..> Vector3D : 3D Projection
+SpatialAdjacencyGraph o-- H3BoundaryInterface : caches
+SpatialAdjacencyGraph ..> SphericalGeodesicCalculator : invokes
+SpatialAdjacencyGraph ..> InterCellFlux : produces
+SpatialMonad ..> SpatialAdjacencyGraph : wraps state
+H3CellState o-- LatLng : centroid
+InterCellFlux o-- LatLng : boundary midpoint
+
+' Relational & Timescale Hypertable Maps
+H3HexelRecord "1" <-- "0..*" BoundaryInterfaceRecord : origin
+H3HexelRecord "1" <-- "0..*" BoundaryInterfaceRecord : neighbor
+H3HexelRecord "1" <-- "0..*" ThermodynamicStockRecord : aggregates
+BoundaryInterfaceRecord "1" <-- "0..*" InterHexelFluxRecord : quantifies
+InterHexelFluxRecord "0..*" --> "1" ThermodynamicBlockRecord : hashed into Merkle Flux Tree
+ThermodynamicStockRecord "0..*" --> "1" ThermodynamicBlockRecord : hashed into Merkle Stock Tree
+
+' Object-Relational Mappings
+H3BoundaryInterface <.. BoundaryInterfaceRecord : maps to
+H3CellState <.. ThermodynamicStockRecord : snapshots
+InterCellFlux <.. InterHexelFluxRecord : persists
+
+@enduml

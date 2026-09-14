@@ -1,199 +1,128 @@
--- Web of Life Thermodynamic Blockchain Ledger & Spatial Topology Schema
--- Sprint 057: Forward Geodesic Azimuth Vectorization & Directional Advective Transport
+-- Web of Life Core Database Schema - Sprint 058
+-- Integration: Spherical Boundary Midpoints, Inter-Hexel Adjacency Interfaces, 
+-- and Conservative Thermodynamic Transport Metrics.
 
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+-- PostGIS and TimescaleDB extension setup
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS timescaledb;
 
--- ---------------------------------------------------------------------
--- Enumerations & Domain Constraints
--- ---------------------------------------------------------------------
+-- Global Enum Types
+CREATE TYPE boundary_interface_type AS ENUM (
+    'ATMOSPHERIC_ADVECTION',
+    'OCEANIC_DIC_TRANSPORT',
+    'TROPHIC_BIOMASS_MIGRATION',
+    'SENSIBLE_HEAT_DIFFUSION'
+);
 
-DO $$ BEGIN
-    CREATE TYPE thermodynamic_stock_type AS ENUM (
-        'MASS_CARBON_KG',
-        'SENSIBLE_HEAT_JOULES',
-        'LIQUID_WATER_KG',
-        'TROPHIC_BIOMASS_KG',
-        'ENTROPY_J_K'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE thermodynamic_conservation_status AS ENUM (
+    'STRICT_CONSERVATIVE',
+    'ENTROPY_GENERATING_DISSIPATIVE',
+    'EQUILIBRIUM_NEUTRAL'
+);
 
-DO $$ BEGIN
-    CREATE TYPE advection_medium_type AS ENUM (
-        'ATMOSPHERIC_BOUNDARY_LAYER',
-        'OCEANIC_SURFACE_CURRENT',
-        'RIVERINE_DRAINAGE',
-        'ANIMAL_MIGRATORY_VECTOR',
-        'AEROSOL_SPORE_PLUME'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE geodesic_boundary_condition AS ENUM (
-        'STANDARD_GEODESIC',
-        'ANTIPODAL_SINGULARITY',
-        'NORTH_POLE_ORIGIN',
-        'SOUTH_POLE_ORIGIN',
-        'ANTIMERIDIAN_CROSSING',
-        'COINCIDENT_ZERO_DISPLACEMENT'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- ---------------------------------------------------------------------
--- Table: h3_hex_cells
--- Description: Spatial partition nodes representing hexagonal cells in H3.
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_hex_cells (
-    h3_index BIGINT PRIMARY KEY,
-    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lng DOUBLE PRECISION NOT NULL CHECK (centroid_lng BETWEEN -180.0 AND 180.0),
+-- =====================================================================
+-- TABLE: h3_hexel_registry
+-- Registry of discrete global grid cells (H3 Hexels)
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS h3_hexel_registry (
+    h3_index VARCHAR(15) PRIMARY KEY,
+    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat >= -90.0 AND centroid_lat <= 90.0),
+    centroid_lng DOUBLE PRECISION NOT NULL CHECK (centroid_lng >= -180.0 AND centroid_lng <= 180.0),
     centroid_geom GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
         ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326)
     ) STORED,
-    surface_area_sq_meters DOUBLE PRECISION NOT NULL CHECK (surface_area_sq_meters > 0.0),
+    cell_boundary GEOMETRY(Polygon, 4326),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_hex_cells_geom ON h3_hex_cells USING GIST (centroid_geom);
+CREATE INDEX IF NOT EXISTS idx_hexel_spatial ON h3_hexel_registry USING GIST (centroid_geom);
+CREATE INDEX IF NOT EXISTS idx_hexel_resolution ON h3_hexel_registry(resolution);
 
--- ---------------------------------------------------------------------
--- Table: h3_geodesic_edges
--- Description: Great-circle directed arcs linking adjacent H3 cells with 
--- forward initial azimuth and local tangent plane normal projections.
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_geodesic_edges (
-    edge_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    origin_h3 BIGINT NOT NULL REFERENCES h3_hex_cells(h3_index) ON DELETE RESTRICT,
-    dest_h3 BIGINT NOT NULL REFERENCES h3_hex_cells(h3_index) ON DELETE RESTRICT,
-    boundary_length_meters DOUBLE PRECISION NOT NULL CHECK (boundary_length_meters >= 0.0),
-    great_circle_distance_meters DOUBLE PRECISION NOT NULL CHECK (great_circle_distance_meters >= 0.0),
-    initial_azimuth_rad DOUBLE PRECISION NOT NULL CHECK (initial_azimuth_rad >= 0.0 AND initial_azimuth_rad < 2.0 * PI()),
-    initial_azimuth_deg DOUBLE PRECISION NOT NULL CHECK (initial_azimuth_deg >= 0.0 AND initial_azimuth_deg < 360.0),
-    unit_u_east DOUBLE PRECISION NOT NULL CHECK (unit_u_east BETWEEN -1.0 AND 1.0),
-    unit_v_north DOUBLE PRECISION NOT NULL CHECK (unit_v_north BETWEEN -1.0 AND 1.0),
-    boundary_state geodesic_boundary_condition NOT NULL DEFAULT 'STANDARD_GEODESIC',
-    is_adjacent BOOLEAN NOT NULL DEFAULT TRUE,
+-- =====================================================================
+-- TABLE: h3_boundary_interfaces
+-- Caches evaluated spherical boundary midpoints and metric properties
+-- between adjacent H3 cells (RFC 058)
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS h3_boundary_interfaces (
+    interface_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    origin_hex VARCHAR(15) NOT NULL REFERENCES h3_hexel_registry(h3_index) ON DELETE CASCADE,
+    neighbor_hex VARCHAR(15) NOT NULL REFERENCES h3_hexel_registry(h3_index) ON DELETE CASCADE,
+    midpoint_lat DOUBLE PRECISION NOT NULL CHECK (midpoint_lat >= -90.0 AND midpoint_lat <= 90.0),
+    midpoint_lng DOUBLE PRECISION NOT NULL CHECK (midpoint_lng >= -180.0 AND midpoint_lng < 180.0),
+    midpoint_geom GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
+        ST_SetSRID(ST_MakePoint(midpoint_lng, midpoint_lat), 4326)
+    ) STORED,
+    geodesic_distance_meters DOUBLE PRECISION NOT NULL CHECK (geodesic_distance_meters >= 0.0),
+    normal_azimuth_degrees DOUBLE PRECISION NOT NULL CHECK (normal_azimuth_degrees >= 0.0 AND normal_azimuth_degrees < 360.0),
+    interface_type boundary_interface_type NOT NULL DEFAULT 'SENSIBLE_HEAT_DIFFUSION',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_origin_dest_edge UNIQUE (origin_h3, dest_h3),
-    CONSTRAINT chk_unit_vector_norm CHECK (
-        ABS((unit_u_east * unit_u_east + unit_v_north * unit_v_north) - 1.0) < 1e-6 
-        OR (unit_u_east = 0.0 AND unit_v_north = 0.0)
-    )
+    CONSTRAINT uq_hex_adjacency_pair UNIQUE (origin_hex, neighbor_hex),
+    CONSTRAINT chk_non_self_adjacent CHECK (origin_hex <> neighbor_hex)
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_geodesic_edges_origin ON h3_geodesic_edges(origin_h3);
-CREATE INDEX IF NOT EXISTS idx_h3_geodesic_edges_dest ON h3_geodesic_edges(dest_h3);
+CREATE INDEX IF NOT EXISTS idx_boundary_midpoint_geom ON h3_boundary_interfaces USING GIST (midpoint_geom);
+CREATE INDEX IF NOT EXISTS idx_boundary_origin ON h3_boundary_interfaces(origin_hex);
+CREATE INDEX IF NOT EXISTS idx_boundary_neighbor ON h3_boundary_interfaces(neighbor_hex);
 
--- ---------------------------------------------------------------------
--- Table: cell_thermodynamic_stocks
--- Description: State of conserved thermodynamic stocks residing in each cell.
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS cell_thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index BIGINT NOT NULL REFERENCES h3_hex_cells(h3_index) ON DELETE RESTRICT,
-    stock_type thermodynamic_stock_type NOT NULL,
-    quantity DOUBLE PRECISION NOT NULL CHECK (quantity >= 0.0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
-    entropy_j_k DOUBLE PRECISION NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    epoch_height BIGINT NOT NULL,
-    CONSTRAINT uq_cell_stock_type UNIQUE (h3_index, stock_type, epoch_height)
+-- =====================================================================
+-- TABLE: thermodynamic_hexel_stocks (Hypertable)
+-- State of physical and chemical stocks per H3 cell over discrete ticks
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS thermodynamic_hexel_stocks (
+    time TIMESTAMPTZ NOT NULL,
+    h3_index VARCHAR(15) NOT NULL REFERENCES h3_hexel_registry(h3_index),
+    internal_energy_joules NUMERIC(28, 8) NOT NULL CHECK (internal_energy_joules >= 0),
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
+    carbon_stock_kg NUMERIC(24, 6) NOT NULL CHECK (carbon_stock_kg >= 0),
+    vapor_stock_kg NUMERIC(24, 6) NOT NULL CHECK (vapor_stock_kg >= 0),
+    biomass_stock_kg NUMERIC(24, 6) NOT NULL CHECK (biomass_stock_kg >= 0),
+    entropy_joules_per_kelvin NUMERIC(28, 8) NOT NULL,
+    state_merkle_root BYTEA NOT NULL,
+    PRIMARY KEY (time, h3_index)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cell_thermo_stocks_lookup ON cell_thermodynamic_stocks(h3_index, epoch_height);
+SELECT create_hypertable('thermodynamic_hexel_stocks', 'time', if_not_exists => TRUE);
+CREATE INDEX IF NOT EXISTS idx_hexel_stocks_spatial ON thermodynamic_hexel_stocks(h3_index, time DESC);
 
--- ---------------------------------------------------------------------
--- Table: directional_advection_fluxes
--- Description: Directed advective fluxes computed along geodesic edges.
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS directional_advection_fluxes (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    edge_id UUID NOT NULL REFERENCES h3_geodesic_edges(edge_id) ON DELETE RESTRICT,
-    epoch_height BIGINT NOT NULL,
-    medium_type advection_medium_type NOT NULL,
-    stock_type thermodynamic_stock_type NOT NULL,
-    velocity_u_east DOUBLE PRECISION NOT NULL,
-    velocity_v_north DOUBLE PRECISION NOT NULL,
-    projected_normal_speed DOUBLE PRECISION NOT NULL,
-    routing_coefficient DOUBLE PRECISION NOT NULL CHECK (routing_coefficient BETWEEN 0.0 AND 1.0),
-    transferred_mass_kg DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (transferred_mass_kg >= 0.0),
-    sensible_heat_flux_joules DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (sensible_heat_flux_joules >= 0.0),
-    entropy_production_j_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_j_k >= 0.0),
-    delta_t_seconds DOUBLE PRECISION NOT NULL CHECK (delta_t_seconds > 0.0),
-    flux_merkle_leaf BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- =====================================================================
+-- TABLE: inter_hexel_flux_ledger (Hypertable)
+-- Conserved interfacial transfers evaluated across geodesic boundary midpoints
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS inter_hexel_flux_ledger (
+    time TIMESTAMPTZ NOT NULL,
+    flux_id UUID DEFAULT gen_random_uuid(),
+    interface_id UUID NOT NULL REFERENCES h3_boundary_interfaces(interface_id),
+    origin_hex VARCHAR(15) NOT NULL,
+    neighbor_hex VARCHAR(15) NOT NULL,
+    mass_flux_kg_sec NUMERIC(20, 8) NOT NULL,
+    energy_flux_watts NUMERIC(24, 6) NOT NULL,
+    entropy_production_rate_w_k NUMERIC(24, 8) NOT NULL CHECK (entropy_production_rate_w_k >= 0.0),
+    potential_gradient_delta DOUBLE PRECISION NOT NULL,
+    conservation_status thermodynamic_conservation_status NOT NULL DEFAULT 'STRICT_CONSERVATIVE',
+    tx_hash BYTEA NOT NULL,
+    PRIMARY KEY (time, flux_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_directional_advection_edge ON directional_advection_fluxes(edge_id, epoch_height);
+SELECT create_hypertable('inter_hexel_flux_ledger', 'time', if_not_exists => TRUE);
+CREATE INDEX IF NOT EXISTS idx_flux_interface ON inter_hexel_flux_ledger(interface_id, time DESC);
 
--- ---------------------------------------------------------------------
--- Table: thermodynamic_blockchain_blocks
--- Description: Consensus ledger blocks anchoring spatial transport states.
--- ---------------------------------------------------------------------
+-- =====================================================================
+-- TABLE: thermodynamic_blockchain_blocks
+-- Immutable cryptographic ledger for verified state-transitions & conservation proofs
+-- =====================================================================
 CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
     block_height BIGINT PRIMARY KEY,
     block_hash BYTEA NOT NULL UNIQUE,
     parent_hash BYTEA NOT NULL,
-    state_root_hash BYTEA NOT NULL,
-    advection_merkle_root BYTEA NOT NULL,
-    total_conserved_mass_kg DOUBLE PRECISION NOT NULL CHECK (total_conserved_mass_kg >= 0.0),
-    total_sensible_heat_joules DOUBLE PRECISION NOT NULL CHECK (total_sensible_heat_joules >= 0.0),
-    system_total_entropy_j_k DOUBLE PRECISION NOT NULL,
-    entropy_delta_j_k DOUBLE PRECISION NOT NULL CHECK (entropy_delta_j_k >= -1e-12), -- Second Law: dS >= 0
-    first_law_epsilon_residual DOUBLE PRECISION NOT NULL CHECK (ABS(first_law_epsilon_residual) < 1e-9), -- Conservation
-    validator_node_id UUID NOT NULL,
-    signature BYTEA NOT NULL,
+    epoch_timestamp TIMESTAMPTZ NOT NULL,
+    merkle_root_stocks BYTEA NOT NULL,
+    merkle_root_fluxes BYTEA NOT NULL,
+    global_internal_energy_joules NUMERIC(38, 8) NOT NULL,
+    global_entropy_joules_per_kelvin NUMERIC(38, 8) NOT NULL,
+    net_first_law_residual_joules NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    validator_signature BYTEA NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ---------------------------------------------------------------------
--- Table: geodesic_advection_transactions
--- Description: Auditable balance-transfers of conserved thermodynamic mass/heat
--- signed cryptographically by peer validators.
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS geodesic_advection_transactions (
-    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tx_hash BYTEA NOT NULL UNIQUE,
-    block_height BIGINT NOT NULL REFERENCES thermodynamic_blockchain_blocks(block_height) ON DELETE CASCADE,
-    origin_h3 BIGINT NOT NULL REFERENCES h3_hex_cells(h3_index),
-    dest_h3 BIGINT NOT NULL REFERENCES h3_hex_cells(h3_index),
-    geodesic_azimuth_deg DOUBLE PRECISION NOT NULL,
-    geodesic_distance_m DOUBLE PRECISION NOT NULL,
-    stock_type thermodynamic_stock_type NOT NULL,
-    stock_amount DOUBLE PRECISION NOT NULL CHECK (stock_amount >= 0.0),
-    temperature_origin_k DOUBLE PRECISION NOT NULL,
-    temperature_dest_k DOUBLE PRECISION NOT NULL,
-    entropy_generated_j_k DOUBLE PRECISION NOT NULL CHECK (entropy_generated_j_k >= 0.0),
-    nonce BIGINT NOT NULL,
-    witness_signature BYTEA NOT NULL,
-    finalized_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_geodesic_tx_block ON geodesic_advection_transactions(block_height);
-CREATE INDEX IF NOT EXISTS idx_geodesic_tx_endpoints ON geodesic_advection_transactions(origin_h3, dest_h3);
-
--- ---------------------------------------------------------------------
--- Table: geodesic_calculation_audit_logs
--- Description: Guardrail checks, boundary logs, and singularity audits.
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS geodesic_calculation_audit_logs (
-    audit_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    origin_lat DOUBLE PRECISION NOT NULL,
-    origin_lng DOUBLE PRECISION NOT NULL,
-    dest_lat DOUBLE PRECISION NOT NULL,
-    dest_lng DOUBLE PRECISION NOT NULL,
-    computed_bearing_rad DOUBLE PRECISION NOT NULL,
-    computed_bearing_deg DOUBLE PRECISION NOT NULL,
-    computed_distance_m DOUBLE PRECISION NOT NULL,
-    boundary_state geodesic_boundary_condition NOT NULL,
-    clamped_trig_argument DOUBLE PRECISION NOT NULL,
-    evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE INDEX IF NOT EXISTS idx_blockchain_epoch ON thermodynamic_blockchain_blocks(epoch_timestamp);
