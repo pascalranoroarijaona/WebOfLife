@@ -87,7 +87,6 @@ describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulatio
 
   describe('5. Stokes Closed Loop Invariant (Discrete Divergence Theorem)', () => {
     it('confirms the vector sum of a closed hexagonal loop is zero', () => {
-      // Create a regular hexagon on the spherical tangent plane
       const centerLat = 45.0;
       const centerLng = 10.0;
       const radiusDeg = 0.5;

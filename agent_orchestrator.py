@@ -154,6 +154,48 @@ setup_logging()
 current_iteration_backups: Dict[str, Optional[str]] = {}
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Cost & Token Tracking Engine
+# ─────────────────────────────────────────────────────────────────────────────
+
+COST_TRACKER_FILE = LOGS_DIR / "cost_tracker.json"
+
+# Tarifs approximatifs par million de tokens (USD) - Ajustables selon les grilles tarifaires officielles Gemini
+GEMINI_PRICING = {
+    "gemini-3.8-flash": {"input": 0.075, "output": 0.30},
+    "gemini-2.5-flash-lite": {"input": 0.075, "output": 0.30},
+    "default": {"input": 0.075, "output": 0.30}
+}
+
+def log_agent_call_cost(model_name: str, input_tokens: int, output_tokens: int, sprint_num: int) -> float:
+    pricing = GEMINI_PRICING.get(model_name, GEMINI_PRICING["default"])
+    cost = (input_tokens / 1_000_000 * pricing["input"]) + (output_tokens / 1_000_000 * pricing["output"])
+    
+    cost_data = load_json_file(COST_TRACKER_FILE, lambda: {"sprints": {}, "total_cost": 0.0})
+    sprint_key = f"sprint_{sprint_num:03d}"
+    
+    sprint_record = cost_data["sprints"].setdefault(sprint_key, {"input_tokens": 0, "output_tokens": 0, "cost": 0.0})
+    sprint_record["input_tokens"] += input_tokens
+    sprint_record["output_tokens"] += output_tokens
+    sprint_record["cost"] += cost
+    
+    cost_data["total_cost"] += cost
+    save_json_file(COST_TRACKER_FILE, cost_data)
+    return cost
+
+def get_sprint_cost(sprint_num: int) -> float:
+    cost_data = load_json_file(COST_TRACKER_FILE, lambda: {"sprints": {}, "total_cost": 0.0})
+    sprint_key = f"sprint_{sprint_num:03d}"
+    return cost_data["sprints"].get(sprint_key, {}).get("cost", 0.0)
+
+def get_average_sprint_cost() -> float:
+    cost_data = load_json_file(COST_TRACKER_FILE, lambda: {"sprints": {}, "total_cost": 0.0})
+    sprints = cost_data.get("sprints", {})
+    if not sprints:
+        return 0.005 # Valeur par défaut indicative si aucun historique
+    total = sum(s.get("cost", 0.0) for s in sprints.values())
+    return total / len(sprints)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dynamic File & Backup Safety Engine
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1027,6 +1069,8 @@ def call_agent(persona_key: str, prompt: str, max_retries: int = 5, initial_dela
     system_instruction = personas.get(persona_key, personas.get("LEAD_ARCHITECT", "You are a helpful AI."))
     temperature = 0.2 if persona_key != "PRODUCT_MANAGER" else 0.5
 
+    current_sprint = get_current_sprint_num()
+
     for attempt in range(1, max_retries + 1):
         try:
             # 1. Gemini Provider
@@ -1040,9 +1084,16 @@ def call_agent(persona_key: str, prompt: str, max_retries: int = 5, initial_dela
                         temperature=temperature,
                     ),
                 )
+                # Extraction dynamique des tokens input/output via le SDK Gemini
+                in_tokens = 0
+                out_tokens = 0
+                if hasattr(response, "usage_metadata") and response.usage_metadata:
+                    in_tokens = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+                    out_tokens = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+                    log_agent_call_cost(SELECTED_MODEL, in_tokens, out_tokens, current_sprint)
+
                 time.sleep(MIN_CALL_DELAY_SEC)
                 return response.text or ""
-
             # 2. Hugging Face Serverless API Provider
             elif SELECTED_PROVIDER == "huggingface":
                 messages = [
@@ -1933,11 +1984,18 @@ def generate_docs_dashboard():
         "<a id='backlog-link' class='backlog-btn' onclick=\"loadMarkdown('BACKLOG.md', 'backlog-link')\">📋 View Master BACKLOG.md</a>",
         "<br/><audio controls style='width:80%; margin: 6px 0; height:28px;'>Repo Audio Intro<source src='gaia_repository_intro.mp3' type='audio/mpeg'>Audio non supporté.</audio>"
     ]
-    
+    avg_cost = get_average_sprint_cost()
     for i, s_dir in enumerate(sprint_dirs):
         open_attr = " open" if i == 0 else ""
-        html_content.append(f"<details class='sprint-group'{open_attr}><summary>{s_dir.name.upper()}</summary><div class='sprint-content'>")
-        
+        # Récupération du coût réel ou application de la moyenne historique par rétro-calcul
+        sprint_num_match = re.search(r"sprint_(\d+)", s_dir.name)
+        s_num = int(sprint_num_match.group(1)) if sprint_num_match else 1
+        s_cost = get_sprint_cost(s_num)
+        if s_cost == 0.0:
+            s_cost = avg_cost # Rétro-calcul basé sur la moyenne des nouveaux sprints
+
+        html_content.append(f"<details class='sprint-group'{open_attr}><summary>{s_dir.name.upper()} <span style='font-weight:normal; font-size:0.8rem; color:#00ffe1;'>(${s_cost:.4f})</span></summary><div class='sprint-content'>")
+
         # 1. Links to Markdown files 01 through 07 in exact order
         md_files = sorted([f for f in s_dir.glob("*.md") if f.name != "05_ACADEMIC_PREPRINT.md" or not (s_dir / "05_ACADEMIC_PREPRINT.pdf").exists()])
         for md_file in sorted(md_files, key=lambda x: x.name):

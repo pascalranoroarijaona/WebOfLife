@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 31%
-SPRINT_GOAL: Implement computeBoundarySegmentVector3D calculating unnormalized displacement vector between spherical boundary vertices in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 32%
+SPRINT_GOAL: Implement computeBoundarySegmentRadialNormal3D calculating normalized radial midpoint unit vector for a boundary segment in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -245,8 +245,9 @@ SPRINT_GOAL: Implement computeBoundarySegmentVector3D calculating unnormalized d
 - [x] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeSphericalGreatCircleNormal3D` computing normalized cross product of two unit vectors representing great circle plane normal in `src/spatial/h3_adjacency.ts`
 - [x] Implement `projectVectorOntoSphereTangentSpace` removing radial projection component along origin vector in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundarySegmentVector3D` calculating unnormalized displacement vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundarySegmentVector3D` calculating unnormalized displacement vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundarySegmentRadialNormal3D` calculating normalized radial midpoint unit vector for a boundary segment in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryOutwardNormal3D` computing outward spherical unit normal vector across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
@@ -275,6 +276,7 @@ SPRINT_GOAL: Implement computeBoundarySegmentVector3D calculating unnormalized d
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
 - [ ] Define `BiomassStoichiometryVector` interface with Redfield canonical ratios in `src/biosphere/stoichiometry_types.ts`
+- [ ] Implement `evaluateLiebigMinimumFactor` across discrete elemental availability pools in `src/biosphere/stoichiometric_limitation.ts`
 - [ ] Implement Sterner-Elser homeostatic regulation function and dynamic overflow respiration in `src/biosphere/homeostatic_regulation.ts`
 - [ ] Implement Liebig's Law of the Minimum and Droop cell quota limitation operators in `src/biosphere/stoichiometric_limitation.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper in `src/biosphere/biomass_energy.ts`

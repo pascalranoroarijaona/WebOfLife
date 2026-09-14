@@ -1,0 +1,10 @@
+{
+  "sprints": {
+    "sprint_062": {
+      "input_tokens": 657525,
+      "output_tokens": 181900,
+      "cost": 0.10388437499999996
+    }
+  },
+  "total_cost": 0.10388437499999996
+}

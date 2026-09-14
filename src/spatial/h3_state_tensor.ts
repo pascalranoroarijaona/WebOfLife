@@ -13,6 +13,7 @@ import {
   THERMODYNAMIC_CONSTANTS,
 } from './h3_types.js';
 import {
+  SOLAR_CONSTANT_W_M2,
   STEFAN_BOLTZMANN_CONSTANT,
   STP_CONSTANTS,
   DRY_MOLE_FRACTION_N2,
@@ -20,6 +21,8 @@ import {
   DRY_MOLE_FRACTION_CO2,
   computeAugustRocheMagnusSatVaporPressure,
 } from '../thermodynamics/constants.js';
+
+export { SOLAR_CONSTANT_W_M2 } from '../thermodynamics/constants.js';
 
 export {
   CellThermodynamicOverride,

@@ -1,0 +1,158 @@
+```Code snippet
+@startuml sprint_062_schema
+!pragma layout smetana
+skinparam backgroundColor #FAFAFA
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam roundcorner 8
+skinparam shadowing true
+
+title Web of Life - Sprint 062: Boundary Segment Radial Normal 3D Unit Vector\nThermodynamic Facet Triad & Flux Ledger Architecture
+
+package "Domain Core: Spatial DGGS (H3 & R3 Geometry)" #E8F4F8 {
+
+    class Vector3D <<struct>> {
+        +x: Double
+        +y: Double
+        +z: Double
+        +norm(): Double
+        +dot(other: Vector3D): Double
+        +cross(other: Vector3D): Vector3D
+        +normalize(epsilon: Double): Vector3D
+    }
+
+    class BoundarySegment3D <<interface>> {
+        +v1: Vector3D
+        +v2: Vector3D
+    }
+
+    class FacetOrthonormalTriad3D {
+        +tangent: Vector3D
+        +lateralNormal: Vector3D
+        +radialNormal: Vector3D
+        +midpoint: Vector3D
+        +verifyOrthogonality(tolerance: Double): Boolean
+    }
+
+    class H3Cell {
+        +h3Index: H3Index64
+        +resolution: Int
+        +isPentagon: Boolean
+        +centroidCartesian: Vector3D
+        +surfaceAreaM2: Double
+        +getBoundarySegments(): List<BoundarySegment3D>
+    }
+
+    BoundarySegment3D "1" *-- "2" Vector3D : defines
+    FacetOrthonormalTriad3D "1" *-- "3" Vector3D : orthonormal basis
+    H3Cell "1" o-- "5..6" BoundarySegment3D : enclosed by
+}
+
+package "Spatial Adjacency Kernels (RFC-062)" #FEF9E7 {
+
+    class H3AdjacencyKernel <<service>> {
+        +computeBoundarySegment3D(origin: H3Cell, dest: H3Cell): BoundarySegment3D
+        +computeBoundarySegmentMidpoint3D(segment: BoundarySegment3D): Vector3D
+        +computeBoundarySegmentTangent3D(segment: BoundarySegment3D): Vector3D
+        +computeBoundarySegmentRadialNormal3D(segment: BoundarySegment3D, epsilon: Double): Vector3D
+        +computeBoundarySegmentRadialNormal3DFromPoints(v1: Vector3D, v2: Vector3D, epsilon: Double): Vector3D
+        +computeBoundarySegmentLateralNormal3D(segment: BoundarySegment3D, radNorm: Vector3D): Vector3D
+        +constructFacetReferenceTriad(segment: BoundarySegment3D): FacetOrthonormalTriad3D
+    }
+
+    H3AdjacencyKernel ..> BoundarySegment3D : analyzes
+    H3AdjacencyKernel ..> FacetOrthonormalTriad3D : synthesizes
+}
+
+package "Thermodynamics & Monad Flux Transports" #F5EEF8 {
+
+    enum FluxTransportMode {
+        ADVECTION
+        LATERAL_DIFFUSION
+        THERMAL_CONDUCTION
+        SURFACE_SHEAR_STRESS
+        GEOSTROPHIC_DRIFT
+    }
+
+    class ThermodynamicCellStockMonad {
+        +h3Index: H3Index64
+        +epochHeight: Long
+        +internalEnergyJoules: BigInt
+        +enthalpyJoules: BigInt
+        +dryAirMassKg: BigInt
+        +moistureMassKg: BigInt
+        +biomassCarbonKg: BigInt
+        +entropyJPerK: BigInt
+        +momentumR3: Vector3D
+        +temperatureKelvin: Double
+        +pressurePascals: Double
+        +applyFacetFlux(flux: FiniteVolumeFacetFluxMonad): ThermodynamicCellStockMonad
+    }
+
+    class FiniteVolumeFacetFluxMonad {
+        +segmentId: UUID
+        +epochHeight: Long
+        +transportMode: FluxTransportMode
+        +referenceTriad: FacetOrthonormalTriad3D
+        +tangentFluxScalar: Double
+        +lateralNormalFluxScalar: Double
+        +radialNormalFluxScalar: Double
+        +massDeltaKg: BigInt
+        +enthalpyDeltaJoules: BigInt
+        +carbonDeltaKg: BigInt
+        +entropyProducedJPerK: BigInt
+        +projectFluxOntoTriad(velocityField: Vector3D): Void
+    }
+
+    FiniteVolumeFacetFluxMonad "1" o-- "1" FacetOrthonormalTriad3D : spatial projection
+    FiniteVolumeFacetFluxMonad --> FluxTransportMode : classifies
+    ThermodynamicCellStockMonad ..> FiniteVolumeFacetFluxMonad : transforms via
+}
+
+package "Blockchain Consensus & Ledger State" #EAFAF1 {
+
+    enum ConservationAuditStatus {
+        STRICTLY_CONSERVED
+        ENTROPY_PRODUCING_VALID
+        MASS_DEFICIT_VIOLATION
+        ENERGY_NON_CONSERVATION_ERROR
+    }
+
+    class ThermodynamicBlockHeader {
+        +blockHeight: Long
+        +blockHash: Hash256
+        +parentHash: Hash256
+        +merkleFacetFluxRoot: Hash256
+        +merkleStateStocksRoot: Hash256
+        +globalNetMassDeltaKg: Double
+        +globalNetEnergyDeltaJ: Double
+        +globalEntropyGeneratedJK: Double
+        +conservationStatus: ConservationAuditStatus
+        +blockTimestamp: Timestamp
+    }
+
+    class ThermodynamicLedgerBlock {
+        +header: ThermodynamicBlockHeader
+        +stocks: Map<H3Index64, ThermodynamicCellStockMonad>
+        +facetFluxes: List<FiniteVolumeFacetFluxMonad>
+        +verifyFirstLawConservation(): Boolean
+        +verifySecondLawEntropyGrowth(): Boolean
+    }
+
+    ThermodynamicLedgerBlock *-- ThermodynamicBlockHeader : encapsulates
+    ThermodynamicLedgerBlock o-- ThermodynamicCellStockMonad : commits state
+    ThermodynamicLedgerBlock o-- FiniteVolumeFacetFluxMonad : journals transactions
+    ThermodynamicBlockHeader --> ConservationAuditStatus : certifies
+}
+
+note right of H3AdjacencyKernel
+  **RFC-062 Mathematical Formulation**:
+  m = 0.5 * (v1 + v2)
+  n_rad = m / ||m||_2
+  Guards against ||v1 + v2|| <= epsilon
+  Preserves First and Second Laws:
+  ΔM = 0, ΔU = 0, ΔS >= 0
+end note
+
+@enduml
