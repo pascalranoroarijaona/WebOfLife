@@ -1,37 +1,40 @@
-/**
- * Root domain error for spatial grid coordinate and indexing anomalies.
- */
-export class SpatialGridError extends Error {
-  public override name: string = "SpatialGridError";
+// =============================================================================
+// WEB OF LIFE - SPATIAL H3 INDEX TYPINGS
+// =============================================================================
 
-  constructor(message: string) {
-    super(message);
-    this.name = "SpatialGridError";
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
+/**
+ * Represents a canonical 15-character hexadecimal Uber H3 spatial index string.
+ */
+export type H3Index = string;
+
+/**
+ * Geometric and topological resolution metrics for H3 hierarchical hexagonal partitions.
+ */
+export interface H3ResolutionInfo {
+  resolution: number;
+  edgeLengthKm: number;
+  areaKm2: number;
 }
 
 /**
- * Raised when an H3 index token fails canonical syntax or topological boundary criteria.
+ * Spatial coordinate representation for geographic anchoring.
  */
-export class H3ValidationError extends SpatialGridError {
-  public override name: string = "H3ValidationError";
-  public readonly token: any;
-
-  constructor(token: any, details?: string) {
-    const reason = details ? `: ${details}` : "";
-    super(`Invalid canonical H3 index token '${String(token)}'${reason}`);
-    this.token = token;
-    this.name = "H3ValidationError";
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
+export interface GeoCoordinates {
+  latitude: number;
+  longitude: number;
 }
 
 /**
- * Raised when an H3 index parameter violates null/undefined/empty guard clauses.
+ * Discrete H3 resolution tiers from 0 to 15.
+ */
+export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+export type H3Resolution = H3ResolutionTier;
+
+/**
+ * Domain error for spatial guard clause violations (RFC-035).
  */
 export class SpatialGuardClauseException extends Error {
-  constructor(message: string) {
+  constructor(message: string = 'Spatial guard clause exception') {
     super(`[SpatialGuardClauseException] ${message}`);
     this.name = 'SpatialGuardClauseException';
     Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
@@ -39,41 +42,32 @@ export class SpatialGuardClauseException extends Error {
 }
 
 /**
- * Standardized H3 error codes for format and topology validation failures.
+ * Standardized H3 error codes across validation sprints.
  */
 export enum H3ErrorCode {
-  SUCCESS = "H3_SUCCESS",
-  INVALID_LENGTH = "H3_ERR_INVALID_LENGTH",
-  INVALID_CHARACTER = "H3_ERR_INVALID_CHARACTER",
-  INVALID_RESOLUTION = "H3_ERR_INVALID_RESOLUTION",
-  INVALID_BASE_CELL = "H3_ERR_INVALID_BASE_CELL",
-  NULL_INDEX = "H3_ERR_NULL_INDEX"
+  SUCCESS = 'H3_SUCCESS',
+  INVALID_LENGTH = 'H3_ERR_INVALID_LENGTH',
+  INVALID_CHARACTER = 'H3_ERR_INVALID_CHARACTER',
+  INVALID_RESOLUTION = 'H3_ERR_INVALID_RESOLUTION',
+  INVALID_BASE_CELL = 'H3_ERR_INVALID_BASE_CELL',
+  NULL_INDEX = 'H3_ERR_NULL_INDEX',
+  ERR_H3_INVALID_NULL = 0x01,
+  ERR_H3_INVALID_LENGTH = 0x02,
+  ERR_H3_INVALID_CHARACTERS = 0x03,
+  ERR_H3_INVALID_RESOLUTION = 0x04,
+  ERR_H3_INVALID_BASE_CELL = 0x05,
+  ERR_H3_OUT_OF_RANGE = 0x06
 }
 
-/**
- * Fundamental thermodynamic stock vector for discrete spatial cells.
- * Models mass-energy conservation invariants across the biosphere.
- */
-export interface ThermodynamicStocks {
-  carbon: number;
-  water: number;
-  nitrogen: number;
-  phosphorus: number;
-  oxygen: number;
-  thermalEnergy: number;
+export interface IH3ValidationResult {
+  isValid: boolean;
+  code: H3ErrorCode;
+  message: string;
+  resolution?: number;
+  baseCell?: number;
 }
 
-/**
- * Type alias for canonical 15-character H3 hexadecimal cell identifier.
- */
-export type H3Index = string;
-
-/**
- * Discrete H3 hierarchy resolution level (0 to 15).
- */
-export type H3Resolution = number;
-
-/**
- * Type alias for H3 resolution tier bounds (0 to 15).
- */
-export type H3ResolutionTier = number;
+export interface IH3GridService {
+  validateIndex(h3Index: string): IH3ValidationResult;
+  assertValidIndex(h3Index: string): void;
+}

@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 19%
-SPRINT_GOAL: Implement regex format validator assertCanonicalH3Pattern(token: string): void raising H3ValidationError in src/spatial/h3_grid.ts.
+Roadmap Completion: 21%
+SPRINT_GOAL: Define global regex constant H3_GLOBAL_CANONICAL_INDEX_PATTERN matching 15-character canonical H3 tokens globally in src/spatial/h3_grid.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -16,8 +16,10 @@ SPRINT_GOAL: Implement regex format validator assertCanonicalH3Pattern(token: st
 - [x] Implement string length boundary validation helper returning explicit boolean flags (`src/spatial/h3_grid.ts`)
 - [x] Implement canonical 15-character hexadecimal regex constant `H3_CANONICAL_INDEX_PATTERN` (`src/spatial/h3_grid.ts`)
 - [x] Implement dedicated regex boolean test function `matchesCanonicalH3Pattern(token: string): boolean` (`src/spatial/h3_grid.ts`)
-- [ ] Implement regex format validator `assertCanonicalH3Pattern(token: string): void` raising `H3ValidationError` (`src/spatial/h3_grid.ts`)
-- [ ] Implement global regex extraction utility `extractCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
+- [x] Implement regex format validator `assertCanonicalH3Pattern(token: string): void` raising `H3ValidationError` (`src/spatial/h3_grid.ts`)
+- [ ] Define global regex constant `H3_GLOBAL_CANONICAL_INDEX_PATTERN` matching 15-character canonical H3 tokens globally (`src/spatial/h3_grid.ts`)
+- [ ] Implement token extractor function `extractCanonicalH3Tokens(text: string): string[]` returning validated canonical H3 tokens (`src/spatial/h3_grid.ts`)
+- [ ] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
 - [ ] `H3CellThermodynamicState` interface and state vector representation (`src/spatial/h3_state_tensor.ts`)
 - [ ] Discrete Topographic Insolation and Solar Zenith Angle formulation (`src/thermodynamics/insolation.ts`)
 - [ ] Top-of-Atmosphere irradiance and daily solar declination engine (`src/thermodynamics/insolation.ts`)

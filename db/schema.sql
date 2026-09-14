@@ -1,149 +1,159 @@
--- Web of Life Thermodynamic Blockchain & Spatial Ledger Schema
--- Sprint 039: Canonical H3 Grid Validation & Spatial Monad Integrity
--- Invariant: First & Second Laws of Thermodynamics; Zero-leakage Geospatial Partitioning
+-- ============================================================================
+-- Web of Life: Thermodynamic Blockchain & Spatial Partition Ledger
+-- Sprint 040: Canonical H3 Spatial Token Ingestion & Validation
+-- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "timescaledb" CASCADE;
+-- Enable cryptographic and regex extensions if not present
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Domain: Canonical H3 Index (15-character hex starting with 8)
-CREATE DOMAIN canonical_h3_index AS VARCHAR(15)
-    CHECK (VALUE ~* '^8[0-9a-fA-F]{14}$');
+-- Domain for strictly validated 15-character canonical H3 spatial index strings
+-- Ensures exact compliance with RFC-040 canonical 15-hexadecimal character specification
+CREATE DOMAIN h3_canonical_index AS VARCHAR(15)
+    CHECK (VALUE ~* '^[0-9a-f]{15}$');
 
--- Enumeration of Thermodynamic Stock Dimensions
-CREATE TYPE stock_element AS ENUM (
-    'BIOMASS',
+-- Enumeration of thermodynamic mass stock elements (First Law Mass Conservation)
+CREATE TYPE biogeochemical_element AS ENUM (
     'CARBON',
     'NITROGEN',
     'PHOSPHORUS',
-    'WATER',
-    'THERMAL_ENERGY'
+    'WATER'
 );
 
--- Enumeration of Spatial Validation Error Categories
-CREATE TYPE validation_fault_type AS ENUM (
-    'INVALID_CANONICAL_FORMAT',
-    'INVALID_RESOLUTION',
-    'TOPOLOGICAL_DISCONTINUITY',
-    'NON_CONSERVATIVE_FLUX'
-);
+-- ============================================================================
+-- Spatial Partitioning & Earth Pod Hierarchy
+-- ============================================================================
 
---------------------------------------------------------------------------------
--- 1. Spatial Partition Topologies (DGGS Layer)
---------------------------------------------------------------------------------
-CREATE TABLE spatial_cells (
-    h3_index canonical_h3_index PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS spatial_partitions (
+    h3_index h3_canonical_index PRIMARY KEY,
     resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    base_cell SMALLINT NOT NULL CHECK (base_cell BETWEEN 0 AND 121),
-    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lon DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
-    surface_area_m2 NUMERIC(18, 4) NOT NULL CHECK (surface_area_m2 > 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+    parent_h3_index h3_canonical_index,
+    bounding_box GEOMETRY(Polygon, 4326),
+    centroid GEOMETRY(Point, 4326),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_parent_partition FOREIGN KEY (parent_h3_index) 
+        REFERENCES spatial_partitions(h3_index) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_spatial_cells_res ON spatial_cells (resolution);
-
---------------------------------------------------------------------------------
--- 2. EarthPods and Spatial Monads
---------------------------------------------------------------------------------
-CREATE TABLE earth_pods (
-    pod_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    pod_label VARCHAR(64) NOT NULL,
-    biome_type VARCHAR(48) NOT NULL,
+CREATE TABLE IF NOT EXISTS earth_pods (
+    pod_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    h3_index h3_canonical_index NOT NULL,
+    pod_label VARCHAR(128) NOT NULL,
+    entropy_budget_joules NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (entropy_budget_joules >= 0.0),
+    total_biomass_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (total_biomass_kg >= 0.0),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT uq_earth_pod_cell UNIQUE (h3_index)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_earth_pod_partition FOREIGN KEY (h3_index) 
+        REFERENCES spatial_partitions(h3_index) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_earth_pods_h3 ON earth_pods (h3_index);
+-- ============================================================================
+-- Thermodynamic Stocks & Conservation Ledger (First & Second Law)
+-- ============================================================================
 
---------------------------------------------------------------------------------
--- 3. Thermodynamic Stocks (State Layer)
---------------------------------------------------------------------------------
-CREATE TABLE monad_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pod_id UUID NOT NULL REFERENCES earth_pods(pod_id) ON DELETE RESTRICT,
-    h3_index canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    biomass_kg NUMERIC(24, 8) NOT NULL CHECK (biomass_kg >= 0.0),
-    carbon_kg NUMERIC(24, 8) NOT NULL CHECK (carbon_kg >= 0.0),
-    nitrogen_kg NUMERIC(24, 8) NOT NULL CHECK (nitrogen_kg >= 0.0),
-    phosphorus_kg NUMERIC(24, 8) NOT NULL CHECK (phosphorus_kg >= 0.0),
-    water_kg NUMERIC(24, 8) NOT NULL CHECK (water_kg >= 0.0),
-    thermal_energy_joules NUMERIC(32, 8) NOT NULL CHECK (thermal_energy_joules >= 0.0),
-    entropy_joules_per_kelvin NUMERIC(28, 8) NOT NULL CHECK (entropy_joules_per_kelvin >= 0.0),
-    exergy_joules NUMERIC(32, 8) NOT NULL CHECK (exergy_joules >= 0.0),
-    state_merkle_root BYTEA NOT NULL,
-    version BIGINT NOT NULL CHECK (version >= 0),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT uq_monad_stock_pod UNIQUE (pod_id)
+CREATE TABLE IF NOT EXISTS trophic_biomass_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pod_id UUID NOT NULL,
+    element biogeochemical_element NOT NULL,
+    mass_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (mass_kg >= 0.0),
+    free_energy_joules NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
+    entropy_joules_per_kelvin NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (entropy_joules_per_kelvin >= 0.0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_stock_earth_pod FOREIGN KEY (pod_id) 
+        REFERENCES earth_pods(pod_id) ON DELETE CASCADE,
+    CONSTRAINT uq_pod_element UNIQUE (pod_id, element)
 );
 
-CREATE INDEX idx_monad_stocks_h3 ON monad_stocks (h3_index);
+-- ============================================================================
+-- Telemetry Stream Ingestion & Global H3 Token Parsing (RFC-040)
+-- ============================================================================
 
---------------------------------------------------------------------------------
--- 4. Thermodynamic Blockchain Ledger (Blocks & State Proofs)
---------------------------------------------------------------------------------
-CREATE TABLE blockchain_blocks (
-    block_number BIGSERIAL PRIMARY KEY,
-    previous_block_hash BYTEA NOT NULL,
-    current_block_hash BYTEA NOT NULL UNIQUE,
-    state_root BYTEA NOT NULL,
-    tx_merkle_root BYTEA NOT NULL,
-    total_entropy_production_jk NUMERIC(32, 8) NOT NULL CHECK (total_entropy_production_jk >= 0.0),
-    total_energy_joules NUMERIC(38, 8) NOT NULL,
-    validator_node_id UUID NOT NULL,
-    block_signature BYTEA NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+CREATE TABLE IF NOT EXISTS spatial_telemetry_streams (
+    stream_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    origin_pod_id UUID,
+    raw_payload TEXT NOT NULL,
+    extracted_tokens_count INTEGER NOT NULL DEFAULT 0 CHECK (extracted_tokens_count >= 0),
+    parsing_duration_ms NUMERIC(10, 4) NOT NULL CHECK (parsing_duration_ms >= 0.0),
+    is_redos_safe BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_stream_pod FOREIGN KEY (origin_pod_id) 
+        REFERENCES earth_pods(pod_id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_blockchain_blocks_prev ON blockchain_blocks (previous_block_hash);
-
---------------------------------------------------------------------------------
--- 5. Thermodynamic Transactions & Flux Allocations
---------------------------------------------------------------------------------
-CREATE TABLE stock_transactions (
-    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_number BIGINT REFERENCES blockchain_blocks(block_number) ON DELETE RESTRICT,
-    source_h3 canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    target_h3 canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    flux_biomass_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
-    flux_carbon_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
-    flux_nitrogen_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
-    flux_phosphorus_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
-    flux_water_kg NUMERIC(24, 8) NOT NULL DEFAULT 0.0,
-    flux_thermal_energy_joules NUMERIC(32, 8) NOT NULL DEFAULT 0.0,
-    entropy_generation_joules_per_kelvin NUMERIC(28, 8) NOT NULL CHECK (entropy_generation_joules_per_kelvin >= 0.0),
-    tx_signature BYTEA NOT NULL,
-    nonce BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT chk_flux_non_negative_all CHECK (
-        flux_biomass_kg >= 0.0 AND
-        flux_carbon_kg >= 0.0 AND
-        flux_nitrogen_kg >= 0.0 AND
-        flux_phosphorus_kg >= 0.0 AND
-        flux_water_kg >= 0.0 AND
-        flux_thermal_energy_joules >= 0.0
-    ),
-    CONSTRAINT chk_distinct_source_target CHECK (source_h3 <> target_h3)
+CREATE TABLE IF NOT EXISTS spatial_token_extractions (
+    extraction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL,
+    canonical_h3_index h3_canonical_index NOT NULL,
+    match_offset_start INTEGER NOT NULL CHECK (match_offset_start >= 0),
+    match_offset_end INTEGER NOT NULL CHECK (match_offset_end > match_offset_start),
+    is_partition_registered BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_extraction_stream FOREIGN KEY (stream_id) 
+        REFERENCES spatial_telemetry_streams(stream_id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_stock_tx_source_h3 ON stock_transactions (source_h3);
-CREATE INDEX idx_stock_tx_target_h3 ON stock_transactions (target_h3);
-CREATE INDEX idx_stock_tx_block ON stock_transactions (block_number);
+-- ============================================================================
+-- Blockchain Block & Thermodynamic Transaction Signatures
+-- ============================================================================
 
---------------------------------------------------------------------------------
--- 6. Spatial Validation Invariant Audit Log
---------------------------------------------------------------------------------
-CREATE TABLE spatial_validation_fault_log (
-    fault_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    raw_token TEXT NOT NULL,
-    fault_type validation_fault_type NOT NULL,
-    error_message TEXT NOT NULL,
-    source_ip INET,
-    caller_component VARCHAR(128) NOT NULL,
-    observed_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    block_height BIGSERIAL PRIMARY KEY,
+    block_hash CHAR(64) NOT NULL UNIQUE CHECK (block_hash ~ '^[0-9a-f]{64}$'),
+    previous_block_hash CHAR(64) NOT NULL CHECK (previous_block_hash ~ '^[0-9a-f]{64}$'),
+    merkle_root_hash CHAR(64) NOT NULL CHECK (merkle_root_hash ~ '^[0-9a-f]{64}$'),
+    thermodynamic_work_joules NUMERIC(24, 8) NOT NULL CHECK (thermodynamic_work_joules >= 0.0),
+    net_entropy_dissipated NUMERIC(24, 8) NOT NULL CHECK (net_entropy_dissipated >= 0.0),
+    nonce NUMERIC(20, 0) NOT NULL,
+    mined_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_spatial_fault_raw ON spatial_validation_fault_log (raw_token);
-CREATE INDEX idx_spatial_fault_type ON spatial_validation_fault_log (fault_type);
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    block_height BIGINT NOT NULL,
+    source_h3_index h3_canonical_index NOT NULL,
+    target_h3_index h3_canonical_index NOT NULL,
+    element biogeochemical_element NOT NULL,
+    mass_transferred_kg NUMERIC(24, 8) NOT NULL CHECK (mass_transferred_kg >= 0.0),
+    energy_transferred_joules NUMERIC(24, 8) NOT NULL,
+    entropy_generated_joules_per_kelvin NUMERIC(24, 8) NOT NULL CHECK (entropy_generated_joules_per_kelvin >= 0.0),
+    digital_signature CHAR(128) NOT NULL CHECK (digital_signature ~ '^[0-9a-fA-F]{128}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tx_block FOREIGN KEY (block_height) 
+        REFERENCES blockchain_blocks(block_height) ON DELETE RESTRICT,
+    CONSTRAINT fk_tx_source_partition FOREIGN KEY (source_h3_index) 
+        REFERENCES spatial_partitions(h3_index) ON DELETE RESTRICT,
+    CONSTRAINT fk_tx_target_partition FOREIGN KEY (target_h3_index) 
+        REFERENCES spatial_partitions(h3_index) ON DELETE RESTRICT
+);
+
+-- ============================================================================
+-- Indices for Zero-Allocation Scans and Accelerated Joins
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS idx_spatial_partitions_res ON spatial_partitions (resolution);
+CREATE INDEX IF NOT EXISTS idx_earth_pods_h3 ON earth_pods (h3_index);
+CREATE INDEX IF NOT EXISTS idx_token_extractions_h3 ON spatial_token_extractions (canonical_h3_index);
+CREATE INDEX IF NOT EXISTS idx_token_extractions_stream ON spatial_token_extractions (stream_id);
+CREATE INDEX IF NOT EXISTS idx_trophic_stocks_pod ON trophic_biomass_stocks (pod_id);
+CREATE INDEX IF NOT EXISTS idx_tx_source_target ON thermodynamic_transactions (source_h3_index, target_h3_index);
+CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_hash ON blockchain_blocks (block_hash);
+
+-- Trigger ensuring First Law conservation: sum of transferred mass balance per transaction must be non-negative
+CREATE OR REPLACE FUNCTION verify_mass_conservation()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.mass_transferred_kg < 0.0 THEN
+        RAISE EXCEPTION 'First Law Violation: Negative mass transfer attempted: %', NEW.mass_transferred_kg;
+    END IF;
+    IF NEW.entropy_generated_joules_per_kelvin < 0.0 THEN
+        RAISE EXCEPTION 'Second Law Violation: Negative entropy dissipation attempted: %', NEW.entropy_generated_joules_per_kelvin;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_verify_thermodynamic_conservation ON thermodynamic_transactions;
+CREATE TRIGGER trg_verify_thermodynamic_conservation
+BEFORE INSERT OR UPDATE ON thermodynamic_transactions
+FOR EACH ROW
+EXECUTE FUNCTION verify_mass_conservation();

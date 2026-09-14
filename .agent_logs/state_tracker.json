@@ -1,5 +1,5 @@
 {
-  "current_sprint": 40,
+  "current_sprint": 41,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -195,6 +195,11 @@
       "sprint": 39,
       "goal": "Implement regex format validator assertCanonicalH3Pattern(token: string): void raising H3ValidationError in src/spatial/h3_grid.ts.",
       "timestamp": "2026-09-14T11:45:30.293479+00:00"
+    },
+    {
+      "sprint": 40,
+      "goal": "Define global regex constant H3_GLOBAL_CANONICAL_INDEX_PATTERN matching 15-character canonical H3 tokens globally in src/spatial/h3_grid.ts.",
+      "timestamp": "2026-09-14T11:55:01.383464+00:00"
     }
   ]
 }

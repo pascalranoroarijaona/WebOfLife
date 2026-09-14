@@ -1,0 +1,211 @@
+@startuml sprint_040_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam shadowing false
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam packageFontSize 14
+
+package "Spatial Monad Subsystem (src/spatial/)" {
+    
+    class H3Constants <<constants>> {
+        + H3_GLOBAL_CANONICAL_INDEX_PATTERN : RegExp = /\\b[0-9a-fA-F]{15}\\b/g
+    }
+
+    class H3Grid {
+        + {static} extractCanonicalTokens(payload: string): string[]
+        + {static} isValidIndex(token: string): boolean
+        + {static} getResolution(token: string): number
+        + {static} cellToParent(token: string, res: number): string
+        + {static} cellToChildren(token: string, res: number): string[]
+    }
+
+    class SpatialMonad<T> {
+        - h3Index: string
+        - payload: T
+        + {static} of<U>(h3Index: string, value: U): SpatialMonad<U>
+        + map<U>(fn: (val: T) => U): SpatialMonad<U>
+        + flatMap<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+        + extractH3Indices(rawMetadata: string): string[]
+        + toJSON(): string
+        + {static} fromJSON(json: string): SpatialMonad<T>
+    }
+
+    class EarthPod {
+        + podId: UUID
+        + h3Index: string
+        + entropyBudgetJoules: number
+        + totalBiomassKg: number
+        + isActive: boolean
+        + processTelemetry(stream: string): string[]
+        + auditConservation(): boolean
+    }
+}
+
+package "Thermodynamic Stocks & Monadic Ledger" {
+
+    enum BiogeochemicalElement {
+        CARBON
+        NITROGEN
+        PHOSPHORUS
+        WATER
+    }
+
+    class TrophicBiomassStock {
+        + stockId: UUID
+        + podId: UUID
+        + element: BiogeochemicalElement
+        + massKg: number
+        + freeEnergyJoules: number
+        + entropyJoulesPerKelvin: number
+        + computeExergy(): number
+    }
+
+    class ThermodynamicTransaction {
+        + transactionId: UUID
+        + blockHeight: number
+        + sourceH3Index: string
+        + targetH3Index: string
+        + element: BiogeochemicalElement
+        + massTransferredKg: number
+        + energyTransferredJoules: number
+        + entropyGeneratedJoulesPerKelvin: number
+        + digitalSignature: string
+        + verifyFirstLaw(): boolean
+        + verifySecondLaw(): boolean
+    }
+
+    class BlockchainBlock {
+        + blockHeight: number
+        + blockHash: string
+        + previousBlockHash: string
+        + merkleRootHash: string
+        + thermodynamicWorkJoules: number
+        + netEntropyDissipated: number
+        + nonce: bigint
+        + minedAt: Date
+    }
+}
+
+package "Database Ingestion Schema (db/schema.sql)" {
+
+    entity "spatial_partitions" as SP {
+        * h3_index : h3_canonical_index [PK]
+        --
+        resolution : SMALLINT
+        parent_h3_index : h3_canonical_index [FK]
+        bounding_box : GEOMETRY(Polygon, 4326)
+        centroid : GEOMETRY(Point, 4326)
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "earth_pods" as EP {
+        * pod_id : UUID [PK]
+        --
+        h3_index : h3_canonical_index [FK]
+        pod_label : VARCHAR(128)
+        entropy_budget_joules : NUMERIC(24,8)
+        total_biomass_kg : NUMERIC(24,8)
+        is_active : BOOLEAN
+        created_at : TIMESTAMPTZ
+        updated_at : TIMESTAMPTZ
+    }
+
+    entity "spatial_telemetry_streams" as STS {
+        * stream_id : UUID [PK]
+        --
+        origin_pod_id : UUID [FK]
+        raw_payload : TEXT
+        extracted_tokens_count : INTEGER
+        parsing_duration_ms : NUMERIC(10,4)
+        is_redos_safe : BOOLEAN
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "spatial_token_extractions" as STE {
+        * extraction_id : UUID [PK]
+        --
+        stream_id : UUID [FK]
+        canonical_h3_index : h3_canonical_index
+        match_offset_start : INTEGER
+        match_offset_end : INTEGER
+        is_partition_registered : BOOLEAN
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "trophic_biomass_stocks" as TBS {
+        * stock_id : UUID [PK]
+        --
+        pod_id : UUID [FK]
+        element : biogeochemical_element
+        mass_kg : NUMERIC(24,8)
+        free_energy_joules : NUMERIC(24,8)
+        entropy_joules_per_kelvin : NUMERIC(24,8)
+        updated_at : TIMESTAMPTZ
+    }
+
+    entity "blockchain_blocks" as BB {
+        * block_height : BIGINT [PK]
+        --
+        block_hash : CHAR(64)
+        previous_block_hash : CHAR(64)
+        merkle_root_hash : CHAR(64)
+        thermodynamic_work_joules : NUMERIC(24,8)
+        net_entropy_dissipated : NUMERIC(24,8)
+        nonce : NUMERIC(20,0)
+        mined_at : TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_transactions" as TT {
+        * transaction_id : UUID [PK]
+        --
+        block_height : BIGINT [FK]
+        source_h3_index : h3_canonical_index [FK]
+        target_h3_index : h3_canonical_index [FK]
+        element : biogeochemical_element
+        mass_transferred_kg : NUMERIC(24,8)
+        energy_transferred_joules : NUMERIC(24,8)
+        entropy_generated_joules_per_kelvin : NUMERIC(24,8)
+        digital_signature : CHAR(128)
+        created_at : TIMESTAMPTZ
+    }
+}
+
+' Class relationships
+H3Grid ..> H3Constants : uses pattern
+SpatialMonad ..> H3Grid : delegates token extraction
+EarthPod o-- SpatialMonad : anchors state
+EarthPod *-- TrophicBiomassStock : contains stocks
+ThermodynamicTransaction --> EarthPod : modifies stocks
+BlockchainBlock *-- ThermodynamicTransaction : packages validated txs
+
+' Database relational linkages
+SP ||..o{ SP : "parent/child"
+SP ||..o{ EP : "locates"
+EP ||..o{ TBS : "owns stocks"
+EP ||..o{ STS : "emits streams"
+STS ||..o{ STE : "yields tokens"
+STE }o..|| SP : "resolves to"
+BB ||..o{ TT : "records"
+SP ||..o{ TT : "source of flow"
+SP ||..o{ TT : "target of flow"
+
+note top of H3Constants
+    Regex Token Contract:
+    /\b[0-9a-fA-F]{15}\b/g
+    - Bounded O(N) DFA execution
+    - Word boundary prevents hash collision
+    - Zero backtracking (No ReDoS)
+    - Zero mass transfer (dM/dt = 0)
+end note
+
+note bottom of TT
+    Conservation Laws:
+    1. First Law: Sum(dM/dt) = 0
+    2. Second Law: dS/dt >= 0
+    Enforced via PostgreSQL trigger
+    'trg_verify_thermodynamic_conservation'
+end note
+
+@enduml
