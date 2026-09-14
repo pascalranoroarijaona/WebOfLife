@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 29%
-SPRINT_GOAL: Define H3CellInterfaceMetrics interface in src/spatial/h3_types.ts.
+Roadmap Completion: 28%
+SPRINT_GOAL: Implement latLngToUnitVector3D 3D Cartesian spherical projection in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -29,7 +29,9 @@ SPRINT_GOAL: Define H3CellInterfaceMetrics interface in src/spatial/h3_types.ts.
 - [x] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
 - [x] Implement isPentagonCell topology validator using H3 cell index decomposition in `src/spatial/h3_adjacency.ts`
 - [x] Implement calculateH3BoundaryContactArea vertical interface cross-section calculator in `src/spatial/h3_adjacency.ts`
-- [ ] Define `H3CellInterfaceMetrics` interface in `src/spatial/h3_types.ts`
+- [x] Define `H3CellInterfaceMetrics` interface in `src/spatial/h3_types.ts`
+- [ ] Implement `latLngToUnitVector3D` 3D Cartesian spherical projection in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeSphericalArcBearing` geodesic azimuth calculation in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryUnitNormalVector` spherical unit normal vector calculator in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`

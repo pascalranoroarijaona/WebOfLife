@@ -1,5 +1,5 @@
 {
-  "current_sprint": 52,
+  "current_sprint": 53,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -255,6 +255,11 @@
       "sprint": 51,
       "goal": "Define H3CellInterfaceMetrics interface in src/spatial/h3_types.ts.",
       "timestamp": "2026-09-14T14:34:04.966333+00:00"
+    },
+    {
+      "sprint": 52,
+      "goal": "Implement latLngToUnitVector3D 3D Cartesian spherical projection in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-14T14:54:52.014105+00:00"
     }
   ]
 }

@@ -1,0 +1,179 @@
+```Code snippet
+@startuml
+!pragma layout smetana
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName "Courier"
+
+title Web of Life - Sprint 052 Class Hierarchy & Thermodynamic Insolation Architecture
+
+package "src::spatial::h3_types" {
+    class UnitVector3D << (T,#B5EAD7) type >> {
+        +readonly [0]: number (x)
+        +readonly [1]: number (y)
+        +readonly [2]: number (z)
+        --
+        +norm(): number == 1.0
+    }
+
+    interface CartesianPoint3D {
+        +x: number
+        +y: number
+        +z: number
+    }
+}
+
+package "src::spatial::h3_adjacency" {
+    class SphericalVectorGeometry << (M,#C7CEEA) module >> {
+        +latLngToUnitVector3D(latDeg: number, lngDeg: number): UnitVector3D
+        +unitVectorDotProduct(a: UnitVector3D, b: UnitVector3D): number
+        +unitVectorCrossProduct(a: UnitVector3D, b: UnitVector3D): UnitVector3D
+        +unitVectorAngularDistance(a: UnitVector3D, b: UnitVector3D): number
+        +unitVectorChordDistance(a: UnitVector3D, b: UnitVector3D): number
+        +computeTangentVector(origin: UnitVector3D, dest: UnitVector3D): UnitVector3D
+    }
+
+    class H3AdjacencyMatrix {
+        -csrRowPointers: Int32Array
+        -csrColumnIndices: Int32Array
+        -chordDistances: Float64Array
+        -tangentVectors: Float64Array
+        +getNeighbors(h3Index: bigint): bigint[]
+        +getChordDistance(from: bigint, to: bigint): number
+        +getTangentVector(from: bigint, to: bigint): UnitVector3D
+    }
+}
+
+package "src::thermodynamics::insolation" {
+    class EphemerisEpoch {
+        +epochTimestamp: number
+        +subsolarVector: UnitVector3D
+        +solarConstant: number
+        +solarDeclination: number
+        +rightAscension: number
+        +computeSubsolarVector(julianDay: number): UnitVector3D
+    }
+
+    class InsolationProjector {
+        +computeCosZenith(cellVector: UnitVector3D, subsolarVector: UnitVector3D): number
+        +computeSolarFluxDensity(cosZenith: number, transmissivity: number, albedo: number): number
+        +integrateHemisphericInflux(cells: PlanetaryCellState[], subsolar: UnitVector3D): number
+    }
+}
+
+package "src::monads::spatial_monad" {
+    class PlanetaryCellState {
+        +h3Index: bigint
+        +latitude: number
+        +longitude: number
+        +unitVector: UnitVector3D
+        +surfaceAreaM2: number
+        +albedo: number
+        +atmTransmissivity: number
+        +cosZenith: number
+        +solarFluxDensity: number
+        +solarInfluxJoules: number
+        +internalEnergyJ: number
+        +temperatureKelvin: number
+        +entropyJPerK: number
+    }
+
+    class PlanetaryState {
+        +epochTimestamp: number
+        +deltaTimeSeconds: number
+        +subsolarVector: UnitVector3D
+        +cells: PlanetaryCellState[]
+        +adjacency: H3AdjacencyMatrix
+    }
+
+    class SpatialMonad<T> {
+        -state: T
+        +constructor(state: T)
+        +static of<U>(value: U): SpatialMonad<U>
+        +map<B>(fn: (state: T) => B): SpatialMonad<B>
+        +bind<B>(fn: (state: T) => SpatialMonad<B>): SpatialMonad<B>
+        +unwrap(): T
+    }
+}
+
+package "src::blockchain::thermodynamic_ledger" {
+    class AdvectiveFluxEdge {
+        +originH3: bigint
+        +destH3: bigint
+        +massFluxKgPerS: number
+        +heatFluxWatts: number
+        +entropyProdRate: number
+        +isSecondLawCompliant(): boolean
+    }
+
+    class ThermodynamicTransaction {
+        +txHash: string
+        +epochTimestamp: number
+        +cellDeltaInternalEnergy: number
+        +solarInfluxJ: number
+        +dissipatedEntropyJPerK: number
+        +stateMerkleRoot: string
+    }
+
+    class ThermodynamicBlock {
+        +blockHeight: number
+        +blockHash: string
+        +parentHash: string
+        +epochTimestamp: number
+        +stateMerkleRoot: string
+        +fluxMerkleRoot: string
+        +firstLawResidualJ: number
+        +totalSolarInfluxJ: number
+        +totalDissipationJ: number
+        +isConserved(): boolean
+        +verifyBlockProof(): boolean
+    }
+}
+
+' Relationships & Dependencies
+CartesianPoint3D <|.. UnitVector3D : realizes
+SphericalVectorGeometry ..> UnitVector3D : produces & consumes
+H3AdjacencyMatrix o-- SphericalVectorGeometry : delegates projection
+PlanetaryCellState *-- UnitVector3D : embeds
+PlanetaryState *-- PlanetaryCellState : aggregates
+PlanetaryState *-- H3AdjacencyMatrix : navigates topology
+PlanetaryState *-- EphemerisEpoch : anchored to
+SpatialMonad o-- PlanetaryState : encapsulates
+
+InsolationProjector ..> UnitVector3D : computes dot product
+InsolationProjector ..> PlanetaryCellState : updates flux state
+InsolationProjector ..> EphemerisEpoch : reads subsolar vector
+
+SpatialMonad ..> InsolationProjector : applies via bind()
+AdvectiveFluxEdge ..> H3AdjacencyMatrix : aligns with chord metric
+
+ThermodynamicTransaction o-- PlanetaryCellState : commits state delta
+ThermodynamicTransaction o-- AdvectiveFluxEdge : commits flux proofs
+ThermodynamicBlock *-- ThermodynamicTransaction : aggregates ledger
+
+note right of SphericalVectorGeometry
+  Singularity-Free S^2 Projection:
+    x = cos(phi) * cos(lambda)
+    y = cos(phi) * sin(lambda)
+    z = sin(phi)
+  ||u|| = 1.0 (strict tolerance <= 1e-15)
+end note
+
+note bottom of InsolationProjector
+  First-Law Boundary Solar Influx:
+    cos(theta_z) = max(0, u_i . s_sun)
+    F_solar = S_0 * tau_atm * (1 - albedo) * cos(theta_z)
+  Closed-sphere integration strictly matches S_0 * PI * R^2
+end note
+
+note bottom of ThermodynamicBlock
+  First Law Verification:
+    Residual = Influx - Dissipation - dU
+    Invariant: abs(Residual) < 1e-4 Joules
+  Second Law Verification:
+    dS_generation / dt >= 0 for all edges
+end note
+
+@enduml
