@@ -1,0 +1,98 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amsfonts, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    citecolor=blue,
+}
+
+\title{\textbf{Thermodynamic Rigor and Temperature Normalization in the Web of Life Simulation: Sprint 009 Report}}
+\author{
+    Lead Scientific Communications \& Academic Outreach Agent \\
+    \textbf{Web of Life Research Group} \\
+    Repository: \url{https://github.com/pascalranoroarijaona/WebOfLife}
+}
+\date{Sprint 009 Implementation Report}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+As artificial ecosystems scale in complexity, maintaining thermodynamic consistency across spatial monads and trophic tiers becomes paramount. Sprint 009 establishes a centralized physical constants repository and temperature normalization engine within the \textit{Web of Life} simulation framework (\url{https://github.com/pascalranoroarijaona/WebOfLife}). By codifying fundamental physical constants---such as the Stefan-Boltzmann constant, Top-of-Atmosphere solar irradiance, and the universal gas constant---alongside strict planetary thermal bounds ($200\,\text{K}$ to $350\,\text{K}$), the framework enforces the First and Second Laws of Thermodynamics. We present the mathematical formalization of Arrhenius metabolic scaling, Stefan-Boltzmann radiative dissipation, and spatial monad thermal stock transitions, bridging discrete agent-based ecology with continuous thermodynamic flux equations.
+\end{abstract}
+
+\section{Introduction and Systems Ecology Framing}
+In complex systems and artificial life simulations, ecological resilience and trophic dynamics are fundamentally constrained by thermodynamic energy fluxes. Ecosystems operate as open thermodynamic systems far from equilibrium, continuously dissipating high-grade solar exergy into low-grade thermal entropy. 
+
+To model these dynamics without violating mass-energy conservation, Sprint 009 introduces \texttt{src/thermodynamics/constants.ts}, establishing an authoritative physical baseline for the \textit{Web of Life} repository. This module unifies temperature scaling, radiative balance, and metabolic kinetic rates across all spatial monads.
+
+\section{Core Physical Constants \& Thermodynamic Governance}
+The simulation anchors its physical calculations on exact SI constants, ensuring strict compliance with the First Law of Thermodynamics (energy conservation) and the Second Law (irreversible entropy generation via radiative cooling and metabolic heat loss):
+
+\begin{table}[htbp]
+\centering
+\begin{small}
+\begin{tabular}{llll}
+\toprule
+\textbf{Constant Name} & \textbf{Symbol} & \textbf{Exact Value / SI Unit} & \textbf{Description} \\
+\midrule
+\texttt{STEFAN\_BOLTZMANN} & $\sigma$ & $5.670374419 \times 10^{-8} \, \text{W}\cdot\text{m}^{-2}\cdot\text{K}^{-4}$ & Stefan-Boltzmann blackbody constant. \\
+\texttt{SOLAR\_CONSTANT\_TOA} & $S_0$ & $1361.0 \, \text{W}\cdot\text{m}^{-2}$ & Top-of-Atmosphere solar irradiance. \\
+\texttt{ZERO\_CELSIUS\_IN\_KELVIN} & $T_0$ & $273.15 \, \text{K}$ & Temperature offset between Celsius and Kelvin. \\
+\texttt{DEFAULT\_ALBEDO} & $\alpha$ & $0.3$ (dimensionless) & Shortwave hemispherical reflectance. \\
+\texttt{GAS\_CONSTANT\_R} & $R$ & $8.314462618 \, \text{J}\cdot\text{mol}^{-1}\cdot\text{K}^{-1}$ & Universal gas constant. \\
+\texttt{PLANETARY\_TEMP\_MIN\_K} & $T_{\min}$ & $200.0 \, \text{K}$ & Lower environmental bound. \\
+\texttt{PLANETARY\_TEMP\_MAX\_K} & $T_{\max}$ & $350.0 \, \text{K}$ & Upper environmental bound. \\
+\bottomrule
+\end{tabular}
+\end{small}
+\caption{Centralized physical constants codified in \texttt{src/thermodynamics/constants.ts}.}
+\label{tab:constants}
+\end{table}
+
+\section{Mathematical Formalization}
+
+\subsection{Temperature Normalization \& Bounding}
+Temperature inputs are normalized to absolute Kelvin units and clamped to planetary survival bounds to prevent thermal singularities:
+\begin{equation}
+T_{\text{K}} = \begin{cases} 
+T_{\text{input}} & \text{if scale} = 'K' \\
+T_{\text{input}} + 273.15 & \text{if scale} = 'C'
+\end{cases}
+\end{equation}
+\begin{equation}
+T_{\text{clamped}} = \max(T_{\min}, \min(T_{\max}, T_{\text{K}}))
+\end{equation}
+
+\subsection{Arrhenius Kinetics \& Metabolic Scaling}
+Biological metabolic rates ($k(T)$) scale exponentially with absolute temperature according to Arrhenius kinetics:
+\begin{equation}
+k(T) = \exp\left( -\frac{E_a}{R \cdot T_{\text{K}}} \right)
+\end{equation}
+where $E_a$ represents the activation energy ($\text{J}\cdot\text{mol}^{-1}$) characteristic of enzymatic pathways.
+
+\subsection{Spatial Monad Thermal Stock Transitions}
+The thermal stock $\mathcal{T}$ (Joules) within a spatial monad evolves across discrete time steps according to:
+\begin{equation}
+\mathcal{T}_{t+1} = \mathcal{T}_{t} + \Delta \mathcal{S}_{\text{solar}} - \Delta \mathcal{S}_{\text{radis}} + \nabla \cdot \vec{\mathbf{Q}}_{\text{adjacent}}
+\end{equation}
+where:
+\begin{itemize}
+    \item \textbf{Solar Influx ($\Delta \mathcal{S}_{\text{solar}}$):} $\Delta \mathcal{S}_{\text{solar}} = S_0 \cdot (1 - \alpha) \cdot A_{\text{surface}} \cdot \Delta t$
+    \item \textbf{Radiative Dissipation ($\Delta \mathcal{S}_{\text{radis}}$):} $\Delta \mathcal{S}_{\text{radis}} = \epsilon \cdot \sigma \cdot T_{\text{K}}^4 \cdot A_{\text{surface}} \cdot \Delta t$
+    \item \textbf{Convective/Conductive Flux ($\nabla \cdot \vec{\mathbf{Q}}_{\text{adjacent}}$):} Net energy transferred across adjacent monad boundaries via Fourier's law.
+\end{itemize}
+
+\section{Conclusion \& Future Directions}
+Sprint 009 establishes a robust thermodynamic bedrock for the \textit{Web of Life} simulation. By centralizing physical constants and temperature normalization, future sprints can reliably simulate trophic efficiency, climate feedback loops, and evolutionary adaptation under strict energy conservation constraints. Access the complete codebase and implementation details at the official repository: \url{https://github.com/pascalranoroarijaona/WebOfLife}.
+
+\end{document}

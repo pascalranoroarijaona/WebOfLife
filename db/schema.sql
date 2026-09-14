@@ -1,46 +1,46 @@
--- Updated Schema & Ledger Definitions: Sprint 008 (H3 Index Validation & Spatial Monads)
+-- ============================================================================
+-- Web of Life Database Schema & Thermodynamic Ledger (Sprint 009)
+-- Compliance: First & Second Laws of Thermodynamics
+-- ============================================================================
 
--- Drop existing tables if re-initializing Sprint 008 architecture
-DROP TABLE IF EXISTS blockchain_transactions CASCADE;
-DROP TABLE IF EXISTS spatial_monad_states CASCADE;
-DROP TABLE IF EXISTS thermodynamic_ledgers CASCADE;
-
--- 1. Thermodynamic Ledgers (First and Second Laws of Thermodynamics tracking)
-CREATE TABLE thermodynamic_ledgers (
-    ledger_id VARCHAR(64) PRIMARY KEY,
-    gaia_earth_pod_id VARCHAR(64) NOT NULL,
-    total_solar_input_joules NUMERIC(24, 6) NOT NULL DEFAULT 0.000000,
-    total_entropy_joules NUMERIC(24, 6) NOT NULL DEFAULT 0.000000,
-    matter_mass_grams NUMERIC(24, 6) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT non_negative_entropy CHECK (total_entropy_joules >= 0),
-    CONSTRAINT conservation_of_matter CHECK (matter_mass_grams >= 0)
-);
-
--- 2. Spatial Monad States with strict H3 Index verification gates
-CREATE TABLE spatial_monad_states (
+CREATE TABLE IF NOT EXISTS spatial_monads (
     monad_id VARCHAR(64) PRIMARY KEY,
-    ledger_id VARCHAR(64) REFERENCES thermodynamic_ledgers(ledger_id),
-    raw_input_string VARCHAR(255) NOT NULL,
-    h3_index VARCHAR(15) CHECK (h3_index ~ '^[0-9a-fA-F]{15}$'),
-    is_valid BOOLEAN NOT NULL DEFAULT FALSE,
-    validation_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    trophic_energy_joules NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    entropy_leakage_risk NUMERIC(12, 6) NOT NULL DEFAULT 0.000000
+    region_name VARCHAR(128) NOT NULL,
+    thermal_stock_joules NUMERIC(24, 6) NOT NULL DEFAULT 0.000000,
+    albedo NUMERIC(4, 3) NOT NULL DEFAULT 0.300,
+    emissivity NUMERIC(4, 3) NOT NULL DEFAULT 0.950,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Blockchain Block Transaction Signatures for Spatial-Thermodynamic State Transitions
-CREATE TABLE blockchain_transactions (
+CREATE TABLE IF NOT EXISTS thermodynamic_constants (
+    constant_key VARCHAR(64) PRIMARY KEY,
+    constant_value NUMERIC(16, 8) NOT NULL,
+    unit_description VARCHAR(64) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO thermodynamic_constants (constant_key, constant_value, unit_description) VALUES
+('STEFAN_BOLTZMANN', 0.00000005670374419, 'W / (m^2 * K^4)'),
+('SOLAR_CONSTANT_TOA', 1361.00000000, 'W / m^2'),
+('ZERO_CELSIUS_IN_KELVIN', 273.15000000, 'K'),
+('DEFAULT_ALBEDO', 0.30000000, 'Dimensionless'),
+('GAS_CONSTANT_R', 8.31446261, 'J / (mol * K)')
+ON CONFLICT (constant_key) DO UPDATE SET 
+    constant_value = EXCLUDED.constant_value,
+    updated_at = CURRENT_TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
     transaction_id VARCHAR(64) PRIMARY KEY,
-    block_height BIGINT NOT NULL,
-    previous_hash VARCHAR(64) NOT NULL,
-    merkle_root VARCHAR(64) NOT NULL,
-    monad_id VARCHAR(64) REFERENCES spatial_monad_states(monad_id),
-    transaction_signature VARCHAR(128) NOT NULL,
-    payload_hash VARCHAR(64) NOT NULL,
-    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    monad_id VARCHAR(64) NOT NULL REFERENCES spatial_monads(monad_id),
+    delta_solar_joules NUMERIC(18, 6) NOT NULL,
+    delta_radiation_joules NUMERIC(18, 6) NOT NULL,
+    delta_conduction_joules NUMERIC(18, 6) NOT NULL,
+    resulting_temperature_k NUMERIC(10, 4) NOT NULL,
+    arrhenius_factor NUMERIC(12, 6) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for spatial lookup and validation performance
-CREATE INDEX idx_spatial_monad_h3 ON spatial_monad_states(h3_index);
-CREATE INDEX idx_blockchain_block_height ON blockchain_transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_monad_id ON thermodynamic_stock_transactions(monad_id);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_timestamp ON thermodynamic_stock_transactions(timestamp);

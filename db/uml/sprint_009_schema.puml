@@ -1,0 +1,67 @@
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 009: Thermodynamic Constants & Normalization Engine
+
+package "src.thermodynamics" {
+    interface IThermodynamicConstants {
+        + STEFAN_BOLTZMANN: number
+        + SOLAR_CONSTANT_TOA: number
+        + ZERO_CELSIUS_IN_KELVIN: number
+        + DEFAULT_ALBEDO: number
+        + GAS_CONSTANT_R: number
+    }
+
+    interface ITemperatureNormalizer {
+        + toKelvin(temp: number, scale: 'C' | 'K'): number
+        + toCelsius(tempKelvin: number): number
+        + getArrheniusScalar(tempKelvin: number, activationEnergy: number): number
+    }
+
+    class ThermodynamicConstantsImpl {
+        + STEFAN_BOLTZMANN: number
+        + SOLAR_CONSTANT_TOA: number
+        + ZERO_CELSIUS_IN_KELVIN: number
+        + DEFAULT_ALBEDO: number
+        + GAS_CONSTANT_R: number
+    }
+
+    class TemperatureNormalizationEngine {
+        - constants: IThermodynamicConstants
+        + toKelvin(temp: number, scale: 'C' | 'K'): number
+        + toCelsius(tempKelvin: number): number
+        + getArrheniusScalar(tempKelvin: number, activationEnergy: number): number
+        + calculateBlackbodyRadiation(tempK: number, emissivity: number): number
+    }
+
+    IThermodynamicConstants <|.. ThermodynamicConstantsImpl
+    ITemperatureNormalizer <|.. TemperatureNormalizationEngine
+    TemperatureNormalizationEngine o-- IThermodynamicConstants : uses
+}
+
+package "db.schema" {
+    class SpatialMonad {
+        + monad_id: string
+        + region_name: string
+        + thermal_stock_joules: number
+        + albedo: number
+        + emissivity: number
+    }
+
+    class ThermodynamicStockTransaction {
+        + transaction_id: string
+        + monad_id: string
+        + delta_solar_joules: number
+        + delta_radiation_joules: number
+        + delta_conduction_joules: number
+        + resulting_temperature_k: number
+        + arrhenius_factor: number
+        + block_hash: string
+        + timestamp: Date
+    }
+
+    SpatialMonad "1" *-- "0..*" ThermodynamicStockTransaction : records fluxes
+}
+
+@enduml
