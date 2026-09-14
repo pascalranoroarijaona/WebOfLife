@@ -14,6 +14,13 @@ export enum H3ErrorCode {
   ERR_H3_OUT_OF_RANGE = "H3_ERR_OUT_OF_RANGE"
 }
 
+export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+
+export interface IResolutionTierValidator {
+  validateResolution(resolution: number): boolean;
+  assertValidResolution(resolution: number): asserts resolution is H3ResolutionTier;
+}
+
 export interface H3ValidationResult {
   readonly isValid: boolean;
   readonly valid?: boolean;
@@ -40,6 +47,16 @@ export interface IH3CellData {
   readonly baseCell: number;
   getEdgeNeighbors(): string[];
   getKRing(k: number): string[][];
+  solarIrradiance?: number;
+  carbonStock?: number;
+  boundary?: any;
+  areaKm2?: number;
+}
+
+export interface IH3GridQuery {
+  resolution: number;
+  baseIndexes?: string[];
+  bounds?: { north: number; south: number; east: number; west: number };
 }
 
 export interface CellStockState {
@@ -48,4 +65,9 @@ export interface CellStockState {
   waterMass: number;
   mineralNutrients: number;
   thermalEnergy: number;
+}
+
+export interface GeoCoordinate {
+  lat: number;
+  lng: number;
 }

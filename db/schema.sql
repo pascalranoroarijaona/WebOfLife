@@ -1,41 +1,82 @@
--- Updated Schema & Ledger Definitions for Sprint 020
--- Target: 15-Character H3 Index Length Validation & Spatial Monad Stock Transitions
+-- ============================================================================
+-- Web of Life Database Schema & Thermodynamic Ledger (Sprint 021)
+-- Spatial Resolution Tier (0-15) Boundary Check Integration
+-- ============================================================================
 
-BEGIN;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Spatial Validation Ledger & Audit Table
-CREATE TABLE IF NOT EXISTS spatial_validations (
-    validation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    h3_index VARCHAR(64) NOT NULL,
-    is_valid BOOLEAN NOT NULL,
-    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    solar_epoch_cycle BIGINT NOT NULL,
-    entropy_delta NUMERIC(18, 10) DEFAULT 0.0000000000
-);
+-- ----------------------------------------------------------------------------
+-- 1. Thermodynamic Ledger & Blockchain Blocks
+-- ----------------------------------------------------------------------------
 
--- Thermodynamic Stock Transactions for Spatial Monads
-CREATE TABLE IF NOT EXISTS spatial_monad_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    validation_id UUID REFERENCES spatial_validations(validation_id),
-    trophic_layer VARCHAR(32) NOT NULL,
-    energy_allocation NUMERIC(18, 8) NOT NULL CHECK (energy_allocation >= 0),
+CREATE TABLE IF NOT EXISTS blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    height BIGINT UNIQUE NOT NULL,
+    prev_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    thermodynamic_entropy_delta NUMERIC(20, 10) NOT NULL, -- Second Law tracking
+    solar_input_joules NUMERIC(24, 6) NOT NULL,           -- Solar flux accounting
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Blockchain Block Transaction Signatures for Spatial State Transitions
-CREATE TABLE IF NOT EXISTS spatial_blockchain_ledger (
-    block_id BIGSERIAL PRIMARY KEY,
-    previous_hash VARCHAR(64) NOT NULL,
-    current_hash VARCHAR(64) NOT NULL,
-    validation_id UUID REFERENCES spatial_validations(validation_id),
-    merkle_root VARCHAR(64) NOT NULL,
-    solar_signature VARCHAR(128) NOT NULL,
-    committed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS block_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES blocks(block_id) ON DELETE CASCADE,
+    sender_node VARCHAR(255) NOT NULL,
+    receiver_node VARCHAR(255) NOT NULL,
+    matter_mass_grams NUMERIC(18, 6) NOT NULL,            -- First Law: Matter Conservation
+    energy_joules NUMERIC(18, 6) NOT NULL,
+    spatial_resolution SMALLINT CHECK (spatial_resolution BETWEEN 0 AND 15),
+    h3_index VARCHAR(15) NOT NULL,
+    signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexing for high-throughput spatial adjacency & validation queries
-CREATE INDEX IF NOT EXISTS idx_spatial_validations_h3 ON spatial_validations(h3_index);
-CREATE INDEX IF NOT EXISTS idx_spatial_monads_layer ON spatial_monad_stocks(trophic_layer);
-CREATE INDEX IF NOT EXISTS idx_spatial_blockchain_hash ON spatial_blockchain_ledger(current_hash);
+-- ----------------------------------------------------------------------------
+-- 2. Spatial Index & Resolution Tier Management (H3 Tiers 0-15)
+-- ----------------------------------------------------------------------------
 
-COMMIT;
+CREATE TABLE IF NOT EXISTS spatial_resolution_tiers (
+    tier_level SMALLINT PRIMARY KEY CHECK (tier_level BETWEEN 0 AND 15),
+    tier_name VARCHAR(64) NOT NULL,
+    average_cell_area_km2 NUMERIC(20, 8) NOT NULL,
+    max_entropy_limit NUMERIC(20, 10) NOT NULL
+);
+
+-- Seed standard H3 resolution tiers (0 to 15)
+INSERT INTO spatial_resolution_tiers (tier_level, tier_name, average_cell_area_km2, max_entropy_limit) VALUES
+(0, 'Planetary Macro-Cell', 4250546.847, 1000000.0),
+(1, 'Continental Sector', 607220.978, 142857.0),
+(2, 'Sub-Continental Zone', 86745.854, 20408.1),
+(3, 'Regional Biome', 12392.265, 2915.4),
+(4, 'Ecoregion', 1767.466, 416.5),
+(5, 'Sub-Ecoregion', 252.495, 59.5),
+(6, 'Macro-Watershed', 36.071, 8.5),
+(7, 'Mesoscale Catchment', 5.153, 1.2),
+(8, 'Micro-Watershed', 0.736, 0.17),
+(9, 'Landscape Unit', 0.105, 0.024),
+(10, 'Habitat Patch', 0.015, 0.0034),
+(11, 'Ecosystem Sub-Unit', 0.0021, 0.00049),
+(12, 'Local Community', 0.00030, 0.00007),
+(13, 'Micro-Habitat', 0.000043, 0.00001),
+(14, 'Sub-Meter Plot', 0.0000061, 0.0000014),
+(15, 'Precise Organism Node', 0.00000087, 0.0000002)
+ON CONFLICT (tier_level) DO NOTHING;
+
+-- ----------------------------------------------------------------------------
+-- 3. Spatial Monad Stock Transitions & Trophic Energy Distribution
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS spatial_monad_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index VARCHAR(15) NOT NULL,
+    resolution_tier SMALLINT NOT NULL REFERENCES spatial_resolution_tiers(tier_level),
+    biomass_stock_grams NUMERIC(18, 6) NOT NULL,
+    energy_stock_joules NUMERIC(18, 6) NOT NULL,
+    entropy_state NUMERIC(18, 10) NOT NULL,
+    validation_status VARCHAR(32) DEFAULT 'PENDING' CHECK (validation_status IN ('PENDING', 'VALIDATED', 'REJECTED')),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_spatial_monads_resolution ON spatial_monad_stocks(resolution_tier);
+CREATE INDEX idx_spatial_monads_h3 ON spatial_monad_stocks(h3_index);

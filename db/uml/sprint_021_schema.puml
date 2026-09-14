@@ -1,0 +1,68 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+package "Spatial Subsystem (src/spatial)" {
+  interface IResolutionTierValidator {
+    + validateResolution(resolution: number): boolean
+    + assertValidResolution(resolution: number): asserts resolution is H3ResolutionTier
+  }
+
+  class H3GridManager implements IResolutionTierValidator {
+    - {static} MIN_RESOLUTION: number = 0
+    - {static} MAX_RESOLUTION: number = 15
+    + validateResolution(resolution: number): boolean
+    + assertValidResolution(resolution: number): asserts resolution is H3ResolutionTier
+  }
+
+  type H3ResolutionTier = "0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15"
+}
+
+package "Monads Subsystem (src/monads)" {
+  class SpatialMonad {
+    - h3Index: string
+    - resolution: H3ResolutionTier
+    - stockData: SpatialMonadStock
+    + transform(targetResolution: H3ResolutionTier): SpatialMonad
+    + validateState(): boolean
+  }
+}
+
+package "Thermodynamic & Blockchain Ledger (db/schema.sql)" {
+  class Block {
+    + block_id: UUID
+    + height: BIGINT
+    + prev_hash: VARCHAR
+    + merkle_root: VARCHAR
+    + thermodynamic_entropy_delta: NUMERIC
+    + solar_input_joules: NUMERIC
+  }
+
+  class BlockTransaction {
+    + tx_id: UUID
+    + block_id: UUID
+    + matter_mass_grams: NUMERIC
+    + energy_joules: NUMERIC
+    + spatial_resolution: SMALLINT
+    + h3_index: VARCHAR
+    + signature: VARCHAR
+  }
+
+  class SpatialMonadStock {
+    + stock_id: UUID
+    + h3_index: VARCHAR
+    + resolution_tier: SMALLINT
+    + biomass_stock_grams: NUMERIC
+    + energy_stock_joules: NUMERIC
+    + entropy_state: NUMERIC
+    + validation_status: VARCHAR
+  }
+}
+
+H3GridManager --> H3ResolutionTier : enforces bounds
+SpatialMonad --> H3GridManager : uses validate/assert
+SpatialMonadStock "*" --> "1" SpatialMonadStock : resolves tier hierarchy
+Block "1" *-- "*" BlockTransaction : contains
+BlockTransaction --> SpatialMonadStock : records state transition
+
+@enduml

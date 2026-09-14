@@ -1,5 +1,5 @@
 {
-  "current_sprint": 21,
+  "current_sprint": 22,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -100,6 +100,11 @@
       "sprint": 20,
       "goal": "Implement 15-character length validation helper function src/spatial/h3_grid.ts.",
       "timestamp": "2026-09-14T06:38:33.582600+00:00"
+    },
+    {
+      "sprint": 21,
+      "goal": "Implement resolution tier (0-15) boundary check function src/spatial/h3_grid.ts.",
+      "timestamp": "2026-09-14T06:44:32.425760+00:00"
     }
   ]
 }
