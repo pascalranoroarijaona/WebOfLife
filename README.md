@@ -206,14 +206,15 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 21%
-SPRINT_GOAL: Implement Uber H3 index string format validation and error code mapping in src/spatial/h3_grid.ts.
+SPRINT_GOAL: Implement regex and character set validation for Uber H3 index strings in src/spatial/h3_grid.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
 - [x] First Law mass conservation net flow calculations and hierarchical structure tree (`src/earth_pod.ts`)
 - [x] Planetary Mega-POD bootstrap mechanism and baseline simulation tick loops (`src/earth_pod.ts`, `src/main.ts`)
 - [x] Uber H3 index parsing, ring generation, and edge-neighbor mapping routines (`src/spatial/h3_adjacency.ts`, `src/spatial/h3_grid.ts`)
-- [ ] Uber H3 index string format validation and error code mapping (`src/spatial/h3_grid.ts`)
+- [ ] Implement regex and character set validation for Uber H3 index strings (`src/spatial/h3_grid.ts`)
+- [ ] Implement resolution tier (0-15) boundary checks and error code mapping (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 spatial ring generation utility functions (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 edge-neighbor mapping functions (`src/spatial/h3_grid.ts`)
 - [ ] Centralized thermodynamic physical constants and temperature normalization engine (`src/thermodynamics/constants.ts`)

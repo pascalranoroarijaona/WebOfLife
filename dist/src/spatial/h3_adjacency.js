@@ -5,6 +5,7 @@
 import { gridDisk, gridDistance } from 'h3-js';
 import { H3_ERROR_CODES } from './h3_types';
 import { validateH3Index } from './h3_grid';
+import { SpatialMonad } from '../monads/spatial_monad';
 export class H3SpatialCell {
     index;
     resolution;
@@ -48,7 +49,7 @@ export class H3AdjacencyEngine {
     executeDiffusionStep(centerState, neighborMap, diffusionRate = 0.05, _dt = 1.0) {
         let netCarbonDelta = 0;
         let netWaterDelta = 0;
-        for (const [nbrId, nbrState] of neighborMap.entries()) {
+        for (const [_, nbrState] of neighborMap.entries()) {
             const carbonFlux = (nbrState.carbonMass - centerState.carbonMass) * diffusionRate;
             const waterFlux = (nbrState.waterMass - centerState.waterMass) * diffusionRate;
             netCarbonDelta += carbonFlux;
@@ -59,11 +60,7 @@ export class H3AdjacencyEngine {
             carbonMass: Math.max(0, centerState.carbonMass + netCarbonDelta),
             waterMass: Math.max(0, centerState.waterMass + netWaterDelta)
         };
-        return {
-            extract: () => updatedState,
-            bind: (fn) => fn(updatedState),
-            map: (fn) => fn(updatedState)
-        };
+        return SpatialMonad.unit(updatedState);
     }
 }
 export function getH3Neighbors(index, k = 1) {

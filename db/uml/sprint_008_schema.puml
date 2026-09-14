@@ -1,0 +1,53 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #F9F9F9
+
+package "Web of Life - Spatial & Thermodynamic Architecture (Sprint 008)" {
+
+    class ThermodynamicLedger {
+        +String ledgerId
+        +String gaiaEarthPodId
+        +BigDecimal totalSolarInputJoules
+        +BigDecimal totalEntropyJoules
+        +BigDecimal matterMassGrams
+        +Timestamp createdAt
+        +validateConservationLaws() : boolean
+    }
+
+    class SpatialMonad {
+        +String monadId
+        +String rawInputString
+        +String h3Index
+        +boolean isValid
+        +BigDecimal trophicEnergyJoules
+        +BigDecimal entropyLeakageRisk
+        +{static} of(rawString: String) : SpatialMonad
+        +bind(validator: Function) : SpatialMonad
+        +assertValidH3() : void
+    }
+
+    class H3GridValidator {
+        +{static} REGEX_H3_15 : String
+        +{static} isValidH3Index(index: String) : boolean
+        +{static} assertValidH3Index(index: String) : void
+        +{static} sanitizeAndValidate(raw: String) : String
+    }
+
+    class BlockchainTransaction {
+        +String transactionId
+        +Long blockHeight
+        +String previousHash
+        +String merkleRoot
+        +String monadId
+        +String transactionSignature
+        +String payloadHash
+        +Timestamp validatedAt
+        +signTransaction() : String
+    }
+
+    ThermodynamicLedger "1" *-- "0..*" SpatialMonad : contains stocks >
+    SpatialMonad --> H3GridValidator : utilizes regex gate >
+    SpatialMonad "1" --> "1" BlockchainTransaction : anchors state via >
+}
+
+@enduml
