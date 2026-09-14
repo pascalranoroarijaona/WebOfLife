@@ -1,0 +1,190 @@
+```Code snippet
+@startuml sprint_060_schema
+!theme plain
+skinparam roundcorner 6
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName "JetBrains Mono", "Fira Code", monospace
+
+title Web of Life - Sprint 060: Tangent Space Projection for Discrete Geodesic Manifolds (RFC-060)
+
+package "Core Geometry & Vector Mechanics" {
+    class Vector3D << (T,#E6F2FF) type alias >> {
+        +x: number
+        +y: number
+        +z: number
+        __
+        +dot(other: Vector3D): number
+        +norm(): number
+        +normSquared(): number
+        +scale(factor: number): Vector3D
+        +subtract(other: Vector3D): Vector3D
+        +add(other: Vector3D): Vector3D
+        +normalize(): Vector3D
+    }
+
+    interface TangentProjectionResult {
+        +projected: Vector3D
+        +radialComponent: Vector3D
+        +radialMagnitude: number
+        +tangentialMagnitude: number
+        +orthogonalCheck: number
+    }
+
+    interface FacetTangentBasis {
+        +originNormal: Vector3D
+        +facetNormal: Vector3D
+        +tangentVector: Vector3D
+        +geodesicArcLength: number
+    }
+}
+
+package "Spatial Geodesic Engine" {
+    class H3AdjacencyGraphEngine {
+        +projectVectorOntoSphereTangentSpace(vector: Vector3D, originPoint: Vector3D, tolerance: number): Vector3D
+        +projectVectorOntoSphereTangentSpaceDetailed(vector: Vector3D, originPoint: Vector3D, tolerance: number): TangentProjectionResult
+        +computeFacetNormalTangentBasis(originPoint: Vector3D, neighborPoint: Vector3D): FacetTangentBasis
+        +getHexNeighbors(origin: string): List<string>
+        +computeGeodesicDistance(origin: string, destination: string): number
+        -computeDotProductCompensated(v: Vector3D, p: Vector3D): number
+    }
+
+    class H3Grid {
+        -cells: Map<string, H3CellMetadata>
+        -adjacencyGraph: H3AdjacencyGraphEngine
+        __
+        +computeHorizontalFluxes(velocityField: Map<string, Vector3D>): Map<string, Vector3D>
+        +enforceZeroNormalRadialDivergence(): boolean
+    }
+
+    class H3CellMetadata {
+        +h3Index: string
+        +resolution: number
+        +centroid: Vector3D
+        +unitNormal: Vector3D
+        +surfaceAreaM2: number
+        +isPentagon: boolean
+    }
+}
+
+package "Thermodynamic State Monad" {
+    class ConservativeStockTensor {
+        +carbonStockMol: number
+        +nitrogenStockMol: number
+        +waterStockKg: number
+        +phosphorusStockMol: number
+        +thermalEnergyJoules: number
+        +temperatureKelvin: number
+        +entropyJK: number
+        __
+        +applyFluxDeltas(delta: ConservativeStockTensor): ConservativeStockTensor
+        +verifyPositiveDefinite(): boolean
+    }
+
+    class SpatialMonad {
+        -cellPositions: Map<string, Vector3D>
+        -velocityField: Map<string, Vector3D>
+        -stocks: Map<string, ConservativeStockTensor>
+        -adjacencyEngine: H3AdjacencyGraphEngine
+        __
+        +stepAdvection(dt: number): SpatialMonad
+        +computeDissipationEntropy(dt: number): number
+        +exportConservativeState(): List<ConservativeStockTensor>
+        +validateZeroRadialLeakage(): boolean
+    }
+
+    class AdvectiveFacetFlux {
+        +sourceIndex: string
+        +targetIndex: string
+        +facetNormalVelocity: number
+        +carbonFluxMol: number
+        +nitrogenFluxMol: number
+        +waterFluxKg: number
+        +phosphorusFluxMol: number
+        +energyFluxJoules: number
+        +entropyDissipationRate: number
+        __
+        +computeFirstLawFlow(sourceStock: ConservativeStockTensor, vPerp: Vector3D): void
+    }
+}
+
+package "Blockchain Consensus & Ledger" {
+    class ThermodynamicBlock {
+        +blockHeight: number
+        +previousBlockHash: Hash256
+        +blockHash: Hash256
+        +stateMerkleRoot: Hash256
+        +fluxReceiptsRoot: Hash256
+        +tangentAuditRoot: Hash256
+        +totalPlanetaryCarbon: number
+        +totalPlanetaryNitrogen: number
+        +totalPlanetaryWater: number
+        +totalPlanetaryEnergy: number
+        +totalEntropyProduction: number
+        +solarIrradianceForcing: number
+        +validatorSignature: Signature
+        +timestamp: Timestamp
+        __
+        +verifyFirstLawConservation(prevBlock: ThermodynamicBlock): boolean
+        +verifySecondLawEntropyInequality(): boolean
+    }
+
+    class ThermodynamicTransaction {
+        +txHash: Hash256
+        +blockHeight: number
+        +senderIdentity: string
+        +targetIndex: string
+        +txType: TransactionType
+        +stockDeltas: ConservativeStockTensor
+        +gasConsumedEntropy: number
+        +signature: Signature
+    }
+
+    class TangentProjectionAuditLog {
+        +auditId: UUID
+        +blockHeight: number
+        +h3Index: string
+        +vectorDotOrigin: number
+        +originNormSquared: number
+        +radialScaleFactor: number
+        +energyConservationResidual: number
+        +leakageDetected: boolean
+    }
+}
+
+' Relations and Dependencies
+H3AdjacencyGraphEngine ..> Vector3D : processes
+H3AdjacencyGraphEngine ..> TangentProjectionResult : produces
+H3AdjacencyGraphEngine ..> FacetTangentBasis : computes
+
+H3Grid *-- H3AdjacencyGraphEngine : utilizes
+H3Grid *-- H3CellMetadata : indexes
+
+SpatialMonad *-- H3AdjacencyGraphEngine : delegates projection to
+SpatialMonad *-- ConservativeStockTensor : encapsulates
+SpatialMonad ..> AdvectiveFacetFlux : generates
+
+AdvectiveFacetFlux ..> Vector3D : constrained by v_perp in T_p S^2
+H3CellMetadata *-- Vector3D : centroid & normal
+
+ThermodynamicBlock *-- ThermodynamicTransaction : aggregates
+ThermodynamicBlock *-- TangentProjectionAuditLog : audits
+ThermodynamicTransaction --> SpatialMonad : applies state mutation
+TangentProjectionAuditLog ..> TangentProjectionResult : records verification of
+
+note right of H3AdjacencyGraphEngine::projectVectorOntoSphereTangentSpace
+  <b>First Law Guarantee:</b>
+  v_perp = v - ((v . p) / ||p||^2) * p
+  Enforces n_hat . J_c = 0
+  Eliminates radial leakage across S^2
+end note
+
+note bottom of ThermodynamicBlock
+  <b>Thermodynamic Consensus:</b>
+  First Law: d(Stock)/dt = Sum(Flux) + Solar
+  Second Law: Sigma >= 0 (Entropy Dissipation)
+  Merkle roots seal state & tangent audits.
+end note
+
+@enduml

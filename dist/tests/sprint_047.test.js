@@ -30,7 +30,6 @@ describe('Sprint 047: Spherical Geodesic Edge Scaling Architecture', () => {
                 const lr = calculateH3EdgeLengthMeters(r);
                 const lNext = calculateH3EdgeLengthMeters(r + 1);
                 assert.ok(lNext < lr, `Monotonicity violated: L(${r + 1}) = ${lNext} is not < L(${r}) = ${lr}`);
-                // Aperture-7 scaling ratio is approximately sqrt(7) ~ 2.64575
                 const ratio = lr / lNext;
                 assert.ok(ratio >= 2.4 && ratio <= 2.9, `Scaling ratio between resolution ${r} and ${r + 1} (${ratio}) deviated excessively from sqrt(7)`);
             }
@@ -40,7 +39,6 @@ describe('Sprint 047: Spherical Geodesic Edge Scaling Architecture', () => {
                 const discrete = calculateH3EdgeLengthMeters(r);
                 const analytical = calculateH3EdgeLengthAnalytical(r);
                 const errorPercent = (Math.abs(discrete - analytical) / discrete) * 100;
-                // Due to icosahedral spherical projection, divergence stays < 10%
                 assert.ok(errorPercent < 10.0, `Analytical formula diverged by ${errorPercent}% at resolution ${r}`);
             }
         });
@@ -75,7 +73,7 @@ describe('Sprint 047: Spherical Geodesic Edge Scaling Architecture', () => {
             assert.strictEqual(boundary.resolution, 7);
             assert.strictEqual(boundary.edgeLengthMeters, edge);
             assert.strictEqual(boundary.centerDistanceMeters, Math.sqrt(3) * edge);
-            const activeDepth = 2.5; // meters
+            const activeDepth = 2.5;
             const expectedArea = edge * activeDepth;
             assert.strictEqual(boundary.calculateContactArea(activeDepth), expectedArea);
         });
@@ -115,17 +113,15 @@ describe('Sprint 047: Spherical Geodesic Edge Scaling Architecture', () => {
         it('Process 1 (Fickian Mass Diffusion): strictly conserves mass across shared edge', () => {
             const resolution = 7;
             const depth = 2.0;
-            const deltaT = 3600; // 1 hour
-            const diffusionCoeff = 1.5e-5; // m^2/s
-            const stockSource = 100.0; // kg
-            const stockTarget = 20.0; // kg
-            const volumeSource = 10_000.0; // m^3
-            const volumeTarget = 10_000.0; // m^3
+            const deltaT = 3600;
+            const diffusionCoeff = 1.5e-5;
+            const stockSource = 100.0;
+            const stockTarget = 20.0;
+            const volumeSource = 10_000.0;
+            const volumeTarget = 10_000.0;
             const result = computeBoundaryDiffusionStep(stockSource, stockTarget, volumeSource, volumeTarget, diffusionCoeff, resolution, depth, deltaT);
-            // Mass transfer invariant: deltaStockSource + deltaStockTarget = 0
             const netDelta = result.deltaStockSource + result.deltaStockTarget;
             assert.ok(Math.abs(netDelta) < 1e-12, `Net mass change must be 0, got ${netDelta}`);
-            // Solute flows from higher concentration (0.01 kg/m^3) to lower (0.002 kg/m^3)
             assert.ok(result.deltaStockSource < 0, 'Source stock should decrease');
             assert.ok(result.deltaStockTarget > 0, 'Target stock should increase');
             assert.strictEqual(-result.deltaStockSource, result.deltaStockTarget);
@@ -133,26 +129,23 @@ describe('Sprint 047: Spherical Geodesic Edge Scaling Architecture', () => {
         it('Process 2 (Fourier Heat Transfer): strictly satisfies First Law and produces non-negative entropy', () => {
             const resolution = 8;
             const depth = 1.0;
-            const deltaT = 60; // 1 min
-            const conductivity = 0.6; // W/(m*K)
-            const tempHot = 310.15; // 37°C
-            const tempCold = 285.15; // 12°C
+            const deltaT = 60;
+            const conductivity = 0.6;
+            const tempHot = 310.15;
+            const tempCold = 285.15;
             const result = computeBoundaryThermalExchangeStep(tempHot, tempCold, conductivity, resolution, depth, deltaT);
-            // Energy Conservation: deltaHeatSource + deltaHeatTarget = 0
             const netHeat = result.deltaHeatJoulesSource + result.deltaHeatJoulesTarget;
             assert.ok(Math.abs(netHeat) < 1e-9, `Net heat change must be 0, got ${netHeat}`);
-            // Heat leaves hot column and enters cold column
             assert.ok(result.deltaHeatJoulesSource < 0, 'Hot body must lose thermal energy');
             assert.ok(result.deltaHeatJoulesTarget > 0, 'Cold body must gain thermal energy');
-            // Second Law Invariant: entropy production >= 0
             assert.ok(result.entropyProductionJoulesPerKelvin >= 0, `Entropy production must be non-negative, got ${result.entropyProductionJoulesPerKelvin}`);
         });
         it('Process 3 (Hydraulic Conveyance): preserves total water mass and volume', () => {
             const resolution = 6;
             const deltaT = 100;
             const hydConductivity = 0.05;
-            const headSource = 120.0; // higher head
-            const headTarget = 115.0; // lower head
+            const headSource = 120.0;
+            const headTarget = 115.0;
             const waterDepthSource = 3.0;
             const waterDepthTarget = 2.0;
             const result = computeBoundaryHydraulicExchangeStep(headSource, headTarget, waterDepthSource, waterDepthTarget, hydConductivity, resolution, deltaT);
@@ -191,11 +184,13 @@ describe('Sprint 047: Spherical Geodesic Edge Scaling Architecture', () => {
             const monadA = SpatialMonad.of('cell_A', 8, stateA);
             const monadB = SpatialMonad.of('cell_B', 8, stateB);
             const { source, target } = monadA.diffuseWith(monadB, 1.0, 1e-4, 300);
+            const sVal = source.value;
+            const tVal = target.value;
             const totalInitial = stateA.dissolvedSoluteKg + stateB.dissolvedSoluteKg;
-            const totalFinal = source.value.dissolvedSoluteKg + target.value.dissolvedSoluteKg;
+            const totalFinal = sVal.dissolvedSoluteKg + tVal.dissolvedSoluteKg;
             assert.ok(Math.abs(totalInitial - totalFinal) < 1e-12, `Conservation of solute failed: initial=${totalInitial}, final=${totalFinal}`);
-            assert.ok(source.value.dissolvedSoluteKg < 50.0);
-            assert.ok(target.value.dissolvedSoluteKg > 10.0);
+            assert.ok(sVal.dissolvedSoluteKg < 50.0);
+            assert.ok(tVal.dissolvedSoluteKg > 10.0);
         });
         it('preserves existing bootstrapMegaPod and EarthPOD core functionality without regressions', () => {
             const { earth, sun } = bootstrapMegaPod();

@@ -53,7 +53,6 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
 
   it('verifies August-Roche-Magnus water vapor saturation at STP baseline', () => {
     const satPressure = computeAugustRocheMagnusSatVaporPressure(STP_CONSTANTS.T_STANDARD);
-    // At 288.15 K (15 C), saturation vapor pressure is ~1705.62 Pa
     assert.ok(Math.abs(satPressure - 1705.62) < 0.5);
 
     const baselinePartialH2O = satPressure * STP_CONSTANTS.BASELINE_RELATIVE_HUMIDITY;
@@ -68,7 +67,6 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
     assert.strictEqual(state.temperatureKelvin, 288.15);
     assert.strictEqual(state.atmosphere.surfacePressurePa, 101325.0);
 
-    // Conservation check: Column atmospheric mass = P0 * Area / g0
     const expectedAtmMassKg = state.areaM2 * (STP_CONSTANTS.P_STANDARD / STP_CONSTANTS.STANDARD_GRAVITY);
     const reconstructedAtmMassKg =
       state.atmosphere.nitrogenMoles * STP_CONSTANTS.MOLAR_MASS_N2 +
@@ -77,7 +75,6 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
       state.atmosphere.waterVaporMoles * STP_CONSTANTS.MOLAR_MASS_H2O;
 
     const relativeError = Math.abs(reconstructedAtmMassKg - expectedAtmMassKg) / expectedAtmMassKg;
-    // Must be conserved within small relative error (allowing for trace gases fraction)
     assert.ok(relativeError < 0.015, `Column atmospheric mass deviation: ${relativeError}`);
   });
 
@@ -85,17 +82,14 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
     const state = createDefaultH3CellThermodynamicState(sampleRes8Cell);
     const area = state.areaM2;
 
-    // Hydrosphere: 50 kg/m2
     assert.strictEqual(state.hydrosphere.liquidWaterKg, area * 50.0);
     assert.strictEqual(state.hydrosphere.iceKg, 0.0);
     assert.strictEqual(state.hydrosphere.salinityPsu, 0.0);
 
-    // Lithosphere: SOC 12 kg/m2, Mineral 1288 kg/m2, Soil moisture 200 kg/m2
     assert.strictEqual(state.lithosphere.soilOrganicCarbonKg, area * 12.0);
     assert.strictEqual(state.lithosphere.inorganicMineralKg, area * 1288.0);
     assert.strictEqual(state.lithosphere.soilMoistureKg, area * 200.0);
 
-    // Biosphere: autotroph 2.50 kg/m2, heterotroph 0.015 kg/m2, detritus 0.75 kg/m2
     assert.strictEqual(state.biosphere.autotrophBiomassKg, area * 2.50);
     assert.strictEqual(state.biosphere.heterotrophBiomassKg, area * 0.015);
     assert.strictEqual(state.biosphere.detritusKg, area * 0.75);
@@ -119,7 +113,6 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
     assert.strictEqual(Object.isFrozen(state.lithosphere), true);
     assert.strictEqual(Object.isFrozen(state.biosphere), true);
 
-    // Mutation attempts in strict mode must throw
     assert.throws(() => {
       // @ts-expect-error mutating readonly property
       state.temperatureKelvin = 300.0;
@@ -132,8 +125,8 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
   });
 
   it('correctly applies partial overrides while maintaining consistency', () => {
-    const customTemp = 305.15; // 32 deg C
-    const customSalinity = 35.0; // Oceanic cell
+    const customTemp = 305.15;
+    const customSalinity = 35.0;
     const state = createDefaultH3CellThermodynamicState(sampleRes8Cell, {
       temperatureKelvin: customTemp,
       hydrosphere: { salinityPsu: customSalinity },
@@ -141,7 +134,6 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
 
     assert.strictEqual(state.temperatureKelvin, 305.15);
     assert.strictEqual(state.hydrosphere.salinityPsu, 35.0);
-    // Preserves baseline liquid water stock
     assert.strictEqual(state.hydrosphere.liquidWaterKg, state.areaM2 * 50.0);
   });
 
@@ -171,7 +163,7 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
 
   it('integrates seamlessly with SpatialMonad functor and bind operations', () => {
     const initialCell = createDefaultH3CellThermodynamicState(sampleRes8Cell);
-    const monad = SpatialMonad.of(initialCell);
+    const monad = SpatialMonad.of<DefaultH3CellState>(initialCell);
 
     // Functor map: extract internal energy density
     const energyDensityMonad = monad.map((s) => s.internalEnergyJoules / s.areaM2);
@@ -182,10 +174,11 @@ describe('Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor', () => {
       const updatedState = createDefaultH3CellThermodynamicState(s.h3Index, {
         temperatureKelvin: s.temperatureKelvin + 5.0,
       });
-      return SpatialMonad.of(updatedState);
+      return SpatialMonad.of<DefaultH3CellState>(updatedState);
     });
 
-    assert.strictEqual(perturbedMonad.value.temperatureKelvin, 293.15);
-    assert.ok(perturbedMonad.value.internalEnergyJoules > initialCell.internalEnergyJoules);
+    const perturbedVal = perturbedMonad.value as DefaultH3CellState;
+    assert.strictEqual(perturbedVal.temperatureKelvin, 293.15);
+    assert.ok(perturbedVal.internalEnergyJoules > initialCell.internalEnergyJoules);
   });
 });

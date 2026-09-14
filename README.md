@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 32%
-SPRINT_GOAL: Implement computeSphericalGreatCircleNormal3D computing normalized cross product of two unit vectors representing great circle plane normal in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 30%
+SPRINT_GOAL: Implement projectVectorOntoSphereTangentSpace removing radial projection component along origin vector in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -243,8 +243,10 @@ SPRINT_GOAL: Implement computeSphericalGreatCircleNormal3D computing normalized 
 - [x] Implement `assertValidCoordinatePair` coordinate boundary assertion helper in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeSphericalArcBearing` forward geodesic initial azimuth calculation between two lat/lng coordinates in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeSphericalGreatCircleNormal3D` computing normalized cross product of two unit vectors representing great circle plane normal in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryUnitNormalVector` outward spherical unit normal vector calculator across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeSphericalGreatCircleNormal3D` computing normalized cross product of two unit vectors representing great circle plane normal in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `projectVectorOntoSphereTangentSpace` removing radial projection component along origin vector in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryOutwardNormal3D` computing outward spherical unit normal vector across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
@@ -272,6 +274,7 @@ SPRINT_GOAL: Implement computeSphericalGreatCircleNormal3D computing normalized 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
 - [ ] Define `BiomassStoichiometryVector` interface with Redfield canonical ratios in `src/biosphere/stoichiometry_types.ts`
+- [ ] Implement Sterner-Elser homeostatic regulation function and dynamic overflow respiration in `src/biosphere/homeostatic_regulation.ts`
 - [ ] Implement Liebig's Law of the Minimum and Droop cell quota limitation operators in `src/biosphere/stoichiometric_limitation.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper in `src/biosphere/biomass_energy.ts`
 - [ ] Plant Functional Type (PFT) enum and `CanopyTraitProfile` interface in `src/biosphere/traits.ts`

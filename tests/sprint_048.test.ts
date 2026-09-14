@@ -160,7 +160,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
       assert.ok(neighbors.includes(neighbor));
 
       const len1 = graph.calculateSharedBoundaryLength(origin, neighbor);
-      const len2 = graph.calculateSharedBoundaryLength(origin, neighbor); // Cached
+      const len2 = graph.calculateSharedBoundaryLength(origin, neighbor);
       assert.ok(len1 > 0.0);
       assert.strictEqual(len1, len2);
     });
@@ -175,7 +175,6 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
       const adjacencyList = new Map<string, string[]>();
       const centroidDistances = new Map<string, number>();
 
-      // Populate origin with high temperature
       cells.set(origin, {
         h3Index: origin,
         energyJoules: 1e9,
@@ -189,7 +188,6 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
       });
       adjacencyList.set(origin, neighbors);
 
-      // Populate neighbors with lower temperature
       for (const n of neighbors) {
         cells.set(n, {
           h3Index: n,
@@ -207,7 +205,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
         centroidDistances.set(`${n}_${origin}`, 50000.0);
       }
 
-      const dt = 3600.0; // 1 hour step
+      const dt = 3600.0;
       const deltas = executeLateralThermodynamicTransportStep(
         cells,
         adjacencyList,
@@ -220,13 +218,11 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
         sumDeltaEnergy += delta.deltaEnergy;
       }
 
-      // Energy conservation verified within machine precision
       assert.ok(
         Math.abs(sumDeltaEnergy) < 1e-9,
         `Total energy delta should be 0.0, got ${sumDeltaEnergy}`
       );
 
-      // Verify Second Law direction: Hot origin lost energy, colder neighbors gained energy
       const originDelta = deltas.get(origin)!;
       assert.ok(
         originDelta.deltaEnergy < 0,
@@ -271,15 +267,21 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
 
       monad.connectNeighbors(origin, neighbor, 25000.0);
 
+      const cellOrigin = monad.getCell(origin);
+      const cellNeighbor = monad.getCell(neighbor);
+      assert.ok(cellOrigin && cellNeighbor);
       const initialTotalEnergy =
-        monad.getCell(origin)!.energyJoules + monad.getCell(neighbor)!.energyJoules;
+        (cellOrigin.energyJoules ?? 0) + (cellNeighbor.energyJoules ?? 0);
 
       for (let step = 0; step < 5; step++) {
         monad.step(60.0);
       }
 
+      const postOrigin = monad.getCell(origin);
+      const postNeighbor = monad.getCell(neighbor);
+      assert.ok(postOrigin && postNeighbor);
       const finalTotalEnergy =
-        monad.getCell(origin)!.energyJoules + monad.getCell(neighbor)!.energyJoules;
+        (postOrigin.energyJoules ?? 0) + (postNeighbor.energyJoules ?? 0);
 
       assert.ok(
         Math.abs(finalTotalEnergy - initialTotalEnergy) < 1e-9,

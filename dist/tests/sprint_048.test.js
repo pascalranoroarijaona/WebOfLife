@@ -104,7 +104,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
             const neighbors = graph.getNeighbors(origin);
             assert.ok(neighbors.includes(neighbor));
             const len1 = graph.calculateSharedBoundaryLength(origin, neighbor);
-            const len2 = graph.calculateSharedBoundaryLength(origin, neighbor); // Cached
+            const len2 = graph.calculateSharedBoundaryLength(origin, neighbor);
             assert.ok(len1 > 0.0);
             assert.strictEqual(len1, len2);
         });
@@ -116,7 +116,6 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
             const cells = new Map();
             const adjacencyList = new Map();
             const centroidDistances = new Map();
-            // Populate origin with high temperature
             cells.set(origin, {
                 h3Index: origin,
                 energyJoules: 1e9,
@@ -129,7 +128,6 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
                 conductivity: 2.5,
             });
             adjacencyList.set(origin, neighbors);
-            // Populate neighbors with lower temperature
             for (const n of neighbors) {
                 cells.set(n, {
                     h3Index: n,
@@ -146,15 +144,13 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
                 centroidDistances.set(`${origin}_${n}`, 50000.0);
                 centroidDistances.set(`${n}_${origin}`, 50000.0);
             }
-            const dt = 3600.0; // 1 hour step
+            const dt = 3600.0;
             const deltas = executeLateralThermodynamicTransportStep(cells, adjacencyList, centroidDistances, dt);
             let sumDeltaEnergy = 0.0;
             for (const delta of deltas.values()) {
                 sumDeltaEnergy += delta.deltaEnergy;
             }
-            // Energy conservation verified within machine precision
             assert.ok(Math.abs(sumDeltaEnergy) < 1e-9, `Total energy delta should be 0.0, got ${sumDeltaEnergy}`);
-            // Verify Second Law direction: Hot origin lost energy, colder neighbors gained energy
             const originDelta = deltas.get(origin);
             assert.ok(originDelta.deltaEnergy < 0, "Origin cell at higher temperature must transfer heat to colder neighbors");
             for (const n of neighbors) {
@@ -188,11 +184,17 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
                 conductivity: 1.8,
             });
             monad.connectNeighbors(origin, neighbor, 25000.0);
-            const initialTotalEnergy = monad.getCell(origin).energyJoules + monad.getCell(neighbor).energyJoules;
+            const cellOrigin = monad.getCell(origin);
+            const cellNeighbor = monad.getCell(neighbor);
+            assert.ok(cellOrigin && cellNeighbor);
+            const initialTotalEnergy = (cellOrigin.energyJoules ?? 0) + (cellNeighbor.energyJoules ?? 0);
             for (let step = 0; step < 5; step++) {
                 monad.step(60.0);
             }
-            const finalTotalEnergy = monad.getCell(origin).energyJoules + monad.getCell(neighbor).energyJoules;
+            const postOrigin = monad.getCell(origin);
+            const postNeighbor = monad.getCell(neighbor);
+            assert.ok(postOrigin && postNeighbor);
+            const finalTotalEnergy = (postOrigin.energyJoules ?? 0) + (postNeighbor.energyJoules ?? 0);
             assert.ok(Math.abs(finalTotalEnergy - initialTotalEnergy) < 1e-9, `Energy conservation must hold across all steps: initial=${initialTotalEnergy}, final=${finalTotalEnergy}`);
         });
     });

@@ -1,125 +1,184 @@
--- Web of Life Thermodynamic Blockchain Ledger & Spatial Monad Schema
--- Sprint 059: Great Circle Plane Normal Vectors & Advective Boundary Flux Ledger
+-- ============================================================================
+-- Web of Life: Planetary Biogeochemical Simulation Engine & Blockchain Ledger
+-- SPRINT 060: Tangent Space Projection for Discrete Geodesic Manifolds (RFC-060)
+-- ============================================================================
 
--- Extension registrations
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ---------------------------------------------------------------------
--- 1. SPATIAL GEODESIC & GREAT CIRCLE PLANE NORMALS
--- ---------------------------------------------------------------------
-
--- Table: spatial_great_circle_normals
--- Persists normalized 3D plane normal vectors for cell boundaries, advective corridors, and geodesics.
-CREATE TABLE IF NOT EXISTS spatial_great_circle_normals (
-    normal_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_h3_index VARCHAR(15) NOT NULL,
-    target_h3_index VARCHAR(15) NOT NULL,
-    u_vector DOUBLE PRECISION[3] NOT NULL, -- [ux, uy, uz] on S^2
-    v_vector DOUBLE PRECISION[3] NOT NULL, -- [vx, vy, vz] on S^2
-    normal_vector DOUBLE PRECISION[3] NOT NULL, -- [nx, ny, nz] unit normal vector (u x v / ||u x v||)
-    sin_theta DOUBLE PRECISION NOT NULL, -- Cross product magnitude ||u x v||
-    is_collinear BOOLEAN NOT NULL DEFAULT FALSE, -- True if ||u x v|| < epsilon (fallback used)
-    epsilon DOUBLE PRECISION NOT NULL DEFAULT 1e-10,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT chk_unit_norm CHECK (
-        ABS(
-            SQRT(
-                (normal_vector[1] * normal_vector[1]) +
-                (normal_vector[2] * normal_vector[2]) +
-                (normal_vector[3] * normal_vector[3])
-            ) - 1.0
-        ) < 1e-10
-    ),
-    CONSTRAINT chk_orthogonal_u CHECK (
-        ABS(
-            (normal_vector[1] * u_vector[1]) +
-            (normal_vector[2] * u_vector[2]) +
-            (normal_vector[3] * u_vector[3])
-        ) < 1e-7
+-- ----------------------------------------------------------------------------
+-- 1. SPATIAL TOPOLOGY: Discrete Geodesic Manifold (H3 Cell Centroids)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS h3_cells (
+    h3_index VARCHAR(15) PRIMARY KEY,
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    -- Centroid Cartesian coordinates embedded in global geocentric R^3 (meters)
+    pos_x DOUBLE PRECISION NOT NULL,
+    pos_y DOUBLE PRECISION NOT NULL,
+    pos_z DOUBLE PRECISION NOT NULL,
+    -- Radius magnitude ||p|| = sqrt(px^2 + py^2 + pz^2)
+    radius_meters DOUBLE PRECISION GENERATED ALWAYS AS (
+        SQRT(pos_x * pos_x + pos_y * pos_y + pos_z * pos_z)
+    ) STORED,
+    -- Outward unit normal vector n_hat = p / ||p||
+    normal_x DOUBLE PRECISION NOT NULL,
+    normal_y DOUBLE PRECISION NOT NULL,
+    normal_z DOUBLE PRECISION NOT NULL,
+    surface_area_m2 DOUBLE PRECISION NOT NULL CHECK (surface_area_m2 > 0),
+    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_unit_normal CHECK (
+        ABS((normal_x * normal_x + normal_y * normal_y + normal_z * normal_z) - 1.0) < 1e-7
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_sgcn_source_target 
-    ON spatial_great_circle_normals (source_h3_index, target_h3_index);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_resolution ON h3_cells(resolution);
 
--- ---------------------------------------------------------------------
--- 2. DGGS BOUNDARY INTERFACE & ADVECTIVE FLUX TRANSACTIONS
--- ---------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+-- 2. THERMODYNAMIC MONAD STATE STOCKS (Conservational State Tensor per Cell)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS monad_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL,
+    h3_index VARCHAR(15) NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    -- Conservative stock scalar variables (First Law invariance)
+    carbon_stock_mol DOUBLE PRECISION NOT NULL CHECK (carbon_stock_mol >= 0),
+    nitrogen_stock_mol DOUBLE PRECISION NOT NULL CHECK (nitrogen_stock_mol >= 0),
+    water_stock_kg DOUBLE PRECISION NOT NULL CHECK (water_stock_kg >= 0),
+    phosphorus_stock_mol DOUBLE PRECISION NOT NULL CHECK (phosphorus_stock_mol >= 0),
+    thermal_energy_joules DOUBLE PRECISION NOT NULL CHECK (thermal_energy_joules >= 0),
+    -- Local intensive variables
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0),
+    state_entropy_j_k DOUBLE PRECISION NOT NULL,
+    state_hash BYTEA NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_monad_stock_cell_height UNIQUE (h3_index, block_height)
+);
 
--- Table: boundary_advective_flux_ledger
--- Tracks mass, energy, and entropy transfer across great circle hexagonal boundaries.
--- Enforces anti-symmetric advection: F(u, v) = -F(v, u).
-CREATE TABLE IF NOT EXISTS boundary_advective_flux_ledger (
+CREATE INDEX IF NOT EXISTS idx_monad_stocks_height ON monad_stocks(block_height);
+CREATE INDEX IF NOT EXISTS idx_monad_stocks_cell ON monad_stocks(h3_index);
+
+-- ----------------------------------------------------------------------------
+-- 3. TANGENT SPACE ADVECTION VECTORS (RFC-060 Orthogonal Velocity Projections)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cell_advection_vectors (
+    vector_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL,
+    h3_index VARCHAR(15) NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    -- Raw 3D Cartesian unconstrained velocity v in R^3 (m/s)
+    raw_vx DOUBLE PRECISION NOT NULL,
+    raw_vy DOUBLE PRECISION NOT NULL,
+    raw_vz DOUBLE PRECISION NOT NULL,
+    -- Orthogonally projected tangential velocity v_perp in T_p S^2 (m/s)
+    tangent_vx DOUBLE PRECISION NOT NULL,
+    tangent_vy DOUBLE PRECISION NOT NULL,
+    tangent_vz DOUBLE PRECISION NOT NULL,
+    -- Filtered radial component v_parallel = ((v . p) / ||p||^2) * p (m/s)
+    radial_vx DOUBLE PRECISION NOT NULL,
+    radial_vy DOUBLE PRECISION NOT NULL,
+    radial_vz DOUBLE PRECISION NOT NULL,
+    -- Diagnostic scalar invariants
+    radial_magnitude DOUBLE PRECISION NOT NULL CHECK (radial_magnitude >= 0),
+    tangential_magnitude DOUBLE PRECISION NOT NULL CHECK (tangential_magnitude >= 0),
+    -- Orthogonality residual: (v_perp . p) / (||v_perp|| * ||p|| + eps)
+    orthogonal_residual DOUBLE PRECISION NOT NULL,
+    is_strictly_tangent BOOLEAN NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_orthogonality_invariant CHECK (ABS(orthogonal_residual) < 1e-6),
+    CONSTRAINT uq_cell_advection_height UNIQUE (h3_index, block_height)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cell_advection_height ON cell_advection_vectors(block_height);
+
+-- ----------------------------------------------------------------------------
+-- 4. ADJACENCY INTER-CELL FLUX TRANSACTIONS (Finite-Volume Facet Fluxes)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS advective_facet_fluxes (
     flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     block_height BIGINT NOT NULL,
-    normal_id UUID NOT NULL REFERENCES spatial_great_circle_normals(normal_id),
-    source_cell VARCHAR(15) NOT NULL,
-    target_cell VARCHAR(15) NOT NULL,
-    advective_velocity DOUBLE PRECISION[3] NOT NULL, -- 3D fluid/biomass velocity vector
-    normal_projected_flux DOUBLE PRECISION NOT NULL, -- Dot product: v_adv . n
-    enthalpy_flux_joules DOUBLE PRECISION NOT NULL, -- Advective energy exchange
-    biomass_flux_kg DOUBLE PRECISION NOT NULL, -- Advective biomass exchange
-    entropy_delta_production DOUBLE PRECISION NOT NULL, -- Irreversible dispersion entropy dS >= 0
-    state_merkle_root BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT chk_entropy_non_negative CHECK (entropy_delta_production >= 0.0)
+    source_h3_index VARCHAR(15) NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    target_h3_index VARCHAR(15) NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    -- Directed edge normal and geodesic arc metrics
+    facet_length_m DOUBLE PRECISION NOT NULL CHECK (facet_length_m > 0),
+    normal_flux_velocity DOUBLE PRECISION NOT NULL, -- Dot product of v_perp with facet outward unit normal
+    -- Conservative advective mass and energy flows (J_c = c * v_perp - D * grad_S2(c))
+    carbon_flux_mol DOUBLE PRECISION NOT NULL,
+    nitrogen_flux_mol DOUBLE PRECISION NOT NULL,
+    water_flux_kg DOUBLE PRECISION NOT NULL,
+    phosphorus_flux_mol DOUBLE PRECISION NOT NULL,
+    energy_flux_joules DOUBLE PRECISION NOT NULL,
+    -- Second Law: Positive-definite dissipation entropy generation (sigma >= 0)
+    entropy_dissipation_joules_per_kelvin DOUBLE PRECISION NOT NULL CHECK (entropy_dissipation_joules_per_kelvin >= 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_source_target_distinct CHECK (source_h3_index <> target_h3_index)
 );
 
-CREATE INDEX IF NOT EXISTS idx_bafl_block_source 
-    ON boundary_advective_flux_ledger (block_height, source_cell);
+CREATE INDEX IF NOT EXISTS idx_facet_flux_height ON advective_facet_fluxes(block_height);
+CREATE INDEX IF NOT EXISTS idx_facet_flux_source ON advective_facet_fluxes(source_h3_index);
+CREATE INDEX IF NOT EXISTS idx_facet_flux_target ON advective_facet_fluxes(target_h3_index);
 
--- ---------------------------------------------------------------------
--- 3. THERMODYNAMIC STATE STOCKS & ACCUMULATORS
--- ---------------------------------------------------------------------
-
--- Table: h3_cell_thermodynamic_stocks
--- Canonical thermodynamic state for DGGS cells, conserving total energy and mass.
-CREATE TABLE IF NOT EXISTS h3_cell_thermodynamic_stocks (
-    cell_h3_index VARCHAR(15) PRIMARY KEY,
-    centroid_unit_vector DOUBLE PRECISION[3] NOT NULL,
-    internal_energy_joules DOUBLE PRECISION NOT NULL CHECK (internal_energy_joules >= 0.0),
-    biomass_carbon_kg DOUBLE PRECISION NOT NULL CHECK (biomass_carbon_kg >= 0.0),
-    entropy_j_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_j_per_k >= 0.0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
-    updated_at_block BIGINT NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+-- ----------------------------------------------------------------------------
+-- 5. THERMODYNAMIC AUDIT TRAIL & LEAKAGE VERIFICATION (RFC-060 Diagnostics)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tangent_projection_audits (
+    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL,
+    h3_index VARCHAR(15) NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    vector_dot_origin DOUBLE PRECISION NOT NULL,
+    origin_norm_squared DOUBLE PRECISION NOT NULL CHECK (origin_norm_squared > 0),
+    radial_scale_factor DOUBLE PRECISION NOT NULL,
+    energy_norm_conservation_error DOUBLE PRECISION NOT NULL,
+    boundary_leakage_detected BOOLEAN NOT NULL DEFAULT FALSE,
+    audit_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_zero_boundary_leakage CHECK (boundary_leakage_detected = FALSE)
 );
 
--- ---------------------------------------------------------------------
--- 4. BLOCKCHAIN ATTESTATION & GEODESIC CONSENSUS
--- ---------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_projection_audit_height ON tangent_projection_audits(block_height);
 
--- Table: thermodynamic_block_headers
--- Verifiable block headers bundling spatial fluxes and conservation proofs.
-CREATE TABLE IF NOT EXISTS thermodynamic_block_headers (
+-- ----------------------------------------------------------------------------
+-- 6. THERMODYNAMIC BLOCKCHAIN LEDGER: State Commitment & Transaction Blocks
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
     block_height BIGINT PRIMARY KEY,
-    parent_block_hash BYTEA NOT NULL,
-    state_root BYTEA NOT NULL,
+    previous_block_hash BYTEA NOT NULL,
+    block_hash BYTEA NOT NULL UNIQUE,
+    state_merkle_root BYTEA NOT NULL,
     flux_receipts_root BYTEA NOT NULL,
-    geodesic_normal_hash BYTEA NOT NULL,
-    total_net_energy_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_net_mass_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_entropy_generated DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    tangent_audit_root BYTEA NOT NULL,
+    -- Global thermodynamic conservation balances (Sum over S^2)
+    total_carbon_mol DOUBLE PRECISION NOT NULL,
+    total_nitrogen_mol DOUBLE PRECISION NOT NULL,
+    total_water_kg DOUBLE PRECISION NOT NULL,
+    total_phosphorus_mol DOUBLE PRECISION NOT NULL,
+    total_energy_joules DOUBLE PRECISION NOT NULL,
+    total_entropy_production_jk DOUBLE PRECISION NOT NULL CHECK (total_entropy_production_jk >= 0),
+    -- Solar input irradiance forcing during this time step dt
+    solar_irradiance_joules DOUBLE PRECISION NOT NULL CHECK (solar_irradiance_joules >= 0),
+    -- Cryptographic consensus & signatures
+    validator_node_id VARCHAR(66) NOT NULL,
     validator_signature BYTEA NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT chk_first_law_conservation CHECK (
-        ABS(total_net_energy_delta) < 1e-6 AND ABS(total_net_mass_delta) < 1e-6
-    ),
-    CONSTRAINT chk_second_law_entropy CHECK (total_entropy_generated >= 0.0)
+    time_delta_seconds DOUBLE PRECISION NOT NULL CHECK (time_delta_seconds > 0),
+    finalized_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ---------------------------------------------------------------------
--- 5. CONTINUOUS TIME-SERIES PARTITIONS (TimescaleDB / Spatial Telemetry)
--- ---------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS cell_flux_telemetry_timeseries (
-    recorded_at TIMESTAMPTZ NOT NULL,
-    cell_h3_index VARCHAR(15) NOT NULL,
-    boundary_normal_id UUID NOT NULL REFERENCES spatial_great_circle_normals(normal_id),
-    flux_rate_joules_sec DOUBLE PRECISION NOT NULL,
-    biomass_rate_kg_sec DOUBLE PRECISION NOT NULL,
-    local_reynolds_number DOUBLE PRECISION NOT NULL
+-- ----------------------------------------------------------------------------
+-- 7. BLOCKCHAIN STATE TRANSITION TRANSACTIONS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    tx_hash BYTEA PRIMARY KEY,
+    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height) ON DELETE CASCADE,
+    sender_identity VARCHAR(66) NOT NULL,
+    target_h3_index VARCHAR(15) NOT NULL REFERENCES h3_cells(h3_index) ON DELETE RESTRICT,
+    tx_type VARCHAR(32) NOT NULL CHECK (tx_type IN ('METABOLIC_FLUX', 'TANGENT_ADVECTION', 'SOLAR_INPUT', 'ENTROPY_DISSIPATION')),
+    stock_delta_carbon DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    stock_delta_nitrogen DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    stock_delta_water DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    stock_delta_phosphorus DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    stock_delta_energy DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    gas_consumed_entropy_units DOUBLE PRECISION NOT NULL CHECK (gas_consumed_entropy_units >= 0),
+    tx_nonce BIGINT NOT NULL,
+    signature BYTEA NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-SELECT create_hypertable('cell_flux_telemetry_timeseries', 'recorded_at', if_not_exists => TRUE);
+CREATE INDEX IF NOT EXISTS idx_thermo_tx_block ON thermodynamic_transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_thermo_tx_cell ON thermodynamic_transactions(target_h3_index);
