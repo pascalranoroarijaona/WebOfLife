@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Web of Life Start-Up Sprint Launcher</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100vw; height: 100vh; overflow: hidden; background: #02050a; font-family: "Courier New", monospace; color: #c8f5f2; }
+  
+  #fallback-launcher {
+    display: none;
+  }
+  
+  iframe {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    border: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="fallback-launcher">
+  <select id="sprintSelect">
+    <option value="index.original.html">Baseline (Commit 0)</option>
+  </select>
+</div>
+
+<iframe id="sprintFrame" src="index.original.html"></iframe>
+
+<script>
+  const select = document.getElementById("sprintSelect");
+  const iframe = document.getElementById("sprintFrame");
+
+  async function initLauncher() {
+    try {
+      // Relative fetch to match GitHub Pages subpath
+      const res = await fetch("./.agent_logs/state_tracker.json");
+      if (!res.ok) throw new Error("No state tracker found.");
+      const state = await res.json();
+      const sprints = state.completed_sprints || [];
+
+      select.innerHTML = '<option value="index.original.html">Baseline (Commit 0)</option>';
+      
+      if (sprints.length > 0) {
+        sprints.forEach(s => {
+          const numStr = String(s.sprint).padStart(3, '0');
+          const opt = document.createElement("option");
+          // Relative path without leading slash
+          opt.value = `docs/sprints/sprint_${numStr}/index.html`;
+          opt.textContent = `Sprint ${numStr}: ${s.goal ? s.goal.substring(0, 30) + '...' : 'Completed'}`;
+          select.appendChild(opt);
+        });
+      }
+
+      // Always default to Baseline (Commit 0) on initial load
+      select.value = "index.original.html";
+      iframe.src = "index.original.html";
+    } catch (err) {
+      console.log("Launcher using Baseline (Commit 0)");
+    }
+  }
+
+  function embedInToolbox() {
+    try {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      if (!iframeDoc) return;
+
+      const controls = iframeDoc.getElementById("controls");
+      if (controls) {
+        // Prevent duplicate injection
+        const existing = iframeDoc.getElementById("launcher-toolbox-item");
+        if (existing) existing.remove();
+
+        const item = iframeDoc.createElement("div");
+        item.id = "launcher-toolbox-item";
+        item.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#07131d; border:1px solid #00e1ff38; border-radius:5px; padding:5px 8px; font-size:0.72rem; color:#9fc7d8;";
+        
+        item.innerHTML = `
+          <span style="color:#00ffe1; font-weight:bold;">🌍 Launcher:</span>
+          <select id="iframeSprintSelect" style="background:#091a24; color:#00e1ff; border:1px solid #315064; border-radius:4px; padding:3px 6px; font-size:0.72rem; outline:none; cursor:pointer;">
+            ${select.innerHTML}
+          </select>
+        `;
+
+        controls.appendChild(item);
+
+        const iframeSelect = item.querySelector("#iframeSprintSelect");
+        iframeSelect.value = select.value;
+
+        iframeSelect.addEventListener("change", (e) => {
+          select.value = e.target.value;
+          iframe.src = e.target.value;
+        });
+      }
+    } catch (e) {
+      console.warn("Toolbox embedding notice:", e);
+    }
+  }
+
+  select.addEventListener("change", (e) => {
+    iframe.src = e.target.value;
+  });
+
+  iframe.addEventListener("load", () => {
+    embedInToolbox();
+  });
+
+  initLauncher();
+</script>
+</body>
+</html>
