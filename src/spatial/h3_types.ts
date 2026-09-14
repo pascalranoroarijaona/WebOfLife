@@ -1,84 +1,35 @@
 /**
- * Nominal branding for canonical H3 Index strings.
+ * Root domain error for spatial grid coordinate and indexing anomalies.
  */
-export type H3Index = string & { readonly __brand: unique symbol };
+export class SpatialGridError extends Error {
+  public override name: string = "SpatialGridError";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "SpatialGridError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
 
 /**
- * Valid H3 resolution levels from 0 (planetary base cells) to 15 (sub-meter cells).
+ * Raised when an H3 index token fails canonical syntax or topological boundary criteria.
  */
-export type H3Resolution =
-  | 0
-  | 1
-  | 2
-  | 3
-  | 4
-  | 5
-  | 6
-  | 7
-  | 8
-  | 9
-  | 10
-  | 11
-  | 12
-  | 13
-  | 14
-  | 15;
+export class H3ValidationError extends SpatialGridError {
+  public override name: string = "H3ValidationError";
+  public readonly token: any;
 
-export type H3ResolutionTier = H3Resolution;
-export type Resolution = H3Resolution;
-
-export interface H3Coordinates {
-  readonly latitude: number;
-  readonly longitude: number;
+  constructor(token: any, details?: string) {
+    const reason = details ? `: ${details}` : "";
+    super(`Invalid canonical H3 index token '${String(token)}'${reason}`);
+    this.token = token;
+    this.name = "H3ValidationError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
 }
 
-export enum H3ErrorCode {
-  SUCCESS = 'H3_SUCCESS',
-  INVALID_LENGTH = 'H3_ERR_INVALID_LENGTH',
-  INVALID_CHARACTER = 'H3_ERR_INVALID_CHARACTER',
-  INVALID_RESOLUTION = 'H3_ERR_INVALID_RESOLUTION',
-  INVALID_BASE_CELL = 'H3_ERR_INVALID_BASE_CELL',
-  NULL_INDEX = 'H3_ERR_NULL_INDEX',
-  ERR_H3_INVALID_NULL = 0x01,
-  ERR_H3_INVALID_LENGTH = 0x02,
-  ERR_H3_INVALID_CHARACTERS = 0x03,
-  ERR_H3_INVALID_RESOLUTION = 0x04,
-  ERR_H3_INVALID_BASE_CELL = 0x05,
-  ERR_H3_OUT_OF_RANGE = 0x06
-}
-
-export interface IH3ValidationResult {
-  isValid: boolean;
-  code: H3ErrorCode;
-  message: string;
-  resolution?: number;
-  baseCell?: number;
-}
-
-export interface IH3GridService {
-  validateIndex(h3Index: string): IH3ValidationResult;
-  assertValidIndex(h3Index: string): void;
-}
-
-export interface IH3GuardContract {
-  validatePayload(h3Index: string | null | undefined): asserts h3Index is string;
-}
-
-export interface IResolutionTierValidator {
-  validateResolution(resolution: number): boolean;
-  assertValidResolution(resolution: number): asserts resolution is H3ResolutionTier;
-}
-
-export interface SpatialResolutionValidator {
-  isValidResolution(resolution: number): resolution is H3Resolution;
-  assertValidResolution(resolution: number): asserts resolution is H3Resolution;
-}
-
-export interface SpatialGridConstraints {
-  readonly minResolution: 0;
-  readonly maxResolution: 15;
-}
-
+/**
+ * Raised when an H3 index parameter violates null/undefined/empty guard clauses.
+ */
 export class SpatialGuardClauseException extends Error {
   constructor(message: string) {
     super(`[SpatialGuardClauseException] ${message}`);
@@ -86,3 +37,43 @@ export class SpatialGuardClauseException extends Error {
     Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
   }
 }
+
+/**
+ * Standardized H3 error codes for format and topology validation failures.
+ */
+export enum H3ErrorCode {
+  SUCCESS = "H3_SUCCESS",
+  INVALID_LENGTH = "H3_ERR_INVALID_LENGTH",
+  INVALID_CHARACTER = "H3_ERR_INVALID_CHARACTER",
+  INVALID_RESOLUTION = "H3_ERR_INVALID_RESOLUTION",
+  INVALID_BASE_CELL = "H3_ERR_INVALID_BASE_CELL",
+  NULL_INDEX = "H3_ERR_NULL_INDEX"
+}
+
+/**
+ * Fundamental thermodynamic stock vector for discrete spatial cells.
+ * Models mass-energy conservation invariants across the biosphere.
+ */
+export interface ThermodynamicStocks {
+  carbon: number;
+  water: number;
+  nitrogen: number;
+  phosphorus: number;
+  oxygen: number;
+  thermalEnergy: number;
+}
+
+/**
+ * Type alias for canonical 15-character H3 hexadecimal cell identifier.
+ */
+export type H3Index = string;
+
+/**
+ * Discrete H3 hierarchy resolution level (0 to 15).
+ */
+export type H3Resolution = number;
+
+/**
+ * Type alias for H3 resolution tier bounds (0 to 15).
+ */
+export type H3ResolutionTier = number;

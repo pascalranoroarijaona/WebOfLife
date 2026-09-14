@@ -1,0 +1,136 @@
+```Code snippet
+@startuml sprint_039_schema
+!theme plain
+skinparam roundcorner 6
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName "Courier New"
+skinparam fontSize 12
+
+title Web of Life - Spatial Grid Validation & Thermodynamic Ledger Class Hierarchy (Sprint 039)
+
+package "Core Exceptions" {
+    class Error {
+        + name: string
+        + message: string
+        + stack: string
+    }
+
+    class SpatialGridError {
+        + name: string = "SpatialGridError"
+        + constructor(message: string)
+    }
+
+    class H3ValidationError {
+        + name: string = "H3ValidationError"
+        + token: string
+        + constructor(token: string, details?: string)
+    }
+
+    Error <|-- SpatialGridError
+    SpatialGridError <|-- H3ValidationError
+}
+
+package "Spatial Subsystem & Parsing" {
+    class H3GridConstants <<constant>> {
+        + CANONICAL_H3_REGEX: RegExp = /^8[0-9a-fA-F]{14}$/
+    }
+
+    class H3GridValidator {
+        + {static} assertCanonicalH3Pattern(token: string): void
+        + {static} assertValidH3Resolution(token: string): void
+    }
+
+    class H3Grid {
+        + getNeighbors(token: string): string[]
+        + kRing(token: string, radius: number): string[]
+        + getResolution(token: string): number
+        + isPentagon(token: string): boolean
+    }
+
+    class SpatialMonad<T> {
+        - h3Index: string
+        - stocks: ThermodynamicStocks
+        + {static} fromH3(token: string, stocks: ThermodynamicStocks): SpatialMonad<ThermodynamicStocks>
+        + getH3Index(): string
+        + getStocks(): ThermodynamicStocks
+        + transition(flux: StockTransaction): SpatialMonad<ThermodynamicStocks>
+    }
+
+    H3GridValidator ..> H3GridConstants : evaluates via
+    H3Grid ..> H3GridValidator : enforces Layer 1
+    SpatialMonad ..> H3GridValidator : asserts token prior to state allocation
+}
+
+package "Thermodynamic State & Stocks" {
+    class ThermodynamicStocks {
+        + biomassKg: number
+        + carbonKg: number
+        + nitrogenKg: number
+        + phosphorusKg: number
+        + waterKg: number
+        + thermalEnergyJoules: number
+        + entropyJoulePerKelvin: number
+        + exergyJoules: number
+        + validateConservation(): boolean
+    }
+
+    class EarthPod {
+        + podId: string
+        + h3Index: string
+        + biomeType: string
+        + monad: SpatialMonad<ThermodynamicStocks>
+        + receiveFlux(flux: StockTransaction): void
+    }
+
+    EarthPod *-- SpatialMonad
+    SpatialMonad *-- ThermodynamicStocks
+}
+
+package "Blockchain Ledger Subsystem" {
+    class StockTransaction {
+        + txId: string
+        + sourceH3: string
+        + targetH3: string
+        + fluxBiomassKg: number
+        + fluxCarbonKg: number
+        + fluxNitrogenKg: number
+        + fluxPhosphorusKg: number
+        + fluxWaterKg: number
+        + fluxThermalEnergyJoules: number
+        + entropyProductionJoulePerKelvin: number
+        + nonce: number
+        + txSignature: Uint8Array
+        + verifySignature(): boolean
+    }
+
+    class ThermodynamicBlock {
+        + blockNumber: number
+        + previousBlockHash: Uint8Array
+        + currentBlockHash: Uint8Array
+        + stateRoot: Uint8Array
+        + txMerkleRoot: Uint8Array
+        + totalEntropyProductionJK: number
+        + totalEnergyJoules: number
+        + validatorNodeId: string
+        + blockSignature: Uint8Array
+        + timestamp: Date
+        + transactions: StockTransaction[]
+        + verifyBlockIntegrity(): boolean
+    }
+
+    ThermodynamicBlock "1" *-- "many" StockTransaction : aggregates
+    StockTransaction ..> H3GridValidator : validates sourceH3 and targetH3
+}
+
+note right of H3GridValidator::assertCanonicalH3Pattern
+  Invariant Check:
+  1. typeof token === "string"
+  2. token.length === 15
+  3. CANONICAL_H3_REGEX.test(token)
+  On failure: throws H3ValidationError(token)
+  Preserves First Law: Zero stock mutations on malformed index.
+end note
+
+@enduml

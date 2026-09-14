@@ -62,6 +62,13 @@ export class SpatialMonad<T = any> {
   private thermodynamics: any = { massGrams: 0.0, solarEnergyJoules: 0.0, dissipationJoules: 1.0 };
   private corrupted: boolean = false;
 
+  public get h3Index(): string {
+    return this.cellIndex;
+  }
+  public set h3Index(val: string) {
+    this.cellIndex = val;
+  }
+
   public constructor(...args: any[]) {
     if (args.length === 0) {
       this.value = (new Map() as unknown) as T;
@@ -108,6 +115,9 @@ export class SpatialMonad<T = any> {
         validateH3Token(token);
       }
       this.cellIndex = typeof token === 'string' ? token : '';
+      if (typeof token === 'string' && token.length === 15 && /^8[0-9a-fA-F]{14}$/.test(token)) {
+        this.resolution = parseInt(token[1], 16);
+      }
       this.value = stockOrEnergy as T;
       this.stock = stockOrEnergy;
       this.stocks = stockOrEnergy;
