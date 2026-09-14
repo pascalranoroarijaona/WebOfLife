@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 34%
-SPRINT_GOAL: Implement orientVectorTowardsTarget3D applying sign flip if dot product with displacement vector is negative in src/spatial/h3_adjacency.ts.
+SPRINT_GOAL: Implement computeBoundaryCentroidDisplacement3D calculating normalized 3D displacement vector between two spherical coordinates in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -43,8 +43,9 @@ SPRINT_GOAL: Implement orientVectorTowardsTarget3D applying sign flip if dot pro
 - [x] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundarySegmentRadialNormal3D` calculating normalized radial midpoint unit vector for a boundary segment in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundaryHorizontalNormal3D` computing unoriented cross product of midpoint tangent and radial normal in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `orientVectorTowardsTarget3D` applying sign flip if dot product with displacement vector is negative in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryOutwardNormal3D` assembling oriented horizontal unit normal vector between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
+- [x] Implement `orientVectorTowardsTarget3D` applying sign flip if dot product with displacement vector is negative in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryCentroidDisplacement3D` calculating normalized 3D displacement vector between two spherical coordinates in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryOutwardNormal3D` combining midpoint horizontal normal with centroid displacement direction in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
@@ -71,14 +72,17 @@ SPRINT_GOAL: Implement orientVectorTowardsTarget3D applying sign flip if dot pro
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
+- [ ] Define `ElementalMassPool` interface & immutable ratio helpers in `src/biosphere/stoichiometry_types.ts`
 - [ ] Define `BiomassStoichiometryVector` interface with Redfield canonical ratios in `src/biosphere/stoichiometry_types.ts`
 - [ ] Implement `assertValidStoichiometryVector` validator enforcing non-negative elemental ratios in `src/biosphere/stoichiometry_types.ts`
 - [ ] Implement `evaluateLiebigMinimumFactor` across discrete elemental availability pools in `src/biosphere/stoichiometric_limitation.ts`
-- [ ] Implement Droop cell quota regulation `computeDroopGrowthMultiplier` in `src/biosphere/stoichiometric_limitation.ts`
+- [ ] Implement Droop cell quota regulation `computeDroopGrowthMultiplier` in `src/biosphere/cell_quota.ts`
 - [ ] Implement Sterner-Elser dynamic overflow respiration `computeOverflowRespiration` in `src/biosphere/homeostatic_regulation.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper in `src/biosphere/biomass_energy.ts`
+- [ ] Define `CanopyLayerStratum` and Leaf Angle Distribution (LAD) tensors in `src/biosphere/canopy_types.ts`
 - [ ] Plant Functional Type (PFT) enum and `CanopyTraitProfile` interface in `src/biosphere/traits.ts`
-- [ ] Implement canopy light extinction via Beer-Lambert formulation with sunlit/shaded leaf partitioning in `src/biosphere/canopy_radiation.ts`
+- [ ] Implement Norman sunlit/shaded leaf partitioning Beer-Lambert formulation in `src/biosphere/canopy_radiation.ts`
+- [ ] Implement Leaf-Boundary-Layer Conductance & Enthalpy Balances in `src/biosphere/leaf_energy_balance.ts`
 - [ ] Rubisco Arrhenius activation and peaked deactivation temperature-response function in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Michaelis-Menten affinity constants calculation for CO2 and O2 in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Farquhar-von Caemmerer-Berry (FvCB) $C_3$/$C_4$ assimilation monad in `src/biosphere/photosynthesis_fvcb.ts`

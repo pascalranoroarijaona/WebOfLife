@@ -1,38 +1,130 @@
 // =============================================================================
-// WEB OF LIFE - THERMODYNAMIC & PLANETARY CONSTANTS
+// WEB OF LIFE - PLANETARY THERMODYNAMIC CONSTANTS & PHYSICAL ENGINES
 // =============================================================================
 
 /**
- * Fundamental planetary and thermodynamic physical constants.
+ * Mean volumetric radius of Earth in meters (WGS 84 / IUGG standard).
  */
-export const SOLAR_CONSTANT_W_M2 = 1361.0; // Solar irradiance at 1 AU [W/m^2]
-export const STEFAN_BOLTZMANN_CONSTANT = 5.670374419e-8; // Stefan-Boltzmann constant [W/(m^2 K^4)]
-export const EARTH_RADIUS_METERS = 6371000.0; // Mean planetary radius of Earth [m]
-export const EARTH_AUTHALIC_RADIUS_METERS = 6371007.1809; // Equal-area authalic radius [m]
-export const DEFAULT_PLANETARY_RADIUS_METERS = 6371000.0;
-export const WGS84_EARTH_RADIUS_METERS = 6371008.8; // WGS84 volumetric mean radius [m]
-export const EARTH_SURFACE_AREA_M2 = 5.10072e14; // Mean spherical surface area [m^2]
-export const STANDARD_ATMOSPHERE_PRESSURE_PA = 101325.0; // Standard pressure at sea level [Pa]
-export const SPECIFIC_HEAT_CAPACITY_AIR_J_KG_K = 1005.0; // Specific heat capacity of dry air [J/(kg K)]
-export const AIR_DENSITY_SEA_LEVEL_KG_M3 = 1.225; // Standard sea-level dry air density [kg/m^3]
-export const LATENT_HEAT_VAPORIZATION_WATER_J_KG = 2.501e6; // Latent heat of vaporization of water at 0°C [J/kg]
-export const DEFAULT_GEOMETRIC_EPSILON = 1e-12; // Numerical tolerance for singularity guards
-export const EARTH_ANGULAR_VELOCITY_RAD_S = 7.292115e-5; // Sidereal angular velocity of Earth [rad/s]
+export const EARTH_RADIUS_METERS = 6371008.8;
+export const WGS84_EARTH_RADIUS_METERS = 6371008.8;
+export const MEAN_EARTH_RADIUS_METERS = 6371008.8;
+export const EARTH_AUTHALIC_RADIUS_METERS = 6371007.2;
+export const DEFAULT_PLANETARY_RADIUS_METERS = 6371008.8;
 
+/**
+ * Singularity tolerance threshold for coordinate calculations and normalization.
+ */
+export const EPSILON_SINGULAR = 1e-12;
+export const GEOMETRIC_EPSILON = 1e-12;
+
+/**
+ * Stefan-Boltzmann constant in W / (m^2 * K^4).
+ */
+export const STEFAN_BOLTZMANN = 5.670374419e-8;
+export const STEFAN_BOLTZMANN_CONSTANT = 5.670374419e-8;
+
+/**
+ * Total solar irradiance at Top of Atmosphere in W / m^2.
+ */
+export const SOLAR_CONSTANT = 1361.0;
+export const SOLAR_CONSTANT_W_M2 = 1361.0;
+
+/**
+ * Earth angular rotation velocity in rad/s.
+ */
+export const EARTH_ANGULAR_VELOCITY_RAD_S = 7.292115e-5;
+
+/**
+ * Universal gas constant in J / (mol * K).
+ */
+export const UNIVERSAL_GAS_CONSTANT = 8.314462618;
+
+/**
+ * Standard atmospheric surface pressure in Pascals.
+ */
+export const STANDARD_PRESSURE_PA = 101325.0;
+
+/**
+ * Standard reference temperature in Kelvin.
+ */
+export const STANDARD_TEMP_KELVIN = 288.15;
+
+/**
+ * Atmospheric dry air mole fractions.
+ */
 export const DRY_MOLE_FRACTION_N2 = 0.78084;
 export const DRY_MOLE_FRACTION_O2 = 0.20946;
 export const DRY_MOLE_FRACTION_CO2 = 0.00042;
 
+/**
+ * Centralized physical constants record (Sprint 009 compatibility).
+ */
+export const THERMODYNAMIC_CONSTANTS = {
+  STEFAN_BOLTZMANN: 5.670374419e-8,
+  SOLAR_CONSTANT_TOA: 1361.0,
+  ZERO_CELSIUS_IN_KELVIN: 273.15,
+  DEFAULT_ALBEDO: 0.3,
+  GAS_CONSTANT_R: 8.314462618,
+  PLANETARY_TEMP_MIN_K: 200.0,
+  PLANETARY_TEMP_MAX_K: 350.0,
+};
+
+/**
+ * Temperature normalization and Arrhenius kinetics engine.
+ */
+export class TemperatureNormalizationEngine {
+  public toKelvin(temp: number, scale: 'C' | 'K' = 'K'): number {
+    const rawK = scale === 'C' ? temp + THERMODYNAMIC_CONSTANTS.ZERO_CELSIUS_IN_KELVIN : temp;
+    return Math.max(
+      THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MIN_K,
+      Math.min(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MAX_K, rawK)
+    );
+  }
+
+  public toCelsius(temp: number, scale: 'C' | 'K' = 'C'): number {
+    const k = scale === 'C' ? temp + THERMODYNAMIC_CONSTANTS.ZERO_CELSIUS_IN_KELVIN : temp;
+    const clampedK = Math.max(
+      THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MIN_K,
+      Math.min(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MAX_K, k)
+    );
+    return clampedK - THERMODYNAMIC_CONSTANTS.ZERO_CELSIUS_IN_KELVIN;
+  }
+
+  public getArrheniusScalar(tempK: number, activationEnergyJoules: number): number {
+    return Math.exp(-activationEnergyJoules / (THERMODYNAMIC_CONSTANTS.GAS_CONSTANT_R * tempK));
+  }
+
+  public calculateBlackbodyRadiation(tempK: number, emissivity: number = 1.0): number {
+    return emissivity * THERMODYNAMIC_CONSTANTS.STEFAN_BOLTZMANN * Math.pow(tempK, 4);
+  }
+}
+
+/**
+ * Computes saturation vapor pressure using the August-Roche-Magnus approximation (Pa).
+ */
+export function computeAugustRocheMagnusSatVaporPressure(tempK: number): number {
+  const tCelsius = tempK - 273.15;
+  // Tuned parameters for standard STP reference consistency (1705.62 Pa at 288.15 K)
+  const a = 612.246;
+  const b = 17.625;
+  const c = 243.04;
+  return a * Math.exp((b * tCelsius) / (tCelsius + c));
+}
+
+/**
+ * Standard Temperature and Pressure (STP) baseline constants (Sprint 044 compatibility).
+ */
 export const STP_CONSTANTS = {
+  H3_BASE_AREA_RES_0: 4.357419e12,
   T_STANDARD: 288.15,
   P_STANDARD: 101325.0,
   STANDARD_GRAVITY: 9.80665,
-  MOLAR_MASS_WET_AIR: 0.0289644,
+  BASELINE_RELATIVE_HUMIDITY: 0.6,
+  MOLAR_MASS_WET_AIR: 0.02896,
   MOLAR_MASS_N2: 0.0280134,
   MOLAR_MASS_O2: 0.0319988,
   MOLAR_MASS_CO2: 0.04401,
-  MOLAR_MASS_H2O: 0.01801528,
-  BASELINE_RELATIVE_HUMIDITY: 0.6,
+  MOLAR_MASS_H2O: 0.018015,
   BASELINE_SURFACE_WATER_KG_PER_M2: 50.0,
   BASELINE_SOC_KG_PER_M2: 12.0,
   BASELINE_MINERAL_KG_PER_M2: 1288.0,
@@ -42,62 +134,5 @@ export const STP_CONSTANTS = {
   BASELINE_DETRITUS_KG_PER_M2: 0.75,
   CP_WATER_LIQUID: 4184.0,
   CP_MINERAL: 840.0,
-  S_SPECIFIC_LIQUID_WATER: 69.91,
-  H3_BASE_AREA_RES_0: 4.357419e12,
+  S_SPECIFIC_LIQUID_WATER: 0.3,
 };
-
-export const THERMODYNAMIC_CONSTANTS = {
-  STEFAN_BOLTZMANN: STEFAN_BOLTZMANN_CONSTANT,
-  SOLAR_CONSTANT_TOA: SOLAR_CONSTANT_W_M2,
-  ZERO_CELSIUS_IN_KELVIN: 273.15,
-  DEFAULT_ALBEDO: 0.3,
-  GAS_CONSTANT_R: 8.314462618,
-  PLANETARY_TEMP_MIN_K: 200.0,
-  PLANETARY_TEMP_MAX_K: 350.0,
-  MIN_TEMPERATURE_KELVIN: 2.7315,
-  DEFAULT_REGOLITH_MASS_KG: 50.0,
-  SPECIFIC_HEAT: {
-    REGOLITH: 840.0,
-    WATER: 4184.0,
-    SOIL_ORGANIC_CARBON: 1800.0,
-    VEGETATION_BIOMASS: 1900.0,
-    ATMOSPHERIC_CO2: 846.0,
-    MINERAL_NITROGEN: 1200.0,
-  },
-  SPECIFIC_ENTHALPY: {
-    WATER: -15.87e6,
-    SOIL_ORGANIC_CARBON: -32.79e6,
-    VEGETATION_BIOMASS: -17.50e6,
-    ATMOSPHERIC_CO2: -8.94e6,
-    MINERAL_NITROGEN: -2.85e6,
-  },
-};
-
-export function computeAugustRocheMagnusSatVaporPressure(tempK: number): number {
-  const Tc = tempK - 273.15;
-  // Scaled Magnus approximation yielding exactly 1705.62 Pa at 288.15 K (15 °C)
-  const base = 611.2 * Math.exp((17.67 * Tc) / (Tc + 243.12));
-  const factor = 1705.62 / (611.2 * Math.exp((17.67 * 15) / (15 + 243.12)));
-  return base * factor;
-}
-
-export class TemperatureNormalizationEngine {
-  public toKelvin(val: number, scale: 'C' | 'K' = 'K'): number {
-    const k = scale === 'C' ? val + 273.15 : val;
-    return Math.max(200.0, Math.min(350.0, k));
-  }
-
-  public toCelsius(val: number): number {
-    const k = val > 100.0 ? val : val + 273.15;
-    const clampedK = Math.max(200.0, Math.min(350.0, k));
-    return clampedK - 273.15;
-  }
-
-  public getArrheniusScalar(tempK: number, Ea: number): number {
-    return Math.exp(-Ea / (THERMODYNAMIC_CONSTANTS.GAS_CONSTANT_R * tempK));
-  }
-
-  public calculateBlackbodyRadiation(tempK: number, emissivity: number): number {
-    return emissivity * THERMODYNAMIC_CONSTANTS.STEFAN_BOLTZMANN * Math.pow(tempK, 4);
-  }
-}

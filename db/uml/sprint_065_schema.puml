@@ -1,0 +1,205 @@
+@startuml
+skinparam backgroundColor #1E1E1E
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #4CAF50
+skinparam class {
+    BackgroundColor #2D2D2D
+    BorderColor #81C784
+    HeaderBackgroundColor #388E3C
+    FontColor #FFFFFF
+    AttributeFontColor #E0E0E0
+}
+skinparam interface {
+    BackgroundColor #2D2D2D
+    BorderColor #64B5F6
+    HeaderBackgroundColor #1976D2
+}
+skinparam package {
+    BackgroundColor #252525
+    BorderColor #757575
+    FontColor #81C784
+}
+
+package "Spatial Monads & Geometry (src/spatial/)" {
+    interface Vector3D <<readonly>> {
+        + x: number
+        + y: number
+        + z: number
+    }
+
+    interface SphericalCoordinates <<readonly>> {
+        + lat: number
+        + lng: number
+    }
+
+    interface BoundaryDisplacement3D <<readonly>> {
+        + origin: Vector3D
+        + target: Vector3D
+        + displacement: Vector3D
+        + unitVector: Vector3D
+        + chordDistance: number
+        + angularDistanceRad: number
+    }
+
+    class H3AdjacencyManager {
+        - cellIndexRegistry: Map<string, SphericalCoordinates>
+        + getCellCentroid(h3Index: string): SphericalCoordinates
+        + getNeighborDisplacement3D(originIndex: string, targetIndex: string): Vector3D
+        + getDetailedNeighborDisplacement3D(originIndex: string, targetIndex: string): BoundaryDisplacement3D
+        + getDirectedEdgeVector3D(edgeId: string): Vector3D
+    }
+
+    class H3DisplacementCalculator <<utility>> {
+        + {static} computeBoundaryCentroidDisplacement3D(origin: SphericalCoordinates, target: SphericalCoordinates, epsilon?: number): Vector3D
+        + {static} computeDetailedCentroidDisplacement3D(origin: SphericalCoordinates, target: SphericalCoordinates, epsilon?: number): BoundaryDisplacement3D
+        - {static} sphericalToCartesian3D(coord: SphericalCoordinates): Vector3D
+        - {static} normalizeVector3D(vec: Vector3D, epsilon: number): Vector3D
+    }
+
+    class SpatialMonad<T> {
+        + cellId: string
+        + coordinates: SphericalCoordinates
+        + state: T
+        + bind<U>(f: (state: T) => SpatialMonad<U>): SpatialMonad<U>
+        + projectBoundaryFlux(target: SpatialMonad<T>, displacement: Vector3D): FluxResult<T>
+    }
+}
+
+package "Thermodynamic State & Invariants (src/thermodynamics/)" {
+    class ThermodynamicCellStock {
+        + cellId: string
+        + epochHeight: bigint
+        + moistureMassKg: number
+        + organicCarbonKg: number
+        + dryAirMassKg: number
+        + thermalEnergyJoules: number
+        + temperatureKelvin: number
+        + entropyJoulesPerK: number
+        + exergyJoules: number
+        + windVelocity3D: Vector3D
+        + computeEntropyProduction(flux: BoundaryFluxTransaction): number
+        + verifyFirstLawInvariant(deltaMass: number, deltaEnergy: number): boolean
+    }
+
+    class BoundaryFluxTransaction {
+        + fluxId: bigint
+        + blockHeight: bigint
+        + edgeId: string
+        + originH3: string
+        + targetH3: string
+        + displacementUnit3D: Vector3D
+        + projectedVelocity: number
+        + transferredMoistureKg: number
+        + transferredCarbonKg: number
+        + transferredEnthalpyJoules: number
+        + entropyProductionJoulesPerK: number
+        + txHash: string
+        + signTransaction(privateKey: string): string
+    }
+}
+
+package "Planetary Ledger Blockchain (db/schema.sql)" {
+    entity "spatial_h3_cells" as SpatialCells {
+        * cell_id : VARCHAR(15) <<PK>>
+        --
+        resolution : SMALLINT
+        lat : DOUBLE PRECISION
+        lng : DOUBLE PRECISION
+        cartesian_x : DOUBLE PRECISION
+        cartesian_y : DOUBLE PRECISION
+        cartesian_z : DOUBLE PRECISION
+        is_active : BOOLEAN
+    }
+
+    entity "boundary_displacements_3d" as BoundaryDisplacements {
+        * edge_id : VARCHAR(32) <<PK>>
+        --
+        origin_h3 : VARCHAR(15) <<FK>>
+        target_h3 : VARCHAR(15) <<FK>>
+        origin_x : DOUBLE PRECISION
+        origin_y : DOUBLE PRECISION
+        origin_z : DOUBLE PRECISION
+        target_x : DOUBLE PRECISION
+        target_y : DOUBLE PRECISION
+        target_z : DOUBLE PRECISION
+        displacement_dx : DOUBLE PRECISION
+        displacement_dy : DOUBLE PRECISION
+        displacement_dz : DOUBLE PRECISION
+        unit_x : DOUBLE PRECISION
+        unit_y : DOUBLE PRECISION
+        unit_z : DOUBLE PRECISION
+        chord_distance : DOUBLE PRECISION
+        angular_distance_rad : DOUBLE PRECISION
+    }
+
+    entity "cell_thermodynamic_stocks" as CellStocks {
+        * cell_id : VARCHAR(15) <<PK, FK>>
+        * epoch_height : BIGINT <<PK>>
+        --
+        moisture_mass_kg : DOUBLE PRECISION
+        organic_carbon_kg : DOUBLE PRECISION
+        dry_air_mass_kg : DOUBLE PRECISION
+        thermal_energy_joules : DOUBLE PRECISION
+        temperature_kelvin : DOUBLE PRECISION
+        entropy_joules_per_k : DOUBLE PRECISION
+        exergy_joules : DOUBLE PRECISION
+        wind_velocity_x : DOUBLE PRECISION
+        wind_velocity_y : DOUBLE PRECISION
+        wind_velocity_z : DOUBLE PRECISION
+        state_merkle_leaf : VARCHAR(64)
+    }
+
+    entity "boundary_flux_ledgers" as BoundaryFluxLedgers {
+        * flux_id : BIGSERIAL <<PK>>
+        --
+        block_height : BIGINT
+        edge_id : VARCHAR(32) <<FK>>
+        origin_h3 : VARCHAR(15) <<FK>>
+        target_h3 : VARCHAR(15) <<FK>>
+        projected_velocity_m_s : DOUBLE PRECISION
+        transferred_moisture_kg : DOUBLE PRECISION
+        transferred_carbon_kg : DOUBLE PRECISION
+        transferred_enthalpy_j : DOUBLE PRECISION
+        entropy_production_j_k : DOUBLE PRECISION
+        flux_tx_hash : VARCHAR(64) <<UQ>>
+    }
+
+    entity "blockchain_blocks" as BlockchainBlocks {
+        * block_height : BIGINT <<PK>>
+        --
+        prev_block_hash : VARCHAR(64)
+        block_hash : VARCHAR(64) <<UQ>>
+        state_merkle_root : VARCHAR(64)
+        flux_merkle_root : VARCHAR(64)
+        total_mass_kg : DOUBLE PRECISION
+        total_energy_joules : DOUBLE PRECISION
+        entropy_delta_proof : DOUBLE PRECISION
+        validator_public_key : VARCHAR(66)
+        validator_signature : VARCHAR(130)
+    }
+}
+
+' Relationships & Invariant Flows
+BoundaryDisplacements ||--o{ BoundaryFluxLedgers : "guides normal projection"
+SpatialCells ||--o{ BoundaryDisplacements : "origin/target"
+SpatialCells ||--o{ CellStocks : "tracks epoch stocks"
+BlockchainBlocks ||--o{ BoundaryFluxLedgers : "batches transfers"
+
+H3AdjacencyManager ..> H3DisplacementCalculator : "delegates calculation"
+H3AdjacencyManager --> BoundaryDisplacement3D : "constructs"
+BoundaryDisplacement3D *-- Vector3D : "contains unit vector"
+SpatialMonad ..> BoundaryDisplacement3D : "projects directional transport"
+SpatialMonad --> ThermodynamicCellStock : "encapsulates"
+ThermodynamicCellStock ..> BoundaryFluxTransaction : "drives mass/energy delta"
+BoundaryFluxTransaction ..> BoundaryFluxLedgers : "persists to SQL"
+
+note right of H3DisplacementCalculator
+  <b>Thermodynamic Invariants:</b>
+  1. <b>First Law:</b> Sum of mass & enthalpy fluxes along
+     unit displacement vectors = 0 across closed boundary.
+  2. <b>Second Law:</b> Flux direction aligns with thermodynamic force;
+     Entropy production >= 0.
+  3. <b>Normalized Vector:</b> ||u_3d|| = 1.0 (clamped within eps = 1e-12).
+end note
+
+@enduml
