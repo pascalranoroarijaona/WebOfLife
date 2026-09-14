@@ -1,49 +1,17 @@
-// =============================================================================
-// WEB OF LIFE - SPATIAL H3 INDEX TYPINGS
-// =============================================================================
-
 /**
- * Represents a canonical 15-character hexadecimal Uber H3 spatial index string.
+ * Web of Life - Planetary Spatial Substrate Types
+ * Full Historical & Sprint 041 Type Compatibility
  */
+
 export type H3Index = string;
+export type Resolution = number;
 
-/**
- * Geometric and topological resolution metrics for H3 hierarchical hexagonal partitions.
- */
-export interface H3ResolutionInfo {
-  resolution: number;
-  edgeLengthKm: number;
-  areaKm2: number;
-}
+export type H3ResolutionTier =
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
-/**
- * Spatial coordinate representation for geographic anchoring.
- */
-export interface GeoCoordinates {
-  latitude: number;
-  longitude: number;
-}
-
-/**
- * Discrete H3 resolution tiers from 0 to 15.
- */
-export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 export type H3Resolution = H3ResolutionTier;
 
-/**
- * Domain error for spatial guard clause violations (RFC-035).
- */
-export class SpatialGuardClauseException extends Error {
-  constructor(message: string = 'Spatial guard clause exception') {
-    super(`[SpatialGuardClauseException] ${message}`);
-    this.name = 'SpatialGuardClauseException';
-    Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
-  }
-}
-
-/**
- * Standardized H3 error codes across validation sprints.
- */
 export enum H3ErrorCode {
   SUCCESS = 'H3_SUCCESS',
   INVALID_LENGTH = 'H3_ERR_INVALID_LENGTH',
@@ -59,6 +27,50 @@ export enum H3ErrorCode {
   ERR_H3_OUT_OF_RANGE = 0x06
 }
 
+export class SpatialGuardClauseException extends Error {
+  constructor(message: string) {
+    super(`[SpatialGuardClauseException] ${message}`);
+    this.name = 'SpatialGuardClauseException';
+    Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
+  }
+}
+
+export interface H3Cell {
+  index: H3Index;
+  resolution: number;
+  mode: number;
+}
+
+export interface SpatialCellCoordinates {
+  lat: number;
+  lng: number;
+}
+
+export interface IH3TokenExtractor {
+  extractTokens(text: string): string[];
+}
+
+export interface IH3GridQuery {
+  resolution: number;
+  baseIndexes?: string[];
+  bounds?: { north: number; south: number; east: number; west: number };
+}
+
+export interface IH3CellData {
+  h3Index: string;
+  resolution: number;
+  centroid?: { lat: number; lng: number };
+  solarIrradiance?: number;
+  carbonStock?: number;
+}
+
+export interface H3ValidationResult {
+  isValid: boolean;
+  errorCode?: string;
+  resolution?: number;
+  baseCell?: number;
+}
+
 export interface IH3ValidationResult {
   isValid: boolean;
   code: H3ErrorCode;
@@ -67,7 +79,7 @@ export interface IH3ValidationResult {
   baseCell?: number;
 }
 
-export interface IH3GridService {
-  validateIndex(h3Index: string): IH3ValidationResult;
-  assertValidIndex(h3Index: string): void;
+export interface IResolutionTierValidator {
+  validateResolution(resolution: number): boolean;
+  assertValidResolution(resolution: number): void;
 }

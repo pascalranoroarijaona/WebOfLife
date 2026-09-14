@@ -1,0 +1,241 @@
+@startuml sprint_041_schema
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam packageBackgroundColor #F9FAFB
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #1E293B
+skinparam classFontSize 12
+skinparam classFontName "Courier New"
+skinparam arrowColor #0EA5E9
+skinparam classAttributeIconSize 0
+
+title Web of Life - Sprint 041: Deduplicated Canonical H3 Extraction & Spatial Monad Schema
+
+package "src::spatial::h3_types" as H3Types {
+    interface IH3TokenExtractor {
+        +extractTokens(text: string): H3Index[]
+    }
+
+    interface IH3CellDescriptor {
+        +index: H3Index
+        +resolution: number
+        +mode: number
+        +isValid: boolean
+    }
+
+    class H3Index <<(T,#38BDF8) TypeAlias>> {
+        string [0-9a-f]{15}
+    }
+}
+
+package "src::spatial::h3_grid" as H3GridModule {
+    class "H3Grid" as H3GridClass {
+        +parseTokens(input: string): H3Index[]
+        +getCell(index: H3Index): IH3CellDescriptor
+        +{static} extractUniqueCanonicalTokens(text: string): H3Index[]
+    }
+
+    class "extractUniqueCanonicalH3Tokens" as TokenExtractorFn <<(F,#10B981) Function>> {
+        +extractUniqueCanonicalH3Tokens(text: string): string[]
+    }
+}
+
+package "src::monads" as MonadsModule {
+    interface "IMonad<T>" as IMonad {
+        +unit(value: T): IMonad<T>
+        +bind<U>(transform: (value: T) => IMonad<U>): IMonad<U>
+    }
+
+    class "SpatialMonad<T>" as SpatialMonadClass {
+        -gridState: T
+        -activeH3Tokens: Set<H3Index>
+        -massConservationInvariant: boolean
+        +unit(state: T): SpatialMonad<T>
+        +bind<U>(fn: (state: T) => SpatialMonad<U>): SpatialMonad<U>
+        +ingestTelemetry(rawLog: string): SpatialMonad<T>
+        +activateCell(token: H3Index): SpatialMonad<T>
+        +getActiveTokens(): H3Index[]
+        +computeMerkleRoot(): string
+    }
+}
+
+package "src::thermodynamics" as ThermodynamicsModule {
+    interface IThermodynamicStock {
+        +totalMassKg: number
+        +totalEnergyJoules: number
+        +verifyFirstLaw(): boolean
+    }
+
+    class AtmosphereStock {
+        +co2Kg: number
+        +o2Kg: number
+        +n2Kg: number
+        +h2oVaporKg: number
+        +getMass(): number
+    }
+
+    class BiomassStock {
+        +autotrophKg: number
+        +herbivoreKg: number
+        +carnivoreKg: number
+        +detritivoreKg: number
+        +getMass(): number
+    }
+
+    class ThermalStock {
+        +sensibleHeatJoules: number
+        +latentHeatJoules: number
+        +surfaceTempKelvin: number
+        +calculateEntropyDissipation(): number
+    }
+
+    class EarthPod {
+        +earthPodId: string
+        +atmosphere: AtmosphereStock
+        +biomass: BiomassStock
+        +thermal: ThermalStock
+        +spatialMonad: SpatialMonadClass
+        +assertMassInvariant(): void
+    }
+}
+
+package "src::blockchain" as BlockchainModule {
+    class ThermodynamicBlock {
+        +blockHeight: number
+        +previousBlockHash: string
+        +blockHash: string
+        +stateMerkleRoot: string
+        +spatialMonadMerkleRoot: string
+        +massConservationDeltaKg: number
+        +entropyDissipatedJoules: number
+        +validatorSignature: string
+        +timestamp: Date
+        +verifyProofOfThermodynamicIntegrity(): boolean
+    }
+
+    class BlockchainTransaction {
+        +txId: string
+        +txHash: string
+        +txType: string
+        +earthPodId: string
+        +ingestId: string
+        +entropyCostJoules: number
+        +gasConsumed: number
+        +receiptStatus: string
+    }
+
+    class CanonicalTokenReceipt {
+        +ingestId: string
+        +canonicalIndices: H3Index[]
+        +deduplicatedCount: number
+        +sha256PayloadHash: string
+        +massDelta: number
+    }
+}
+
+package "Database Relational Schemas (db/schema.sql)" as DBSchemas {
+    entity "earth_pods" as DBPod {
+        *earth_pod_id: UUID [PK]
+        --
+        pod_name: VARCHAR(128)
+        status: VARCHAR(32)
+        created_at: TIMESTAMPTZ
+    }
+
+    entity "spatial_telemetry_ingests" as DBIngest {
+        *ingest_id: UUID [PK]
+        --
+        earth_pod_id: UUID [FK]
+        raw_payload: TEXT
+        byte_length: INTEGER
+        payload_hash: VARCHAR(64)
+        extracted_token_count: INTEGER
+        entropy_dissipation_joules: NUMERIC
+        ingested_at: TIMESTAMPTZ
+    }
+
+    entity "h3_cells" as DBH3Cell {
+        *canonical_h3_index: VARCHAR(15) [PK]
+        --
+        resolution: SMALLINT
+        mode: SMALLINT
+        base_cell: SMALLINT
+        is_valid: BOOLEAN
+    }
+
+    entity "canonical_h3_token_extractions" as DBExtractions {
+        *extraction_id: UUID [PK]
+        --
+        ingest_id: UUID [FK]
+        canonical_h3_index: VARCHAR(15) [FK]
+        discovery_order: SMALLINT
+        raw_match_fragment: VARCHAR(64)
+        extracted_at: TIMESTAMPTZ
+    }
+
+    entity "spatial_monad_states" as DBMonadState {
+        *monad_id: UUID [PK]
+        --
+        earth_pod_id: UUID [FK]
+        state_version: BIGINT
+        active_tokens_merkle_root: VARCHAR(64)
+        total_active_cells: INTEGER
+        thermodynamic_mass_delta_kg: NUMERIC (=0.0)
+    }
+
+    entity "blockchain_blocks" as DBBlock {
+        *block_height: BIGINT [PK]
+        --
+        block_hash: VARCHAR(64)
+        state_merkle_root: VARCHAR(64)
+        spatial_monad_merkle_root: VARCHAR(64)
+        mass_conservation_delta_kg: NUMERIC (=0.0)
+        entropy_dissipated_joules: NUMERIC
+        mined_at: TIMESTAMPTZ
+    }
+}
+
+' Interface implementations
+H3GridClass .up.|> IH3TokenExtractor
+SpatialMonadClass .up.|> IMonad
+EarthPod .up.|> IThermodynamicStock
+
+' Relationships
+H3GridClass ..> TokenExtractorFn : delegates to
+TokenExtractorFn ..> H3Index : returns canonical lower-case
+SpatialMonadClass o-- H3Index : accumulates unique
+EarthPod *-- AtmosphereStock
+EarthPod *-- BiomassStock
+EarthPod *-- ThermalStock
+EarthPod *-- SpatialMonadClass
+
+SpatialMonadClass ..> TokenExtractorFn : invokes during ingestTelemetry()
+BlockchainTransaction o-- CanonicalTokenReceipt : encapsulates
+ThermodynamicBlock "1" *-- "many" BlockchainTransaction : aggregates
+
+' ORM / Relational DB Mapping Connections
+DBPod "1" <.. EarthPod : mirrors
+DBH3Cell "1" <.. IH3CellDescriptor : persists
+DBIngest "1" <.. CanonicalTokenReceipt : logs payload
+DBExtractions "many" }o--|| DBIngest : joins
+DBExtractions "many" }o--|| DBH3Cell : normalizes
+DBMonadState "1" <.. SpatialMonadClass : checkpoints
+DBBlock "1" <.. ThermodynamicBlock : persists on-chain
+
+note right of TokenExtractorFn
+  Regex: \b([0-9a-fA-F]{15})\b
+  Preserves FIFO discovery order.
+  Performs strict lower-casing.
+  Validates Mode 1 & Resolution (0-15).
+  Thermodynamically zero-mass operation:
+  Delta M_total = 0.0 kg.
+end note
+
+note bottom of DBMonadState
+  Trigger Enforcement:
+  thermodynamic_mass_delta_kg == 0.0
+  First Law of Thermodynamics
+  strictly verified before commit.
+end note
+
+@enduml

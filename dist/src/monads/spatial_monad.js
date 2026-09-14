@@ -343,7 +343,7 @@ export class SpatialMonadStockRegister {
         this.validator = validator;
     }
     ingestIndex(idx) {
-        if (this.validator.validateIndex(idx)) {
+        if (Boolean(this.validator.validateIndex(idx))) {
             this.validIndices.push(idx);
             return true;
         }

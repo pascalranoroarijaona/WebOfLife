@@ -1,18 +1,6 @@
-// =============================================================================
-// WEB OF LIFE - SPATIAL H3 INDEX TYPINGS
-// =============================================================================
 /**
- * Domain error for spatial guard clause violations (RFC-035).
- */
-export class SpatialGuardClauseException extends Error {
-    constructor(message = 'Spatial guard clause exception') {
-        super(`[SpatialGuardClauseException] ${message}`);
-        this.name = 'SpatialGuardClauseException';
-        Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
-    }
-}
-/**
- * Standardized H3 error codes across validation sprints.
+ * Web of Life - Planetary Spatial Substrate Types
+ * Full Historical & Sprint 041 Type Compatibility
  */
 export var H3ErrorCode;
 (function (H3ErrorCode) {
@@ -29,3 +17,10 @@ export var H3ErrorCode;
     H3ErrorCode[H3ErrorCode["ERR_H3_INVALID_BASE_CELL"] = 5] = "ERR_H3_INVALID_BASE_CELL";
     H3ErrorCode[H3ErrorCode["ERR_H3_OUT_OF_RANGE"] = 6] = "ERR_H3_OUT_OF_RANGE";
 })(H3ErrorCode || (H3ErrorCode = {}));
+export class SpatialGuardClauseException extends Error {
+    constructor(message) {
+        super(`[SpatialGuardClauseException] ${message}`);
+        this.name = 'SpatialGuardClauseException';
+        Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
+    }
+}

@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 21%
-SPRINT_GOAL: Define global regex constant H3_GLOBAL_CANONICAL_INDEX_PATTERN matching 15-character canonical H3 tokens globally in src/spatial/h3_grid.ts.
+Roadmap Completion: 23%
+SPRINT_GOAL: Implement deduplicated canonical token extraction helper extractUniqueCanonicalH3Tokens(text: string): string[] in src/spatial/h3_grid.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -223,26 +223,34 @@ SPRINT_GOAL: Define global regex constant H3_GLOBAL_CANONICAL_INDEX_PATTERN matc
 - [x] Implement canonical 15-character hexadecimal regex constant `H3_CANONICAL_INDEX_PATTERN` (`src/spatial/h3_grid.ts`)
 - [x] Implement dedicated regex boolean test function `matchesCanonicalH3Pattern(token: string): boolean` (`src/spatial/h3_grid.ts`)
 - [x] Implement regex format validator `assertCanonicalH3Pattern(token: string): void` raising `H3ValidationError` (`src/spatial/h3_grid.ts`)
-- [ ] Define global regex constant `H3_GLOBAL_CANONICAL_INDEX_PATTERN` matching 15-character canonical H3 tokens globally (`src/spatial/h3_grid.ts`)
-- [ ] Implement token extractor function `extractCanonicalH3Tokens(text: string): string[]` returning validated canonical H3 tokens (`src/spatial/h3_grid.ts`)
+- [x] Define global regex constant `H3_GLOBAL_CANONICAL_INDEX_PATTERN` matching 15-character canonical H3 tokens globally (`src/spatial/h3_grid.ts`)
+- [x] Implement token extractor function `extractCanonicalH3Tokens(text: string): string[]` returning validated canonical H3 tokens (`src/spatial/h3_grid.ts`)
 - [ ] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
 - [ ] `H3CellThermodynamicState` interface and state vector representation (`src/spatial/h3_state_tensor.ts`)
+- [ ] Factory function and thermal boundary assertions for `H3CellThermodynamicState` (`src/spatial/h3_state_tensor.ts`)
+- [ ] Geodesic distance and shared boundary length calculation between adjacent H3 cells (`src/spatial/h3_adjacency.ts`)
 - [ ] Discrete Topographic Insolation and Solar Zenith Angle formulation (`src/thermodynamics/insolation.ts`)
 - [ ] Top-of-Atmosphere irradiance and daily solar declination engine (`src/thermodynamics/insolation.ts`)
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation (`src/thermodynamics/radiative_balance.ts`)
-- [ ] Spatial-Thermodynamic State Tensor Routing and boundary heat flux operator (`src/spatial/tensor_router.ts`)
-- [ ] Inter-cell Fourier thermal conduction across shared H3 cell boundaries (`src/spatial/h3_heat_flux.ts`)
+- [ ] Clausius-Clapeyron saturation vapor pressure and hydro-thermodynamic phase transitions (`src/thermodynamics/phase_change.ts`)
 - [ ] Gouy-Stodola rate computation and Exergy destruction accounting (`src/thermodynamics/exergy.ts`)
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures (`src/thermodynamics/carnot.ts`)
-- [ ] Clausius-Clapeyron saturation vapor pressure and hydro-thermodynamic phase transitions (`src/thermodynamics/phase_change.ts`)
+- [ ] Constant definitions for snow, ice, ocean, and canopy albedo thresholds (`src/thermodynamics/constants.ts`)
+- [ ] Temperature-dependent sigmoidal ice-fraction melting function (`src/thermodynamics/albedo.ts`)
 - [ ] Dynamic Albedo & Cryospheric Radiation Balance Feedback (`src/thermodynamics/albedo.ts`)
+- [ ] Inter-cell Fourier thermal conduction across shared H3 cell boundaries (`src/spatial/h3_heat_flux.ts`)
+- [ ] First-order upwind spatial advection tensor operator across directed H3 edges (`src/spatial/tensor_router.ts`)
+- [ ] Spatial-Thermodynamic State Tensor Routing and boundary heat flux operator (`src/spatial/tensor_router.ts`)
+- [ ] Elemental stoichiometric vector interface `StoichiometricPool` (`src/monads/biogeochemical_types.ts`)
+- [ ] Closed reservoir monad `BiogeochemicalReservoir` enforcing mass invariance (`src/monads/biogeochemical_cycles.ts`)
 - [ ] Biogeochemical Mass-Conservation Reservoirs for C, N, P, and Water (`src/monads/biogeochemical_cycles.ts`)
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper (`src/biosphere/biomass_energy.ts`)
-- [ ] Leaf Trait & Plant Functional Type (PFT) parameter interfaces (`src/biosphere/traits.ts`)
+- [ ] Plant Functional Type (PFT) enum and Leaf Trait profile interfaces (`src/biosphere/traits.ts`)
 - [ ] Elemental Liebig's Law & Redfield Ratio stoichiometric limiter (`src/biosphere/redfield_ratio.ts`)
+- [ ] Farquhar-von Caemmerer-Berry (FvCB) photosynthesis kinetics and enzyme Arrhenius activation (`src/biosphere/photosynthesis_kinetics.ts`)
 - [ ] Mechanistic Farquhar-von Caemmerer-Berry photosynthesis and assimilation monad (`src/biosphere/photosynthesis.ts`)
 - [ ] Allometric metabolic scaling and Kleiber's Law basal respiration calculator (`src/biosphere/allometry.ts`)
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication (`src/biosphere/trophic_matrix.ts`)
@@ -261,6 +269,7 @@ SPRINT_GOAL: Define global regex constant H3_GLOBAL_CANONICAL_INDEX_PATTERN matc
 
 ### Phase 3: Technosphere & Industrial Metabolism
 - [ ] Define `MaterialStream` interface tracking mass flow, enthalpy, and species vectors (`src/technosphere/material_stream.ts`)
+- [ ] Implement adiabatic material stream mixing function conserving mass and enthalpy (`src/technosphere/material_stream.ts`)
 - [ ] Define `EnergyCarrier` interface with Carnot exergetic quality factor (`src/technosphere/energy_carrier.ts`)
 - [ ] Abstract class `IndustrialProcessMonad extends ThermodynamicStructure` with First/Second Law enthalpy balances (`src/technosphere/industrial_monad.ts`)
 - [ ] Sherwood separation work calculation for ultra-dilute gas Direct Air Capture (`src/technosphere/dac_thermodynamics.ts`)

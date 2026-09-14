@@ -1,5 +1,5 @@
 {
-  "current_sprint": 41,
+  "current_sprint": 42,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -200,6 +200,11 @@
       "sprint": 40,
       "goal": "Define global regex constant H3_GLOBAL_CANONICAL_INDEX_PATTERN matching 15-character canonical H3 tokens globally in src/spatial/h3_grid.ts.",
       "timestamp": "2026-09-14T11:55:01.383464+00:00"
+    },
+    {
+      "sprint": 41,
+      "goal": "Implement deduplicated canonical token extraction helper extractUniqueCanonicalH3Tokens(text: string): string[] in src/spatial/h3_grid.ts.",
+      "timestamp": "2026-09-14T12:05:01.214084+00:00"
     }
   ]
 }

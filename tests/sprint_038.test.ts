@@ -134,16 +134,16 @@ describe('Sprint 038: Canonical H3 Pattern Matching Engine', () => {
       const nextDst = result.nextGrid.get(dstCellKey)!;
 
       // First Law Checksums: delta(universe) === 0
-      const totalCarbonBefore = initialStocksSrc.carbonMol + initialStocksDst.carbonMol;
-      const totalCarbonAfter = nextSrc.carbonMol + nextDst.carbonMol;
+      const totalCarbonBefore = initialStocksSrc.carbonMol! + initialStocksDst.carbonMol!;
+      const totalCarbonAfter = nextSrc.carbonMol! + nextDst.carbonMol!;
       assert.strictEqual(Math.abs(totalCarbonAfter - totalCarbonBefore) < 1e-12, true);
 
-      const totalWaterBefore = initialStocksSrc.waterMol + initialStocksDst.waterMol;
-      const totalWaterAfter = nextSrc.waterMol + nextDst.waterMol;
+      const totalWaterBefore = initialStocksSrc.waterMol! + initialStocksDst.waterMol!;
+      const totalWaterAfter = nextSrc.waterMol! + nextDst.waterMol!;
       assert.strictEqual(Math.abs(totalWaterAfter - totalWaterBefore) < 1e-12, true);
 
-      const totalEnthalpyBefore = initialStocksSrc.enthalpyJoules + initialStocksDst.enthalpyJoules;
-      const totalEnthalpyAfter = nextSrc.enthalpyJoules + nextDst.enthalpyJoules;
+      const totalEnthalpyBefore = initialStocksSrc.enthalpyJoules! + initialStocksDst.enthalpyJoules!;
+      const totalEnthalpyAfter = nextSrc.enthalpyJoules! + nextDst.enthalpyJoules!;
       assert.strictEqual(Math.abs(totalEnthalpyAfter - totalEnthalpyBefore) < 1e-9, true);
     });
 

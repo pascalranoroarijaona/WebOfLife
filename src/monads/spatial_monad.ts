@@ -440,10 +440,10 @@ export class SpatialMonadStockRegister {
   private validIndices: string[] = [];
   private rejectedCount: number = 0;
 
-  constructor(private readonly validator: { validateIndex(idx: string): boolean }) {}
+  constructor(private readonly validator: { validateIndex(idx: string): boolean | any }) {}
 
   public ingestIndex(idx: string): boolean {
-    if (this.validator.validateIndex(idx)) {
+    if (Boolean(this.validator.validateIndex(idx))) {
       this.validIndices.push(idx);
       return true;
     }
