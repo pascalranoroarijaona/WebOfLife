@@ -1,0 +1,152 @@
+@startuml sprint_046_schema
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Web of Life - Sprint 046: Geodesic Haversine Distance Metric & Spatial Thermodynamic Manifold
+
+package "src::spatial" {
+    interface LatLngCoord {
+        +lat: number
+        +lng: number
+    }
+
+    interface GeodesicDistanceOptions {
+        +radiusMeters?: number
+        +unit?: 'meters' | 'kilometers'
+    }
+
+    class HaversineMetric <<utility>> {
+        +{static} calculateHaversineDistance(coordA: LatLngCoord | [number, number], coordB: LatLngCoord | [number, number], options?: GeodesicDistanceOptions): number
+        +{static} toRadians(degrees: number): number
+        +{static} normalizeLongitudeDelta(deltaLngRad: number): number
+    }
+
+    class H3CellMetadata {
+        +cellIndex: string
+        +resolution: number
+        +centroid: LatLngCoord
+        +surfaceAreaM2: number
+        +isPentagon: boolean
+    }
+
+    class H3AdjacencyMatrix {
+        -neighborsMap: Map<string, Set<string>>
+        -edgeBoundaryLengths: Map<string, number>
+        #distanceCache: Map<string, number>
+        +areNeighbors(cellA: string, cellB: string): boolean
+        +getNeighbors(cellIndex: string): string[]
+        +getBoundaryLength(cellA: string, cellB: string): number
+        +getCentroidDistance(cellA: string, cellB: string): number
+        -formatEdgeKey(cellA: string, cellB: string): string
+    }
+
+    H3AdjacencyMatrix ..> HaversineMetric : delegates geodesic calculation
+    H3CellMetadata --> LatLngCoord : contains centroid
+    H3AdjacencyMatrix --> H3CellMetadata : indexes
+}
+
+package "src::thermodynamics" {
+    class ThermodynamicConstants <<constants>> {
+        +{static} EARTH_RADIUS_METERS: number = 6371007.0
+        +{static} STEFAN_BOLTZMANN: number = 5.670374419e-8
+        +{static} BOLTZMANN_CONSTANT: number = 1.380649e-23
+    }
+
+    class CellThermodynamicState {
+        +cellIndex: string
+        +internalEnergyJoules: number
+        +entropyJoulesPerKelvin: number
+        +temperatureKelvin: number
+        +sensibleHeatJoules: number
+        +latentHeatJoules: number
+        +biomassCarbonKg: number
+        +atmosphericMoistureKg: number
+        +chemicalPotential: number
+        +computeThermalGradient(target: CellThermodynamicState): number
+    }
+
+    class SpatialDiffusionFlux {
+        +sourceCell: string
+        +targetCell: string
+        +carrierType: string
+        +geodesicDistanceMeters: number
+        +effectiveConductance: number
+        +potentialGradient: number
+        +fluxAmount: number
+        +entropyGenerated: number
+        +evaluateFlux(distanceMeters: number, boundaryMeters: number, transportCoeff: number): void
+    }
+
+    note right of SpatialDiffusionFlux
+      **First Law:**
+      Delta E_source + Delta E_target = 0
+      
+      **Second Law:**
+      sigma_S = J_ij * (Phi_j - Phi_i) / T >= 0
+      
+      **Conductance Tensor:**
+      Gamma_ij = (kappa * A_ij) / d_ij
+    end note
+}
+
+package "src::monads" {
+    abstract class ThermodynamicMonad<T> {
+        +state: T
+        +{abstract} bind<U>(fn: (val: T) => ThermodynamicMonad<U>): ThermodynamicMonad<U>
+        +{abstract} auditInvariance(): boolean
+    }
+
+    class SpatialMonad {
+        +cells: Map<string, CellThermodynamicState>
+        +adjacency: H3AdjacencyMatrix
+        +dispatchFluxes(): SpatialMonad
+        +assertSecondLawCompliance(): boolean
+    }
+
+    ThermodynamicMonad <|-- SpatialMonad
+    SpatialMonad *-- H3AdjacencyMatrix
+    SpatialMonad *-- CellThermodynamicState
+    SpatialMonad ..> SpatialDiffusionFlux : generates
+}
+
+package "db::ledger" {
+    class ThermodynamicBlock {
+        +blockHeight: number
+        +previousBlockHash: Buffer
+        +blockHash: Buffer
+        +fluxMerkleRoot: Buffer
+        +stateMerkleRoot: Buffer
+        +totalEntropyProduction: number
+        +netEnergyVariance: number = 0.0
+        +transactionCount: number
+        +validatorSignature: Buffer
+        +minedTimestamp: Date
+    }
+
+    class SpatialFluxTransaction {
+        +transactionId: string
+        +blockHeight: number
+        +cellSource: string
+        +cellTarget: string
+        +carrierType: string
+        +geodesicDistanceMeters: number
+        +potentialGradient: number
+        +effectiveConductance: number
+        +netFluxAmount: number
+        +entropyProduction: number
+        +sourceEnergyDelta: number
+        +targetEnergyDelta: number
+        +txSignature: Buffer
+    }
+
+    ThermodynamicBlock "1" *-- "0..*" SpatialFluxTransaction : commits
+    SpatialFluxTransaction ..> SpatialDiffusionFlux : on-chain ledger proof
+}
+
+HaversineMetric ..> ThermodynamicConstants : uses EARTH_RADIUS_METERS
+HaversineMetric ..> LatLngCoord : accepts
+HaversineMetric ..> GeodesicDistanceOptions : accepts
+
+@enduml

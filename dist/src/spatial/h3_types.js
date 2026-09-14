@@ -1,6 +1,8 @@
+// =============================================================================
+// WEB OF LIFE - SPATIAL H3 & GEODESIC TYPE DEFINITIONS (UNIFIED RETRO-COMPATIBLE)
+// =============================================================================
 /**
- * Web of Life - Planetary Thermodynamic Spatial Types
- * RFC-001 through RFC-045 Comprehensive Retro-Compatibility Layer
+ * Enumeration of standardized H3 spatial validation error codes.
  */
 export var H3ErrorCode;
 (function (H3ErrorCode) {
@@ -10,7 +12,16 @@ export var H3ErrorCode;
     H3ErrorCode["INVALID_RESOLUTION"] = "H3_ERR_INVALID_RESOLUTION";
     H3ErrorCode["INVALID_BASE_CELL"] = "H3_ERR_INVALID_BASE_CELL";
     H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
+    H3ErrorCode[H3ErrorCode["ERR_H3_INVALID_NULL"] = 1] = "ERR_H3_INVALID_NULL";
+    H3ErrorCode[H3ErrorCode["ERR_H3_INVALID_LENGTH"] = 2] = "ERR_H3_INVALID_LENGTH";
+    H3ErrorCode[H3ErrorCode["ERR_H3_INVALID_CHARACTERS"] = 3] = "ERR_H3_INVALID_CHARACTERS";
+    H3ErrorCode[H3ErrorCode["ERR_H3_INVALID_RESOLUTION"] = 4] = "ERR_H3_INVALID_RESOLUTION";
+    H3ErrorCode[H3ErrorCode["ERR_H3_INVALID_BASE_CELL"] = 5] = "ERR_H3_INVALID_BASE_CELL";
+    H3ErrorCode[H3ErrorCode["ERR_H3_OUT_OF_RANGE"] = 6] = "ERR_H3_OUT_OF_RANGE";
 })(H3ErrorCode || (H3ErrorCode = {}));
+/**
+ * Domain-specific exception thrown on spatial guard clause violations.
+ */
 export class SpatialGuardClauseException extends Error {
     constructor(message) {
         super(`[SpatialGuardClauseException] ${message}`);
@@ -18,11 +29,8 @@ export class SpatialGuardClauseException extends Error {
         Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
-// =============================================================================
-// SPRINT 045: THERMODYNAMIC OVERRIDES & TENSOR TYPES
-// =============================================================================
 /**
- * Physical channel layout indices within H3StateTensor stride buffer.
+ * Contiguous channel layout definition for H3StateTensor.
  */
 export var ThermodynamicChannel;
 (function (ThermodynamicChannel) {
@@ -32,23 +40,23 @@ export var ThermodynamicChannel;
     ThermodynamicChannel[ThermodynamicChannel["VEGETATION_BIOMASS_KG"] = 3] = "VEGETATION_BIOMASS_KG";
     ThermodynamicChannel[ThermodynamicChannel["ATMOSPHERIC_CO2_KG"] = 4] = "ATMOSPHERIC_CO2_KG";
     ThermodynamicChannel[ThermodynamicChannel["MINERAL_NITROGEN_KG"] = 5] = "MINERAL_NITROGEN_KG";
-    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 6] = "SENSIBLE_HEAT_JOULES";
-    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 7] = "ALBEDO";
+    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 6] = "ALBEDO";
+    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 7] = "SENSIBLE_HEAT_JOULES";
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
 /**
- * Standard specific heat capacities (J / kg / K) and enthalpy reference values.
+ * Thermodynamic and specific heat constants for state tensor calculations.
  */
 export const THERMODYNAMIC_CONSTANTS = {
     MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 50_000.0,
+    DEFAULT_REGOLITH_MASS_KG: 50000.0,
     SPECIFIC_HEAT: {
-        REGOLITH: 840.0,
         WATER: 4184.0,
         SOIL_ORGANIC_CARBON: 1800.0,
         VEGETATION_BIOMASS: 1900.0,
         ATMOSPHERIC_CO2: 846.0,
         MINERAL_NITROGEN: 1200.0,
+        REGOLITH: 840.0,
     },
     SPECIFIC_ENTHALPY: {
         WATER: -15.87e6,
@@ -58,4 +66,11 @@ export const THERMODYNAMIC_CONSTANTS = {
         MINERAL_NITROGEN: -2.85e6,
         REGOLITH: 0.0,
     },
+    STEFAN_BOLTZMANN: 5.670374419e-8,
+    SOLAR_CONSTANT_TOA: 1361.0,
+    ZERO_CELSIUS_IN_KELVIN: 273.15,
+    DEFAULT_ALBEDO: 0.3,
+    GAS_CONSTANT_R: 8.314462618,
+    PLANETARY_TEMP_MIN_K: 200.0,
+    PLANETARY_TEMP_MAX_K: 350.0,
 };

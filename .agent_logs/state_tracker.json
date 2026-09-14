@@ -1,5 +1,5 @@
 {
-  "current_sprint": 46,
+  "current_sprint": 47,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -225,6 +225,11 @@
       "sprint": 45,
       "goal": "Implement applyThermodynamicOverrides helper for partial cell state mutations in src/spatial/h3_state_tensor.ts.",
       "timestamp": "2026-09-14T12:51:56.858310+00:00"
+    },
+    {
+      "sprint": 46,
+      "goal": "Implement calculateHaversineDistance geodesic metric helper between cell centroids in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-14T13:01:47.965140+00:00"
     }
   ]
 }

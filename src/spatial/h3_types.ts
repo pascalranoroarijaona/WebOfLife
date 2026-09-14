@@ -1,18 +1,72 @@
+// =============================================================================
+// WEB OF LIFE - SPATIAL H3 & GEODESIC TYPE DEFINITIONS (UNIFIED RETRO-COMPATIBLE)
+// =============================================================================
+
 /**
- * Web of Life - Planetary Thermodynamic Spatial Types
- * RFC-001 through RFC-045 Comprehensive Retro-Compatibility Layer
+ * Coordinate pair representing geographic position in decimal degrees.
  */
+export interface LatLngCoord {
+  readonly lat: number; // Latitude [-90, +90]
+  readonly lng: number; // Longitude [-180, +180]
+}
 
-// =============================================================================
-// HISTORICAL H3 TYPES & CONSTANTS (Sprints 001 - 044)
-// =============================================================================
+/**
+ * Alternate coordinate pair supporting 'lon' key naming.
+ */
+export interface LatLonCoord {
+  readonly lat: number; // Latitude [-90, +90]
+  readonly lon: number; // Longitude [-180, +180]
+}
 
+/**
+ * Centroid distance query configuration options.
+ */
+export interface GeodesicDistanceOptions {
+  /**
+   * Planetary reference radius in meters.
+   * Defaults to EARTH_RADIUS_METERS (6,371,007 m).
+   */
+  readonly radiusMeters?: number;
+
+  /**
+   * Desired distance unit: 'meters' | 'kilometers'.
+   * Defaults to 'meters'.
+   */
+  readonly unit?: 'meters' | 'kilometers';
+}
+
+/**
+ * Geographic polygon representation of an H3 cell facet.
+ */
+export interface H3CellBoundary {
+  readonly cellIndex: string;
+  readonly vertices: LatLngCoord[];
+}
+
+/**
+ * Canonical H3 index string identifier representation.
+ */
 export type H3Index = string;
-export type H3Resolution = number;
-export type H3ResolutionTier =
-  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
+/**
+ * Structural descriptor for an active H3 cell.
+ */
+export interface H3Cell {
+  readonly index: string;
+  readonly resolution: number;
+  readonly mode?: number;
+}
+
+/**
+ * Contract for token extraction from unstructured payload text.
+ */
+export interface IH3TokenExtractor {
+  extractTokens(text: string): string[];
+}
+
+/**
+ * Enumeration of standardized H3 spatial validation error codes.
+ */
 export enum H3ErrorCode {
   SUCCESS = 'H3_SUCCESS',
   INVALID_LENGTH = 'H3_ERR_INVALID_LENGTH',
@@ -20,8 +74,17 @@ export enum H3ErrorCode {
   INVALID_RESOLUTION = 'H3_ERR_INVALID_RESOLUTION',
   INVALID_BASE_CELL = 'H3_ERR_INVALID_BASE_CELL',
   NULL_INDEX = 'H3_ERR_NULL_INDEX',
+  ERR_H3_INVALID_NULL = 0x01,
+  ERR_H3_INVALID_LENGTH = 0x02,
+  ERR_H3_INVALID_CHARACTERS = 0x03,
+  ERR_H3_INVALID_RESOLUTION = 0x04,
+  ERR_H3_INVALID_BASE_CELL = 0x05,
+  ERR_H3_OUT_OF_RANGE = 0x06,
 }
 
+/**
+ * Domain-specific exception thrown on spatial guard clause violations.
+ */
 export class SpatialGuardClauseException extends Error {
   constructor(message: string) {
     super(`[SpatialGuardClauseException] ${message}`);
@@ -30,37 +93,41 @@ export class SpatialGuardClauseException extends Error {
   }
 }
 
-export interface H3Cell {
-  index: string;
-  resolution: number;
-  mode?: number;
-}
-
-export interface IH3TokenExtractor {
-  extractTokens(text: string): string[];
-}
-
+/**
+ * H3 grid query configuration parameters.
+ */
 export interface IH3GridQuery {
   resolution: number;
   baseIndexes?: string[];
   bounds?: { north: number; south: number; east: number; west: number };
 }
 
+/**
+ * Cell metadata container for H3 grid engines.
+ */
 export interface IH3CellData {
   h3Index: string;
   resolution: number;
-  centroid: { lat: number; lng: number };
+  centroid?: { lat: number; lng: number };
+  boundary?: Array<{ lat: number; lng: number }>;
+  areaKm2?: number;
   solarIrradiance?: number;
   carbonStock?: number;
 }
 
+/**
+ * Structural validation result for H3 indices.
+ */
 export interface H3ValidationResult {
   isValid: boolean;
-  errorCode?: string;
+  errorCode?: string | H3ErrorCode;
   resolution?: number;
   baseCell?: number;
 }
 
+/**
+ * Typed validation result contract.
+ */
 export interface IH3ValidationResult {
   isValid: boolean;
   code: H3ErrorCode;
@@ -69,17 +136,28 @@ export interface IH3ValidationResult {
   baseCell?: number;
 }
 
+/**
+ * Resolution tier validation interface contract.
+ */
 export interface IResolutionTierValidator {
   validateResolution(resolution: number): boolean;
   assertValidResolution(resolution: number): void;
 }
 
-// =============================================================================
-// SPRINT 045: THERMODYNAMIC OVERRIDES & TENSOR TYPES
-// =============================================================================
+/**
+ * H3 valid resolution tier literal union type (0 through 15).
+ */
+export type H3ResolutionTier =
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 /**
- * Physical channel layout indices within H3StateTensor stride buffer.
+ * Type alias for H3 numerical resolution.
+ */
+export type H3Resolution = number;
+
+/**
+ * Contiguous channel layout definition for H3StateTensor.
  */
 export enum ThermodynamicChannel {
   TEMPERATURE_KELVIN = 0,
@@ -88,38 +166,13 @@ export enum ThermodynamicChannel {
   VEGETATION_BIOMASS_KG = 3,
   ATMOSPHERIC_CO2_KG = 4,
   MINERAL_NITROGEN_KG = 5,
-  SENSIBLE_HEAT_JOULES = 6,
-  ALBEDO = 7,
+  ALBEDO = 6,
+  SENSIBLE_HEAT_JOULES = 7,
   CHANNEL_COUNT = 8,
 }
 
 /**
- * Standard specific heat capacities (J / kg / K) and enthalpy reference values.
- */
-export const THERMODYNAMIC_CONSTANTS = {
-  MIN_TEMPERATURE_KELVIN: 2.7315,
-  DEFAULT_REGOLITH_MASS_KG: 50_000.0,
-  SPECIFIC_HEAT: {
-    REGOLITH: 840.0,
-    WATER: 4184.0,
-    SOIL_ORGANIC_CARBON: 1800.0,
-    VEGETATION_BIOMASS: 1900.0,
-    ATMOSPHERIC_CO2: 846.0,
-    MINERAL_NITROGEN: 1200.0,
-  },
-  SPECIFIC_ENTHALPY: {
-    WATER: -15.87e6,
-    SOIL_ORGANIC_CARBON: -32.79e6,
-    VEGETATION_BIOMASS: -17.50e6,
-    ATMOSPHERIC_CO2: -8.94e6,
-    MINERAL_NITROGEN: -2.85e6,
-    REGOLITH: 0.0,
-  },
-} as const;
-
-/**
- * Partial thermodynamic state representing target values or overrides
- * for a single hexagonal cell.
+ * Partial thermodynamic override payload per cell.
  */
 export interface CellThermodynamicOverride {
   temperatureKelvin?: number;
@@ -128,19 +181,12 @@ export interface CellThermodynamicOverride {
   vegetationBiomassKg?: number;
   atmosphericCo2Kg?: number;
   mineralNitrogenKg?: number;
-  sensibleHeatJoules?: number;
   albedo?: number;
+  sensibleHeatJoules?: number;
 }
 
 /**
- * Map or dictionary associating H3 spatial index string to partial override parameters.
- */
-export type H3ThermodynamicOverridesMap =
-  | Map<string, CellThermodynamicOverride>
-  | Record<string, CellThermodynamicOverride>;
-
-/**
- * Auditing record detailing mass and energy delta per modified cell.
+ * Individual cell delta report produced by applyThermodynamicOverrides.
  */
 export interface CellThermodynamicDeltaRecord {
   h3Index: string;
@@ -153,7 +199,7 @@ export interface CellThermodynamicDeltaRecord {
 }
 
 /**
- * Comprehensive ledger generated by applyThermodynamicOverrides.
+ * Consolidated ledger report produced by applyThermodynamicOverrides.
  */
 export interface ThermodynamicOverrideReport {
   timestamp: number;
@@ -166,13 +212,51 @@ export interface ThermodynamicOverrideReport {
 }
 
 /**
- * Behavioral configuration options for applying overrides.
+ * Key-value mapping of H3 indices to their respective partial overrides.
+ */
+export type H3ThermodynamicOverridesMap =
+  | Map<string, CellThermodynamicOverride>
+  | Record<string, CellThermodynamicOverride>;
+
+/**
+ * Execution options for partial thermodynamic override applications.
  */
 export interface OverrideOptions {
   strictThermodynamicBounds?: boolean;
   minTemperatureKelvin?: number;
-  allowMassDestruction?: boolean;
   recomputeSensibleHeat?: boolean;
   regolithMassKg?: number;
   includeChemicalEnthalpy?: boolean;
+  allowMassDestruction?: boolean;
 }
+
+/**
+ * Thermodynamic and specific heat constants for state tensor calculations.
+ */
+export const THERMODYNAMIC_CONSTANTS = {
+  MIN_TEMPERATURE_KELVIN: 2.7315,
+  DEFAULT_REGOLITH_MASS_KG: 50000.0,
+  SPECIFIC_HEAT: {
+    WATER: 4184.0,
+    SOIL_ORGANIC_CARBON: 1800.0,
+    VEGETATION_BIOMASS: 1900.0,
+    ATMOSPHERIC_CO2: 846.0,
+    MINERAL_NITROGEN: 1200.0,
+    REGOLITH: 840.0,
+  },
+  SPECIFIC_ENTHALPY: {
+    WATER: -15.87e6,
+    SOIL_ORGANIC_CARBON: -32.79e6,
+    VEGETATION_BIOMASS: -17.50e6,
+    ATMOSPHERIC_CO2: -8.94e6,
+    MINERAL_NITROGEN: -2.85e6,
+    REGOLITH: 0.0,
+  },
+  STEFAN_BOLTZMANN: 5.670374419e-8,
+  SOLAR_CONSTANT_TOA: 1361.0,
+  ZERO_CELSIUS_IN_KELVIN: 273.15,
+  DEFAULT_ALBEDO: 0.3,
+  GAS_CONSTANT_R: 8.314462618,
+  PLANETARY_TEMP_MIN_K: 200.0,
+  PLANETARY_TEMP_MAX_K: 350.0,
+};
