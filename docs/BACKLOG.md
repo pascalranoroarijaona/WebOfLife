@@ -23,16 +23,21 @@ SPRINT_GOAL: Implement 15-character length validation helper function src/spatia
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
-- [ ] Compressed sparse row (CSR) matrix structures for multi-trophic energy routing (`src/biosphere/trophic_matrix.ts`)
-- [ ] Iterative linear solver for steady-state flux propagation across $N$-tier food webs (`src/biosphere/trophic_solver.ts`)
+- [ ] Compressed sparse row (CSR) conversion utility for sparse trophic adjacency weights (`src/biosphere/trophic_matrix.ts`)
+- [ ] Matrix vector multiplication methods for rapid parallel energy flux propagation across spatial nodes (`src/biosphere/trophic_matrix.ts`)
+- [ ] Gauss-Seidel iterative linear solver to compute steady-state biomass distributions across $N$-tier food webs (`src/biosphere/trophic_solver.ts`)
+- [ ] Convergence criteria checking based on maximum residual error tolerance ($\epsilon < 10^{-6}$) (`src/biosphere/trophic_solver.ts`)
 - [ ] Holling Type II predator ingestion rate function with handling time parameters (`src/biosphere/holling_kinetics.ts`)
 - [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds (`src/biosphere/holling_kinetics.ts`)
 - [ ] Elemental stoichiometric constraint checks enforcing strict C:N:P mass conservation ratios during biomass synthesis (`src/biosphere/redfield_ratio.ts`)
+- [ ] Nutrient limitation penalty modifier scaling down primary production when N or P stock reservoirs drop below critical thresholds (`src/biosphere/redfield_ratio.ts`)
 - [ ] Adjacency-weighted hyphal transport arrays for carbon-for-mineral exchange (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Metabolic maintenance cost deductions (respiration carbon loss) for fungal symbionts (`src/biosphere/mycorrhizal_flows.ts`)
 - [ ] Shannon-Wiener entropy metric calculation across spatial H3 node communities (`src/biosphere/diversity_metrics.ts`)
 - [ ] Simpson's dominance and evenness index calculator (`src/biosphere/diversity_metrics.ts`)
 - [ ] Stochastic Extinction, Bottleneck, and Minimum Viable Population engine (`src/biosphere/population_genetics.ts`)
-- [ ] Soil Organic Matter (SOM) and microbial necromass decomposition pools (`src/geobiome/soil_matrix.ts`)
+- [ ] Soil Organic Matter (SOM) pool tracking with labile and recalcitrant carbon fractions (`src/geobiome/soil_matrix.ts`)
+- [ ] Microbial necromass respiration and temperature-dependent decomposition kinetics (`src/geobiome/soil_matrix.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
 - [ ] Minimum theoretical separation work calculator using Gibbs free energy of mixing for ambient CO2 (`src/technosphere/dac_thermodynamics.ts`)

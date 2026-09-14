@@ -1,0 +1,66 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class SpatialMonad {
+    + cellId: string
+    + resolution: number
+    + validateIndex(): boolean
+    + transitionState(stock: ThermodynamicStock): void
+}
+
+class H3Grid {
+    {static} + isValidH3Length(index: string): boolean
+}
+
+class H3Types {
+    + H3Index: string
+    + Resolution: number
+}
+
+class H3Adjacency {
+    + getNeighbors(index: string): H3Index[]
+    + validateAdjacency(a: H3Index, b: H3Index): boolean
+}
+
+class ThermodynamicStock {
+    + stockId: string
+    + cellId: string
+    + biomassGrams: number
+    + entropyJoulesPerK: number
+    + updateStock(delta: number): void
+}
+
+class ThermodynamicFlow {
+    + flowId: string
+    + sourceStockId: string
+    + targetStockId: string
+    + energyTransferredJoules: number
+    + executeFlow(): void
+}
+
+class BlockchainBlock {
+    + blockIndex: number
+    + previousHash: string
+    + currentHash: string
+    + merkleRoot: string
+    + solarInputValidator: string
+    + timestamp: Date
+    + verifyBlock(): boolean
+}
+
+class BlockTransaction {
+    + transactionId: string
+    + blockIndex: number
+    + flowId: string
+    + signature: string
+}
+
+SpatialMonad --> H3Grid : utilizes isValidH3Length()
+H3Grid ..> H3Types : references
+H3Grid ..> H3Adjacency : integrates
+SpatialMonad --> ThermodynamicStock : manages
+ThermodynamicStock "1" *-- "*" ThermodynamicFlow : sources / targets
+BlockchainBlock "1" *-- "*" BlockTransaction : contains
+BlockTransaction --> ThermodynamicFlow : records
+@enduml
