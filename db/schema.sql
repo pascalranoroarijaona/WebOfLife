@@ -1,65 +1,50 @@
--- ============================================================================
--- Web of Life Database, UML & Thermodynamic Blockchain Schema
--- Sprint 012 Update: H3 String Payload Guard Clauses & Spatial Monad Integrity
--- ============================================================================
+-- Updated Schema & Ledger Definitions: Sprint 13 Spatial Guard Clauses & Thermodynamic Monads
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "timescaledb";
+BEGIN;
 
--- ----------------------------------------------------------------------------
--- 1. Thermodynamic Blockchain Ledger (Blocks & Transactions)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blocks (
-    block_height BIGINT PRIMARY KEY,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
-    previous_hash VARCHAR(64) NOT NULL,
+-- Spatial Nodes Table representing H3 Grid cells with thermodynamic energy reserves
+CREATE TABLE IF NOT EXISTS spatial_nodes (
+    h3_index VARCHAR(15) PRIMARY KEY,
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    energy_stock NUMERIC(18, 8) NOT NULL DEFAULT 0.00000000 CHECK (energy_stock >= 0),
+    entropy_level NUMERIC(12, 8) NOT NULL DEFAULT 0.00000000,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Spatial Payload Validation Logs (Tracking Guard Clause Interceptions for Second Law Entropy Management)
+CREATE TABLE IF NOT EXISTS spatial_payload_audit_logs (
+    log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_payload TEXT,
+    rejection_reason VARCHAR(255) NOT NULL,
+    thermodynamic_state VARCHAR(50) NOT NULL DEFAULT 'TRAPPED_ERROR',
+    intercepted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Thermodynamic Stock Transactions Ledger (Blockchain Anchored)
+CREATE TABLE IF NOT EXISTS spatial_stock_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_h3_index VARCHAR(15) REFERENCES spatial_nodes(h3_index) ON DELETE SET NULL,
+    target_h3_index VARCHAR(15) REFERENCES spatial_nodes(h3_index) ON DELETE SET NULL,
+    energy_delta NUMERIC(18, 8) NOT NULL,
+    entropy_delta NUMERIC(12, 8) NOT NULL,
+    block_signature VARCHAR(64) NOT NULL,
+    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Blockchain Blocks Ledger for Spatial Monad State Transitions
+CREATE TABLE IF NOT EXISTS spatial_blockchain_blocks (
+    block_height SERIAL PRIMARY KEY,
+    previous_block_signature VARCHAR(64),
+    current_block_signature VARCHAR(64) UNIQUE NOT NULL,
     merkle_root VARCHAR(64) NOT NULL,
-    thermodynamic_entropy NUMERIC(20, 10) NOT NULL,
-    total_energy_joules NUMERIC(24, 6) NOT NULL,
-    validator_node_id UUID NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    transaction_count INTEGER NOT NULL DEFAULT 0,
+    forged_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS block_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT REFERENCES blocks(block_height) ON DELETE CASCADE,
-    sender_id UUID NOT NULL,
-    recipient_id UUID NOT NULL,
-    energy_delta_joules NUMERIC(18, 6) NOT NULL,
-    entropy_delta NUMERIC(18, 10) NOT NULL,
-    payload_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
+-- Indexing for high-performance spatial monad traversals
+CREATE INDEX IF NOT EXISTS idx_spatial_nodes_resolution ON spatial_nodes(resolution);
+CREATE INDEX IF NOT EXISTS idx_spatial_transactions_sig ON spatial_stock_transactions(block_signature);
 
--- ----------------------------------------------------------------------------
--- 2. Spatial Monad & H3 Grid Tables
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_monad_states (
-    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    monad_uuid UUID NOT NULL,
-    h3_index VARCHAR(15), -- Nullable in raw intake, strictly guarded before state mutation
-    validation_status VARCHAR(32) NOT NULL DEFAULT 'PENDING', -- 'VALID', 'GUARD_REJECTED', 'DEFAULT_SINK'
-    energy_stock NUMERIC(18, 6) NOT NULL,
-    entropy_stock NUMERIC(18, 10) NOT NULL,
-    error_message TEXT,
-    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- Convert to TimescaleDB hypertable for time-series spatial tracking
-SELECT create_hypertable('spatial_monad_states', 'recorded_at', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Stock Transactions & Flows
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_flows (
-    flow_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_stock_id UUID NOT NULL,
-    target_stock_id UUID NOT NULL,
-    joules_transferred NUMERIC(18, 6) NOT NULL,
-    guard_assertion_passed BOOLEAN NOT NULL DEFAULT FALSE,
-    flow_signature VARCHAR(128) NOT NULL,
-    executed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_spatial_monad_h3 ON spatial_monad_states(h3_index);
-CREATE INDEX IF NOT EXISTS idx_spatial_monad_status ON spatial_monad_states(validation_status);
+COMMIT;

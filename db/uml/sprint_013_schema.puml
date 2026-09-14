@@ -1,0 +1,58 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 13: Spatial Monad & H3 Guard Clause Architecture
+
+interface IH3PayloadGuard {
+    + validate(payload: string | null | undefined): boolean
+}
+
+class H3GridManager {
+    + {static} guardPayload(h3Index: string | null | undefined): string
+}
+
+class SpatialMonad<T> {
+    - value: T | null
+    + {static} of(value: T): SpatialMonad<T>
+    + {static} empty(): SpatialMonad<never>
+    + map<U>(fn: (val: T) => U): SpatialMonad<U>
+    + flatMap<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+    + getOrElse(defaultValue: T): T
+}
+
+class ThermodynamicSpatialError {
+    + message: string
+    + name: string
+    + constructor(message: string)
+}
+
+class SpatialNodeStock {
+    + h3Index: string
+    + energyStock: number
+    + entropyLevel: number
+    + transferEnergy(target: SpatialNodeStock, amount: number): void
+}
+
+class SpatialBlockchainLedger {
+    + blockHeight: number
+    + currentSignature: string
+    + previousSignature: string
+    + recordTransaction(tx: SpatialTransaction): void
+}
+
+IH3PayloadGuard <|.. H3GridManager
+H3GridManager ..> ThermodynamicSpatialError : throws
+H3GridManager ..> SpatialMonad : produces
+SpatialMonad --> SpatialNodeStock : manages state
+SpatialNodeStock --> SpatialBlockchainLedger : anchors transactions
+
+note right of H3GridManager
+  Sprint 13 Guard Clause:
+  Rejects null, undefined, 
+  and empty H3 strings to preserve
+  Thermodynamic Law I & II.
+end note
+
+@enduml

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@4.1.0"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 013: H3 String Payload Null-Check Guard Clauses</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+  <canvas id="simCanvas"></canvas>
+
+  <div id="topbar">
+    <h1>Sprint 013: H3 String Payload Null-Check Guard Clauses</h1>
+    <h2>Robust Spatial Adjacency &amp; Thermodynamic Node Verification</h2>
+    <p>
+      Ensures strict type-checking and null safety on all <span class="highlight">H3 string payloads</span> and adjacency lookups, preventing runtime faults during high-entropy trophic energy cascades.
+    </p>
+    <div class="social-links">
+      <a href="01_RFC.md" target="_blank">📄 RFC Spec</a>
+      <a href="02_METHODS.md" target="_blank">🔬 Methods</a>
+      <a href="https://github.com" target="_blank">⭐ GitHub Repository</a>
+    </div>
+  </div>
+
+  <div id="sprint-telemetry">
+    <h4>H3 Null-Check Telemetry</h4>
+    <div class="telemetry-row">
+      <span>Active Cells:</span>
+      <span id="telemetry-cells" class="highlight">0</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Null Guards Caught:</span>
+      <span id="telemetry-guards" class="highlight">0</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Entropy Flux (J/s):</span>
+      <span id="telemetry-entropy" class="highlight">0.00</span>
+    </div>
+    <div class="telemetry-row">
+      <span>System Status:</span>
+      <span id="telemetry-status" style="color: var(--flora);">STABLE</span>
+    </div>
+  </div>
+
+  <div id="controls">
+    <input type="text" id="search" placeholder="Filter species, H3 index, or trophic level..." />
+    <div class="zoom-container">
+      <span>Zoom:</span>
+      <input type="range" id="zoomRange" min="0.5" max="3.0" step="0.1" value="1.0" />
+    </div>
+    <label class="debug-container">
+      <input type="checkbox" id="debugToggle" checked />
+      <span>H3 Mesh &amp; Guards</span>
+    </label>
+    <button id="resetViewBtn">Reset View</button>
+    <button id="pauseBtn">Pause</button>
+  </div>
+
+  <script type="module">
+    import * as h3 from 'h3-js';
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    let zoom = 1.0;
+    let offsetX = width / 2;
+    let offsetY = height / 2;
+    let isPaused = false;
+    let showDebug = true;
+    let nullGuardsCaught = 0;
+    let entropyFlux = 124.5;
+
+    // UI elements
+    const zoomRange = document.getElementById('zoomRange');
+    const debugToggle = document.getElementById('debugToggle');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetViewBtn = document.getElementById('resetViewBtn');
+    const searchInput = document.getElementById('search');
+    const telemetryCells = document.getElementById('telemetry-cells');
+    const telemetryGuards = document.getElementById('telemetry-guards');
+    const telemetryEntropy = document.getElementById('telemetry-entropy');
+
+    zoomRange.addEventListener('input', (e) => {
+      zoom = parseFloat(e.target.value);
+    });
+
+    debugToggle.addEventListener('change', (e) => {
+      showDebug = e.target.checked;
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      isPaused = !isPaused;
+      pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+      pauseBtn.style.borderColor = isPaused ? 'var(--sun)' : '#315064';
+    });
+
+    resetViewBtn.addEventListener('click', () => {
+      zoom = 1.0;
+      zoomRange.value = "1.0";
+      offsetX = width / 2;
+      offsetY = height / 2;
+    });
+
+    // Generate robust H3 base cells with guard clause verification
+    const baseLatLng = [37.775, -122.4183];
+    let resolution = 3;
+    let h3Indices = [];
+
+    try {
+      if (h3 && typeof h3.latLngToCell === 'function') {
+        const centerCell = h3.latLngToCell(baseLatLng[0], baseLatLng[1], resolution);
+        if (centerCell && typeof centerCell === 'string') {
+          h3Indices = h3.gridDisk(centerCell, 3) || [];
+        } else {
+          nullGuardsCaught++;
+        }
+      }
+    } catch (err) {
+      console.warn("H3 initialization warning:", err);
+      nullGuardsCaught++;
+    }
+
+    telemetryCells.textContent = h3Indices.length;
+    telemetryGuards.textContent = nullGuardsCaught;
+
+    // Pan / Drag handlers
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX - offsetX;
+      startY = e.clientY - offsetY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      offsetX = e.clientX - startX;
+      offsetY = e.clientY - startY;
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Simulation Loop
+    function update() {
+      if (!isPaused) {
+        entropyFlux += (Math.random() - 0.48) * 1.5;
+        if (entropyFlux < 10) entropyFlux = 10;
+        telemetryEntropy.textContent = entropyFlux.toFixed(2);
+      }
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(zoom, zoom);
+
+      // Draw coordinate origin grid
+      ctx.strokeStyle = '#0b1e2d';
+      ctx.lineWidth = 1;
+      const gridSize = 80;
+      const ext = 4000;
+      for (let x = -ext; x <= ext; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, -ext);
+        ctx.lineTo(x, ext);
+        ctx.stroke();
+      }
+      for (let y = -ext; y <= ext; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(-ext, y);
+        ctx.lineTo(ext, y);
+        ctx.stroke();
+      }
+
+      // Render simulated H3 Hexagons with null payload guard verification
+      h3Indices.forEach((cellStr, idx) => {
+        // Robust guard clause simulation
+        if (!cellStr || typeof cellStr !== 'string') {
+          nullGuardsCaught++;
+          telemetryGuards.textContent = nullGuardsCaught;
+          return;
+        }
+
+        let boundary = [];
+        try {
+          if (typeof h3.cellToBoundary === 'function') {
+            boundary = h3.cellToBoundary(cellStr);
+          }
+        } catch (e) {
+          nullGuardsCaught++;
+          telemetryGuards.textContent = nullGuardsCaught;
+        }
+
+        if (!boundary || boundary.length === 0) return;
+
+        // Project lat/lng to canvas local coordinates
+        ctx.beginPath();
+        boundary.forEach(([lat, lng], ptIdx) => {
+          const px = lng * 35;
+          const py = -lat * 35;
+          if (ptIdx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+
+        // Color coding based on index hash / trophic tier
+        const isSelected = idx % 5 === 0;
+        ctx.fillStyle = isSelected ? 'rgba(0, 225, 255, 0.12)' : 'rgba(0, 255, 102, 0.05)';
+        ctx.fill();
+
+        if (showDebug) {
+          ctx.strokeStyle = isSelected ? 'rgba(0, 225, 255, 0.6)' : 'rgba(117, 151, 168, 0.3)';
+          ctx.lineWidth = isSelected ? 1.5 : 0.75;
+          ctx.stroke();
+
+          // Draw cell center label
+          if (boundary[0]) {
+            const cx = boundary[0][1] * 35;
+            const cy = -boundary[0][0] * 35;
+            ctx.fillStyle = '#7597a8';
+            ctx.font = '8px monospace';
+            ctx.fillText(cellStr.substring(0, 6), cx - 15, cy);
+          }
+        }
+      });
+
+      // Draw thermodynamic flow nodes connecting centers
+      ctx.strokeStyle = 'rgba(255, 170, 0, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      h3Indices.forEach((cellStr, i) => {
+        if (i % 3 === 0 && h3Indices[i + 1]) {
+          try {
+            const b1 = h3.cellToBoundary(cellStr);
+            const b2 = h3.cellToBoundary(h3Indices[i + 1]);
+            if (b1 && b1[0] && b2 && b2[0]) {
+              ctx.moveTo(b1[0][1] * 35, -b1[0][0] * 35);
+              ctx.lineTo(b2[0][1] * 35, -b2[0][0] * 35);
+            }
+          } catch (err) {
+            // Guard clause caught
+          }
+        }
+      });
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function loop() {
+      update();
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>

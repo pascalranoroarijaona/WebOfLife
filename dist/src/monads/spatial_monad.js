@@ -1,21 +1,144 @@
 /**
- * src/monads/spatial_monad.ts
- * Spatial Monad linking Uber H3 indices to ecological trophic stocks, biogeochemical mass flows,
- * and robust monadic validation pipelines.
+ * Sprint 001-013: Comprehensive Spatial Monad and Thermodynamic Stock Register
  */
-import { H3GridManager, H3GridParser, H3Validator } from "../spatial/h3_grid.js";
+import { H3GridManager } from "../spatial/h3_grid.js";
 import { H3ErrorCode } from "../spatial/h3_types.js";
+export class SpatialMonad {
+    value;
+    entropyState;
+    historyStack = [];
+    constructor(val = null, entropyState = false) {
+        this.value = val;
+        this.entropyState = entropyState;
+        if (val !== null) {
+            this.historyStack.push(val);
+        }
+    }
+    static of(cell) {
+        if (cell === null || cell === undefined) {
+            return SpatialMonad.empty();
+        }
+        return new SpatialMonad(cell, false);
+    }
+    static unit(val) {
+        return SpatialMonad.of(val);
+    }
+    static empty() {
+        return new SpatialMonad(null, true);
+    }
+    static fromGeo(coord, resolution, initialStock) {
+        const indexStr = H3GridManager.fromGeo(coord, resolution);
+        return new SpatialMonad({ h3Index: indexStr, ...initialStock });
+    }
+    chain(fn) {
+        if (this.entropyState || this.value === null) {
+            return SpatialMonad.empty();
+        }
+        try {
+            return fn(this.value);
+        }
+        catch {
+            return SpatialMonad.empty();
+        }
+    }
+    bind(fn) {
+        if (this.entropyState || this.value === null) {
+            return SpatialMonad.empty();
+        }
+        try {
+            const res = fn(this.value);
+            if (res instanceof SpatialMonad) {
+                return res;
+            }
+            return SpatialMonad.of(res);
+        }
+        catch {
+            return SpatialMonad.empty();
+        }
+    }
+    map(fn) {
+        if (this.entropyState || this.value === null) {
+            return SpatialMonad.empty();
+        }
+        try {
+            const mapped = fn(this.value);
+            return SpatialMonad.of(mapped);
+        }
+        catch {
+            return SpatialMonad.empty();
+        }
+    }
+    extract() {
+        if (this.value === null) {
+            throw new Error("[Entropy Leak Prevented] Cannot extract null value from SpatialMonad.");
+        }
+        return this.value;
+    }
+    unwrapStock() {
+        return this.extract();
+    }
+    getIndex() {
+        if (this.value && typeof this.value === 'object' && 'h3Index' in this.value) {
+            return this.value.h3Index;
+        }
+        if (typeof this.value === 'string') {
+            return this.value;
+        }
+        return '';
+    }
+    isCorrupted() {
+        return this.entropyState;
+    }
+    getStock() {
+        return this.value;
+    }
+    isRight() {
+        return !this.entropyState && this.value !== null;
+    }
+    getOrThrow() {
+        if (!this.isRight()) {
+            throw new Error("[Entropy Leak Prevented] Monad is in Left/Empty state.");
+        }
+        return this.value;
+    }
+    run(action) {
+        try {
+            action();
+            if (this.value !== null) {
+                this.historyStack.push(this.value);
+            }
+        }
+        catch {
+            this.entropyState = true;
+        }
+    }
+    setValue(val) {
+        this.value = val;
+        this.entropyState = false;
+        this.historyStack.push(val);
+    }
+    getValue() {
+        return this.value;
+    }
+    rollback() {
+        if (this.historyStack.length > 1) {
+            this.historyStack.pop();
+            this.value = this.historyStack[this.historyStack.length - 1];
+            return true;
+        }
+        return false;
+    }
+}
 export class SpatialMonadStockRegister {
-    validIndices = new Set();
-    rejectedCount = 0;
     validator;
-    constructor(validator = new H3GridManager()) {
+    validIndices = [];
+    rejectedCount = 0;
+    constructor(validator) {
         this.validator = validator;
     }
-    ingestIndex(h3Index) {
-        const isValid = this.validator.validateIndex(h3Index);
-        if (isValid) {
-            this.validIndices.add(h3Index);
+    ingestIndex(index) {
+        if (this.validator.validateIndex(index)) {
+            this.validIndices.push(index);
             return true;
         }
         else {
@@ -24,127 +147,10 @@ export class SpatialMonadStockRegister {
         }
     }
     getValidIndices() {
-        return Array.from(this.validIndices);
+        return this.validIndices;
     }
     getRejectedCount() {
         return this.rejectedCount;
-    }
-}
-export class SpatialMonad {
-    value = null;
-    error = null;
-    h3Index = '';
-    stock = null;
-    historyStack = [];
-    constructor(val) {
-        if (val !== undefined) {
-            this.value = val;
-        }
-    }
-    static unit(val) {
-        return new SpatialMonad(val);
-    }
-    static of(indexStr) {
-        const m = new SpatialMonad(indexStr);
-        m.h3Index = indexStr;
-        const validation = H3GridParser.validateIndex(indexStr);
-        if (!validation.isValid) {
-            m.error = new Error('[Entropy Leak Prevented]: Invalid H3 index');
-        }
-        return m;
-    }
-    static fromGeo(coord, resolution, initialStock) {
-        const indexStr = H3GridParser.fromGeo(coord, resolution);
-        const validation = H3GridParser.validateIndex(indexStr);
-        if (!validation.isValid) {
-            throw new Error(`SpatialMonad Binding Failed: Invalid H3 index generated [${validation.errorCode}]`);
-        }
-        const m = new SpatialMonad(initialStock);
-        m.h3Index = indexStr;
-        m.stock = initialStock;
-        return m;
-    }
-    bind(fn) {
-        if (this.error) {
-            const errM = new SpatialMonad();
-            errM.error = this.error;
-            return errM;
-        }
-        try {
-            const result = fn(this.value);
-            if (result instanceof SpatialMonad) {
-                return result;
-            }
-            return SpatialMonad.unit(result);
-        }
-        catch (err) {
-            const errM = new SpatialMonad();
-            errM.error = err;
-            return errM;
-        }
-    }
-    map(fn) {
-        if (this.error) {
-            const errM = new SpatialMonad();
-            errM.error = this.error;
-            return errM;
-        }
-        try {
-            const mapped = fn(this.value);
-            return SpatialMonad.unit(mapped);
-        }
-        catch (err) {
-            const errM = new SpatialMonad();
-            errM.error = err;
-            return errM;
-        }
-    }
-    inspect() {
-        if (this.error)
-            throw this.error;
-        return this.value;
-    }
-    extract() {
-        return this.inspect();
-    }
-    isRight() {
-        return this.error === null;
-    }
-    getOrThrow() {
-        if (this.error)
-            throw this.error;
-        if (this.value !== null)
-            return this.value;
-        if (this.h3Index)
-            return this.h3Index;
-        throw new Error('SpatialMonad has no value or contains an error');
-    }
-    getIndex() {
-        return this.h3Index || (typeof this.value === 'string' ? this.value : '');
-    }
-    unwrapStock() {
-        if (this.stock)
-            return { ...this.stock };
-        return { carbonKg: 0, waterKg: 0, biomassJoules: 0 };
-    }
-    run(action) {
-        if (this.value !== null) {
-            this.historyStack.push(JSON.parse(JSON.stringify(this.value)));
-        }
-        action();
-    }
-    setValue(val) {
-        this.value = val;
-    }
-    getValue() {
-        return this.value;
-    }
-    rollback() {
-        if (this.historyStack.length > 0) {
-            this.value = this.historyStack.pop();
-            return true;
-        }
-        return false;
     }
 }
 export class H3ValidationMonad {
@@ -156,33 +162,32 @@ export class H3ValidationMonad {
         this.error = error;
         this.validator = validator;
     }
-    static unit(state, validator = new H3Validator()) {
-        const isValid = validator.validateIndex(state.h3Index);
+    static unit(state, validator) {
+        const isValid = validator.validate ? validator.validate(state.h3Index) : validator.isValidIndex(state.h3Index);
         if (!isValid) {
-            let code = H3ErrorCode.INVALID_CHARACTER;
-            if (state.h3Index === '000000000000000')
-                code = H3ErrorCode.NULL_INDEX;
-            else if (state.h3Index.length !== 15)
-                code = H3ErrorCode.INVALID_LENGTH;
-            return new H3ValidationMonad(null, { code, message: 'Invalid H3 Index' }, validator);
+            return new H3ValidationMonad(null, { code: H3ErrorCode.INVALID_CHARACTER, message: "Invalid H3 Index" }, validator);
         }
         return new H3ValidationMonad(state, null, validator);
     }
     bind(fn) {
         if (this.error || !this.state) {
-            return new H3ValidationMonad(null, this.error, this.validator);
+            return this;
         }
         try {
             const nextState = fn(this.state);
-            return H3ValidationMonad.unit(nextState, this.validator);
+            const isValid = this.validator.validate ? this.validator.validate(nextState.h3Index) : this.validator.isValidIndex(nextState.h3Index);
+            if (!isValid) {
+                return new H3ValidationMonad(null, { code: H3ErrorCode.INVALID_CHARACTER, message: "Invalid H3 Index" }, this.validator);
+            }
+            return new H3ValidationMonad(nextState, null, this.validator);
         }
-        catch (err) {
-            return new H3ValidationMonad(null, { code: H3ErrorCode.INTERNAL_ERROR, message: err.message }, this.validator);
+        catch {
+            return new H3ValidationMonad(null, { code: H3ErrorCode.INVALID_CHARACTER, message: "Error in bind" }, this.validator);
         }
     }
     match(onSuccess, onError) {
         if (this.error || !this.state) {
-            return onError(this.error || { code: H3ErrorCode.INTERNAL_ERROR, message: 'Unknown error' });
+            return onError(this.error || { code: H3ErrorCode.INVALID_CHARACTER, message: "Unknown error" });
         }
         return onSuccess(this.state);
     }
