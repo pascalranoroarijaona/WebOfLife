@@ -1,0 +1,175 @@
+@startuml sprint_059_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classFontSize 12
+skinparam classFontName "Courier"
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 059 Architecture Diagram\nSpherical Great Circle Plane Normal Vector Computation & Geodesic Flux Ledger
+
+package "Spatial Geodesics (src/spatial)" {
+    class H3Adjacency {
+        + computeSphericalGreatCircleNormal3D(u: Vector3D, v: Vector3D, epsilon: number): Vector3D
+        + latLngToUnitVector3D(lat: number, lng: number): Vector3D
+        + crossProduct3D(u: Vector3D, v: Vector3D): Vector3D
+        + dotProduct3D(u: Vector3D, v: Vector3D): number
+        + normalizeVector3D(v: Vector3D): Vector3D
+        + getDirectedBoundaryNormal(sourceCell: string, targetCell: string): Vector3D
+    }
+
+    class GreatCirclePlaneNormal {
+        - normalId: UUID
+        - sourceVectorU: Vector3D
+        - targetVectorV: Vector3D
+        - unitNormal: Vector3D
+        - sinTheta: number
+        - isCollinear: boolean
+        + evaluateHemisphere(p: Vector3D): number
+        + projectVelocity(flowVector: Vector3D): number
+        + getAntiSymmetricNormal(): Vector3D
+    }
+
+    class SpatialMonad<T> {
+        - coordinates: Vector3D
+        - h3Index: string
+        - value: T
+        + bind<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+        + transportAcrossBoundary(targetCell: string, normal: Vector3D): SpatialMonad<T>
+    }
+}
+
+package "Thermodynamic State & Invariants" {
+    class ThermodynamicStock {
+        + cellH3Index: string
+        + centroid: Vector3D
+        + internalEnergyJoules: number
+        + biomassCarbonKg: number
+        + entropyJPerK: number
+        + temperatureKelvin: number
+        + applyFlux(flux: BoundaryFlux): void
+        + verifyFirstLaw(): boolean
+        + verifySecondLaw(): boolean
+    }
+
+    class BoundaryAdvectiveFlux {
+        + fluxId: UUID
+        + blockHeight: number
+        + sourceCell: string
+        + targetCell: string
+        + advectiveVelocity: Vector3D
+        + normalProjectedFlux: number
+        + enthalpyFluxJoules: number
+        + biomassFluxKg: number
+        + entropyProduction: number
+        + computeConservativeExchange(): Pair<number, number>
+    }
+}
+
+package "Thermodynamic Blockchain Consensus (db/ledger)" {
+    class ThermodynamicBlockHeader {
+        + blockHeight: uint64
+        + parentBlockHash: Hash256
+        + stateRoot: Hash256
+        + fluxReceiptsRoot: Hash256
+        + geodesicNormalHash: Hash256
+        + totalNetEnergyDelta: double
+        + totalNetMassDelta: double
+        + totalEntropyGenerated: double
+        + validatorSignature: Signature
+        + validateConservation(): boolean
+    }
+
+    class SpatialBoundaryLedger {
+        + registerGreatCircleNormal(u: Vector3D, v: Vector3D): GreatCirclePlaneNormal
+        + recordBoundaryFlux(flux: BoundaryAdvectiveFlux): TxReceipt
+        + commitBlock(header: ThermodynamicBlockHeader): boolean
+    }
+}
+
+package "Relational Persistence (PostgreSQL / TimescaleDB)" {
+    entity "spatial_great_circle_normals" as SGCN {
+        * normal_id : UUID <<PK>>
+        --
+        * source_h3_index : VARCHAR(15)
+        * target_h3_index : VARCHAR(15)
+        * u_vector : DOUBLE[3]
+        * v_vector : DOUBLE[3]
+        * normal_vector : DOUBLE[3]
+        * sin_theta : DOUBLE
+        * is_collinear : BOOLEAN
+        * epsilon : DOUBLE
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "boundary_advective_flux_ledger" as BAFL {
+        * flux_id : UUID <<PK>>
+        --
+        * block_height : BIGINT
+        * normal_id : UUID <<FK>>
+        * source_cell : VARCHAR(15)
+        * target_cell : VARCHAR(15)
+        * advective_velocity : DOUBLE[3]
+        * normal_projected_flux : DOUBLE
+        * enthalpy_flux_joules : DOUBLE
+        * biomass_flux_kg : DOUBLE
+        * entropy_delta_production : DOUBLE
+        * state_merkle_root : BYTEA
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "h3_cell_thermodynamic_stocks" as HCTS {
+        * cell_h3_index : VARCHAR(15) <<PK>>
+        --
+        * centroid_unit_vector : DOUBLE[3]
+        * internal_energy_joules : DOUBLE
+        * biomass_carbon_kg : DOUBLE
+        * entropy_j_per_k : DOUBLE
+        * temperature_kelvin : DOUBLE
+        * updated_at_block : BIGINT
+        updated_at : TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_block_headers" as TBH {
+        * block_height : BIGINT <<PK>>
+        --
+        * parent_block_hash : BYTEA
+        * state_root : BYTEA
+        * flux_receipts_root : BYTEA
+        * geodesic_normal_hash : BYTEA
+        * total_net_energy_delta : DOUBLE
+        * total_net_mass_delta : DOUBLE
+        * total_entropy_generated : DOUBLE
+        * validator_signature : BYTEA
+        timestamp : TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invariants
+H3Adjacency ..> GreatCirclePlaneNormal : generates
+GreatCirclePlaneNormal --> SpatialMonad : guides boundary advection
+SpatialMonad --> BoundaryAdvectiveFlux : computes
+BoundaryAdvectiveFlux --> ThermodynamicStock : modulates state
+SpatialBoundaryLedger --> ThermodynamicBlockHeader : writes
+SpatialBoundaryLedger --> BAFL : inserts
+SpatialBoundaryLedger --> SGCN : inserts
+BAFL }o--|| SGCN : references normal_id
+BAFL }o--|| TBH : verified in block
+HCTS ||--o{ BAFL : bounded by
+
+note right of H3Adjacency
+  RFC-059 Mathematical Invariant:
+  n = (u x v) / ||u x v||
+  ||n|| = 1.0 +/- 1e-12
+  n(v, u) = -n(u, v) (Anti-symmetric)
+  Fallback via orthogonal basis when ||u x v|| < epsilon
+end note
+
+note right of ThermodynamicBlockHeader
+  Thermodynamic Invariants:
+  1. SUM(dE) = 0 (1st Law)
+  2. SUM(dM) = 0 (Conservation of Mass)
+  3. SUM(dS) >= 0 (2nd Law)
+end note
+
+@enduml

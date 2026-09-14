@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 31%
-SPRINT_GOAL: Implement computeBoundaryMidpointLatLng spherical midpoint calculator between adjacent H3 cell centroids in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 32%
+SPRINT_GOAL: Implement computeSphericalGreatCircleNormal3D computing normalized cross product of two unit vectors representing great circle plane normal in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -242,8 +242,10 @@ SPRINT_GOAL: Implement computeBoundaryMidpointLatLng spherical midpoint calculat
 - [x] Implement `normalizeAngleRadians` angular wrapper mapping radians into [-pi, pi) range in `src/spatial/h3_adjacency.ts`
 - [x] Implement `assertValidCoordinatePair` coordinate boundary assertion helper in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeSphericalArcBearing` forward geodesic initial azimuth calculation between two lat/lng coordinates in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundaryMidpointLatLng` spherical midpoint calculator between adjacent H3 cell centroids in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeSphericalGreatCircleNormal3D` computing normalized cross product of two unit vectors representing great circle plane normal in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryUnitNormalVector` outward spherical unit normal vector calculator across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
 - [ ] Implement Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
@@ -297,7 +299,7 @@ SPRINT_GOAL: Implement computeBoundaryMidpointLatLng spherical midpoint calculat
 - [ ] Stochastic Extinction, Allee effect, and Minimum Viable Population engine in `src/biosphere/population_viability.ts`
 
 ### Phase 3: Technosphere & Industrial Metabolism
-- [ ] Implement standard NASA 7-coefficient polynomials for thermodynamic species enthalpy and entropy in `src/technosphere/thermochemistry.ts`
+- [ ] Define `StandardChemicalSpecies` enum and NASA 7-coefficient polynomials for thermodynamic species enthalpy and entropy in `src/technosphere/thermochemistry.ts`
 - [ ] Define chemical specie vector and concentration map with unit-sum invariants in `src/technosphere/species.ts`
 - [ ] Define `MaterialStream` interface tracking mass flow, enthalpy, and species vectors in `src/technosphere/material_stream.ts`
 - [ ] Implement adiabatic material stream mixing function conserving mass and enthalpy in `src/technosphere/material_stream.ts`

@@ -1,128 +1,125 @@
--- Web of Life Core Database Schema - Sprint 058
--- Integration: Spherical Boundary Midpoints, Inter-Hexel Adjacency Interfaces, 
--- and Conservative Thermodynamic Transport Metrics.
+-- Web of Life Thermodynamic Blockchain Ledger & Spatial Monad Schema
+-- Sprint 059: Great Circle Plane Normal Vectors & Advective Boundary Flux Ledger
 
--- PostGIS and TimescaleDB extension setup
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- Extension registrations
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- Global Enum Types
-CREATE TYPE boundary_interface_type AS ENUM (
-    'ATMOSPHERIC_ADVECTION',
-    'OCEANIC_DIC_TRANSPORT',
-    'TROPHIC_BIOMASS_MIGRATION',
-    'SENSIBLE_HEAT_DIFFUSION'
+-- ---------------------------------------------------------------------
+-- 1. SPATIAL GEODESIC & GREAT CIRCLE PLANE NORMALS
+-- ---------------------------------------------------------------------
+
+-- Table: spatial_great_circle_normals
+-- Persists normalized 3D plane normal vectors for cell boundaries, advective corridors, and geodesics.
+CREATE TABLE IF NOT EXISTS spatial_great_circle_normals (
+    normal_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_h3_index VARCHAR(15) NOT NULL,
+    target_h3_index VARCHAR(15) NOT NULL,
+    u_vector DOUBLE PRECISION[3] NOT NULL, -- [ux, uy, uz] on S^2
+    v_vector DOUBLE PRECISION[3] NOT NULL, -- [vx, vy, vz] on S^2
+    normal_vector DOUBLE PRECISION[3] NOT NULL, -- [nx, ny, nz] unit normal vector (u x v / ||u x v||)
+    sin_theta DOUBLE PRECISION NOT NULL, -- Cross product magnitude ||u x v||
+    is_collinear BOOLEAN NOT NULL DEFAULT FALSE, -- True if ||u x v|| < epsilon (fallback used)
+    epsilon DOUBLE PRECISION NOT NULL DEFAULT 1e-10,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_unit_norm CHECK (
+        ABS(
+            SQRT(
+                (normal_vector[1] * normal_vector[1]) +
+                (normal_vector[2] * normal_vector[2]) +
+                (normal_vector[3] * normal_vector[3])
+            ) - 1.0
+        ) < 1e-10
+    ),
+    CONSTRAINT chk_orthogonal_u CHECK (
+        ABS(
+            (normal_vector[1] * u_vector[1]) +
+            (normal_vector[2] * u_vector[2]) +
+            (normal_vector[3] * u_vector[3])
+        ) < 1e-7
+    )
 );
 
-CREATE TYPE thermodynamic_conservation_status AS ENUM (
-    'STRICT_CONSERVATIVE',
-    'ENTROPY_GENERATING_DISSIPATIVE',
-    'EQUILIBRIUM_NEUTRAL'
-);
+CREATE INDEX IF NOT EXISTS idx_sgcn_source_target 
+    ON spatial_great_circle_normals (source_h3_index, target_h3_index);
 
--- =====================================================================
--- TABLE: h3_hexel_registry
--- Registry of discrete global grid cells (H3 Hexels)
--- =====================================================================
-CREATE TABLE IF NOT EXISTS h3_hexel_registry (
-    h3_index VARCHAR(15) PRIMARY KEY,
-    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat >= -90.0 AND centroid_lat <= 90.0),
-    centroid_lng DOUBLE PRECISION NOT NULL CHECK (centroid_lng >= -180.0 AND centroid_lng <= 180.0),
-    centroid_geom GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
-        ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326)
-    ) STORED,
-    cell_boundary GEOMETRY(Polygon, 4326),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- ---------------------------------------------------------------------
+-- 2. DGGS BOUNDARY INTERFACE & ADVECTIVE FLUX TRANSACTIONS
+-- ---------------------------------------------------------------------
 
-CREATE INDEX IF NOT EXISTS idx_hexel_spatial ON h3_hexel_registry USING GIST (centroid_geom);
-CREATE INDEX IF NOT EXISTS idx_hexel_resolution ON h3_hexel_registry(resolution);
-
--- =====================================================================
--- TABLE: h3_boundary_interfaces
--- Caches evaluated spherical boundary midpoints and metric properties
--- between adjacent H3 cells (RFC 058)
--- =====================================================================
-CREATE TABLE IF NOT EXISTS h3_boundary_interfaces (
-    interface_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    origin_hex VARCHAR(15) NOT NULL REFERENCES h3_hexel_registry(h3_index) ON DELETE CASCADE,
-    neighbor_hex VARCHAR(15) NOT NULL REFERENCES h3_hexel_registry(h3_index) ON DELETE CASCADE,
-    midpoint_lat DOUBLE PRECISION NOT NULL CHECK (midpoint_lat >= -90.0 AND midpoint_lat <= 90.0),
-    midpoint_lng DOUBLE PRECISION NOT NULL CHECK (midpoint_lng >= -180.0 AND midpoint_lng < 180.0),
-    midpoint_geom GEOMETRY(Point, 4326) GENERATED ALWAYS AS (
-        ST_SetSRID(ST_MakePoint(midpoint_lng, midpoint_lat), 4326)
-    ) STORED,
-    geodesic_distance_meters DOUBLE PRECISION NOT NULL CHECK (geodesic_distance_meters >= 0.0),
-    normal_azimuth_degrees DOUBLE PRECISION NOT NULL CHECK (normal_azimuth_degrees >= 0.0 AND normal_azimuth_degrees < 360.0),
-    interface_type boundary_interface_type NOT NULL DEFAULT 'SENSIBLE_HEAT_DIFFUSION',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_hex_adjacency_pair UNIQUE (origin_hex, neighbor_hex),
-    CONSTRAINT chk_non_self_adjacent CHECK (origin_hex <> neighbor_hex)
-);
-
-CREATE INDEX IF NOT EXISTS idx_boundary_midpoint_geom ON h3_boundary_interfaces USING GIST (midpoint_geom);
-CREATE INDEX IF NOT EXISTS idx_boundary_origin ON h3_boundary_interfaces(origin_hex);
-CREATE INDEX IF NOT EXISTS idx_boundary_neighbor ON h3_boundary_interfaces(neighbor_hex);
-
--- =====================================================================
--- TABLE: thermodynamic_hexel_stocks (Hypertable)
--- State of physical and chemical stocks per H3 cell over discrete ticks
--- =====================================================================
-CREATE TABLE IF NOT EXISTS thermodynamic_hexel_stocks (
-    time TIMESTAMPTZ NOT NULL,
-    h3_index VARCHAR(15) NOT NULL REFERENCES h3_hexel_registry(h3_index),
-    internal_energy_joules NUMERIC(28, 8) NOT NULL CHECK (internal_energy_joules >= 0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
-    carbon_stock_kg NUMERIC(24, 6) NOT NULL CHECK (carbon_stock_kg >= 0),
-    vapor_stock_kg NUMERIC(24, 6) NOT NULL CHECK (vapor_stock_kg >= 0),
-    biomass_stock_kg NUMERIC(24, 6) NOT NULL CHECK (biomass_stock_kg >= 0),
-    entropy_joules_per_kelvin NUMERIC(28, 8) NOT NULL,
+-- Table: boundary_advective_flux_ledger
+-- Tracks mass, energy, and entropy transfer across great circle hexagonal boundaries.
+-- Enforces anti-symmetric advection: F(u, v) = -F(v, u).
+CREATE TABLE IF NOT EXISTS boundary_advective_flux_ledger (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL,
+    normal_id UUID NOT NULL REFERENCES spatial_great_circle_normals(normal_id),
+    source_cell VARCHAR(15) NOT NULL,
+    target_cell VARCHAR(15) NOT NULL,
+    advective_velocity DOUBLE PRECISION[3] NOT NULL, -- 3D fluid/biomass velocity vector
+    normal_projected_flux DOUBLE PRECISION NOT NULL, -- Dot product: v_adv . n
+    enthalpy_flux_joules DOUBLE PRECISION NOT NULL, -- Advective energy exchange
+    biomass_flux_kg DOUBLE PRECISION NOT NULL, -- Advective biomass exchange
+    entropy_delta_production DOUBLE PRECISION NOT NULL, -- Irreversible dispersion entropy dS >= 0
     state_merkle_root BYTEA NOT NULL,
-    PRIMARY KEY (time, h3_index)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_entropy_non_negative CHECK (entropy_delta_production >= 0.0)
 );
 
-SELECT create_hypertable('thermodynamic_hexel_stocks', 'time', if_not_exists => TRUE);
-CREATE INDEX IF NOT EXISTS idx_hexel_stocks_spatial ON thermodynamic_hexel_stocks(h3_index, time DESC);
+CREATE INDEX IF NOT EXISTS idx_bafl_block_source 
+    ON boundary_advective_flux_ledger (block_height, source_cell);
 
--- =====================================================================
--- TABLE: inter_hexel_flux_ledger (Hypertable)
--- Conserved interfacial transfers evaluated across geodesic boundary midpoints
--- =====================================================================
-CREATE TABLE IF NOT EXISTS inter_hexel_flux_ledger (
-    time TIMESTAMPTZ NOT NULL,
-    flux_id UUID DEFAULT gen_random_uuid(),
-    interface_id UUID NOT NULL REFERENCES h3_boundary_interfaces(interface_id),
-    origin_hex VARCHAR(15) NOT NULL,
-    neighbor_hex VARCHAR(15) NOT NULL,
-    mass_flux_kg_sec NUMERIC(20, 8) NOT NULL,
-    energy_flux_watts NUMERIC(24, 6) NOT NULL,
-    entropy_production_rate_w_k NUMERIC(24, 8) NOT NULL CHECK (entropy_production_rate_w_k >= 0.0),
-    potential_gradient_delta DOUBLE PRECISION NOT NULL,
-    conservation_status thermodynamic_conservation_status NOT NULL DEFAULT 'STRICT_CONSERVATIVE',
-    tx_hash BYTEA NOT NULL,
-    PRIMARY KEY (time, flux_id)
+-- ---------------------------------------------------------------------
+-- 3. THERMODYNAMIC STATE STOCKS & ACCUMULATORS
+-- ---------------------------------------------------------------------
+
+-- Table: h3_cell_thermodynamic_stocks
+-- Canonical thermodynamic state for DGGS cells, conserving total energy and mass.
+CREATE TABLE IF NOT EXISTS h3_cell_thermodynamic_stocks (
+    cell_h3_index VARCHAR(15) PRIMARY KEY,
+    centroid_unit_vector DOUBLE PRECISION[3] NOT NULL,
+    internal_energy_joules DOUBLE PRECISION NOT NULL CHECK (internal_energy_joules >= 0.0),
+    biomass_carbon_kg DOUBLE PRECISION NOT NULL CHECK (biomass_carbon_kg >= 0.0),
+    entropy_j_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_j_per_k >= 0.0),
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
+    updated_at_block BIGINT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
-SELECT create_hypertable('inter_hexel_flux_ledger', 'time', if_not_exists => TRUE);
-CREATE INDEX IF NOT EXISTS idx_flux_interface ON inter_hexel_flux_ledger(interface_id, time DESC);
+-- ---------------------------------------------------------------------
+-- 4. BLOCKCHAIN ATTESTATION & GEODESIC CONSENSUS
+-- ---------------------------------------------------------------------
 
--- =====================================================================
--- TABLE: thermodynamic_blockchain_blocks
--- Immutable cryptographic ledger for verified state-transitions & conservation proofs
--- =====================================================================
-CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
+-- Table: thermodynamic_block_headers
+-- Verifiable block headers bundling spatial fluxes and conservation proofs.
+CREATE TABLE IF NOT EXISTS thermodynamic_block_headers (
     block_height BIGINT PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_hash BYTEA NOT NULL,
-    epoch_timestamp TIMESTAMPTZ NOT NULL,
-    merkle_root_stocks BYTEA NOT NULL,
-    merkle_root_fluxes BYTEA NOT NULL,
-    global_internal_energy_joules NUMERIC(38, 8) NOT NULL,
-    global_entropy_joules_per_kelvin NUMERIC(38, 8) NOT NULL,
-    net_first_law_residual_joules NUMERIC(20, 10) NOT NULL DEFAULT 0.0,
+    parent_block_hash BYTEA NOT NULL,
+    state_root BYTEA NOT NULL,
+    flux_receipts_root BYTEA NOT NULL,
+    geodesic_normal_hash BYTEA NOT NULL,
+    total_net_energy_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_net_mass_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_entropy_generated DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     validator_signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_first_law_conservation CHECK (
+        ABS(total_net_energy_delta) < 1e-6 AND ABS(total_net_mass_delta) < 1e-6
+    ),
+    CONSTRAINT chk_second_law_entropy CHECK (total_entropy_generated >= 0.0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_blockchain_epoch ON thermodynamic_blockchain_blocks(epoch_timestamp);
+-- ---------------------------------------------------------------------
+-- 5. CONTINUOUS TIME-SERIES PARTITIONS (TimescaleDB / Spatial Telemetry)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS cell_flux_telemetry_timeseries (
+    recorded_at TIMESTAMPTZ NOT NULL,
+    cell_h3_index VARCHAR(15) NOT NULL,
+    boundary_normal_id UUID NOT NULL REFERENCES spatial_great_circle_normals(normal_id),
+    flux_rate_joules_sec DOUBLE PRECISION NOT NULL,
+    biomass_rate_kg_sec DOUBLE PRECISION NOT NULL,
+    local_reynolds_number DOUBLE PRECISION NOT NULL
+);
+
+SELECT create_hypertable('cell_flux_telemetry_timeseries', 'recorded_at', if_not_exists => TRUE);
