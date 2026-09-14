@@ -4,6 +4,7 @@
 import { H3ErrorCode, SpatialGuardClauseException, } from "./h3_types.js";
 import { EARTH_RADIUS_METERS } from "../thermodynamics/constants.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
+import { createVec3D } from "./h3_adjacency.js";
 export { SpatialMonad, H3ErrorCode };
 export const MIN_H3_RESOLUTION = 0;
 export const MAX_H3_RESOLUTION = 15;
@@ -290,7 +291,7 @@ export function degreesToRadians(coord) {
         lamRad: (coord.lonDeg * Math.PI) / 180.0,
     };
 }
-export function syntheticH3Index(res, latDeg, lonDeg) {
+export function syntheticH3Index(res, latDeg, _lonDeg) {
     if (latDeg < -90 || latDeg > 90) {
         throw new RangeError("Latitude out of range [-90, 90]");
     }
@@ -307,7 +308,7 @@ export class H3GridParser {
             resolution: valid ? parseInt(str.charAt(1), 16) : undefined,
         };
     }
-    static fromGeo(coord, resolution) {
+    static fromGeo(_coord, resolution) {
         return `8${resolution.toString(16)}000000000000`;
     }
     static parseString(h3Str) {
@@ -657,7 +658,7 @@ export function createCellStocks(data) {
         thermalEnergy: data.thermalEnergy ?? 0,
     };
 }
-export function computeInterfaceAdvectiveTransfer(cellA, _cellB, _edgeLen, _dt) {
+export function computeInterfaceAdvectiveTransfer(_cellA, _cellB, _edgeLen, _dt) {
     return {
         fluxAtoB: createCellStocks({ carbon: 10, water: 50 }),
         normalVelocity: 5.0,
@@ -799,19 +800,11 @@ export class H3Grid {
         const phi = coord.lat * DEG_TO_RAD;
         const lambda = coord.lng * DEG_TO_RAD;
         const cosPhi = Math.cos(phi);
-        return {
-            x: cosPhi * Math.cos(lambda),
-            y: cosPhi * Math.sin(lambda),
-            z: Math.sin(phi),
-        };
+        return createVec3D(cosPhi * Math.cos(lambda), cosPhi * Math.sin(lambda), Math.sin(phi));
     }
     static sphericalToCartesianMeters(coord) {
         const unit = H3Grid.sphericalToCartesianUnit(coord);
-        return {
-            x: unit.x * EARTH_RADIUS_METERS,
-            y: unit.y * EARTH_RADIUS_METERS,
-            z: unit.z * EARTH_RADIUS_METERS,
-        };
+        return createVec3D((unit.x ?? unit[0]) * EARTH_RADIUS_METERS, (unit.y ?? unit[1]) * EARTH_RADIUS_METERS, (unit.z ?? unit[2]) * EARTH_RADIUS_METERS);
     }
     static validate(index) {
         return H3GridValidator.isValidIndex(index);

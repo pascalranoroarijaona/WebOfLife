@@ -8,6 +8,7 @@ import assert from "node:assert";
 
 import {
   Vector3D,
+  createVec3D,
   projectVectorOntoSphereTangentSpace,
   projectVectorOntoSphereTangentSpaceDetailed,
   computeFacetNormalTangentBasis,
@@ -33,8 +34,8 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
 
   it("Identity 1: Pure Tangent Invariance - already tangent vector is unchanged", () => {
     // Equatorial centroid p = [R, 0, 0] -> Tangent plane is y-z plane (x=0)
-    const p: Vector3D = [R, 0, 0];
-    const vTangent: Vector3D = [0, 15.5, -42.1];
+    const p: Vector3D = createVec3D(R, 0, 0);
+    const vTangent: Vector3D = createVec3D(0, 15.5, -42.1);
 
     const result = projectVectorOntoSphereTangentSpace(vTangent, p);
 
@@ -44,9 +45,9 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
   });
 
   it("Identity 2: Pure Radial Cancellation - radial vector is entirely eliminated", () => {
-    const p: Vector3D = [1000, 2000, 3000];
+    const p: Vector3D = createVec3D(1000, 2000, 3000);
     const lambda = 7.42;
-    const vRadial: Vector3D = [lambda * p[0], lambda * p[1], lambda * p[2]];
+    const vRadial: Vector3D = createVec3D(lambda * p[0], lambda * p[1], lambda * p[2]);
 
     const result = projectVectorOntoSphereTangentSpace(vRadial, p);
 
@@ -58,8 +59,8 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
   });
 
   it("Identity 3: Orthogonal Decomposition - ||v_perp||^2 + ||v_par||^2 == ||v||^2", () => {
-    const p: Vector3D = [1234567, -2345678, 5678901];
-    const v: Vector3D = [25.3, -12.7, 48.9];
+    const p: Vector3D = createVec3D(1234567, -2345678, 5678901);
+    const v: Vector3D = createVec3D(25.3, -12.7, 48.9);
 
     const detailed = projectVectorOntoSphereTangentSpaceDetailed(v, p);
 
@@ -84,8 +85,8 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
 
   it("Identity 4: Polar and Equatorial Consistency", () => {
     // North pole centroid p = [0, 0, R]
-    const pPole: Vector3D = [0, 0, R];
-    const vPole: Vector3D = [10, 20, 50]; // 50 is radial along z-axis
+    const pPole: Vector3D = createVec3D(0, 0, R);
+    const vPole: Vector3D = createVec3D(10, 20, 50); // 50 is radial along z-axis
 
     const resultPole = projectVectorOntoSphereTangentSpace(vPole, pPole);
     assert.strictEqual(resultPole[0], 10);
@@ -96,8 +97,8 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
     );
 
     // Prime meridian equator centroid p = [R, 0, 0]
-    const pEquator: Vector3D = [R, 0, 0];
-    const vEquator: Vector3D = [35, -15, 80]; // 35 is radial along x-axis
+    const pEquator: Vector3D = createVec3D(R, 0, 0);
+    const vEquator: Vector3D = createVec3D(35, -15, 80); // 35 is radial along x-axis
 
     const resultEquator = projectVectorOntoSphereTangentSpace(vEquator, pEquator);
     assert.ok(
@@ -109,11 +110,11 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
   });
 
   it("Singularity & Degeneracy Guard: Zero origin vector returns zero vector", () => {
-    const pZero: Vector3D = [0, 0, 0];
-    const v: Vector3D = [10, 20, 30];
+    const pZero: Vector3D = createVec3D(0, 0, 0);
+    const v: Vector3D = createVec3D(10, 20, 30);
 
     const result = projectVectorOntoSphereTangentSpace(v, pZero);
-    assert.deepStrictEqual(result, [0, 0, 0]);
+    assert.deepStrictEqual(result, createVec3D(0, 0, 0));
 
     const detailed = projectVectorOntoSphereTangentSpaceDetailed(v, pZero);
     assert.strictEqual(detailed.tangentialMagnitude, 0);
@@ -121,8 +122,8 @@ describe("RFC-060: Tangent Space Projection Core Differential Geometry", () => {
   });
 
   it("Idempotency Invariant: P(P(v)) == P(v)", () => {
-    const p: Vector3D = [3000000, 4000000, 5000000];
-    const v: Vector3D = [-12.5, 33.1, 7.8];
+    const p: Vector3D = createVec3D(3000000, 4000000, 5000000);
+    const v: Vector3D = createVec3D(-12.5, 33.1, 7.8);
 
     const p1 = projectVectorOntoSphereTangentSpace(v, p);
     const p2 = projectVectorOntoSphereTangentSpace(p1, p);
@@ -167,7 +168,7 @@ describe("RFC-060: H3 Facet Tangent Basis & Adjacency Engine", () => {
     const neighbors = engine.getHexNeighbors("hex_1");
     assert.deepStrictEqual(neighbors, ["hex_2"]);
 
-    const rawVelocity: Vector3D = [100, 200, 300];
+    const rawVelocity: Vector3D = createVec3D(100, 200, 300);
     const projected = engine.projectVector(rawVelocity, "hex_1");
     const detailed = projectVectorOntoSphereTangentSpaceDetailed(rawVelocity, c1);
 
@@ -181,8 +182,8 @@ describe("RFC-060: Conservative Spherical Advection & Stock Invariance", () => {
     const cB = latLngToCartesian(0, 0.5);
 
     // Give cell A and cell B velocities with massive radial corruption
-    const vA_raw: Vector3D = [10000, 5.0, 0.0]; // 10000 m/s radial along x
-    const vB_raw: Vector3D = [8000, 5.0, 0.0];
+    const vA_raw: Vector3D = createVec3D(10000, 5.0, 0.0); // 10000 m/s radial along x
+    const vB_raw: Vector3D = createVec3D(8000, 5.0, 0.0);
 
     const cellA: CellAdvectionState = {
       h3Index: "A",

@@ -13,6 +13,7 @@ import {
 } from "./h3_types.js";
 import { EARTH_RADIUS_METERS } from "../thermodynamics/constants.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
+import { createVec3D } from "./h3_adjacency.js";
 
 export { SpatialMonad, CellThermodynamicStocks, StockTransferDelta, ThermodynamicStocks, H3ErrorCode };
 
@@ -336,7 +337,7 @@ export function degreesToRadians(coord: { latDeg: number; lonDeg: number }): { p
   };
 }
 
-export function syntheticH3Index(res: number, latDeg: number, lonDeg: number): string {
+export function syntheticH3Index(res: number, latDeg: number, _lonDeg: number): string {
   if (latDeg < -90 || latDeg > 90) {
     throw new RangeError("Latitude out of range [-90, 90]");
   }
@@ -368,7 +369,7 @@ export class H3GridParser {
     };
   }
 
-  public static fromGeo(coord: GeoCoordinate, resolution: number): string {
+  public static fromGeo(_coord: GeoCoordinate, resolution: number): string {
     return `8${resolution.toString(16)}000000000000`;
   }
 
@@ -806,7 +807,7 @@ export function createCellStocks(data: Partial<CellStocks>): CellStocks {
 }
 
 export function computeInterfaceAdvectiveTransfer(
-  cellA: CellAdvectionState,
+  _cellA: CellAdvectionState,
   _cellB: CellAdvectionState,
   _edgeLen: number,
   _dt: number
@@ -971,20 +972,20 @@ export class H3Grid<T = any> {
     const phi = coord.lat * DEG_TO_RAD;
     const lambda = coord.lng * DEG_TO_RAD;
     const cosPhi = Math.cos(phi);
-    return {
-      x: cosPhi * Math.cos(lambda),
-      y: cosPhi * Math.sin(lambda),
-      z: Math.sin(phi),
-    };
+    return createVec3D(
+      cosPhi * Math.cos(lambda),
+      cosPhi * Math.sin(lambda),
+      Math.sin(phi)
+    );
   }
 
   public static sphericalToCartesianMeters(coord: SphericalCoordinates): Vector3D {
     const unit = H3Grid.sphericalToCartesianUnit(coord);
-    return {
-      x: unit.x * EARTH_RADIUS_METERS,
-      y: unit.y * EARTH_RADIUS_METERS,
-      z: unit.z * EARTH_RADIUS_METERS,
-    };
+    return createVec3D(
+      (unit.x ?? unit[0]) * EARTH_RADIUS_METERS,
+      (unit.y ?? unit[1]) * EARTH_RADIUS_METERS,
+      (unit.z ?? unit[2]) * EARTH_RADIUS_METERS
+    );
   }
 
   public static validate(index: string): boolean {

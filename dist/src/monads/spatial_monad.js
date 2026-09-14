@@ -1,10 +1,10 @@
 /**
  * Planetary Thermodynamic Spatial Monad Kernel
- * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 064)
+ * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 066)
  */
 import { H3ErrorCode, SpatialGuardClauseException, } from '../spatial/h3_types.js';
 import { isValidH3Index, validateH3Token, assertCanonicalH3Pattern, assertH3Resolution, matchesCanonicalH3Pattern, } from '../spatial/h3_grid.js';
-import { calculateH3BoundaryContactArea, computeAdvectiveEdgeTransfer, computeAdvectiveTransfer, projectVectorOntoSphereTangentSpace, dotProduct, toVec3D, } from '../spatial/h3_adjacency.js';
+import { calculateH3BoundaryContactArea, computeAdvectiveEdgeTransfer, computeAdvectiveTransfer, projectVectorOntoSphereTangentSpace, dotProduct, toVec3D, latLngToUnitVector3D, unitVectorDotProduct, } from '../spatial/h3_adjacency.js';
 import { SOLAR_CONSTANT_W_M2 } from '../thermodynamics/constants.js';
 import { applyThermodynamicOverrides } from '../spatial/h3_state_tensor.js';
 export { SOLAR_CONSTANT_W_M2, };
@@ -45,7 +45,7 @@ export class SpatialMonad {
     overrideLedger = [];
     cellsMap = new Map();
     neighborEdgesMap = new Map();
-    constructor(arg1, arg2, arg3, arg4) {
+    constructor(arg1, arg2, arg3, _arg4) {
         if (arg1 === undefined && arg2 === undefined) {
             this.value = null;
             return;
@@ -189,7 +189,7 @@ export class SpatialMonad {
         m.h3Index = payload;
         return m;
     }
-    static fromGeo(coord, res, stock) {
+    static fromGeo(_coord, res, stock) {
         const m = new SpatialMonad(stock);
         m.id = `8${res.toString(16)}000000000000`;
         m.h3Index = m.id;
@@ -431,13 +431,15 @@ export class SpatialMonad {
         return transfers.get(cellB.h3Index) ?? { carbonMol: 0, waterKg: 0 };
     }
     setCellNode(data) {
-        const vTan = projectVectorOntoSphereTangentSpace(data.velocity, data.centroid);
-        this.cellsMap.set(data.h3Index, { ...data, velocity: vTan });
+        const c = toVec3D(data.centroid);
+        const v = toVec3D(data.velocity);
+        const vTan = projectVectorOntoSphereTangentSpace(v, c);
+        this.cellsMap.set(data.h3Index, { ...data, centroid: c, velocity: vTan });
     }
     setVelocity(cellId, vel) {
         const cell = this.cellsMap.get(cellId);
         if (cell) {
-            cell.velocity = projectVectorOntoSphereTangentSpace(vel, cell.centroid);
+            cell.velocity = projectVectorOntoSphereTangentSpace(toVec3D(vel), toVec3D(cell.centroid));
         }
     }
     totalStocks() {
@@ -639,60 +641,86 @@ export function computeLateralBoundaryTransfer(cellA, stratumA, stocksA, cellB, 
         };
     }
     const volTransferred = params.normalVelocityMs * contactResult.contactAreaM2 * params.timeStepSeconds;
-    const massTransferred = volTransferred * params.fluidDensityKgM3;
-    const waterFrac = stocksA.massWaterKg > 0 ? massTransferred / stocksA.massWaterKg : 0;
-    const dWater = stocksA.massWaterKg * waterFrac;
-    const dCarbon = stocksA.massCarbonKg * waterFrac;
-    const dOxygen = stocksA.massOxygenKg * waterFrac;
-    const dMinerals = stocksA.massMineralsKg * waterFrac;
-    const dEnergy = stocksA.internalEnergyJoules * waterFrac;
+    let heatConductionJoules = 0;
+    if (params.thermalConductivityWMK &&
+        params.distanceCentroidsMeters &&
+        params.distanceCentroidsMeters > 0 &&
+        params.temperatureKelvinA !== undefined &&
+        params.temperatureKelvinB !== undefined) {
+        const tempGrad = (params.temperatureKelvinA - params.temperatureKelvinB) / params.distanceCentroidsMeters;
+        heatConductionJoules = params.thermalConductivityWMK * tempGrad * contactResult.contactAreaM2 * params.timeStepSeconds;
+    }
+    const isAtoB = params.normalVelocityMs >= 0;
+    const donor = isAtoB ? stocksA : stocksB;
+    const donorWater = Math.max(1e-6, donor.massWaterKg);
+    const frac = Math.min(1.0, (Math.abs(volTransferred) * (params.fluidDensityKgM3 || 1000.0)) / donorWater);
+    const deltaWater = frac * donor.massWaterKg;
+    const deltaCarbon = frac * donor.massCarbonKg;
+    const deltaOxygen = frac * donor.massOxygenKg;
+    const deltaMinerals = frac * donor.massMineralsKg;
+    const deltaEnergy = frac * donor.internalEnergyJoules;
+    const sign = isAtoB ? 1 : -1;
+    const deltaStocksA = {
+        massWaterKg: -sign * deltaWater,
+        massCarbonKg: -sign * deltaCarbon,
+        massOxygenKg: -sign * deltaOxygen,
+        massMineralsKg: -sign * deltaMinerals,
+        internalEnergyJoules: -sign * deltaEnergy - heatConductionJoules,
+    };
+    const deltaStocksB = {
+        massWaterKg: sign * deltaWater,
+        massCarbonKg: sign * deltaCarbon,
+        massOxygenKg: sign * deltaOxygen,
+        massMineralsKg: sign * deltaMinerals,
+        internalEnergyJoules: sign * deltaEnergy + heatConductionJoules,
+    };
     return {
         contactResult,
-        deltaStocksA: {
-            massWaterKg: -dWater,
-            massCarbonKg: -dCarbon,
-            massOxygenKg: -dOxygen,
-            massMineralsKg: -dMinerals,
-            internalEnergyJoules: -dEnergy,
-        },
-        deltaStocksB: {
-            massWaterKg: dWater,
-            massCarbonKg: dCarbon,
-            massOxygenKg: dOxygen,
-            massMineralsKg: dMinerals,
-            internalEnergyJoules: dEnergy,
-        },
+        deltaStocksA,
+        deltaStocksB,
     };
 }
-export function applyPlanetaryInsolationStep(state, subsolar) {
+export function applyPlanetaryInsolationStep(state, subsolarVector, stepDt) {
+    const dt = stepDt ?? state.timeStepSeconds ?? 3600.0;
+    const sVec = toVec3D(subsolarVector);
     const nextCells = new Map();
-    for (const [id, cell] of state.cells.entries()) {
-        const u = cell.unitVector ?? [Math.cos((cell.latDeg * Math.PI) / 180), Math.sin((cell.latDeg * Math.PI) / 180), 0];
-        const cosZ = Math.max(0.0, u[0] * subsolar[0] + u[1] * subsolar[1] + u[2] * subsolar[2]);
-        const energyInflux = SOLAR_CONSTANT_W_M2 * cell.tauAtm * (1.0 - cell.albedo) * cosZ * cell.areaM2 * state.timeStepSeconds;
-        const carbonFixationRateKg = (energyInflux / 1e9) * 0.05;
-        const co2ConsumedKg = carbonFixationRateKg * (MOLAR_MASS_CO2 / MOLAR_MASS_C);
-        const waterTranspiredKg = carbonFixationRateKg * 20.0;
-        const o2ProducedKg = co2ConsumedKg * 0.727;
-        const nextCell = {
-            ...cell,
-            stocks: {
-                thermalEnergyJoules: cell.stocks.thermalEnergyJoules + energyInflux,
-                carbonDioxideKg: Math.max(0, cell.stocks.carbonDioxideKg - co2ConsumedKg),
-                biomassCarbonKg: cell.stocks.biomassCarbonKg + carbonFixationRateKg,
-                atmosphericWaterKg: cell.stocks.atmosphericWaterKg + waterTranspiredKg,
-                oxygenKg: cell.stocks.oxygenKg + o2ProducedKg,
-            },
+    for (const [key, cell] of state.cells.entries()) {
+        const uCell = latLngToUnitVector3D(cell.latDeg, cell.lngDeg);
+        const cosZ = Math.max(0.0, unitVectorDotProduct(uCell, sVec));
+        const energyInflux = SOLAR_CONSTANT_W_M2 * cell.tauAtm * (1.0 - cell.albedo) * cosZ * cell.areaM2 * dt;
+        let deltaCO2 = 0;
+        let deltaBiomassC = 0;
+        let deltaH2O = 0;
+        let deltaO2 = 0;
+        if (cosZ > 0) {
+            const maxRate = 1e-7 * cell.lai * cosZ * cell.areaM2 * dt;
+            deltaBiomassC = Math.min(cell.stocks.carbonDioxideKg * (MOLAR_MASS_C / MOLAR_MASS_CO2) * 0.1, maxRate);
+            deltaCO2 = deltaBiomassC * (MOLAR_MASS_CO2 / MOLAR_MASS_C);
+            deltaO2 = deltaCO2 * (31.9988 / MOLAR_MASS_CO2);
+            deltaH2O = deltaBiomassC * 10.0;
+        }
+        const nextStocks = {
+            ...cell.stocks,
+            thermalEnergyJoules: cell.stocks.thermalEnergyJoules + energyInflux,
+            carbonDioxideKg: cell.stocks.carbonDioxideKg - deltaCO2,
+            biomassCarbonKg: cell.stocks.biomassCarbonKg + deltaBiomassC,
+            atmosphericWaterKg: cell.stocks.atmosphericWaterKg + deltaH2O,
+            oxygenKg: cell.stocks.oxygenKg + deltaO2,
         };
-        nextCells.set(id, nextCell);
+        nextCells.set(key, {
+            ...cell,
+            stocks: nextStocks,
+        });
     }
     return {
         ...state,
-        subsolarVector: subsolar,
+        timeStepSeconds: dt,
+        subsolarVector,
         cells: nextCells,
     };
 }
-export function updatePlanetaryInsolation(monad, subsolar) {
-    const nextState = applyPlanetaryInsolationStep(monad.value, subsolar);
+export function updatePlanetaryInsolation(monad, subsolarVector, dt) {
+    const state = monad.getState();
+    const nextState = applyPlanetaryInsolationStep(state, subsolarVector, dt);
     return SpatialMonad.of(nextState);
 }

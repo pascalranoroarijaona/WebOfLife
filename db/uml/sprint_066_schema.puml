@@ -1,0 +1,152 @@
+@startuml sprint_066_schema
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam roundcorner 6
+skinparam shadowing true
+skinparam linetype ortho
+
+title Web of Life - 3D Boundary Outward Normal Vector & Thermodynamic Adjacency Model (Sprint 066)
+
+package "Spatial Manifold & Adjacency Module" {
+
+    class Vector3D <<struct>> {
+        +x: Float64
+        +y: Float64
+        +z: Float64
+        +dot(other: Vector3D): Float64
+        +cross(other: Vector3D): Vector3D
+        +norm(): Float64
+        +normalize(): Vector3D
+        +scale(s: Float64): Vector3D
+        +add(other: Vector3D): Vector3D
+        +sub(other: Vector3D): Vector3D
+    }
+
+    class BoundaryNormal3DOptions <<interface>> {
+        +blendAlpha: Float64 = 0.5
+        +earthRadius: Float64 = 6371008.8
+    }
+
+    class BoundaryNormal3DResult <<interface>> {
+        +normal: Vector3D
+        +midpoint: Vector3D
+        +midpointNormal: Vector3D
+        +displacementNormal: Vector3D
+        +alignmentCos: Float64
+    }
+
+    class BoundaryNormalSolver <<singleton>> {
+        +computeBoundaryOutwardNormal3D(originCentroid: Vector3D, neighborCentroid: Vector3D, edgeVertexA: Vector3D, edgeVertexB: Vector3D, options?: BoundaryNormal3DOptions): BoundaryNormal3DResult
+        -computeMidpointOnSphere(vA: Vector3D, vB: Vector3D, radius: Float64): Vector3D
+        -projectToTangentPlane(v: Vector3D, radialUnit: Vector3D): Vector3D
+        -enforceAntiSymmetry(normal: Vector3D, displacement: Vector3D): Vector3D
+    }
+
+    class H3CellManifold {
+        +h3Index: String
+        +resolution: Int32
+        +centroid: Vector3D
+        +areaM2: Float64
+        +isPentagon: Boolean
+        +getBoundaryEdges(): List<H3CellInterface>
+    }
+
+    class H3CellInterface {
+        +interfaceId: UUID
+        +originCell: H3CellManifold
+        +neighborCell: H3CellManifold
+        +edgeVertexA: Vector3D
+        +edgeVertexB: Vector3D
+        +midpoint: Vector3D
+        +radialUnit: Vector3D
+        +midpointNormal: Vector3D
+        +displacementNormal: Vector3D
+        +outwardNormal: Vector3D
+        +blendAlpha: Float64
+        +alignmentCos: Float64
+        +geodesicLengthM: Float64
+        +isAntiSymmetric: Boolean
+        +evaluateNormal(): BoundaryNormal3DResult
+    }
+}
+
+package "Thermodynamic State & Conservative Flux Ledger" {
+
+    class ThermodynamicCellStock {
+        +stockId: UUID
+        +h3Index: String
+        +epochIndex: Int64
+        +internalEnergyJoules: Float64
+        +waterMassKg: Float64
+        +carbonMassKg: Float64
+        +biomassDryKg: Float64
+        +temperatureKelvin: Float64
+        +entropyJPerK: Float64
+        +stateMerkleRoot: Bytes
+        +applyFlux(flux: BoundaryFluxTransaction): ThermodynamicCellStock
+    }
+
+    class BoundaryFluxTransaction {
+        +fluxTxId: UUID
+        +interface: H3CellInterface
+        +epochIndex: Int64
+        +fluidVelocity: Vector3D
+        +normalVelocity: Float64
+        +scalarConcentration: Float64
+        +massFluxKgPerSec: Float64
+        +heatFluxWatts: Float64
+        +entropyGenerationRateWPerK: Float64
+        +txSignature: Bytes
+        +validateConservation(): Boolean
+        +validateSecondLaw(): Boolean
+    }
+
+    class ThermodynamicBlock {
+        +blockHeight: Int64
+        +previousBlockHash: Bytes
+        +blockHash: Bytes
+        +merkleFluxRoot: Bytes
+        +merkleStateRoot: Bytes
+        +totalFluxNetCancellation: Float64
+        +totalEntropyProductionJPerK: Float64
+        +transactionCount: Int32
+        +timestampEpoch: Int64
+        +validatorNodeId: String
+        +blockSignature: Bytes
+        +verifyBlockConservation(): Boolean
+    }
+}
+
+' Relationships & Invariants
+BoundaryNormalSolver ..> BoundaryNormal3DResult : computes
+BoundaryNormalSolver ..> BoundaryNormal3DOptions : configures
+BoundaryNormalSolver ..> Vector3D : operates on
+H3CellInterface o-- Vector3D : vertices & normals
+H3CellInterface --> BoundaryNormalSolver : delegates to
+H3CellManifold "1" o-- "1..6" H3CellInterface : adjacent facets
+
+BoundaryFluxTransaction --> H3CellInterface : crosses facet along outwardNormal
+BoundaryFluxTransaction --> Vector3D : fluid velocity vector
+ThermodynamicCellStock "1" *-- "many" BoundaryFluxTransaction : updates state
+ThermodynamicBlock "1" *-- "many" BoundaryFluxTransaction : seals into merkle tree
+ThermodynamicBlock "1" *-- "many" ThermodynamicCellStock : anchors state commitments
+
+note right of BoundaryNormalSolver
+  **Thermodynamic Invariants:**
+  1. Anti-symmetry: n_{ji} = -n_{ij}
+  2. Radial Orthogonality: n_{ij} · r_hat = 0
+  3. Strict Outward Alignment: n_{ij} · (c_j - c_i) > 0
+  4. Unit Normal: ||n_{ij}|| = 1
+end note
+
+note bottom of BoundaryFluxTransaction
+  **First Law Compliance:**
+  F_{ij} + F_{ji} = 0
+  sum_i sum_{j in N(i)} F_{ij} == 0
+
+  **Second Law Compliance:**
+  S_dot_{interface} = (Phi_i - Phi_j) * F_{ij} >= 0
+end note
+
+@enduml

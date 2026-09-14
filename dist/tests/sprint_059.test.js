@@ -4,25 +4,25 @@
 // =============================================================================
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { computeSphericalGreatCircleNormal3D, latLngToUnitVector3D, unitVectorToLatLng, dotProduct3D, vectorNorm3D, advectiveBoundaryFluxMonad, H3Adjacency } from '../src/spatial/h3_adjacency.js';
+import { computeSphericalGreatCircleNormal3D, latLngToUnitVector3D, unitVectorToLatLng, dotProduct3D, vectorNorm3D, advectiveBoundaryFluxMonad, H3Adjacency, createVec3D, } from '../src/spatial/h3_adjacency.js';
 describe('RFC-059: Spherical Great Circle Plane Normal Vector Computation', () => {
     it('1. Canonical Axes: computes expected orthogonal normals', () => {
         // Equator (0N, 0E) -> [1, 0, 0]
         // Equator (0N, 90E) -> [0, 1, 0]
         // u x v should point directly to North Pole [0, 0, 1]
-        const u = [1, 0, 0];
-        const v = [0, 1, 0];
+        const u = createVec3D(1, 0, 0);
+        const v = createVec3D(0, 1, 0);
         const normal = computeSphericalGreatCircleNormal3D(u, v);
         assert.ok(Math.abs(normal[0] - 0) < 1e-12);
         assert.ok(Math.abs(normal[1] - 0) < 1e-12);
         assert.ok(Math.abs(normal[2] - 1) < 1e-12);
         // [0, 1, 0] x [0, 0, 1] -> [1, 0, 0]
-        const normal2 = computeSphericalGreatCircleNormal3D([0, 1, 0], [0, 0, 1]);
+        const normal2 = computeSphericalGreatCircleNormal3D(createVec3D(0, 1, 0), createVec3D(0, 0, 1));
         assert.ok(Math.abs(normal2[0] - 1) < 1e-12);
         assert.ok(Math.abs(normal2[1] - 0) < 1e-12);
         assert.ok(Math.abs(normal2[2] - 0) < 1e-12);
         // [0, 0, 1] x [1, 0, 0] -> [0, 1, 0]
-        const normal3 = computeSphericalGreatCircleNormal3D([0, 0, 1], [1, 0, 0]);
+        const normal3 = computeSphericalGreatCircleNormal3D(createVec3D(0, 0, 1), createVec3D(1, 0, 0));
         assert.ok(Math.abs(normal3[0] - 0) < 1e-12);
         assert.ok(Math.abs(normal3[1] - 1) < 1e-12);
         assert.ok(Math.abs(normal3[2] - 0) < 1e-12);
@@ -63,19 +63,19 @@ describe('RFC-059: Spherical Great Circle Plane Normal Vector Computation', () =
     });
     it('5. Collinear and Antipodal Edge Cases: deterministic stable fallback', () => {
         // Identical North Pole vectors
-        const northPole = [0, 0, 1];
+        const northPole = createVec3D(0, 0, 1);
         const nIdentical = computeSphericalGreatCircleNormal3D(northPole, northPole);
         assert.ok(!isNaN(nIdentical[0]) && !isNaN(nIdentical[1]) && !isNaN(nIdentical[2]));
         assert.ok(Math.abs(vectorNorm3D(nIdentical) - 1.0) < 1e-12);
         assert.ok(Math.abs(dotProduct3D(nIdentical, northPole)) < 1e-10);
         // Antipodal vectors (North Pole vs South Pole)
-        const southPole = [0, 0, -1];
+        const southPole = createVec3D(0, 0, -1);
         const nAntipodal = computeSphericalGreatCircleNormal3D(northPole, southPole);
         assert.ok(!isNaN(nAntipodal[0]) && !isNaN(nAntipodal[1]) && !isNaN(nAntipodal[2]));
         assert.ok(Math.abs(vectorNorm3D(nAntipodal) - 1.0) < 1e-12);
         assert.ok(Math.abs(dotProduct3D(nAntipodal, northPole)) < 1e-10);
         // Identical X-axis vector (|u[0]| >= 0.9 branch)
-        const xAxis = [1, 0, 0];
+        const xAxis = createVec3D(1, 0, 0);
         const nXAxis = computeSphericalGreatCircleNormal3D(xAxis, xAxis);
         assert.ok(Math.abs(vectorNorm3D(nXAxis) - 1.0) < 1e-12);
         assert.ok(Math.abs(dotProduct3D(nXAxis, xAxis)) < 1e-10);
@@ -105,8 +105,8 @@ describe('RFC-059: Spherical Great Circle Plane Normal Vector Computation', () =
             energyJoules: 5e8,
             volumeM3: 1e6
         };
-        const normal = [0, 1, 0];
-        const flowVelocity = [0, 2.5, 0]; // directed from A to B
+        const normal = createVec3D(0, 1, 0);
+        const flowVelocity = createVec3D(0, 2.5, 0); // directed from A to B
         const edgeLength = 1000; // 1 km
         const layerHeight = 100; // 100 m
         const dt = 10; // 10 seconds
@@ -130,8 +130,8 @@ describe('RFC-059: Spherical Great Circle Plane Normal Vector Computation', () =
         assert.ok(Math.abs(vectorNorm3D(midpoint) - 1.0) < 1e-12);
         assert.ok(Math.abs(vectorNorm3D(tangent) - 1.0) < 1e-12);
         // Test hemisphere discrimination
-        const northPole = [0, 0, 1];
-        const southPole = [0, 0, -1];
+        const northPole = createVec3D(0, 0, 1);
+        const southPole = createVec3D(0, 0, -1);
         assert.strictEqual(adjacency.isPositiveHemisphere(northPole, neighborCentroid), true);
         assert.strictEqual(adjacency.isPositiveHemisphere(southPole, neighborCentroid), false);
     });

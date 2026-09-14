@@ -1,6 +1,7 @@
-// =============================================================================
-// WEB OF LIFE - SPATIAL AND H3 MANIFOLD TYPES
-// =============================================================================
+/**
+ * 3D Coordinate and DGGS Types for Spherical Planetary Manifolds
+ * Unified Multi-Sprint Implementation (Sprints 002 - 066)
+ */
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -11,9 +12,9 @@ export var H3ErrorCode;
     H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
 })(H3ErrorCode || (H3ErrorCode = {}));
 export class SpatialGuardClauseException extends Error {
-    constructor(message) {
+    constructor(message = "H3 Index cannot be null, undefined, or empty.") {
         super(`[SpatialGuardClauseException] ${message}`);
-        this.name = 'SpatialGuardClauseException';
+        this.name = "SpatialGuardClauseException";
         Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
@@ -30,8 +31,6 @@ export var ThermodynamicChannel;
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
 export const THERMODYNAMIC_CONSTANTS = {
-    MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 5.0e7,
     SPECIFIC_HEAT: {
         REGOLITH: 840.0,
         WATER: 4184.0,
@@ -43,65 +42,82 @@ export const THERMODYNAMIC_CONSTANTS = {
     SPECIFIC_ENTHALPY: {
         WATER: -15.87e6,
         SOIL_ORGANIC_CARBON: -32.79e6,
-        VEGETATION_BIOMASS: -17.50e6,
+        VEGETATION_BIOMASS: -17.5e6,
         ATMOSPHERIC_CO2: -8.94e6,
         MINERAL_NITROGEN: -2.85e6,
-    }
+    },
+    DEFAULT_REGOLITH_MASS_KG: 1e6,
+    MIN_TEMPERATURE_KELVIN: 2.7315,
 };
 export function createH3CellInterfaceMetrics(params) {
     if (params.originIndex === params.neighborIndex) {
-        throw new Error('Self-interface is invalid');
+        throw new Error("Self-interface is invalid for neighboring cells");
     }
     if (params.sharedEdgeLengthMeters <= 0) {
-        throw new Error('sharedEdgeLengthMeters must be strictly positive');
+        throw new RangeError("sharedEdgeLengthMeters must be strictly positive");
     }
     if (params.centroidDistanceMeters <= 0) {
-        throw new Error('centroidDistanceMeters must be strictly positive');
+        throw new RangeError("centroidDistanceMeters must be strictly positive");
     }
+    const geometricConductance = params.sharedEdgeLengthMeters / params.centroidDistanceMeters;
     return {
-        ...params,
-        geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
+        originIndex: params.originIndex,
+        neighborIndex: params.neighborIndex,
+        sharedEdgeLengthMeters: params.sharedEdgeLengthMeters,
+        centroidDistanceMeters: params.centroidDistanceMeters,
+        bearingRadians: params.bearingRadians,
+        normalVector: params.normalVector,
+        atmosphericContactAreaM2: params.atmosphericContactAreaM2,
+        subterraneanContactAreaM2: params.subterraneanContactAreaM2,
+        topographicSlope: params.topographicSlope,
+        geometricConductance,
     };
 }
 export function createReciprocalInterfaceMetrics(m) {
+    const norm = m.normalVector;
+    const invertedNormal = [
+        -(norm[0] ?? 0),
+        -(norm[1] ?? 0),
+        -(norm[2] ?? 0),
+    ];
     return {
         originIndex: m.neighborIndex,
         neighborIndex: m.originIndex,
         sharedEdgeLengthMeters: m.sharedEdgeLengthMeters,
         centroidDistanceMeters: m.centroidDistanceMeters,
         bearingRadians: (m.bearingRadians + Math.PI) % (2 * Math.PI),
-        normalVector: [-m.normalVector[0], -m.normalVector[1], -m.normalVector[2]],
+        normalVector: invertedNormal,
         atmosphericContactAreaM2: m.atmosphericContactAreaM2,
         subterraneanContactAreaM2: m.subterraneanContactAreaM2,
         topographicSlope: -m.topographicSlope,
         geometricConductance: m.geometricConductance,
     };
 }
-export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
-    const isAtoB = metrics.normalVector[0] > 0 || (metrics.normalVector[0] === 0 && metrics.normalVector[1] >= 0);
-    const sign = isAtoB ? 1 : -1;
-    const wA = stateA.waterMassKg ?? 0;
-    const wB = stateB.waterMassKg ?? 0;
-    const dWater = sign * 0.001 * (wA - wB) * metrics.geometricConductance * dt;
-    const tA = stateA.temperatureKelvin ?? 290;
-    const tB = stateB.temperatureKelvin ?? 290;
-    const cond = params.eddyDiffusivityHeat ?? 15.0;
-    const heatFlux = cond * metrics.geometricConductance * (tA - tB) * dt;
-    const dEnthalpy = sign * heatFlux;
-    const cA = stateA.carbonMassKg ?? 0;
-    const cB = stateB.carbonMassKg ?? 0;
-    const dCarbon = sign * 0.001 * (cA - cB) * metrics.geometricConductance * dt;
-    const mA = stateA.mineralMassKg ?? 0;
-    const mB = stateB.mineralMassKg ?? 0;
-    const dMineral = sign * 0.001 * (mA - mB) * metrics.geometricConductance * dt;
-    const entropyProducedJPerK = heatFlux > 0
-        ? heatFlux * Math.abs(1 / Math.min(tA, tB) - 1 / Math.max(tA, tB))
-        : 0;
+export function computeInterfaceFlux(stateA, stateB, metrics, dt, params = {}) {
+    const isAtoB = metrics.originIndex < metrics.neighborIndex;
+    const cond = metrics.geometricConductance;
+    const slope = metrics.topographicSlope;
+    const kSat = params.kSatPorous ?? 1e-4;
+    const waterHeadDiff = (stateA.waterMassKg ?? 0) - (stateB.waterMassKg ?? 0);
+    const waterFlowRate = kSat * (waterHeadDiff * 1e-4 + slope * 10.0) * metrics.subterraneanContactAreaM2;
+    const deltaWaterKg = waterFlowRate * dt;
+    const cDiff = (stateA.carbonMassKg ?? 0) - (stateB.carbonMassKg ?? 0);
+    const deltaCarbonKg = 1e-5 * cond * cDiff * dt;
+    const mDiff = (stateA.mineralMassKg ?? 0) - (stateB.mineralMassKg ?? 0);
+    const deltaMineralKg = 1e-6 * cond * mDiff * dt;
+    const heatDiffusivity = params.eddyDiffusivityHeat ?? 15.0;
+    const tempA = stateA.temperatureKelvin ?? 288.15;
+    const tempB = stateB.temperatureKelvin ?? 288.15;
+    const heatFlux = heatDiffusivity * (tempA - tempB) * cond * metrics.atmosphericContactAreaM2 * dt;
+    const deltaEnthalpyJoules = heatFlux;
+    const t1 = Math.max(tempA, 1.0);
+    const t2 = Math.max(tempB, 1.0);
+    const entropyProducedJPerK = Math.abs(heatFlux) * Math.abs(1 / t2 - 1 / t1);
     return {
-        deltaWaterKg: dWater,
-        deltaEnthalpyJoules: dEnthalpy,
-        deltaCarbonKg: dCarbon,
-        deltaMineralKg: dMineral,
+        deltaWaterKg,
+        deltaCarbonKg,
+        deltaMineralKg,
+        deltaEnthalpyJoules,
         entropyProducedJPerK,
     };
 }

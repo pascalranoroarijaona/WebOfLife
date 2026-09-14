@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 34%
-SPRINT_GOAL: Implement computeBoundaryCentroidDisplacement3D calculating normalized 3D displacement vector between two spherical coordinates in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 35%
+SPRINT_GOAL: Implement computeBoundaryOutwardNormal3D combining midpoint horizontal normal with centroid displacement direction in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -250,8 +250,9 @@ SPRINT_GOAL: Implement computeBoundaryCentroidDisplacement3D calculating normali
 - [x] Implement `computeBoundarySegmentRadialNormal3D` calculating normalized radial midpoint unit vector for a boundary segment in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundaryHorizontalNormal3D` computing unoriented cross product of midpoint tangent and radial normal in `src/spatial/h3_adjacency.ts`
 - [x] Implement `orientVectorTowardsTarget3D` applying sign flip if dot product with displacement vector is negative in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryCentroidDisplacement3D` calculating normalized 3D displacement vector between two spherical coordinates in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundaryCentroidDisplacement3D` calculating normalized 3D displacement vector between two spherical coordinates in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryOutwardNormal3D` combining midpoint horizontal normal with centroid displacement direction in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeDetailedInterfaceNormal3D` returning oriented boundary normal and alignment metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
