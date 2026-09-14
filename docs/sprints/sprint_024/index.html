@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@3.7.2"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 024: Spatial Resolution Tier (0-15) Boundary Check</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>SPRINT 024: SPATIAL RESOLUTION TIER (0-15) BOUNDARY CHECK</h1>
+  <h2>Uber H3 Hierarchical Spatial Indexing & Thermodynamic Equilibrium Grid</h2>
+  <p>
+    Validating continuous resolution scaling across all 16 H3 tiers (0 to 15). 
+    Dynamic adaptive cell subdivision activates based on viewport zoom altitude and thermodynamic free energy flux gradients.
+  </p>
+  <div class="social-links">
+    <a href="01_RFC.html" target="_blank">📄 RFC Specification</a>
+    <a href="02_METHODS.html" target="_blank">🔬 Methods &amp; Mathematics</a>
+    <a href="gaia_sprint_summary.mp3" target="_blank">🎧 Gaia Audio Briefing</a>
+  </div>
+</div>
+
+<div id="sprint-telemetry">
+  <h4>Spatial Tier Diagnostics</h4>
+  <div class="telemetry-row"><span>Active H3 Tier:</span><span id="tel-tier" class="highlight">3</span></div>
+  <div class="telemetry-row"><span>Cell Edge Length:</span><span id="tel-edge" class="highlight">-</span></div>
+  <div class="telemetry-row"><span>Rendered Hexagons:</span><span id="tel-cells" class="highlight">0</span></div>
+  <div class="telemetry-row"><span>Free Energy Flux:</span><span id="tel-flux" class="highlight">0.00 W/m²</span></div>
+  <div class="telemetry-row"><span>Subdivision Status:</span><span id="tel-status" class="highlight">STABLE</span></div>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search H3 cell index or organism..." />
+  <div class="zoom-container">
+    <span>Zoom Tier (0-15):</span>
+    <input type="range" id="zoomRange" min="0" max="15" value="3" step="1" />
+    <span id="zoomVal" class="highlight">3</span>
+  </div>
+  <label class="debug-container">
+    <input type="checkbox" id="chkBoundaries" checked />
+    <span>Boundaries</span>
+  </label>
+  <label class="debug-container">
+    <input type="checkbox" id="chkFlux" checked />
+    <span>Flux Vector</span>
+  </label>
+  <button id="btnReset">Reset View</button>
+  <button id="btnToggleSim">Pause</button>
+</div>
+
+<script type="module">
+  import * as h3 from 'h3-js';
+
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  let state = {
+    tier: 3,
+    zoom: 1.0,
+    offsetX: 0,
+    offsetY: 0,
+    paused: false,
+    showBoundaries: true,
+    showFlux: true,
+    searchQuery: '',
+    time: 0
+  };
+
+  // UI Bindings
+  const zoomRange = document.getElementById('zoomRange');
+  const zoomVal = document.getElementById('zoomVal');
+  const telTier = document.getElementById('tel-tier');
+  const telEdge = document.getElementById('tel-edge');
+  const telCells = document.getElementById('tel-cells');
+  const telFlux = document.getElementById('tel-flux');
+  const telStatus = document.getElementById('tel-status');
+  const chkBoundaries = document.getElementById('chkBoundaries');
+  const chkFlux = document.getElementById('chkFlux');
+  const searchInput = document.getElementById('search');
+
+  zoomRange.addEventListener('input', (e) => {
+    state.tier = parseInt(e.target.value, 10);
+    zoomVal.textContent = state.tier;
+    telTier.textContent = state.tier;
+  });
+
+  chkBoundaries.addEventListener('change', (e) => {
+    state.showBoundaries = e.target.checked;
+  });
+
+  chkFlux.addEventListener('change', (e) => {
+    state.showFlux = e.target.checked;
+  });
+
+  searchInput.addEventListener('input', (e) => {
+    state.searchQuery = e.target.value.trim().toLowerCase();
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    state.tier = 3;
+    zoomRange.value = 3;
+    zoomVal.textContent = '3';
+    telTier.textContent = '3';
+    state.offsetX = 0;
+    state.offsetY = 0;
+    state.zoom = 1.0;
+  });
+
+  const btnToggleSim = document.getElementById('btnToggleSim');
+  btnToggleSim.addEventListener('click', () => {
+    state.paused = !state.paused;
+    btnToggleSim.textContent = state.paused ? 'Resume' : 'Pause';
+    telStatus.textContent = state.paused ? 'PAUSED' : 'STABLE';
+    telStatus.style.color = state.paused ? 'var(--sun)' : 'var(--flora)';
+  });
+
+  // Approximate edge lengths (km) for H3 resolutions 0-15
+  const h3EdgeLengths = [
+    1107.71, 418.68, 158.24, 59.81, 22.60, 8.54, 3.23, 1.22,
+    0.46, 0.17, 0.065, 0.024, 0.009, 0.0035, 0.0013, 0.0005
+  ];
+
+  // Mouse / Pan interaction
+  let isDragging = false;
+  let startX = 0, startY = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX - state.offsetX;
+    startY = e.clientY - state.offsetY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    state.offsetX = e.clientX - startX;
+    state.offsetY = e.clientY - startY;
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      state.tier = Math.min(15, state.tier + 1);
+    } else {
+      state.tier = Math.max(0, state.tier - 1);
+    }
+    zoomRange.value = state.tier;
+    zoomVal.textContent = state.tier;
+    telTier.textContent = state.tier;
+  }, { passive: false });
+
+  // Center lat/lng (approx equator/prime meridian or default view)
+  const baseLat = 20.0;
+  const baseLng = 0.0;
+
+  function render() {
+    if (!state.paused) {
+      state.time += 0.01;
+    }
+
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg');
+    ctx.fillRect(0, 0, width, height);
+
+    // Update Telemetry Edge Length
+    const edgeLen = h3EdgeLengths[state.tier] || 0.001;
+    telEdge.textContent = edgeLen >= 1 ? `${edgeLen.toFixed(1)} km` : `${(edgeLen * 1000).toFixed(1)} m`;
+
+    // Fetch H3 ring or neighborhood around center
+    let centerHex;
+    try {
+      centerHex = h3.geoToH3(baseLat, baseLng, state.tier);
+    } catch (err) {
+      centerHex = '831fbffffffffff'; // Fallback valid h3 index
+    }
+
+    let kRingSize = state.tier < 4 ? 2 : (state.tier < 8 ? 3 : 2);
+    let hexagons = [];
+    try {
+      hexagons = h3.kRing(centerHex, kRingSize);
+    } catch (err) {
+      hexagons = [centerHex];
+    }
+
+    telCells.textContent = hexagons.length;
+    let totalFlux = 0;
+
+    const centerX = width / 2 + state.offsetX;
+    const centerY = height / 2 + state.offsetY;
+    const scale = Math.max(50, Math.min(width, height) * 0.35 * Math.pow(1.2, state.tier - 3));
+
+    hexagons.forEach((hex, idx) => {
+      let boundary = [];
+      try {
+        boundary = h3.h3ToBoundary(hex, true); // returns [[lat, lng], ...]
+      } catch (err) {
+        return;
+      }
+
+      if (!boundary || boundary.length === 0) return;
+
+      // Project lat/lng to canvas x/y
+      let pts = boundary.map(([lat, lng]) => {
+        let x = centerX + (lng - baseLng) * (Math.PI / 180) * scale;
+        let y = centerY - (lat - baseLat) * (Math.PI / 180) * scale;
+        return { x, y };
+      });
+
+      // Thermodynamic flux simulation per cell
+      let cellFlux = Math.sin(state.time + idx * 0.5) * 45 + 120;
+      totalFlux += cellFlux;
+
+      let isMatch = state.searchQuery && (hex.includes(state.searchQuery) || `tier ${state.tier}`.includes(state.searchQuery));
+
+      ctx.beginPath();
+      pts.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.closePath();
+
+      // Color mapping based on tier and thermodynamic flux
+      let alpha = 0.15 + (state.tier / 15) * 0.25;
+      if (isMatch) alpha = 0.8;
+      
+      let hue = (state.tier * 24 + idx * 15) % 360;
+      ctx.fillStyle = isMatch ? 'rgba(0, 225, 255, 0.6)' : `hsla(${hue}, 70%, 50%, ${alpha})`;
+      ctx.fill();
+
+      if (state.showBoundaries || isMatch) {
+        ctx.strokeStyle = isMatch ? '#ffffff' : `hsla(${hue}, 80%, 70%, 0.7)`;
+        ctx.lineWidth = isMatch ? 2 : 1;
+        ctx.stroke();
+      }
+
+      // Draw flux vector if enabled
+      if (state.showFlux && pts.length > 0) {
+        let centroidX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+        let centroidY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+
+        ctx.beginPath();
+        ctx.arc(centroidX, centroidY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ffe1';
+        ctx.fill();
+
+        if (state.tier <= 6) {
+          ctx.fillStyle = 'rgba(200, 245, 242, 0.8)';
+          ctx.font = '9px Courier New';
+          ctx.fillText(`H3:${hex.substring(0, 6)}`, centroidX - 22, centroidY - 6);
+        }
+      }
+    });
+
+    telFlux.textContent = `${(totalFlux / (hexagons.length || 1)).toFixed(2)} W/m²`;
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+</script>
+
+</body>
+</html>

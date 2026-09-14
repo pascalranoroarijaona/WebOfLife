@@ -1,5 +1,5 @@
 {
-  "current_sprint": 24,
+  "current_sprint": 25,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -115,6 +115,11 @@
       "sprint": 23,
       "goal": "Implement resolution tier (0-15) boundary check function src/spatial/h3_grid.ts.",
       "timestamp": "2026-09-14T06:52:22.711648+00:00"
+    },
+    {
+      "sprint": 24,
+      "goal": "Implement resolution tier (0-15) boundary check function (`src/spatial/h3_grid.ts`).",
+      "timestamp": "2026-09-14T06:56:51.400405+00:00"
     }
   ]
 }

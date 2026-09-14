@@ -1,10 +1,10 @@
 import { H3GridManager } from "./h3_grid.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
-import { IH3CellData, CellStockState } from "./h3_types.js";
+import { CellStockState } from "./h3_types.js";
 
 export type { CellStockState } from "./h3_types.js";
 
-export class H3SpatialCell implements IH3CellData {
+export class H3SpatialCell {
   constructor(
     public readonly index: string,
     public readonly resolution: number,

@@ -1,0 +1,79 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 024: Spatial Resolution Tier & Thermodynamic Monad Architecture
+
+package "Spatial Domain (src/spatial/)" {
+  class H3GridManager {
+    + validateResolutionTier(resolution: number): boolean
+    + assertResolutionTier(resolution: number): void
+  }
+
+  interface SpatialGridConstraints {
+    + minResolution: number
+    + maxResolution: number
+    + isValidResolution(res: number): boolean
+  }
+
+  class H3ResolutionTier << (T, #FF7700) >> {
+    0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15
+  }
+}
+
+package "Monadic State Domain (src/monads/)" {
+  class SpatialMonad<T> {
+    + h3Index: string
+    + resolution: number
+    + stock: T
+    + constructor(h3Index: string, resolution: number, stock: T)
+    + refine(newResolution: number): SpatialMonad<T>
+  }
+}
+
+package "Database & Ledger Domain (db/schema.sql)" {
+  class SpatialResolutionTierTable {
+    + resolution_tier: INT (PK)
+    + description: VARCHAR
+    + average_edge_length_km: NUMERIC
+    + average_area_km2: NUMERIC
+  }
+
+  class SpatialMonadTable {
+    + monad_id: UUID (PK)
+    + h3_index: VARCHAR
+    + resolution_tier: INT (FK)
+    + energy_stock_joules: NUMERIC
+    + biomass_stock_kg: NUMERIC
+    + created_at: TIMESTAMPTZ
+  }
+
+  class SpatialTransitionTable {
+    + transition_id: UUID (PK)
+    + source_monad_id: UUID (FK)
+    + target_monad_id: UUID (FK)
+    + transition_type: VARCHAR
+    + energy_delta_joules: NUMERIC
+    + biomass_delta_kg: NUMERIC
+  }
+
+  class ThermodynamicBlockTable {
+    + block_height: BIGSERIAL (PK)
+    + block_hash: VARCHAR
+    + parent_hash: VARCHAR
+    + solar_flux_input_joules: NUMERIC
+    + thermal_dissipation_joules: NUMERIC
+    + state_root: VARCHAR
+  }
+}
+
+-- Relationships & Dependencies
+SpatialGridConstraints <|.. H3GridManager : implements
+H3GridManager ..> H3ResolutionTier : enforces bounds
+SpatialMonad --> H3GridManager : calls assertResolutionTier()
+SpatialMonadTable --> SpatialResolutionTierTable : references tier [0-15]
+SpatialTransitionTable --> SpatialMonadTable : source / target stocks
+ThermodynamicBlockTable "1" *-- "*" SpatialTransitionTable : secures ledger
+
+@enduml
