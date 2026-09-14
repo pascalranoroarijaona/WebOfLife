@@ -1,16 +1,16 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 21%
-SPRINT_GOAL: Implement Uber H3 Geospatial Partitioning Engine base initialization in src/spatial/h3_grid.ts.
+SPRINT_GOAL: Implement Uber H3 index string format validation and error code mapping in src/spatial/h3_grid.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
 - [x] First Law mass conservation net flow calculations and hierarchical structure tree (`src/earth_pod.ts`)
 - [x] Planetary Mega-POD bootstrap mechanism and baseline simulation tick loops (`src/earth_pod.ts`, `src/main.ts`)
 - [x] Uber H3 index parsing, ring generation, and edge-neighbor mapping routines (`src/spatial/h3_adjacency.ts`, `src/spatial/h3_grid.ts`)
-- [ ] Uber H3 Geospatial Partitioning Engine base initialization (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 index string format validation and error code mapping (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 spatial ring generation utility functions (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 edge-neighbor mapping functions (`src/spatial/h3_grid.ts`)
+- [ ] Spatial-Thermodynamic State Tensor Routing (`src/spatial/tensor_router.ts`)
 - [ ] Centralized thermodynamic physical constants and temperature normalization engine (`src/thermodynamics/constants.ts`)
 - [ ] Exergy & Entropy Generation Accounting and Gouy-Stodola theorem validation (`src/thermodynamics/exergy.ts`)
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures (`src/thermodynamics/carnot.ts`)

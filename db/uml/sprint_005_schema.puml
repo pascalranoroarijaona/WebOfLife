@@ -1,0 +1,72 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 005: Spatial H3 Validation & Thermodynamic Monad Architecture
+
+package "Spatial Subsystem (src/spatial)" {
+  interface IH3GridService {
+    +validateIndex(h3Index: string): IH3ValidationResult
+    +assertValidIndex(h3Index: string): void
+  }
+
+  class H3Grid {
+    - {static} H3_REGEX: RegExp
+    +validateIndex(h3Index: string): IH3ValidationResult
+    +assertValidIndex(h3Index: string): void
+  }
+
+  enum H3ErrorCode {
+    SUCCESS
+    INVALID_LENGTH
+    INVALID_CHARACTER
+    INVALID_RESOLUTION
+    INVALID_BASE_CELL
+    NULL_INDEX
+  }
+
+  interface IH3ValidationResult {
+    +isValid: boolean
+    +code: H3ErrorCode
+    +message: string
+    +resolution?: number
+    +baseCell?: number
+  }
+
+  IH3GridService <|.. H3Grid
+  H3Grid ..> IH3ValidationResult : creates
+  IH3ValidationResult --> H3ErrorCode : uses
+}
+
+package "Monad & Thermodynamic Ledger" {
+  class SpatialMonadStock {
+    -h3Index: string
+    -state: SpatialState
+    -matterStockKg: number
+    -solarFluxJules: number
+    +transition(targetState: SpatialState): void
+  }
+
+  class ThermodynamicBlock {
+    +blockId: UUID
+    +blockHeight: long
+    +previousHash: string
+    +merkleRoot: string
+    +solarDissipationEntropy: number
+  }
+
+  class SpatialMonadTransaction {
+    +txId: UUID
+    +errorCode: H3ErrorCode
+    +energyCostJoules: number
+    +signature: string
+  }
+
+  SpatialMonadStock --> SpatialMonadTransaction : records
+  ThermodynamicBlock "1" *-- "*" SpatialMonadTransaction : bundles
+}
+
+H3Grid --> SpatialMonadStock : validates state gates (S_0 -> S_1 / S_err)
+
+@enduml

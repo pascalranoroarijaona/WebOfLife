@@ -1,3 +1,4 @@
+import { H3GridParser } from '../spatial/h3_grid.js';
 export class SpatialMonad {
     value;
     history = [];
@@ -17,7 +18,7 @@ export class SpatialMonad {
         return new SpatialMonad(value);
     }
     static fromGeo(coord, resolution, initialStock) {
-        const indexStr = `8${resolution}1f18fffffffff`;
+        const indexStr = H3GridParser.fromGeo(coord, resolution);
         const stock = initialStock ?? { carbonKg: 1000, waterKg: 50000, biomassJoules: 250000 };
         return new SpatialMonad(stock, indexStr, stock);
     }

@@ -1,68 +1,74 @@
 -- ============================================================================
--- Web of Life Database Schema: Sprint 004 Additions
--- Uber H3 Geospatial Partitioning Engine & Thermodynamic Ledger Integration
+-- WEB OF LIFE DATABASE & THERMODYNAMIC BLOCKCHAIN SCHEMA
+-- Sprint 005: Uber H3 Index String Format Validation & Spatial Monad Integration
+-- Compliance: First & Second Laws of Thermodynamics (Matter Conservation & Solar Flux)
 -- ============================================================================
 
--- Ensure TimescaleDB extension is available for time-series thermodynamic tracking
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "timescaledb";
 
--- ----------------------------------------------------------------------------
--- 1. Spatial Grid Cells Table (Uber H3 Partitioning Engine)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_spatial_cells (
+-- Enums matching TypeScript H3ErrorCode and Validation States
+CREATE TYPE h3_error_code AS ENUM (
+    'H3_SUCCESS',
+    'H3_ERR_INVALID_LENGTH',
+    'H3_ERR_INVALID_CHARACTER',
+    'H3_ERR_INVALID_RESOLUTION',
+    'H3_ERR_INVALID_BASE_CELL',
+    'H3_ERR_NULL_INDEX'
+);
+
+CREATE TYPE spatial_state AS ENUM (
+    'UNVERIFIED',
+    'VALIDATED',
+    'FAULT'
+);
+
+-- ============================================================================
+-- 1. SPATIAL CELLS & H3 INDEX REGISTRY
+-- ============================================================================
+CREATE TABLE spatial_h3_cells (
     h3_index VARCHAR(15) PRIMARY KEY,
-    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    centroid_lat DOUBLE PRECISION NOT NULL,
-    centroid_lng DOUBLE PRECISION NOT NULL,
-    boundary_polygon JSONB NOT NULL,
-    area_km2 DOUBLE PRECISION NOT NULL,
+    resolution INT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    base_cell INT NOT NULL CHECK (base_cell >= 0 AND base_cell <= 121),
+    state spatial_state NOT NULL DEFAULT 'UNVERIFIED',
+    last_error h3_error_code DEFAULT 'H3_SUCCESS',
+    matter_stock_kg NUMERIC(18, 6) NOT NULL DEFAULT 0.000000, -- First Law: Matter conservation stock
+    solar_flux_jules NUMERIC(18, 6) NOT NULL DEFAULT 0.000000, -- Second Law: Solar input tracking
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================================
+-- 2. THERMODYNAMIC BLOCKCHAIN LEDGER & TRANSACTIONS
+-- ============================================================================
+CREATE TABLE thermodynamic_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGSERIAL UNIQUE,
+    previous_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    solar_dissipation_entropy NUMERIC(18, 6) NOT NULL, -- Entropy overhead tracking
+    miner_pod_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_cells_resolution ON h3_spatial_cells(resolution);
-
--- ----------------------------------------------------------------------------
--- 2. H3 Adjacency Table (Topological Neighborhoods & Gradient Tracking)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_adjacencies (
-    source_index VARCHAR(15) NOT NULL REFERENCES h3_spatial_cells(h3_index) ON DELETE CASCADE,
-    neighbor_index VARCHAR(15) NOT NULL REFERENCES h3_spatial_cells(h3_index) ON DELETE CASCADE,
-    edge_distance_km DOUBLE PRECISION NOT NULL,
-    PRIMARY KEY (source_index, neighbor_index)
+CREATE TABLE spatial_monad_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
+    h3_index VARCHAR(15) REFERENCES spatial_h3_cells(h3_index),
+    transition_from spatial_state NOT NULL,
+    transition_to spatial_state NOT NULL,
+    error_code h3_error_code NOT NULL,
+    energy_cost_joules NUMERIC(12, 4) NOT NULL, -- Metabolic cost of validation
+    signature VARCHAR(128) NOT NULL,
+    logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_adj_source ON h3_adjacencies(source_index);
+-- Convert transactions to a TimescaleDB hypertable for time-series spatial tracking
+SELECT create_hypertable('spatial_monad_transactions', 'logged_at', if_not_exists => TRUE);
 
--- ----------------------------------------------------------------------------
--- 3. Spatial Monad Ecological Stocks (Time-Series / Hypertable)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_monad_stocks (
-    time TIMESTAMPTZ NOT NULL,
-    h3_index VARCHAR(15) NOT NULL REFERENCES h3_spatial_cells(h3_index) ON DELETE CASCADE,
-    biomass_stock DOUBLE PRECISION NOT NULL CHECK (biomass_stock >= 0),
-    energy_stock DOUBLE PRECISION NOT NULL CHECK (energy_stock >= 0),
-    entropy_stock DOUBLE PRECISION NOT NULL CHECK (entropy_stock >= 0),
-    solar_irradiance_input DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    PRIMARY KEY (time, h3_index)
-);
-
--- Convert to TimescaleDB hypertable for efficient time-series state propagation
-SELECT create_hypertable('spatial_monad_stocks', 'time', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Blockchain Transactions (Conservation & Dissipation Ledgers)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
-    transaction_id UUID PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    source_h3 VARCHAR(15) REFERENCES h3_spatial_cells(h3_index),
-    target_h3 VARCHAR(15) REFERENCES h3_spatial_cells(h3_index),
-    energy_transferred DOUBLE PRECISION NOT NULL,
-    entropy_generated DOUBLE PRECISION NOT NULL CHECK (entropy_generated >= 0),
-    transaction_signature VARCHAR(128) NOT NULL,
-    CONSTRAINT chk_first_law_conservation CHECK (energy_transferred >= 0)
-);
-
-CREATE INDEX IF NOT EXISTS idx_thermo_tx_block ON thermodynamic_transactions(block_number);
-CREATE INDEX IF NOT EXISTS idx_thermo_tx_time ON thermodynamic_transactions(timestamp);
+-- ============================================================================
+-- 3. INDEXES FOR PERFORMANCE
+-- ============================================================================
+CREATE INDEX idx_spatial_cells_resolution ON spatial_h3_cells(resolution);
+CREATE INDEX idx_spatial_cells_state ON spatial_h3_cells(state);
+CREATE INDEX idx_spatial_tx_h3 ON spatial_monad_transactions(h3_index, logged_at DESC);

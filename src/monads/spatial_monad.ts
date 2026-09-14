@@ -1,12 +1,9 @@
+import { H3GridParser, GeoCoordinate } from '../spatial/h3_grid.js';
+
 export interface ThermodynamicStock {
   carbonKg: number;
   waterKg: number;
   biomassJoules: number;
-}
-
-export interface GeoCoordinate {
-  lat: number;
-  lng: number;
 }
 
 export class SpatialMonad<T> {
@@ -34,7 +31,7 @@ export class SpatialMonad<T> {
     resolution: number,
     initialStock?: ThermodynamicStock
   ): SpatialMonad<any> {
-    const indexStr = `8${resolution}1f18fffffffff`;
+    const indexStr = H3GridParser.fromGeo(coord, resolution);
     const stock = initialStock ?? { carbonKg: 1000, waterKg: 50000, biomassJoules: 250000 };
     return new SpatialMonad<any>(stock, indexStr, stock);
   }

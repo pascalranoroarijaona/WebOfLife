@@ -1,97 +1,81 @@
-import { SpatialMonad } from '../monads/spatial_monad.js';
-import { getH3Adjacency } from './h3_adjacency.js';
-export class H3GridParser {
-    static validateIndex(h3Index) {
-        const str = h3Index.toString();
-        if (!str || str === 'invalid_string' || str.length < 3) {
-            return { isValid: false, errorCode: 'INVALID_FORMAT' };
+/**
+ * src/spatial/h3_grid.ts
+ * Sprint 005: Uber H3 Index String Format Validation and Error Code Mapping
+ */
+import { latLngToCell, cellToLatLng, getResolution, isValidCell } from 'h3-js';
+import { H3_ERROR_CODES } from './h3_types';
+/**
+ * Validates an H3 index string using h3-js isValidCell and format regex.
+ */
+export function validateH3Index(index) {
+    if (typeof index !== 'string') {
+        return { valid: false, code: H3_ERROR_CODES.INVALID_TYPE };
+    }
+    // H3 index format: 15-character hex string starting with '8'
+    const h3Regex = /^[8a-fA-F0-9]{15}$/;
+    if (!h3Regex.test(index)) {
+        return { valid: false, code: H3_ERROR_CODES.MALFORMED_FORMAT };
+    }
+    try {
+        const valid = isValidCell(index);
+        if (!valid) {
+            return { valid: false, code: H3_ERROR_CODES.INVALID_INDEX };
         }
-        return { isValid: true, resolution: 5, baseCell: 1 };
+        const res = getResolution(index);
+        return { valid: true, res };
     }
-    static fromGeo(coord, resolution) {
-        return `8${resolution}1f18fffffffff`;
-    }
-    static parseString(h3Str) {
-        return h3Str.toLowerCase();
+    catch (err) {
+        return { valid: false, code: H3_ERROR_CODES.RESOLUTION_MISMATCH };
     }
 }
-export class BaseSpatialGrid {
-    resolution;
-    cells;
-    constructor(resolution) {
-        this.resolution = resolution;
-        this.cells = new Map();
+/**
+ * Converts latitude and longitude to an H3 index string at a given resolution.
+ */
+export function latLngToH3Index(lat, lng, resolution) {
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        throw new Error(`[H3_ERROR_INVALID_COORDINATES] Lat/Lng out of bounds: (${lat}, ${lng})`);
+    }
+    if (resolution < 0 || resolution > 15) {
+        throw new Error(`[H3_ERROR_RESOLUTION_MISMATCH] Resolution out of bounds: ${resolution}`);
+    }
+    try {
+        const cell = latLngToCell(lat, lng, resolution);
+        const validation = validateH3Index(cell);
+        if (!validation.valid) {
+            throw new Error(`[${validation.code}] Generated cell is invalid: ${cell}`);
+        }
+        return cell;
+    }
+    catch (err) {
+        if (err.message && err.message.includes('H3_ERROR')) {
+            throw err;
+        }
+        throw new Error(`[H3_ERROR_INTERNAL] Failed to convert LatLng to H3: ${err.message}`);
     }
 }
-export class H3GridEngine extends BaseSpatialGrid {
-    spatialMonad;
-    constructor(resolution = 3) {
-        super(resolution);
-        this.spatialMonad = new SpatialMonad();
+/**
+ * Converts an H3 index string to its center latitude and longitude.
+ */
+export function h3IndexToLatLng(index) {
+    const validation = validateH3Index(index);
+    if (!validation.valid) {
+        throw new Error(`[${validation.code}] Cannot convert invalid H3 index: ${index}`);
     }
-    initializeGrid(query) {
-        this.resolution = query.resolution;
-        const generatedCells = new Map();
-        const indexes = query.baseIndexes && query.baseIndexes.length > 0
-            ? query.baseIndexes
-            : ['831f18fffffffff', '831f19fffffffff', '831f1afffffffff', '831f1bfffffffff'];
-        for (const idx of indexes) {
-            const lat = 45.0 + (Math.random() - 0.5) * 10;
-            const lng = -93.0 + (Math.random() - 0.5) * 10;
-            const area = Math.round(1000 / Math.pow(7, this.resolution));
-            const zenith = Math.abs(lat) * (Math.PI / 180);
-            const solarConstant = 1361;
-            const solarIrradiance = solarConstant * Math.max(0, Math.cos(zenith)) * area;
-            const cellData = {
-                h3Index: idx,
-                resolution: this.resolution,
-                centroid: { lat, lng },
-                boundary: [
-                    { lat: lat + 0.1, lng: lng - 0.1 },
-                    { lat: lat + 0.1, lng: lng + 0.1 },
-                    { lat: lat - 0.1, lng: lng + 0.1 },
-                    { lat: lat - 0.1, lng: lng - 0.1 },
-                ],
-                areaKm2: area,
-                solarIrradiance,
-                carbonStock: 500 * area,
-                waterStock: 2000 * area,
-                energyStock: solarIrradiance * 24,
-            };
-            generatedCells.set(idx, cellData);
-        }
-        this.spatialMonad.run(() => {
-            this.cells = generatedCells;
-            this.spatialMonad.setValue(generatedCells);
-        });
+    try {
+        const [lat, lng] = cellToLatLng(index);
+        return { lat, lng };
     }
-    getCell(h3Index) {
-        return this.cells.get(h3Index);
+    catch (err) {
+        throw new Error(`[H3_ERROR_INTERNAL] Failed to convert H3 to LatLng: ${err.message}`);
     }
-    getAdjacentCells(h3Index) {
-        return getH3Adjacency(h3Index);
+}
+/**
+ * Retrieves the resolution of an H3 index string.
+ */
+export function getH3Resolution(index) {
+    const validation = validateH3Index(index);
+    if (!validation.valid || validation.res === undefined) {
+        throw new Error(`[${validation.code || H3_ERROR_CODES.INVALID_INDEX}] Cannot get resolution for invalid H3 index: ${index}`);
     }
-    propagateCellState(h3Index, dt = 1.0) {
-        const cell = this.cells.get(h3Index);
-        if (!cell)
-            return;
-        const photosynth = (cell.solarIrradiance ?? 0) * 0.0001;
-        const respiration = (cell.carbonStock ?? 0) * 0.00005;
-        const decomposition = 10.0;
-        const deltaC = (photosynth - respiration - decomposition) * dt;
-        const precipitation = 50.0;
-        const evapotranspiration = 20.0;
-        const runoffOut = 5.0;
-        const deltaW = (precipitation - evapotranspiration - runoffOut) * dt;
-        const solarIn = cell.solarIrradiance ?? 0;
-        const dissipation = (cell.energyStock ?? 0) * 0.01;
-        const deltaE = (solarIn - dissipation) * dt;
-        cell.carbonStock = Math.max(0, (cell.carbonStock ?? 0) + deltaC);
-        cell.waterStock = Math.max(0, (cell.waterStock ?? 0) + deltaW);
-        cell.energyStock = Math.max(0, (cell.energyStock ?? 0) + deltaE);
-        this.cells.set(h3Index, cell);
-    }
-    getSpatialMonad() {
-        return this.spatialMonad;
-    }
+    return validation.res;
 }

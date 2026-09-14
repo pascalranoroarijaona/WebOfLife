@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@4.1.0"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 005: Uber H3 Index String Format Validation and Error Code Mapping</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+#inspector {
+  position: fixed;
+  z-index: 12;
+  bottom: 80px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Sprint 005: H3 Validation & Error Mapping</h1>
+  <h2>Thermodynamic Web of Life</h2>
+  <p>Validating Uber H3 index strings against strict format rules, spatial resolution boundaries, and robust error-code mapping matrices.</p>
+  <div class="social-links">
+    <a href="01_RFC.md" target="_blank">📄 RFC 005</a>
+    <a href="02_METHODS.md" target="_blank">🔬 Methods</a>
+  </div>
+</div>
+
+<div id="sprint-telemetry">
+  <h4>Sprint 005 Diagnostics</h4>
+  <div class="telemetry-row"><span>H3 Validation Engine:</span><span id="tel-engine" class="highlight">Active</span></div>
+  <div class="telemetry-row"><span>Checked Indices:</span><span id="tel-checked" class="highlight">0</span></div>
+  <div class="telemetry-row"><span>Validation Errors:</span><span id="tel-errors" class="highlight">0</span></div>
+  <div class="telemetry-row"><span>Format Strictness:</span><span class="highlight">Enabled</span></div>
+</div>
+
+<div id="inspector">
+  <h4 id="insp-title" style="color:var(--sun)">Cell Inspector</h4>
+  <div id="insp-content">Click any H3 cell on the grid</div>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search H3 cell index (e.g., 882685805ffffee)..." />
+  <div class="zoom-container">
+    <span>Zoom:</span>
+    <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1">
+  </div>
+  <div class="debug-container">
+    <label><input type="checkbox" id="debugToggle" checked /> H3 Grid Overlay</label>
+  </div>
+  <button id="btnValidate">Run Validation Test</button>
+</div>
+
+<script type="module">
+  import { h3IsValid, stringToH3, h3GetResolution } from 'h3-js';
+
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const searchInput = document.getElementById('search');
+  const zoomRange = document.getElementById('zoomRange');
+  const debugToggle = document.getElementById('debugToggle');
+  const btnValidate = document.getElementById('btnValidate');
+  const telChecked = document.getElementById('tel-checked');
+  const telErrors = document.getElementById('tel-errors');
+  const inspector = document.getElementById('inspector');
+  const inspTitle = document.getElementById('insp-title');
+  const inspContent = document.getElementById('insp-content');
+
+  let width = canvas.width = window.innerWidth;
+  let height = canvas.height = window.innerHeight;
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  let zoom = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let checkedCount = 0;
+  let errorCount = 0;
+
+  // Error Code Mapping
+  const H3_ERROR_CODES = {
+    ERR_INVALID_FORMAT: { code: 'H3_ERR_001', msg: 'Invalid hex string format or invalid length' },
+    ERR_OUT_OF_BOUNDS: { code: 'H3_ERR_002', msg: 'Resolution or coordinate out of valid range (0-15)' },
+    ERR_NULL_INDEX: { code: 'H3_ERR_003', msg: 'Null or empty H3 index string' },
+    ERR_BASE_CELL: { code: 'H3_ERR_004', msg: 'Invalid base cell number in H3 index' }
+  };
+
+  function validateH3String(str) {
+    checkedCount++;
+    telChecked.textContent = checkedCount;
+
+    if (!str || typeof str !== 'string' || str.trim() === '') {
+      errorCount++;
+      telErrors.textContent = errorCount;
+      return { valid: false, error: H3_ERROR_CODES.ERR_NULL_INDEX };
+    }
+
+    const trimmed = str.trim();
+    // Strict H3 hex check: 15 characters typical for resolution ~9, valid hex [0-9a-f]
+    const hexRegex = /^[0-9a-fA-F]{12,16}$/;
+    if (!hexRegex.test(trimmed)) {
+      errorCount++;
+      telErrors.textContent = errorCount;
+      return { valid: false, error: H3_ERROR_CODES.ERR_INVALID_FORMAT };
+    }
+
+    try {
+      const isValid = h3IsValid(trimmed);
+      if (!isValid) {
+        errorCount++;
+        telErrors.textContent = errorCount;
+        return { valid: false, error: H3_ERROR_CODES.ERR_OUT_OF_BOUNDS };
+      }
+      const res = h3GetResolution(trimmed);
+      if (res < 0 || res > 15) {
+        errorCount++;
+        telErrors.textContent = errorCount;
+        return { valid: false, error: H3_ERROR_CODES.ERR_BASE_CELL };
+      }
+      return { valid: true, resolution: res };
+    } catch (err) {
+      errorCount++;
+      telErrors.textContent = errorCount;
+      return { valid: false, error: H3_ERROR_CODES.ERR_INVALID_FORMAT };
+    }
+  }
+
+  // Sample valid h3 index around equator / prime meridian
+  const sampleIndex = '882685805ffffee';
+  searchInput.value = sampleIndex;
+
+  btnValidate.addEventListener('click', () => {
+    const val = searchInput.value;
+    const res = validateH3String(val);
+    inspector.style.display = 'flex';
+    if (res.valid) {
+      inspTitle.textContent = `H3 Index Valid (Res: ${res.resolution})`;
+      inspContent.innerHTML = `<span style="color:var(--flora)">SUCCESS</span>: Index ${val} passed all format and resolution checks.`;
+    } else {
+      inspTitle.textContent = `H3 Error: ${res.error.code}`;
+      inspContent.innerHTML = `<span style="color:var(--danger)">${res.error.code}</span>: ${res.error.msg}`;
+    }
+  });
+
+  zoomRange.addEventListener('input', (e) => {
+    zoom = parseFloat(e.target.value);
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX - offsetX;
+    startY = e.clientY - offsetY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    offsetX = e.clientX - startX;
+    offsetY = e.clientY - startY;
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Approximate click to sample index inspection
+    inspector.style.display = 'flex';
+    inspTitle.textContent = 'Grid Cell Selected';
+    inspContent.innerHTML = `Canvas Pos: (${Math.round(x)}, ${Math.round(y)})<br>Simulating H3 lookup...`;
+    validateH3String(sampleIndex);
+  });
+
+  function drawGrid() {
+    ctx.clearRect(0, 0, width, height);
+
+    if (!debugToggle.checked) return;
+
+    ctx.save();
+    ctx.translate(width / 2 + offsetX, height / 2 + offsetY);
+    ctx.scale(zoom, zoom);
+
+    // Draw ambient coordinate grid representing H3 hierarchical hexagons
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.12)';
+    ctx.lineWidth = 1 / zoom;
+
+    const size = 60;
+    const cols = 14;
+    const rows = 10;
+
+    for (let r = -rows; r <= rows; r++) {
+      for (let c = -cols; c <= cols; c++) {
+        const x = c * size * 1.5;
+        const y = r * size * Math.sqrt(3) + (c % 2 === 0 ? 0 : (size * Math.sqrt(3)) / 2);
+        
+        drawHexagon(ctx, x, y, size * 0.95);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function drawHexagon(ctx, x, y, radius) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      const hx = x + radius * Math.cos(angle);
+      const hy = y + radius * Math.sin(angle);
+      if (i === 0) ctx.moveTo(hx, hy);
+      else ctx.lineTo(hx, hy);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  function loop() {
+    drawGrid();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+
+  // Initial auto-validation of sample
+  validateH3String(sampleIndex);
+</script>
+
+</body>
+</html>
