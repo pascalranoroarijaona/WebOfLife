@@ -14,6 +14,9 @@ export enum H3ErrorCode {
   ERR_H3_OUT_OF_RANGE = "H3_ERR_OUT_OF_RANGE"
 }
 
+export type H3Index = string;
+export type Resolution = number;
+
 export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export interface IResolutionTierValidator {
@@ -22,7 +25,7 @@ export interface IResolutionTierValidator {
 }
 
 export interface H3ValidationResult {
-  readonly isValid: boolean;
+  readonly isValid?: boolean;
   readonly valid?: boolean;
   readonly code?: H3ErrorCode;
   readonly errorCode?: H3ErrorCode;
@@ -30,6 +33,7 @@ export interface H3ValidationResult {
   readonly message?: string;
   readonly resolution?: number;
   readonly baseCell?: number;
+  readonly payload?: string | null;
 }
 
 export interface SpatialGuardContract {

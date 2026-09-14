@@ -1,0 +1,84 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #2C3E50
+
+title Web of Life - Sprint 023: Spatial Resolution Tier & Thermodynamic Monad Architecture
+
+package "src.spatial" {
+    interface IH3GridManager {
+        + validateResolution(resolution: number): boolean
+        + assertValidResolution(resolution: number): void
+    }
+
+    class H3Grid {
+        - minResolution: Resolution
+        - maxResolution: Resolution
+        + isValidH3Resolution(resolution: number): boolean
+        + assertH3Resolution(resolution: number): void
+        + getNeighbors(index: H3Index, resolution: Resolution): H3Index[]
+    }
+
+    class "H3Types" as H3TypesModule {
+        + type H3Index = string
+        + type Resolution = number
+    }
+}
+
+package "src.monads" {
+    class SpatialMonad {
+        - stockId: string
+        - h3Index: H3Index
+        - resolution: Resolution
+        - matterKg: number
+        - energyJoules: number
+        - entropyJK: number
+        + transition(targetResolution: Resolution): SpatialMonad
+        + validateState(): boolean
+    }
+}
+
+package "Database Schema" {
+    class h3_resolution_tiers {
+        + tier_level: SMALLINT {PK}
+        + avg_area_km2: NUMERIC
+        + avg_edge_length_km: NUMERIC
+        + description: TEXT
+    }
+
+    class spatial_monad_stocks {
+        + stock_id: UUID {PK}
+        + entity_id: UUID
+        + h3_index: VARCHAR(15)
+        + resolution: SMALLINT {FK}
+        + matter_kg: NUMERIC
+        + energy_joules: NUMERIC
+        + entropy_j_k: NUMERIC
+        + solar_flux_watts: NUMERIC
+    }
+
+    class thermodynamic_stock_transactions {
+        + transaction_id: UUID {PK}
+        + block_height: BIGINT
+        + parent_stock_id: UUID {FK}
+        + target_stock_id: UUID {FK}
+        + transition_type: VARCHAR(64)
+        + source_resolution: SMALLINT
+        + target_resolution: SMALLINT
+        + delta_matter_kg: NUMERIC
+        + delta_energy_joules: NUMERIC
+        + delta_entropy_j_k: NUMERIC
+        + cryptographic_signature: VARCHAR(128)
+    }
+}
+
+IH3GridManager <|.. H3Grid
+H3Grid --> H3TypesModule : uses
+SpatialMonad --> H3Grid : invokes assertH3Resolution()
+spatial_monad_stocks }-- h3_resolution_tiers : references tier [0-15]
+thermodynamic_stock_transactions --> spatial_monad_stocks : parent_stock_id
+thermodynamic_stock_transactions --> spatial_monad_stocks : target_stock_id
+
+@enduml

@@ -1,6 +1,3 @@
-/**
- * Sprint 002-013: H3 Adjacency & Adjacency Engine Module with Full Backward Compatibility
- */
 import { H3GridManager } from "./h3_grid.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
 export class H3SpatialCell {

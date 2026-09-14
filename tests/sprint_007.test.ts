@@ -80,7 +80,7 @@ describe('Sprint 007 - Uber H3 Index String Format Validation and Error Code Map
 
   it('should instantiate error classes correctly', () => {
     const err = new InvalidLengthError('Test length error');
-    assert.strictEqual(err.errorCode, H3ErrorCode.INVALID_LENGTH);
+    assert.strictEqual(err.code, H3ErrorCode.INVALID_LENGTH);
     assert.strictEqual(err.name, 'InvalidLengthError');
   });
 });
