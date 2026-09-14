@@ -1,196 +1,255 @@
--- Web of Life - Thermodynamic Planetary Ledger Schema
--- Sprint 050: Discrete Vertical Cross-Section Contact Area & Lateral Flux Integration
--- Mathematical Invariant: A_ij = A_ji (Exact geometric symmetry for advective/diffusive conservation)
+-- ============================================================================
+-- Web of Life Thermodynamic Blockchain & Spatial Subsystem Schema
+-- Sprint 051: H3CellInterfaceMetrics & Finite-Volume Boundary Transfer Ledger
+-- ============================================================================
 
--- Enable PostGIS & cryptographic extensions if not already present
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Extensions for spatial computations and cryptographic hashing
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ----------------------------------------------------------------------
--- Planetary Stratification Enums & Domain Definitions
--- ----------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+-- 1. Base Blockchain & Ledger Constructs
+-- ----------------------------------------------------------------------------
 
-CREATE TYPE planetary_stratum_layer AS ENUM (
-    'ATMOSPHERE_EXOSPHERE',
-    'ATMOSPHERE_THERMOSPHERE',
-    'ATMOSPHERE_MESOSPHERE',
-    'ATMOSPHERE_STRATOSPHERE',
-    'ATMOSPHERE_TROPOSPHERE_UPPER',
-    'ATMOSPHERE_TROPOSPHERE_BOUNDARY',
-    'HYDROSPHERE_EPILIMNION',
-    'HYDROSPHERE_THERMOCLINE',
-    'HYDROSPHERE_HYPOLIMNION',
-    'HYDROSPHERE_BENTHIC',
-    'EDAPHIC_ORGANIC_HORIZON',
-    'EDAPHIC_TOPSOIL_A',
-    'EDAPHIC_SUBSOIL_B',
-    'EDAPHIC_REGOLITH_C',
-    'LITHOSPHERE_CRUST_UPPER',
-    'LITHOSPHERE_CRUST_LOWER'
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    block_height BIGINT PRIMARY KEY,
+    block_hash CHAR(64) NOT NULL UNIQUE,
+    parent_hash CHAR(64) NOT NULL,
+    merkle_root CHAR(64) NOT NULL,
+    state_root CHAR(64) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    total_entropy_generated_j_per_k NUMERIC(24, 8) NOT NULL CHECK (total_entropy_generated_j_per_k >= 0),
+    net_enthalpy_variance_joules NUMERIC(24, 8) NOT NULL DEFAULT 0.0 CHECK (ABS(net_enthalpy_variance_joules) <= 1e-6),
+    validator_signature BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TYPE thermodynamic_flux_type AS ENUM (
-    'MASS_ADVECTIVE_FLUID',
-    'MASS_DIFFUSIVE_SOLUTE',
-    'MASS_SEEPAGE_EDAPHIC',
-    'HEAT_SENSIBLE_TURBULENT',
-    'HEAT_CONDUCTIVE_LITHIC',
-    'HEAT_LATENT_PHASE_CHANGE',
-    'ENTROPY_DISSIPATION'
+CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_timestamp 
+    ON blockchain_blocks (timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
+    tx_hash CHAR(64) PRIMARY KEY,
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    tx_type VARCHAR(64) NOT NULL,
+    sender_account CHAR(42) NOT NULL,
+    recipient_account CHAR(42) NOT NULL,
+    state_delta_hash CHAR(64) NOT NULL,
+    signature BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- ----------------------------------------------------------------------
--- Spatial Strata Registry (H3 3D Prisms)
--- ----------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_blockchain_tx_block 
+    ON blockchain_transactions(block_height);
 
-CREATE TABLE IF NOT EXISTS h3_cell_strata (
-    stratum_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    h3_index VARCHAR(15) NOT NULL,
+-- ----------------------------------------------------------------------------
+-- 2. Spatial DGGS: H3 Discrete Global Grid Cells
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS h3_cells (
+    cell_index VARCHAR(15) PRIMARY KEY CHECK (cell_index ~ '^[0-9a-fA-F]{15}$'),
     resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    layer_type planetary_stratum_layer NOT NULL,
-    z_base_meters DOUBLE PRECISION NOT NULL,
-    z_top_meters DOUBLE PRECISION NOT NULL,
-    volume_m3 DOUBLE PRECISION GENERATED ALWAYS AS (
-        -- Geometric volume computed from horizontal area * layer height
-        -- Actual exact volume incorporates spherical radial expansion
-        GREATEST(0.0, z_top_meters - z_base_meters)
-    ) STORED,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_valid_stratum_bounds CHECK (z_top_meters >= z_base_meters),
-    CONSTRAINT uq_cell_stratum_layer UNIQUE (h3_index, layer_type)
+    centroid_latitude NUMERIC(10, 7) NOT NULL CHECK (centroid_latitude BETWEEN -90.0 AND 90.0),
+    centroid_longitude NUMERIC(11, 7) NOT NULL CHECK (centroid_longitude BETWEEN -180.0 AND 180.0),
+    elevation_meters NUMERIC(8, 2) NOT NULL DEFAULT 0.0,
+    surface_area_m2 NUMERIC(18, 4) NOT NULL CHECK (surface_area_m2 > 0),
+    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_cell_strata_h3 ON h3_cell_strata(h3_index);
-CREATE INDEX IF NOT EXISTS idx_h3_cell_strata_elev ON h3_cell_strata(z_base_meters, z_top_meters);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_resolution 
+    ON h3_cells(resolution);
 
--- ----------------------------------------------------------------------
--- Geometric Boundary Contact Area Ledger
--- Stores canonical symmetric edges: cell_index_a < cell_index_b
--- ----------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+-- 3. H3 Cell Interface Metrics (RFC-051)
+-- Captures the physical, geometric, and topological attributes of the shared 
+-- boundary between topologically adjacent H3 cells.
+-- ----------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS h3_boundary_interfaces (
-    interface_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cell_index_a VARCHAR(15) NOT NULL,
-    cell_index_b VARCHAR(15) NOT NULL,
-    stratum_id_a UUID NOT NULL REFERENCES h3_cell_strata(stratum_id) ON DELETE CASCADE,
-    stratum_id_b UUID NOT NULL REFERENCES h3_cell_strata(stratum_id) ON DELETE CASCADE,
-    is_adjacent BOOLEAN NOT NULL DEFAULT TRUE,
-    nominal_edge_length_meters DOUBLE PRECISION NOT NULL CHECK (nominal_edge_length_meters >= 0.0),
-    midpoint_elevation_meters DOUBLE PRECISION NOT NULL,
-    radial_scale_factor DOUBLE PRECISION NOT NULL CHECK (radial_scale_factor > 0.0),
-    effective_overlap_height_meters DOUBLE PRECISION NOT NULL CHECK (effective_overlap_height_meters >= 0.0),
-    contact_area_m2 DOUBLE PRECISION NOT NULL CHECK (contact_area_m2 >= 0.0),
-    geometry_checksum VARCHAR(64) NOT NULL,
-    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- Enforce canonical ordering to guarantee A_ij = A_ji symmetry at the relational level
-    CONSTRAINT chk_canonical_cell_ordering CHECK (cell_index_a < cell_index_b),
-    CONSTRAINT uq_canonical_strata_pair UNIQUE (stratum_id_a, stratum_id_b)
+CREATE TABLE IF NOT EXISTS h3_cell_interfaces (
+    edge_id VARCHAR(31) PRIMARY KEY, -- Format: originIndex:neighborIndex
+    origin_index VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index) ON DELETE CASCADE,
+    neighbor_index VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index) ON DELETE CASCADE,
+    shared_edge_length_meters NUMERIC(12, 4) NOT NULL CHECK (shared_edge_length_meters > 0),
+    centroid_distance_meters NUMERIC(12, 4) NOT NULL CHECK (centroid_distance_meters > 0),
+    bearing_radians NUMERIC(9, 8) NOT NULL CHECK (bearing_radians >= 0.0 AND bearing_radians < 2.0 * PI()),
+    normal_vector_east NUMERIC(9, 8) NOT NULL,
+    normal_vector_north NUMERIC(9, 8) NOT NULL,
+    normal_vector_up NUMERIC(9, 8) NOT NULL,
+    atmospheric_contact_area_m2 NUMERIC(16, 4) NOT NULL CHECK (atmospheric_contact_area_m2 >= 0),
+    subterranean_contact_area_m2 NUMERIC(16, 4) NOT NULL CHECK (subterranean_contact_area_m2 >= 0),
+    topographic_slope NUMERIC(10, 6) NOT NULL,
+    geometric_conductance NUMERIC(14, 8) NOT NULL CHECK (geometric_conductance > 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Invariants: Origin and neighbor must be distinct
+    CONSTRAINT chk_h3_interface_distinct_cells CHECK (origin_index <> neighbor_index),
+    -- Edge ID format consistency
+    CONSTRAINT chk_h3_edge_id_format CHECK (edge_id = origin_index || ':' || neighbor_index),
+    -- Normal vector Euclidean length ~ 1.0 (unit vector in local ENU frame)
+    CONSTRAINT chk_h3_normal_vector_unit_norm CHECK (
+        ABS((normal_vector_east * normal_vector_east + 
+             normal_vector_north * normal_vector_north + 
+             normal_vector_up * normal_vector_up) - 1.0) < 1e-4
+    ),
+    -- Conductance definition: L / d
+    CONSTRAINT chk_h3_geometric_conductance CHECK (
+        ABS(geometric_conductance - (shared_edge_length_meters / centroid_distance_meters)) < 1e-4
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_boundary_lookup ON h3_boundary_interfaces(cell_index_a, cell_index_b);
-CREATE INDEX IF NOT EXISTS idx_h3_boundary_area ON h3_boundary_interfaces(contact_area_m2);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_h3_cell_interfaces_pair 
+    ON h3_cell_interfaces (origin_index, neighbor_index);
 
--- ----------------------------------------------------------------------
--- Blockchain Ledger: Thermodynamic Blocks & Epoch State Roots
--- ----------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_h3_cell_interfaces_origin 
+    ON h3_cell_interfaces (origin_index);
 
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_height BIGSERIAL PRIMARY KEY,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
-    previous_block_hash VARCHAR(64) NOT NULL,
-    epoch_timestamp TIMESTAMPTZ NOT NULL,
-    delta_time_seconds DOUBLE PRECISION NOT NULL CHECK (delta_time_seconds > 0.0),
-    total_mass_kg NUMERIC(38, 8) NOT NULL,
-    total_internal_energy_joules NUMERIC(38, 8) NOT NULL,
-    entropy_production_joules_per_kelvin NUMERIC(38, 8) NOT NULL CHECK (entropy_production_joules_per_kelvin >= 0.0),
-    merkle_root VARCHAR(64) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE INDEX IF NOT EXISTS idx_h3_cell_interfaces_neighbor 
+    ON h3_cell_interfaces (neighbor_index);
 
-CREATE INDEX IF NOT EXISTS idx_thermo_block_height ON thermodynamic_blocks(block_height);
+-- ----------------------------------------------------------------------------
+-- 4. Interface Reciprocity Audit & Invariant Triggers (INV-051-A..E)
+-- ----------------------------------------------------------------------------
 
--- ----------------------------------------------------------------------
--- Thermodynamic Lateral Boundary Flux Transactions
--- Divergence operator: Delta S_i = Delta t * SUM(F_ji * A_contact(j, i))
--- ----------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS thermodynamic_lateral_flux_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height) ON DELETE RESTRICT,
-    interface_id UUID NOT NULL REFERENCES h3_boundary_interfaces(interface_id) ON DELETE RESTRICT,
-    flux_type thermodynamic_flux_type NOT NULL,
-    -- Positive flux indicates directional transport from cell_a to cell_b; negative indicates b to a
-    flux_density DOUBLE PRECISION NOT NULL, -- e.g. kg/(m^2*s) or J/(m^2*s)
-    total_flux_quantity NUMERIC(38, 12) NOT NULL, -- flux_density * contact_area_m2 * delta_time
-    symmetry_verified BOOLEAN NOT NULL DEFAULT TRUE,
-    transaction_signature VARCHAR(128) NOT NULL,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_flux_symmetry_enforced CHECK (symmetry_verified IS TRUE)
-);
-
-CREATE INDEX IF NOT EXISTS idx_flux_tx_block ON thermodynamic_lateral_flux_transactions(block_height);
-CREATE INDEX IF NOT EXISTS idx_flux_tx_interface ON thermodynamic_lateral_flux_transactions(interface_id);
-
--- ----------------------------------------------------------------------
--- Cell Thermodynamic Stock Balance (Double-entry Invariant Ledger)
--- Enforces: dM_i/dt + div(J) = 0 and First Law Energy Conservation
--- ----------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS thermodynamic_cell_stocks (
-    stock_record_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height) ON DELETE RESTRICT,
-    stratum_id UUID NOT NULL REFERENCES h3_cell_strata(stratum_id) ON DELETE RESTRICT,
-    mass_stock_kg NUMERIC(38, 8) NOT NULL CHECK (mass_stock_kg >= 0.0),
-    internal_energy_joules NUMERIC(38, 8) NOT NULL,
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
-    pressure_pascals DOUBLE PRECISION NOT NULL CHECK (pressure_pascals >= 0.0),
-    divergence_mass_in_kg NUMERIC(38, 12) NOT NULL DEFAULT 0.0,
-    divergence_mass_out_kg NUMERIC(38, 12) NOT NULL DEFAULT 0.0,
-    divergence_energy_in_joules NUMERIC(38, 12) NOT NULL DEFAULT 0.0,
-    divergence_energy_out_joules NUMERIC(38, 12) NOT NULL DEFAULT 0.0,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_cell_stock_per_block UNIQUE (block_height, stratum_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_cell_stocks_block ON thermodynamic_cell_stocks(block_height);
-CREATE INDEX IF NOT EXISTS idx_cell_stocks_stratum ON thermodynamic_cell_stocks(stratum_id);
-
--- ----------------------------------------------------------------------
--- Continuous Integrity Trigger: Symmetrical Conservation Verification
--- ----------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION verify_stratum_flux_conservation()
+CREATE OR REPLACE FUNCTION trg_assert_h3_cell_interface_reciprocity()
 RETURNS TRIGGER AS $$
 DECLARE
-    contact_area DOUBLE PRECISION;
-    calculated_total NUMERIC(38, 12);
-    block_dt DOUBLE PRECISION;
+    reciprocal_row RECORD;
 BEGIN
-    -- Retrieve verified contact area
-    SELECT contact_area_m2 INTO contact_area
-    FROM h3_boundary_interfaces
-    WHERE interface_id = NEW.interface_id;
+    SELECT * INTO reciprocal_row
+    FROM h3_cell_interfaces
+    WHERE origin_index = NEW.neighbor_index AND neighbor_index = NEW.origin_index;
 
-    -- Retrieve block time-step
-    SELECT delta_time_seconds INTO block_dt
-    FROM thermodynamic_blocks
-    WHERE block_height = NEW.block_height;
+    IF reciprocal_row IS NOT NULL THEN
+        -- INV-051-A: Reciprocity of Shared Length
+        IF ABS(reciprocal_row.shared_edge_length_meters - NEW.shared_edge_length_meters) > 1e-3 THEN
+            RAISE EXCEPTION 'INV-051-A Violation: Shared edge length mismatch between % and %', 
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
 
-    calculated_total := NEW.flux_density * contact_area * block_dt;
+        -- INV-051-B: Reciprocity of Centroid Distance
+        IF ABS(reciprocal_row.centroid_distance_meters - NEW.centroid_distance_meters) > 1e-3 THEN
+            RAISE EXCEPTION 'INV-051-B Violation: Centroid distance mismatch between % and %', 
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
 
-    -- Verify transactional fidelity against geometric bounds
-    IF ABS(NEW.total_flux_quantity - calculated_total) > 1e-6 THEN
-        RAISE EXCEPTION 'Thermodynamic Invariant Violation: Flux total (%) does not match contact_area * flux_density * dt (%)',
-            NEW.total_flux_quantity, calculated_total;
+        -- INV-051-C: Normal Vector Inversion
+        IF ABS(reciprocal_row.normal_vector_east + NEW.normal_vector_east) > 1e-3 OR
+           ABS(reciprocal_row.normal_vector_north + NEW.normal_vector_north) > 1e-3 OR
+           ABS(reciprocal_row.normal_vector_up + NEW.normal_vector_up) > 1e-3 THEN
+            RAISE EXCEPTION 'INV-051-C Violation: Normal vector not anti-parallel between % and %', 
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
+
+        -- INV-051-D: Slope Antisymmetry
+        IF ABS(reciprocal_row.topographic_slope + NEW.topographic_slope) > 1e-4 THEN
+            RAISE EXCEPTION 'INV-051-D Violation: Topographic slope not antisymmetric between % and %', 
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
     END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_verify_flux_conservation ON thermodynamic_lateral_flux_transactions;
-CREATE TRIGGER trg_verify_flux_conservation
-BEFORE INSERT ON thermodynamic_lateral_flux_transactions
-FOR EACH ROW
-EXECUTE FUNCTION verify_stratum_flux_conservation();
+DROP TRIGGER IF EXISTS trg_h3_cell_interface_reciprocity ON h3_cell_interfaces;
+CREATE TRIGGER trg_h3_cell_interface_reciprocity
+    AFTER INSERT OR UPDATE ON h3_cell_interfaces
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_assert_h3_cell_interface_reciprocity();
+
+-- ----------------------------------------------------------------------------
+-- 5. Thermodynamic Boundary Flux Ledger
+-- Records conservative cross-boundary flows (First & Second Laws)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS thermodynamic_interface_fluxes (
+    flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    tx_hash CHAR(64) NOT NULL REFERENCES blockchain_transactions(tx_hash) ON DELETE CASCADE,
+    edge_id VARCHAR(31) NOT NULL REFERENCES h3_cell_interfaces(edge_id),
+    origin_index VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index),
+    neighbor_index VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index),
+    epoch_timestamp TIMESTAMPTZ NOT NULL,
+    
+    -- Stock Transport Rates (Fluxes)
+    enthalpy_flux_watts NUMERIC(18, 6) NOT NULL,            -- Thermal/internal energy flux (W)
+    water_flux_kg_per_s NUMERIC(18, 6) NOT NULL,            -- Water mass transfer (kg/s)
+    carbon_flux_kg_per_s NUMERIC(18, 6) NOT NULL,           -- Carbon mass transfer (kg/s)
+    nutrient_flux_mol_per_s NUMERIC(18, 6) NOT NULL,        -- Nutrients (N, P) flux (mol/s)
+    
+    -- Driving Thermodynamic Potentials (for 2nd Law validation)
+    origin_temperature_k NUMERIC(8, 3) NOT NULL CHECK (origin_temperature_k > 0),
+    neighbor_temperature_k NUMERIC(8, 3) NOT NULL CHECK (neighbor_temperature_k > 0),
+    entropy_production_rate_w_per_k NUMERIC(18, 6) NOT NULL CHECK (entropy_production_rate_w_per_k >= 0),
+    
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_flux_cells_match_edge CHECK (edge_id = origin_index || ':' || neighbor_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_interface_fluxes_block 
+    ON thermodynamic_interface_fluxes(block_height);
+
+CREATE INDEX IF NOT EXISTS idx_interface_fluxes_edge 
+    ON thermodynamic_interface_fluxes(edge_id);
+
+CREATE INDEX IF NOT EXISTS idx_interface_fluxes_origin_time 
+    ON thermodynamic_interface_fluxes(origin_index, epoch_timestamp);
+
+-- ----------------------------------------------------------------------------
+-- 6. Spatial Finite-Volume Laplacian & Divergence View
+-- Computes net divergence \nabla \cdot J over each H3 cell for thermodynamic audit
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW view_cell_flux_divergence AS
+SELECT
+    tif.block_height,
+    tif.origin_index AS cell_index,
+    COUNT(tif.neighbor_index) AS neighbor_count,
+    SUM(tif.enthalpy_flux_watts) AS net_enthalpy_divergence_watts,
+    SUM(tif.water_flux_kg_per_s) AS net_water_divergence_kg_per_s,
+    SUM(tif.carbon_flux_kg_per_s) AS net_carbon_divergence_kg_per_s,
+    SUM(tif.entropy_production_rate_w_per_k) AS total_cell_entropy_production_w_per_k
+FROM thermodynamic_interface_fluxes tif
+GROUP BY tif.block_height, tif.origin_index;
+
+-- ----------------------------------------------------------------------------
+-- 7. First Law Conservation Verification Trigger
+-- Ensures pair-wise antisymmetry: Phi_{i->j} + Phi_{j->i} = 0 across block interfaces
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION trg_assert_first_law_flux_antisymmetry()
+RETURNS TRIGGER AS $$
+DECLARE
+    counter_flux RECORD;
+BEGIN
+    SELECT * INTO counter_flux
+    FROM thermodynamic_interface_fluxes
+    WHERE block_height = NEW.block_height
+      AND origin_index = NEW.neighbor_index
+      AND neighbor_index = NEW.origin_index;
+
+    IF counter_flux IS NOT NULL THEN
+        IF ABS(NEW.enthalpy_flux_watts + counter_flux.enthalpy_flux_watts) > 1e-4 THEN
+            RAISE EXCEPTION 'First Law Violation: Enthalpy flux not antisymmetric across % -> %',
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
+        IF ABS(NEW.water_flux_kg_per_s + counter_flux.water_flux_kg_per_s) > 1e-4 THEN
+            RAISE EXCEPTION 'First Law Violation: Water flux not antisymmetric across % -> %',
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
+        IF ABS(NEW.carbon_flux_kg_per_s + counter_flux.carbon_flux_kg_per_s) > 1e-4 THEN
+            RAISE EXCEPTION 'First Law Violation: Carbon flux not antisymmetric across % -> %',
+                NEW.origin_index, NEW.neighbor_index;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_thermodynamic_flux_antisymmetry ON thermodynamic_interface_fluxes;
+CREATE TRIGGER trg_thermodynamic_flux_antisymmetry
+    AFTER INSERT ON thermodynamic_interface_fluxes
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_assert_first_law_flux_antisymmetry();

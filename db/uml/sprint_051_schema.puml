@@ -1,0 +1,179 @@
+@startuml sprint_051_schema
+!theme plain
+skinparam roundcorner 6
+skinparam classFontSize 12
+skinparam packageFontSize 13
+skinparam defaultFontName "Courier"
+skinparam arrowColor #2C3E50
+skinparam classBorderColor #34495E
+
+title Web of Life - Sprint 051: H3CellInterfaceMetrics & Spatial Transfer Architecture
+
+package "Domain: Spatial Subsystem (src/spatial)" {
+    
+    interface H3CellInterfaceMetrics <<interface>> {
+        +originIndex: string
+        +neighborIndex: string
+        +sharedEdgeLengthMeters: number
+        +centroidDistanceMeters: number
+        +bearingRadians: number
+        +normalVector: readonly [number, number, number]
+        +atmosphericContactAreaM2: number
+        +subterraneanContactAreaM2: number
+        +topographicSlope: number
+        +geometricConductance: number
+    }
+
+    class H3AdjacencyManager {
+        -metricCache: Map<string, H3CellInterfaceMetrics>
+        -gridResolution: number
+        +computeInterfaceMetrics(origin: string, neighbor: string): H3CellInterfaceMetrics
+        +getInterfaceMetrics(origin: string, neighbor: string): H3CellInterfaceMetrics
+        +getNeighborInterfaces(origin: string): ReadonlyMap<string, H3CellInterfaceMetrics>
+        +validateReciprocity(origin: string, neighbor: string): boolean
+    }
+
+    class H3SpatialGrid {
+        +resolution: number
+        +cellCount: number
+        +getCellCentroid(cellIndex: string): [number, number]
+        +getCellElevation(cellIndex: string): number
+        +getSharedEdgeLength(cellA: string, cellB: string): number
+        +getCentroidDistance(cellA: string, cellB: string): number
+    }
+
+    class H3StateTensor {
+        +dimensions: [number, number]
+        +enthalpyLayer: Float64Array
+        +waterLayer: Float64Array
+        +carbonLayer: Float64Array
+        +entropyLayer: Float64Array
+        +getCellValue(cellIndex: string, layer: number): number
+        +setCellValue(cellIndex: string, layer: number, val: number): void
+    }
+}
+
+package "Domain: Spatial Monad & Physics (src/monads)" {
+    class SpatialMonad<T> {
+        -state: T
+        -adjacency: H3AdjacencyManager
+        +bind<U>(transform: (state: T) => SpatialMonad<U>): SpatialMonad<U>
+        +computeAdvectiveFluxes(tensor: H3StateTensor): ThermodynamicFluxReport
+        +computeDiffusiveLaplacian(tensor: H3StateTensor): H3StateTensor
+        +verifyFirstLawConservation(): boolean
+        +verifySecondLawEntropyGeneration(): boolean
+    }
+
+    class ThermodynamicFluxReport {
+        +blockHeight: bigint
+        +fluxes: Map<string, InterfaceFluxRecord>
+        +netEnthalpyDivergence: number
+        +netEntropyGenerated: number
+        +isConservative(): boolean
+    }
+}
+
+package "Database Relational Models (db/schema.sql)" {
+    
+    entity "h3_cells" as H3Cells <<Table>> {
+        * cell_index: VARCHAR(15) [PK]
+        --
+        resolution: SMALLINT
+        centroid_latitude: NUMERIC(10, 7)
+        centroid_longitude: NUMERIC(11, 7)
+        elevation_meters: NUMERIC(8, 2)
+        surface_area_m2: NUMERIC(18, 4)
+        is_pentagon: BOOLEAN
+        created_at: TIMESTAMPTZ
+    }
+
+    entity "h3_cell_interfaces" as H3CellInterfaces <<Table>> {
+        * edge_id: VARCHAR(31) [PK]
+        --
+        * origin_index: VARCHAR(15) [FK]
+        * neighbor_index: VARCHAR(15) [FK]
+        shared_edge_length_meters: NUMERIC(12, 4)
+        centroid_distance_meters: NUMERIC(12, 4)
+        bearing_radians: NUMERIC(9, 8)
+        normal_vector_east: NUMERIC(9, 8)
+        normal_vector_north: NUMERIC(9, 8)
+        normal_vector_up: NUMERIC(9, 8)
+        atmospheric_contact_area_m2: NUMERIC(16, 4)
+        subterranean_contact_area_m2: NUMERIC(16, 4)
+        topographic_slope: NUMERIC(10, 6)
+        geometric_conductance: NUMERIC(14, 8)
+        created_at: TIMESTAMPTZ
+        updated_at: TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_interface_fluxes" as ThermodynamicInterfaceFluxes <<Table>> {
+        * flux_id: UUID [PK]
+        --
+        * block_height: BIGINT [FK]
+        * tx_hash: CHAR(64) [FK]
+        * edge_id: VARCHAR(31) [FK]
+        * origin_index: VARCHAR(15) [FK]
+        * neighbor_index: VARCHAR(15) [FK]
+        epoch_timestamp: TIMESTAMPTZ
+        enthalpy_flux_watts: NUMERIC(18, 6)
+        water_flux_kg_per_s: NUMERIC(18, 6)
+        carbon_flux_kg_per_s: NUMERIC(18, 6)
+        nutrient_flux_mol_per_s: NUMERIC(18, 6)
+        origin_temperature_k: NUMERIC(8, 3)
+        neighbor_temperature_k: NUMERIC(8, 3)
+        entropy_production_rate_w_per_k: NUMERIC(18, 6)
+    }
+
+    entity "blockchain_blocks" as BlockchainBlocks <<Table>> {
+        * block_height: BIGINT [PK]
+        --
+        block_hash: CHAR(64)
+        parent_hash: CHAR(64)
+        merkle_root: CHAR(64)
+        state_root: CHAR(64)
+        timestamp: TIMESTAMPTZ
+        total_entropy_generated_j_per_k: NUMERIC(24, 8)
+        net_enthalpy_variance_joules: NUMERIC(24, 8)
+        validator_signature: BYTEA
+    }
+
+    entity "blockchain_transactions" as BlockchainTransactions <<Table>> {
+        * tx_hash: CHAR(64) [PK]
+        --
+        * block_height: BIGINT [FK]
+        tx_type: VARCHAR(64)
+        sender_account: CHAR(42)
+        recipient_account: CHAR(42)
+        state_delta_hash: CHAR(64)
+        signature: BYTEA
+    }
+}
+
+' Relationships & Invariant Alignments
+H3AdjacencyManager ..> H3CellInterfaceMetrics : computes & caches
+H3AdjacencyManager o-- H3SpatialGrid : uses coordinate topology
+SpatialMonad *-- H3AdjacencyManager : coordinates diffusion/advection
+SpatialMonad ..> ThermodynamicFluxReport : produces
+ThermodynamicFluxReport o-- H3StateTensor : audits conservation on
+
+H3CellInterfaceMetrics ..> H3CellInterfaces : 1:1 Schema Mapping
+H3Cells ||--o{ H3CellInterfaces : origin_cell
+H3Cells ||--o{ H3CellInterfaces : neighbor_cell
+
+BlockchainBlocks ||--o{ BlockchainTransactions : contains
+BlockchainTransactions ||--o{ ThermodynamicInterfaceFluxes : authorizes
+H3CellInterfaces ||--o{ ThermodynamicInterfaceFluxes : parameterized_by
+BlockchainBlocks ||--o{ ThermodynamicInterfaceFluxes : records
+
+note right of H3CellInterfaceMetrics
+  <b>Thermodynamic Invariants:</b>
+  * <b>INV-051-A:</b> L(i, j) == L(j, i)
+  * <b>INV-051-B:</b> d(i, j) == d(j, i)
+  * <b>INV-051-C:</b> n(i, j) == -n(j, i)
+  * <b>INV-051-D:</b> slope(i, j) == -slope(j, i)
+  * <b>INV-051-E:</b> L, d, gamma > 0
+  * <b>First Law:</b> Phi_{i->j} == -Phi_{j->i}
+  * <b>Second Law:</b> S_gen >= 0
+end note
+
+@enduml
