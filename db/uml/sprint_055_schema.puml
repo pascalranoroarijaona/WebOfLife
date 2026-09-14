@@ -1,0 +1,147 @@
+@startuml sprint_055_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classFontSize 12
+skinparam classHeaderBackgroundColor #E8EEF5
+skinparam classBorderColor #2C3E50
+skinparam arrowColor #34495E
+
+title Web of Life Simulation - Sprint 055
+subtitle Angular Normalization (normalizeAngleRadians) & Geodesic Advection Topology
+
+package "Thermodynamic Blockchain & Stock Ledger" {
+    class BlockchainBlock <<Entity>> {
+        + block_height: Long [PK]
+        + block_hash: String [UNIQUE]
+        + previous_hash: String
+        + merkle_state_root: String
+        + thermodynamic_entropy_flux: Double
+        + kinetic_energy_conserved: Boolean
+        + timestamp: Timestamp
+        --
+        + verifyFirstLawConservation(): Boolean
+        + verifySecondLawEntropy(): Boolean
+    }
+
+    class ThermodynamicStockTransaction <<Ledger>> {
+        + tx_id: UUID [PK]
+        + block_height: Long [FK]
+        + cell_index: H3Index [FK]
+        + internal_energy_joules: Double
+        + enthalpy_joules: Double
+        + entropy_joules_per_kelvin: Double
+        + temperature_kelvin: Double
+        + pressure_pascals: Double
+        + mass_kg: Double
+        + tx_signature: String
+        --
+        + signTransaction(privateKey: Key): String
+    }
+}
+
+package "Spatial DGGS & Angular Vector Hierarchy" {
+    interface IAngularVector2D <<Interface>> {
+        + magnitude: number
+        + angleRadians: number
+    }
+
+    class SpatialH3Cell <<Entity>> {
+        + cell_index: H3Index [PK]
+        + resolution: Short
+        + centroid_lat: Double
+        + centroid_lon: Double
+        + altitude_meters: Double
+        --
+        + getNeighbors(): List<SpatialH3Cell>
+        + distanceTo(other: SpatialH3Cell): Double
+    }
+
+    class HexagonalAdvectiveBearing implements IAngularVector2D {
+        - _originCell: H3Index
+        - _targetCell: H3Index
+        - _bearingRadians: Double
+        - _magnitude: Double
+        --
+        + constructor(origin: H3Index, target: H3Index, rad: Double, mag: Double)
+        + get magnitude(): Double
+        + get angleRadians(): Double
+        + get originCell(): H3Index
+        + get targetCell(): H3Index
+        + normalize(): HexagonalAdvectiveBearing
+        + toCartesianComponents(): CartesianVector2D
+    }
+
+    class CartesianVector2D <<Value Object>> {
+        + u: Double
+        + v: Double
+        --
+        + toMagnitudeAngle(): IAngularVector2D
+    }
+
+    class HexagonalAdvectionFlux <<Entity>> {
+        + flux_id: UUID [PK]
+        + block_height: Long [FK]
+        + origin_cell: H3Index [FK]
+        + target_cell: H3Index [FK]
+        + velocity_magnitude: Double
+        + advection_bearing_radians: Double
+        + velocity_u: Double
+        + velocity_v: Double
+        + mass_flux_kg_per_sec: Double
+        + kinetic_energy_flux_watts: Double
+        + dissipation_entropy_delta: Double
+        --
+        + assertConservation(): Boolean
+    }
+}
+
+package "Functional Monads & Utility Services" {
+    class H3AdjacencyModule <<Module>> {
+        + normalizeAngleRadians(radians: Double): Double
+        + computeAzimuth(origin: SpatialH3Cell, target: SpatialH3Cell): Double
+        + computeGeodesicAdvectionVector(u: Double, v: Double): IAngularVector2D
+    }
+
+    class SpatialMonad<S> <<Monad>> {
+        - state: S
+        - cell: SpatialH3Cell
+        --
+        + unit(state: S, cell: SpatialH3Cell): SpatialMonad<S>
+        + bind<R>(fn: (s: S) => SpatialMonad<R>): SpatialMonad<R>
+        + advect(bearing: HexagonalAdvectiveBearing): SpatialMonad<S>
+        + run(): S
+    }
+}
+
+' Relationships & Associations
+BlockchainBlock "1" *-- "0..*" ThermodynamicStockTransaction : records >
+BlockchainBlock "1" *-- "0..*" HexagonalAdvectionFlux : commits >
+SpatialH3Cell "1" -- "0..*" SpatialH3Cell : adjacent_to >
+SpatialH3Cell "1" o-- "0..*" ThermodynamicStockTransaction : stores_state >
+
+SpatialH3Cell "1" <-- HexagonalAdvectiveBearing : references_origin
+SpatialH3Cell "1" <-- HexagonalAdvectiveBearing : references_target
+
+HexagonalAdvectiveBearing ..> CartesianVector2D : produces >
+HexagonalAdvectiveBearing ..> H3AdjacencyModule : invokes normalizeAngleRadians() >
+SpatialMonad ..> HexagonalAdvectiveBearing : transforms_through >
+HexagonalAdvectionFlux "1" ..> HexagonalAdvectiveBearing : represents_realized_flow >
+
+note right of H3AdjacencyModule
+  **Quotient Group Mapping**
+  $$\psi: \mathbb{R} \to [-\pi, \pi)$$
+  $$\psi(\theta) = \theta - 2\pi \left\lfloor \frac{\theta + \pi}{2\pi} \right\rfloor$$
+  - Boundary cut: $+\pi \mapsto -\pi$
+  - Preserves First Law (kinetic energy & directional momentum)
+  - Isentropic projection ($dS_{phase} = 0$)
+end note
+
+note bottom of HexagonalAdvectionFlux
+  **Thermodynamic Constraint**
+  $$u = \|\mathbf{v}\| \cos(\hat{\theta})$$
+  $$v = \|\mathbf{v}\| \sin(\hat{\theta})$$
+  $$\sum_{k \in \text{neighbors}} \text{flux}_k(m) = 0$$
+end note
+
+@enduml

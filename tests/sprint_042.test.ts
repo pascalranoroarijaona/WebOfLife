@@ -235,9 +235,9 @@ describe('Sprint 042 - H3 Spatial Thermodynamic State Tensor', () => {
 
   it('chains transitions cleanly within SpatialMonad', () => {
     const dt = 100;
-    const monad = SpatialMonad.of(validRecord)
-      .map(s => evaluateRadiativeStep(s, dt))
-      .bind(s => SpatialMonad.of(evaluatePhaseTransitions(s, dt)));
+    const monad = SpatialMonad.of<H3CellThermodynamicRecord>(validRecord)
+      .map((s: H3CellThermodynamicRecord) => evaluateRadiativeStep(s, dt))
+      .bind((s: H3CellThermodynamicRecord) => SpatialMonad.of(evaluatePhaseTransitions(s, dt)));
 
     const result = monad.unwrap();
     assert.ok(result instanceof H3CellThermodynamicRecord);

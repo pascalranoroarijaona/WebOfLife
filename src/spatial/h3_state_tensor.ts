@@ -21,6 +21,22 @@ import {
   computeAugustRocheMagnusSatVaporPressure,
 } from '../thermodynamics/constants.js';
 
+export {
+  CellThermodynamicOverride,
+  CellThermodynamicDeltaRecord,
+  ThermodynamicOverrideReport,
+  H3ThermodynamicOverridesMap,
+  OverrideOptions,
+  ThermodynamicChannel,
+  THERMODYNAMIC_CONSTANTS,
+} from './h3_types.js';
+
+export {
+  HexCellStocks,
+  AdvectiveEdgeContext,
+  computeAdvectiveEdgeTransfer,
+} from './h3_adjacency.js';
+
 export { SpatialMonad } from '../monads/spatial_monad.js';
 
 // =============================================================================
@@ -426,7 +442,6 @@ export function validateH3CellThermodynamicState(
     violations.push(v);
   };
 
-  // Metadata check
   if (!state.cellIndex || state.cellIndex.trim() === '') {
     pushViolation({
       type: ThermodynamicViolationType.CORRUPT_METADATA,
@@ -443,7 +458,6 @@ export function validateH3CellThermodynamicState(
     if (failFast) return { isValid: false, violations, cellIndex: state.cellIndex, evaluatedAt: Date.now() };
   }
 
-  // Non-finite checks
   const fieldsToCheck: [string, number][] = [
     ['temperatureKelvin', state.temperatureKelvin],
     ['atmosphericCarbon', state.atmosphericCarbon],
@@ -476,7 +490,6 @@ export function validateH3CellThermodynamicState(
     }
   }
 
-  // Temperature check
   if (Number.isFinite(state.temperatureKelvin) && state.temperatureKelvin < minT) {
     pushViolation({
       type: ThermodynamicViolationType.NON_POSITIVE_TEMPERATURE,
@@ -487,7 +500,6 @@ export function validateH3CellThermodynamicState(
     if (failFast) return { isValid: false, violations, cellIndex: state.cellIndex, evaluatedAt: Date.now() };
   }
 
-  // Stock positivity checks
   const stockFields: [string, number][] = [
     ['atmosphericCarbon', state.atmosphericCarbon],
     ['organicCarbon', state.organicCarbon],

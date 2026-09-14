@@ -4,6 +4,8 @@
  */
 import { ThermodynamicChannel, THERMODYNAMIC_CONSTANTS, } from './h3_types.js';
 import { STEFAN_BOLTZMANN_CONSTANT, STP_CONSTANTS, DRY_MOLE_FRACTION_N2, DRY_MOLE_FRACTION_O2, DRY_MOLE_FRACTION_CO2, computeAugustRocheMagnusSatVaporPressure, } from '../thermodynamics/constants.js';
+export { ThermodynamicChannel, THERMODYNAMIC_CONSTANTS, } from './h3_types.js';
+export { computeAdvectiveEdgeTransfer, } from './h3_adjacency.js';
 export { SpatialMonad } from '../monads/spatial_monad.js';
 // =============================================================================
 // ERROR HIERARCHY
@@ -303,7 +305,6 @@ export function validateH3CellThermodynamicState(state, options = {}) {
     const pushViolation = (v) => {
         violations.push(v);
     };
-    // Metadata check
     if (!state.cellIndex || state.cellIndex.trim() === '') {
         pushViolation({
             type: ThermodynamicViolationType.CORRUPT_METADATA,
@@ -320,7 +321,6 @@ export function validateH3CellThermodynamicState(state, options = {}) {
         if (failFast)
             return { isValid: false, violations, cellIndex: state.cellIndex, evaluatedAt: Date.now() };
     }
-    // Non-finite checks
     const fieldsToCheck = [
         ['temperatureKelvin', state.temperatureKelvin],
         ['atmosphericCarbon', state.atmosphericCarbon],
@@ -352,7 +352,6 @@ export function validateH3CellThermodynamicState(state, options = {}) {
             }
         }
     }
-    // Temperature check
     if (Number.isFinite(state.temperatureKelvin) && state.temperatureKelvin < minT) {
         pushViolation({
             type: ThermodynamicViolationType.NON_POSITIVE_TEMPERATURE,
@@ -363,7 +362,6 @@ export function validateH3CellThermodynamicState(state, options = {}) {
         if (failFast)
             return { isValid: false, violations, cellIndex: state.cellIndex, evaluatedAt: Date.now() };
     }
-    // Stock positivity checks
     const stockFields = [
         ['atmosphericCarbon', state.atmosphericCarbon],
         ['organicCarbon', state.organicCarbon],
