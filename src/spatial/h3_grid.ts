@@ -1,24 +1,27 @@
-import * as h3 from 'h3-js';
+import { latLngToCell, cellToLatLng, gridDisk, isValidCell } from "h3-js";
+import { H3Index, H3Coordinate, H3Resolution } from "./h3_types";
 
-export interface H3CellData {
-  index: string;
-  resolution: number;
-  temperature: number;
-  biomassFlux: number;
-}
+export class H3GridManager {
+  private resolution: H3Resolution;
 
-export function createH3Cell(lat: number, lng: number, resolution: number): H3CellData {
-  const index = h3.latLngToCell(lat, lng, resolution);
-  const res = h3.getResolution(index);
-  return {
-    index,
-    resolution: res,
-    temperature: 298.15,
-    biomassFlux: 1.0,
-  };
-}
+  constructor(resolution: H3Resolution = 3) {
+    this.resolution = resolution;
+  }
 
-export function getCellBoundary(index: string): [number, number][] {
-  const boundary = h3.cellToBoundary(index, true);
-  return boundary as [number, number][];
+  public latLngToH3(lat: number, lng: number): H3Index {
+    return latLngToCell(lat, lng, this.resolution);
+  }
+
+  public h3ToLatLng(h3Index: H3Index): H3Coordinate {
+    const [lat, lng] = cellToLatLng(h3Index);
+    return { lat, lng };
+  }
+
+  public getNeighbors(h3Index: H3Index, k: number = 1): H3Index[] {
+    return gridDisk(h3Index, k);
+  }
+
+  public isValid(h3Index: H3Index): boolean {
+    return isValidCell(h3Index);
+  }
 }

@@ -1,0 +1,68 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+class Error {
+  +message: string
+  +stack: string
+}
+
+class H3ValidationError {
+  +errorCode: H3ErrorCode
+  +message: string
+}
+
+class InvalidLengthError {
+  +expected: number
+  +actual: number
+}
+
+class InvalidCharacterError {
+  +invalidChar: string
+}
+
+class InvalidResolutionError {
+  +resolution: number
+}
+
+class InvalidBaseCellError {
+  +baseCell: number
+}
+
+Error <|-- H3ValidationError
+H3ValidationError <|-- InvalidLengthError
+H3ValidationError <|-- InvalidCharacterError
+H3ValidationError <|-- InvalidResolutionError
+H3ValidationError <|-- InvalidBaseCellError
+
+enum H3ErrorCode {
+  ERR_H3_INVALID_NULL = 0x01
+  ERR_H3_INVALID_LENGTH = 0x02
+  ERR_H3_INVALID_CHARACTERS = 0x03
+  ERR_H3_INVALID_RESOLUTION = 0x04
+  ERR_H3_INVALID_BASE_CELL = 0x05
+  ERR_H3_OUT_OF_RANGE = 0x06
+}
+
+class H3GridValidator {
+  {static} +validateString(h3Index: string): H3ValidationResult
+  {static} +parseResolution(h3Index: string): number
+  {static} +mapErrorCode(err: H3ValidationError): H3ErrorCode
+  {static} +isH3Index(value: unknown): value is string
+}
+
+class SpatialMonad {
+  -h3Token: string
+  -resolution: number
+  -matterStockKg: number
+  -energyJoules: number
+  +of(h3String: string): SpatialMonad
+  +bind(transform: Function): SpatialMonad
+  +map(transform: Function): SpatialMonad
+}
+
+H3GridValidator --> H3ErrorCode : maps to
+SpatialMonad --> H3GridValidator : validates via
+H3GridValidator ..> H3ValidationError : throws / handles
+
+@enduml

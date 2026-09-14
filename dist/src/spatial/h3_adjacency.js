@@ -59,7 +59,6 @@ export class H3AdjacencyEngine {
             carbonMass: Math.max(0, centerState.carbonMass + netCarbonDelta),
             waterMass: Math.max(0, centerState.waterMass + netWaterDelta)
         };
-        // Return wrapped in SpatialMonad for Sprint 002 test compatibility
         return {
             extract: () => updatedState,
             bind: (fn) => fn(updatedState),
@@ -67,9 +66,6 @@ export class H3AdjacencyEngine {
         };
     }
 }
-/**
- * Returns neighboring H3 cells within k distance (gridDisk).
- */
 export function getH3Neighbors(index, k = 1) {
     const validation = validateH3Index(index);
     if (!validation.valid) {
@@ -83,7 +79,6 @@ export function getH3Neighbors(index, k = 1) {
         return disks.filter((cell) => cell !== null);
     }
     catch (err) {
-        // Fallback simulated neighbors if h3-js execution fails on mock strings
         const mockNeighbors = [index];
         for (let i = 0; i < 6 * k; i++) {
             mockNeighbors.push('8c2681432ffffff' + (i % 10));
@@ -91,9 +86,6 @@ export function getH3Neighbors(index, k = 1) {
         return mockNeighbors;
     }
 }
-/**
- * Computes grid distance between two H3 index strings.
- */
 export function getH3GridDistance(origin, destination) {
     const v1 = validateH3Index(origin);
     if (!v1.valid) {

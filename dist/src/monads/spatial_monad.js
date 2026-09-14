@@ -17,7 +17,7 @@ export class H3ValidationMonad {
             if (err instanceof H3Error) {
                 return new H3ValidationMonad(null, err, validator);
             }
-            throw err;
+            return new H3ValidationMonad(null, new H3Error(H3ErrorCode.INVALID_CHARACTER, err.message), validator);
         }
     }
     bind(transitionFn) {
@@ -60,7 +60,7 @@ export class SpatialMonad {
     static fromGeo(coord, resolution, initialStock) {
         const normalizedIndex = H3GridParser.fromGeo(coord, resolution);
         const validation = H3GridParser.validateIndex(normalizedIndex);
-        if (!validation.isValid) {
+        if (!validation.valid) {
             throw new Error(`SpatialMonad Binding Failed: Invalid H3 index generated [${validation.errorCode}]`);
         }
         const monad = new SpatialMonad(normalizedIndex);
