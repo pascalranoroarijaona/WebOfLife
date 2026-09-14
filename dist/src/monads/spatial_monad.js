@@ -2,36 +2,59 @@ import { H3ErrorCode } from '../spatial/h3_types';
 import { assertValidH3Resolution, guardH3Payload, isValidH3Index } from '../spatial/h3_grid';
 export class SpatialMonad {
     h3Index;
-    stocks;
-    trophicEnergyStockJoules;
     value;
     runValue = null;
     history = [];
     stock;
     resolution;
-    constructor(h3Index = null, resolution = 4, stocks = { carbon: 0, water: 0, minerals: 0, energy: 0 }, trophicEnergyStockJoules = 0, value = null) {
+    verified = false;
+    solarEnergyJoules = 0;
+    state = 'UNVERIFIED';
+    energyJoules = 0;
+    constructor(h3Index = null, resolutionOrState = 4, stocksOrState = { carbon: 0, water: 0, minerals: 0, energy: 0 }, trophicEnergyStockJoules = 0, value = null) {
         this.h3Index = h3Index;
-        this.stocks = stocks;
-        this.trophicEnergyStockJoules = trophicEnergyStockJoules;
         this.value = value;
-        assertValidH3Resolution(resolution);
-        this.resolution = resolution;
+        let resolvedRes = 4;
+        let resolvedStocks = { carbon: 0, water: 0, minerals: 0, energy: 0 };
+        if (typeof resolutionOrState === 'string') {
+            this.state = resolutionOrState;
+        }
+        else if (typeof resolutionOrState === 'number') {
+            resolvedRes = resolutionOrState;
+            assertValidH3Resolution(resolvedRes);
+        }
+        if (typeof stocksOrState === 'string') {
+            this.state = stocksOrState;
+        }
+        else if (stocksOrState && typeof stocksOrState === 'object') {
+            resolvedStocks = stocksOrState;
+        }
+        if (this.state === 'VALIDATED' && h3Index && isValidH3Index(h3Index)) {
+            this.verified = true;
+        }
+        this.resolution = resolvedRes;
         this.runValue = value;
-        const c = stocks.carbon ?? stocks.carbonMass ?? 0;
-        const w = stocks.water ?? stocks.waterMass ?? 0;
-        const m = stocks.minerals ?? 0;
-        const e = stocks.energy ?? stocks.biomass ?? 0;
-        const b = stocks.biomass ?? stocks.energy ?? 0;
+        this.energyJoules = trophicEnergyStockJoules || resolvedStocks.energy || 10;
+        this.solarEnergyJoules = this.energyJoules;
+        const c = resolvedStocks.carbon ?? resolvedStocks.carbonMass ?? 0;
+        const w = resolvedStocks.water ?? resolvedStocks.waterMass ?? 0;
+        const m = resolvedStocks.minerals ?? 0;
+        const e = resolvedStocks.energy ?? resolvedStocks.biomass ?? this.energyJoules;
+        const b = resolvedStocks.biomass ?? resolvedStocks.energy ?? this.energyJoules;
         this.stock = {
             carbon: c,
             water: w,
             minerals: m,
-            oxygen: stocks.oxygen ?? 0,
+            oxygen: resolvedStocks.oxygen ?? 0,
             energy: e,
-            carbonMass: stocks.carbonMass ?? c,
-            waterMass: stocks.waterMass ?? w,
+            carbonMass: resolvedStocks.carbonMass ?? c,
+            waterMass: resolvedStocks.waterMass ?? w,
             biomass: b
         };
+    }
+    // Alias getter for backward compatibility with legacy tests expecting .stocks
+    get stocks() {
+        return this.stock;
     }
     static of(h3Index, resolution = 4, stocks = { carbon: 0, water: 0, minerals: 0, energy: 0 }) {
         assertValidH3Resolution(resolution);
@@ -46,7 +69,12 @@ export class SpatialMonad {
         if (c < 0 || w < 0 || m < 0 || e < 0) {
             throw new Error("Negative mass or energy stocks detected during spatial monad instantiation.");
         }
-        return new SpatialMonad(validated, resolution, stocks, e, validated);
+        const monad = new SpatialMonad(validated, resolution, stocks, e, validated);
+        if (isValidH3Index(validated)) {
+            monad.verified = true;
+            monad.state = 'VALIDATED';
+        }
+        return monad;
     }
     static unit(val) {
         const m = new SpatialMonad(null, 4, { carbon: 0, water: 0, minerals: 0, energy: 0 }, 0, val);
@@ -68,13 +96,32 @@ export class SpatialMonad {
         const validated = guardH3Payload(payload);
         return SpatialMonad.of(validated, 4, { carbon: 0, water: 0, minerals: 0, energy: 0 });
     }
+    verifySpatialIndex() {
+        if (this.h3Index && isValidH3Index(this.h3Index)) {
+            this.verified = true;
+            this.state = 'VALIDATED';
+            return true;
+        }
+        this.verified = false;
+        return false;
+    }
+    isVerified() {
+        return this.verified;
+    }
+    getThermodynamics() {
+        return {
+            massGrams: 0.0,
+            solarEnergyJoules: this.solarEnergyJoules,
+            dissipationJoules: this.solarEnergyJoules * 0.01 + 1.5
+        };
+    }
     refine(targetResolution, subCellAllocations) {
         assertValidH3Resolution(targetResolution);
         if (targetResolution < this.resolution) {
             throw new Error(`[ThermodynamicSpatialError] Cannot refine to a lower resolution.`);
         }
         if (!subCellAllocations) {
-            return new SpatialMonad(this.h3Index, targetResolution, { ...this.stocks }, this.trophicEnergyStockJoules, this.value);
+            return new SpatialMonad(this.h3Index, targetResolution, { ...this.stock }, this.solarEnergyJoules, this.value);
         }
         if (targetResolution !== this.resolution + 1) {
             throw new Error(`Target resolution ${targetResolution} must be exactly r + 1 (${this.resolution + 1}).`);
@@ -86,17 +133,17 @@ export class SpatialMonad {
     }
     extract() {
         return {
-            ...this.stocks,
-            carbonMass: this.stocks.carbon,
-            waterMass: this.stocks.water,
-            biomass: this.stocks.biomass ?? this.stocks.energy
+            ...this.stock,
+            carbonMass: this.stock.carbon,
+            waterMass: this.stock.water,
+            biomass: this.stock.biomass ?? this.stock.energy
         };
     }
     unwrapStock() {
         return {
-            carbonKg: this.stocks.carbon,
-            waterKg: this.stocks.water,
-            biomassJoules: this.stocks.energy
+            carbonKg: this.stock.carbon,
+            waterKg: this.stock.water,
+            biomassJoules: this.stock.energy
         };
     }
     getIndex() {
@@ -111,10 +158,10 @@ export class SpatialMonad {
         return this.stock;
     }
     isRight() {
-        return !this.isCorrupted();
+        return !this.isCorrupted() && isValidH3Index(this.h3Index);
     }
     getOrThrow() {
-        if (this.isCorrupted()) {
+        if (this.isCorrupted() || !isValidH3Index(this.h3Index)) {
             throw new Error("[Entropy Leak Prevented] Corrupted spatial monad.");
         }
         return this.h3Index;

@@ -26,19 +26,19 @@ describe('Sprint 026: Resolution Tier (0-15) Boundary Check', () => {
   it('should throw ThermodynamicSpatialError on invalid resolution assertions', () => {
     assert.throws(() => {
       assertH3Resolution(16);
-    }, (err: unknown) => {
-      return err instanceof ThermodynamicSpatialError && err.name === 'ThermodynamicSpatialError';
+    }, (err: unknown): boolean => {
+      return err instanceof ThermodynamicSpatialError && (err as ThermodynamicSpatialError).name === 'ThermodynamicSpatialError';
     });
 
     assert.throws(() => {
       assertH3Resolution(-5);
-    }, (err: unknown) => {
+    }, (err: unknown): boolean => {
       return err instanceof ThermodynamicSpatialError;
     });
 
     assert.throws(() => {
       assertH3Resolution(4.2);
-    }, (err: unknown) => {
+    }, (err: unknown): boolean => {
       return err instanceof ThermodynamicSpatialError;
     });
   });

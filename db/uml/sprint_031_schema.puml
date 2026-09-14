@@ -1,0 +1,49 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam backgroundColor #F9F9F9
+
+namespace Spatial {
+  class H3GridValidator {
+    + {static} HEX_PATTERN: RegExp
+    + {static} isValidHexIndex(index: string): boolean
+  }
+
+  class SpatialMonad {
+    - monadId: string
+    - rawIdentifier: string
+    - state: MonadState
+    - energyStock: number
+    + transition(): MonadState
+    + validateIndex(): boolean
+  }
+
+  enum MonadState {
+    S0_INPUT
+    S1_STABLE_ACTIVE
+    S2_QUARANTINE_ENTROPY_SINK
+  }
+}
+
+namespace Thermodynamics {
+  class ThermodynamicLedger {
+    + blockId: number
+    + transactionHash: string
+    + firstLawCheck: boolean
+    + entropyDelta: number
+    + verifyConservation(): void
+  }
+
+  class EntropySink {
+    + quarantineId: number
+    + invalidToken: string
+    + logRejection(): void
+  }
+}
+
+Spatial.H3GridValidator --> Spatial.SpatialMonad : validates >
+Spatial.SpatialMonad --> Spatial.MonadState : transitions to >
+Spatial.SpatialMonad --> Thermodynamics.EntropySink : invalid state triggers >
+Spatial.SpatialMonad --> Thermodynamics.ThermodynamicLedger : records transaction >
+
+@enduml
