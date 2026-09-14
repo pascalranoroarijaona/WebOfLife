@@ -27,7 +27,7 @@ describe('Sprint 003: Base H3 Grid Parsing and Index Validation', () => {
   it('should reject malformed H3 strings or invalid resolutions during validation', () => {
     const invalidResValidation = H3GridParser.validateIndex('invalid_string');
     assert.strictEqual(invalidResValidation.isValid, false);
-    assert.strictEqual(invalidResValidation.errorCode, 'INVALID_FORMAT');
+    assert.strictEqual(invalidResValidation.errorCode, 'H3_ERR_INVALID_LENGTH');
   });
 
   it('should enforce SpatialMonad First Law conservation and binding', () => {

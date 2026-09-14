@@ -26,7 +26,7 @@ export class H3AdjacencyEngine {
     cache = new Map();
     parseIndex(h3Str) {
         const validation = validateH3Index(h3Str);
-        if (!validation.valid) {
+        if (!validation.isValid && !validation.valid) {
             throw new Error(`Invalid H3 index format: ${h3Str}`);
         }
         if (this.cache.has(h3Str)) {
@@ -65,7 +65,7 @@ export class H3AdjacencyEngine {
 }
 export function getH3Neighbors(index, k = 1) {
     const validation = validateH3Index(index);
-    if (!validation.valid) {
+    if (!validation.isValid && !validation.valid) {
         throw new Error(`[${validation.code}] Cannot compute neighbors for invalid H3 index: ${index}`);
     }
     if (k < 0) {
@@ -85,11 +85,11 @@ export function getH3Neighbors(index, k = 1) {
 }
 export function getH3GridDistance(origin, destination) {
     const v1 = validateH3Index(origin);
-    if (!v1.valid) {
+    if (!v1.isValid && !v1.valid) {
         throw new Error(`[${v1.code}] Invalid origin H3 index: ${origin}`);
     }
     const v2 = validateH3Index(destination);
-    if (!v2.valid) {
+    if (!v2.isValid && !v2.valid) {
         throw new Error(`[${v2.code}] Invalid destination H3 index: ${destination}`);
     }
     try {

@@ -1,0 +1,57 @@
+@startuml
+skinparam backgroundColor #F9F9F9
+skinparam classAttributeIconSize 0
+
+title Web of Life - Sprint 010: Spatial H3 Validation & Thermodynamic Monad Schema
+
+class H3GridValidator {
+    - H3_REGEX: RegExp
+    + isValidIndex(h3Index: string): boolean
+}
+
+class H3Grid {
+    - resolution: number
+    + validateAndAddCell(h3Index: string): boolean
+}
+
+class SpatialMonad {
+    - stockId: string
+    - currentState: MonadState
+    - h3Index: string
+    - matterAllocation: number
+    - solarEnergyInput: number
+    + transition(inputString: string): MonadState
+}
+
+enum MonadState {
+    State_unverified
+    State_active_cell
+    State_entropy_sink
+}
+
+class SpatialH3ValidationAuditRecord {
+    + auditId: UUID
+    + h3IndexInput: string
+    + isValid: boolean
+    + resolution: number
+    + entropyDelta: number
+    + processedAt: Timestamp
+}
+
+class ThermodynamicStockTransaction {
+    + transactionId: UUID
+    + sourceStockId: UUID
+    + targetStockId: UUID
+    + transitionType: string
+    + energyTransferred: number
+    + blockSignature: string
+    + createdAt: Timestamp
+}
+
+H3GridValidator --> H3Grid : uses
+SpatialMonad --> H3GridValidator : validates via
+SpatialMonad --> MonadState : transitions to
+SpatialMonad "1" *-- "0..1" SpatialH3ValidationAuditRecord : logs audit
+ThermodynamicStockTransaction --> SpatialMonad : records state flow
+
+@enduml

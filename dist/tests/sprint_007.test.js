@@ -16,12 +16,12 @@ describe('Sprint 007 - Uber H3 Index String Format Validation and Error Code Map
         const resNull = H3GridValidator.validateString(null);
         assert.strictEqual(resNull.valid, false);
         if (!resNull.valid) {
-            assert.strictEqual(resNull.errorCode, H3ErrorCode.ERR_H3_INVALID_NULL);
+            assert.strictEqual(resNull.errorCode, H3ErrorCode.NULL_INDEX);
         }
         const resUndefined = H3GridValidator.validateString(undefined);
         assert.strictEqual(resUndefined.valid, false);
         if (!resUndefined.valid) {
-            assert.strictEqual(resUndefined.errorCode, H3ErrorCode.ERR_H3_INVALID_NULL);
+            assert.strictEqual(resUndefined.errorCode, H3ErrorCode.NULL_INDEX);
         }
     });
     it('should catch invalid length H3 index strings', () => {
@@ -29,7 +29,7 @@ describe('Sprint 007 - Uber H3 Index String Format Validation and Error Code Map
         const result = H3GridValidator.validateString(shortIndex);
         assert.strictEqual(result.valid, false);
         if (!result.valid) {
-            assert.strictEqual(result.errorCode, H3ErrorCode.ERR_H3_INVALID_LENGTH);
+            assert.strictEqual(result.errorCode, H3ErrorCode.INVALID_LENGTH);
         }
     });
     it('should catch invalid characters or incorrect prefix', () => {
@@ -38,14 +38,14 @@ describe('Sprint 007 - Uber H3 Index String Format Validation and Error Code Map
         let res = H3GridValidator.validateString(wrongPrefix);
         assert.strictEqual(res.valid, false);
         if (!res.valid) {
-            assert.strictEqual(res.errorCode, H3ErrorCode.ERR_H3_INVALID_CHARACTERS);
+            assert.strictEqual(res.errorCode, H3ErrorCode.INVALID_CHARACTER);
         }
         // Contains non-hex characters
         const invalidChar = '88268582zffffff';
         res = H3GridValidator.validateString(invalidChar);
         assert.strictEqual(res.valid, false);
         if (!res.valid) {
-            assert.strictEqual(res.errorCode, H3ErrorCode.ERR_H3_INVALID_CHARACTERS);
+            assert.strictEqual(res.errorCode, H3ErrorCode.INVALID_CHARACTER);
         }
     });
     it('should correctly parse resolution and base cell', () => {
@@ -63,7 +63,7 @@ describe('Sprint 007 - Uber H3 Index String Format Validation and Error Code Map
     });
     it('should instantiate error classes correctly', () => {
         const err = new InvalidLengthError('Test length error');
-        assert.strictEqual(err.errorCode, H3ErrorCode.ERR_H3_INVALID_LENGTH);
+        assert.strictEqual(err.errorCode, H3ErrorCode.INVALID_LENGTH);
         assert.strictEqual(err.name, 'InvalidLengthError');
     });
 });

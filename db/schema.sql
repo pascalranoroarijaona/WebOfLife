@@ -1,46 +1,45 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger (Sprint 009)
--- Compliance: First & Second Laws of Thermodynamics
+-- Web of Life: Sprint 010 Database & Thermodynamic Ledger Schema
+-- Spatial H3 Index Validation & Thermodynamic Monad Stock State Machine
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS spatial_monads (
-    monad_id VARCHAR(64) PRIMARY KEY,
-    region_name VARCHAR(128) NOT NULL,
-    thermal_stock_joules NUMERIC(24, 6) NOT NULL DEFAULT 0.000000,
-    albedo NUMERIC(4, 3) NOT NULL DEFAULT 0.300,
-    emissivity NUMERIC(4, 3) NOT NULL DEFAULT 0.950,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+BEGIN;
+
+-- Spatial H3 Index Validation Audit Log
+CREATE TABLE IF NOT EXISTS spatial_h3_validation_audit (
+    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    h3_index_input VARCHAR(32) NOT NULL,
+    is_valid BOOLEAN NOT NULL,
+    resolution INT CHECK (resolution BETWEEN 0 AND 15),
+    entropy_delta NUMERIC(18, 8) NOT NULL DEFAULT 0.00000000,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS thermodynamic_constants (
-    constant_key VARCHAR(64) PRIMARY KEY,
-    constant_value NUMERIC(16, 8) NOT NULL,
-    unit_description VARCHAR(64) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Thermodynamic Monad Stock Table (Tracking Earth Pod / Spatial Monad States)
+CREATE TABLE IF NOT EXISTS thermodynamic_monad_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    monad_type VARCHAR(64) NOT NULL DEFAULT 'SpatialMonad',
+    current_state VARCHAR(32) NOT NULL CHECK (current_state IN ('State_unverified', 'State_active_cell', 'State_entropy_sink')),
+    h3_index VARCHAR(15) REFERENCES spatial_h3_validation_audit(h3_index_input),
+    matter_allocation NUMERIC(24, 12) NOT NULL CHECK (matter_allocation >= 0),
+    solar_energy_input NUMERIC(24, 12) NOT NULL CHECK (solar_energy_input >= 0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO thermodynamic_constants (constant_key, constant_value, unit_description) VALUES
-('STEFAN_BOLTZMANN', 0.00000005670374419, 'W / (m^2 * K^4)'),
-('SOLAR_CONSTANT_TOA', 1361.00000000, 'W / m^2'),
-('ZERO_CELSIUS_IN_KELVIN', 273.15000000, 'K'),
-('DEFAULT_ALBEDO', 0.30000000, 'Dimensionless'),
-('GAS_CONSTANT_R', 8.31446261, 'J / (mol * K)')
-ON CONFLICT (constant_key) DO UPDATE SET 
-    constant_value = EXCLUDED.constant_value,
-    updated_at = CURRENT_TIMESTAMP;
-
+-- Thermodynamic Stock Transactions / Ledger
 CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
-    transaction_id VARCHAR(64) PRIMARY KEY,
-    monad_id VARCHAR(64) NOT NULL REFERENCES spatial_monads(monad_id),
-    delta_solar_joules NUMERIC(18, 6) NOT NULL,
-    delta_radiation_joules NUMERIC(18, 6) NOT NULL,
-    delta_conduction_joules NUMERIC(18, 6) NOT NULL,
-    resulting_temperature_k NUMERIC(10, 4) NOT NULL,
-    arrhenius_factor NUMERIC(12, 6) NOT NULL,
-    block_hash VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_stock_id UUID REFERENCES thermodynamic_monad_stocks(stock_id),
+    target_stock_id UUID REFERENCES thermodynamic_monad_stocks(stock_id),
+    transition_type VARCHAR(64) NOT NULL, -- e.g., 'State_unverified -> State_active_cell'
+    energy_transferred NUMERIC(24, 12) NOT NULL,
+    block_signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_stock_tx_monad_id ON thermodynamic_stock_transactions(monad_id);
-CREATE INDEX IF NOT EXISTS idx_stock_tx_timestamp ON thermodynamic_stock_transactions(timestamp);
+-- Indexes for optimal time-series query performance
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_audit_valid ON spatial_h3_validation_audit(is_valid);
+CREATE INDEX IF NOT EXISTS idx_monad_stocks_state ON thermodynamic_monad_stocks(current_state);
+CREATE INDEX IF NOT EXISTS idx_stock_transactions_sig ON thermodynamic_stock_transactions(block_signature);
+
+COMMIT;
