@@ -1,0 +1,27 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class InvalidH3TokenError {
+    +string token
+    +constructor(token: string)
+}
+
+class H3Grid {
+    +resolveCell(token: string): SpatialCell
+}
+
+class SpatialMonad {
+    -string token
+    +validate(): void
+    +map<U>(fn: (cell: SpatialCell) => U): SpatialMonad
+}
+
+class ThermodynamicBlockchainLedger {
+    +recordTransaction(txId: string, energyDelta: number, valid: boolean): void
+    +verifyIntegrity(): boolean
+}
+
+InvalidH3TokenError <-- H3Grid : throws
+H3Grid --> SpatialMonad : manages
+SpatialMonad --> ThermodynamicBlockchainLedger : logs state / entropy
+@enduml

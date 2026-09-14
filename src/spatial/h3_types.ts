@@ -25,6 +25,15 @@ export interface GeoCoordinate {
   lng: number;
 }
 
+export interface SpatialCell {
+  index: string;
+  resolution: number;
+  center: GeoCoordinate;
+  boundary: GeoCoordinate[];
+  stocks: Map<string, number>;
+  localEntropy: number;
+}
+
 export enum H3ErrorCode {
   SUCCESS = "H3_SUCCESS",
   INVALID_LENGTH = "H3_ERR_INVALID_LENGTH",

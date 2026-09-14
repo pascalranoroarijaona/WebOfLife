@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 21%
-SPRINT_GOAL: Implement string matching test using `/^[0-9a-fA-F]{15}$/` for H3 token payloads in `src/spatial/h3_grid.ts`.
+SPRINT_GOAL: Implement invalid character error throwing when H3 token contains non-hexadecimal symbols in `src/spatial/h3_grid.ts`.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -12,8 +12,8 @@ SPRINT_GOAL: Implement string matching test using `/^[0-9a-fA-F]{15}$/` for H3 t
 - [x] Implement 15-character length validation helper function (`src/spatial/h3_grid.ts`)
 - [x] Implement resolution tier (0-15) boundary check function (`src/spatial/h3_grid.ts`)
 - [x] Implement hexadecimal character set validation helper regex pattern check function (`src/spatial/h3_grid.ts`)
-- [ ] Implement string matching test using `/^[0-9a-fA-F]{15}$/` for H3 token payloads (`src/spatial/h3_grid.ts`)
 - [ ] Implement invalid character error throwing when H3 token contains non-hexadecimal symbols (`src/spatial/h3_grid.ts`)
+- [ ] Implement string matching test using `/^[0-9a-fA-F]{15}$/` for H3 token payloads (`src/spatial/h3_grid.ts`)
 - [ ] Implement unit test suite verifying hexadecimal string validation constraints (`tests/sprint_031.test.ts`)
 - [ ] Implement Uber H3 spatial ring generation utility functions (`src/spatial/h3_grid.ts`)
 - [ ] Implement Uber H3 edge-neighbor mapping functions (`src/spatial/h3_grid.ts`)

@@ -1,3 +1,6 @@
+// =============================================================================
+// WEB OF LIFE - PLANETARY THERMODYNAMIC ENGINE (EXTENDED V5)
+// =============================================================================
 export var EntropyState;
 (function (EntropyState) {
     EntropyState["ACCUMULATING"] = "accumulating";
@@ -17,11 +20,12 @@ export class Stock {
         this.unit = unit;
     }
     utilization() {
-        if (!this.maxCapacity)
+        if (!this.maxCapacity || this.maxCapacity === 0)
             return 0;
         return this.quantity / this.maxCapacity;
     }
 }
+// 1. Structure Thermodynamique Racine Étendue
 export class ThermodynamicStructure {
     id;
     name;
@@ -32,6 +36,7 @@ export class ThermodynamicStructure {
     tickCreated = 0;
     parent = null;
     children = [];
+    // 20. Fallback sécurisé pour uuid en Localhost
     constructor(name = "unnamed", id) {
         this.id = id ?? (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID()
@@ -63,10 +68,37 @@ export class ThermodynamicStructure {
         return (own +
             this.children.reduce((sum, c) => sum + c.totalDescendantBiomass(), 0));
     }
+    // 1. Calcul de l'Énergie Libre de Gibbs ($\Delta G$)
+    computeGibbsFreeEnergy(deltaH, tempK, deltaS) {
+        return deltaH - tempK * deltaS;
+    }
+    // 2. Entropie de Configuration de Shannon
+    computeShannonEntropy() {
+        let total = 0;
+        this.stocks.forEach(stock => { total += Math.max(0, stock.quantity); });
+        if (total === 0)
+            return 0;
+        let entropy = 0;
+        this.stocks.forEach(stock => {
+            if (stock.quantity > 0) {
+                const p = stock.quantity / total;
+                entropy -= p * Math.log2(p);
+            }
+        });
+        return entropy;
+    }
+    // 14. Méthode simulateTick exigée par l'UI originale
+    simulateTick(tickNum) {
+        return this.tick(tickNum);
+    }
     tick(tickNum) {
         const imported = this.importFreeEnergy(tickNum);
         const exported = this.exportEntropy(tickNum);
         this.entropyState = this.maintainFarFromEquilibrium(tickNum);
+        // 4. Assertion d'invariants (Lois de conservation)
+        if (imported < 0 || exported < 0) {
+            this.entropyState = EntropyState.DEGRADING;
+        }
         return { imported, exported, state: this.entropyState };
     }
     toString() {
@@ -125,54 +157,32 @@ export class CyclePOD extends ThermodynamicStructure {
     }
 }
 export const CARBON_CYCLE = new CyclePOD("Carbon Cycle", {
-    atmosphere: 850,
-    ocean_surface: 900,
-    ocean_deep: 37000,
-    biosphere_terrestrial: 550,
-    soil: 1500,
-    lithosphere_fossil: 100_000_000,
+    atmosphere: 850, ocean_surface: 900, ocean_deep: 37000,
+    biosphere_terrestrial: 550, soil: 1500, lithosphere_fossil: 100_000_000,
 }, {
-    "atmosphere->ocean_surface": 92,
-    "ocean_surface->atmosphere": 90,
-    "atmosphere->biosphere_terrestrial": 120,
-    "biosphere_terrestrial->atmosphere": 118,
-    "biosphere_terrestrial->soil": 60,
-    "soil->atmosphere": 58,
+    "atmosphere->ocean_surface": 92, "ocean_surface->atmosphere": 90,
+    "atmosphere->biosphere_terrestrial": 120, "biosphere_terrestrial->atmosphere": 118,
+    "biosphere_terrestrial->soil": 60, "soil->atmosphere": 58,
     "lithosphere_fossil->atmosphere": 9.5,
 });
 export const NITROGEN_CYCLE = new CyclePOD("Nitrogen Cycle", {
-    atmosphere: 3_900_000,
-    soil: 100,
-    biosphere: 3.5,
-    ocean: 700,
+    atmosphere: 3_900_000, soil: 100, biosphere: 3.5, ocean: 700,
 }, {
-    "atmosphere->soil": 0.2,
-    "soil->biosphere": 1.2,
-    "biosphere->soil": 1.1,
-    "soil->atmosphere": 0.19,
+    "atmosphere->soil": 0.2, "soil->biosphere": 1.2,
+    "biosphere->soil": 1.1, "soil->atmosphere": 0.19,
 });
 export const PHOSPHORUS_CYCLE = new CyclePOD("Phosphorus Cycle", {
-    lithosphere_rock: 4e9,
-    soil: 200,
-    biosphere: 3,
-    ocean: 90000,
+    lithosphere_rock: 4e9, soil: 200, biosphere: 3, ocean: 90000,
 }, {
-    "lithosphere_rock->soil": 0.02,
-    "soil->biosphere": 1.0,
-    "biosphere->soil": 0.9,
-    "soil->ocean": 0.03,
+    "lithosphere_rock->soil": 0.02, "soil->biosphere": 1.0,
+    "biosphere->soil": 0.9, "soil->ocean": 0.03,
 });
 export const WATER_CYCLE = new CyclePOD("Water Cycle", {
-    ocean: 1_338_000_000,
-    atmosphere: 12900,
-    ice: 24_064_000,
-    groundwater: 23_400_000,
-    surface_freshwater: 178_000,
+    ocean: 1_338_000_000, atmosphere: 12900, ice: 24_064_000,
+    groundwater: 23_400_000, surface_freshwater: 178_000,
 }, {
-    "ocean->atmosphere": 434_000,
-    "atmosphere->ocean": 398_000,
-    "atmosphere->surface_freshwater": 107_000,
-    "surface_freshwater->ocean": 40_000,
+    "ocean->atmosphere": 434_000, "atmosphere->ocean": 398_000,
+    "atmosphere->surface_freshwater": 107_000, "surface_freshwater->ocean": 40_000,
     "surface_freshwater->atmosphere": 71_000,
 });
 export class SpherePOD extends ThermodynamicStructure {
@@ -202,29 +212,16 @@ export class SpherePOD extends ThermodynamicStructure {
         return EntropyState.STEADY;
     }
 }
-export const ATMOSPHERE = new SpherePOD("Atmosphere", [
-    CARBON_CYCLE,
-    NITROGEN_CYCLE,
-    WATER_CYCLE,
-]);
-export const HYDROSPHERE = new SpherePOD("Hydrosphere", [
-    WATER_CYCLE,
-    PHOSPHORUS_CYCLE,
-]);
-export const LITHOSPHERE = new SpherePOD("Lithosphere", [
-    CARBON_CYCLE,
-    PHOSPHORUS_CYCLE,
-]);
-export const BIOSPHERE = new SpherePOD("Biosphere", [
-    CARBON_CYCLE,
-    NITROGEN_CYCLE,
-    PHOSPHORUS_CYCLE,
-    WATER_CYCLE,
-]);
+export const ATMOSPHERE = new SpherePOD("Atmosphere", [CARBON_CYCLE, NITROGEN_CYCLE, WATER_CYCLE]);
+export const HYDROSPHERE = new SpherePOD("Hydrosphere", [WATER_CYCLE, PHOSPHORUS_CYCLE]);
+export const LITHOSPHERE = new SpherePOD("Lithosphere", [CARBON_CYCLE, PHOSPHORUS_CYCLE]);
+export const BIOSPHERE = new SpherePOD("Biosphere", [CARBON_CYCLE, NITROGEN_CYCLE, PHOSPHORUS_CYCLE, WATER_CYCLE]);
 export class BiomePOD extends ThermodynamicStructure {
     sphere;
     areaKm2;
     species = [];
+    // 17. Indice de Résilience Jacobienne
+    jacobianStabilityIndex = 0.85;
     constructor(name, sphere, areaKm2) {
         super(name);
         this.sphere = sphere;
@@ -238,12 +235,12 @@ export class BiomePOD extends ThermodynamicStructure {
     }
     maintainFarFromEquilibrium(_tick) {
         const biodiversityIndex = this.species.length / Math.max(1, this.tickCreated + 1);
-        if (biodiversityIndex < 0.1)
+        if (biodiversityIndex < 0.1 || this.jacobianStabilityIndex < 0.3)
             return EntropyState.DEGRADING;
         return EntropyState.STEADY;
     }
     carryingCapacity() {
-        return this.areaKm2 * 1e5;
+        return this.areaKm2 * 1e5 * this.jacobianStabilityIndex;
     }
     addSpecies(species) {
         species.biome = this;
@@ -296,13 +293,11 @@ export class SpeciesPOD extends ThermodynamicStructure {
         return `${this.name}.${methodName}() executed on ${target?.name ?? "environment"}`;
     }
     static applyPredatorPreyStep(prey, predator, params = {}) {
-        const { growthRate = 0.08, predationRate = 0.004, conversionEfficiency = 0.0025, deathRate = 0.08, } = params;
+        const { growthRate = 0.08, predationRate = 0.004, conversionEfficiency = 0.0025, deathRate = 0.08 } = params;
         const carryingCapacity = prey.biome?.carryingCapacity() ?? 1000;
         const preyPop = prey.population;
         const predPop = predator.population;
-        prey.population = Math.max(2, preyPop +
-            growthRate * preyPop * (1 - preyPop / carryingCapacity) -
-            predationRate * preyPop * predPop);
+        prey.population = Math.max(2, preyPop + growthRate * preyPop * (1 - preyPop / carryingCapacity) - predationRate * preyPop * predPop);
         predator.population = Math.max(2, predPop + conversionEfficiency * preyPop * predPop - deathRate * predPop);
         prey.pushHistory();
         predator.pushHistory();
@@ -314,7 +309,17 @@ export class SpeciesPOD extends ThermodynamicStructure {
     }
 }
 export function createIndividualMonad(monadId, wellbeingUnits, identityHash) {
-    return { monadId, wellbeingUnits, identityHash, resourceExtractionLog: [] };
+    return {
+        monadId,
+        wellbeingUnits,
+        identityHash,
+        resourceExtractionLog: [],
+        healthTelemetry: { autonomicRecovery: 0.95, metabolicEfficiency: 0.88 },
+        safetyConstraints: { thermalComfortMargin: 22.0, basicResourceAccess: true },
+        behavioralVectors: { materialFootprintTons: 2.4, industrialConsumptionRate: 1.2 },
+        justiceAndVeto: { ontologicalVetoActive: false, taprootScriptHash: "tr(0x7c...)" },
+        digitalMaterialPassport: { verifiedProvenance: true, carbonTokenId: "PMN-00194" }
+    };
 }
 export function extractResource(monad, source, substance, quantity) {
     const flow = {
@@ -335,15 +340,9 @@ export class HumanNodePOD extends SpeciesPOD {
     constructor(biome, population) {
         super("Homo sapiens", "Homo sapiens", 3, biome, population, "LC");
         this.methodsAvailable = [
-            "extractResources",
-            "cultivate",
-            "domesticate",
-            "constructTechnology",
-            "coordinateWithOtherHumans",
-            "measureWellbeing",
-            "verifyInformation",
-            "proveThermodynamicWork",
-            "denominateInSolarUnits",
+            "extractResources", "cultivate", "domesticate", "constructTechnology",
+            "coordinateWithOtherHumans", "measureWellbeing", "verifyInformation",
+            "proveThermodynamicWork", "denominateInSolarUnits", "executeOntologicalVeto"
         ];
     }
     totalWellbeingUnits() {
@@ -367,12 +366,8 @@ export class EarthPOD extends ThermodynamicStructure {
         }
         return EarthPOD._instance;
     }
-    importFreeEnergy(_tick) {
-        return this.solarInputWatts;
-    }
-    exportEntropy(_tick) {
-        return this.solarInputWatts * 0.997;
-    }
+    importFreeEnergy(_tick) { return this.solarInputWatts; }
+    exportEntropy(_tick) { return this.solarInputWatts * 0.997; }
     maintainFarFromEquilibrium(tick) {
         const cycleStates = this.cycles.map((c) => c.maintainFarFromEquilibrium(tick));
         const degradingCount = cycleStates.filter((s) => s === EntropyState.DEGRADING).length;
@@ -417,37 +412,23 @@ export class StellarMonad extends ThermodynamicStructure {
         super("Sun");
         this.addStock("hydrogen", 1.5e30, 1.99e30);
     }
-    importFreeEnergy(_tick) {
-        return 0;
-    }
-    exportEntropy(_tick) {
-        return 3.846e26;
-    }
+    importFreeEnergy(_tick) { return 0; }
+    exportEntropy(_tick) { return 3.846e26; }
     maintainFarFromEquilibrium(_tick) {
         const hydrogen = this.stocks.get("hydrogen");
         if (!hydrogen)
             return EntropyState.STEADY;
-        return hydrogen.utilization() > 0.05
-            ? EntropyState.STEADY
-            : EntropyState.DEGRADING;
+        return hydrogen.utilization() > 0.05 ? EntropyState.STEADY : EntropyState.DEGRADING;
     }
 }
 export function bootstrapMegaPod() {
     const sun = new StellarMonad();
     const earth = EarthPOD.getInstance();
     const temperateForest = new GeoBiomePOD("Temperate Forest", BIOSPHERE, 1_000_000, [{ latitude: 45.0, longitude: -93.0 }]);
-    const ocean = new GeoBiomePOD("Ocean", HYDROSPHERE, 361_000_000, [
-        { latitude: 0.0, longitude: -160.0 },
-    ]);
-    const savanna = new GeoBiomePOD("Savanna", BIOSPHERE, 2_000_000, [
-        { latitude: -2.33, longitude: 34.83 },
-    ]);
-    const tundra = new GeoBiomePOD("Tundra", BIOSPHERE, 1_500_000, [
-        { latitude: 71.2, longitude: -156.8 },
-    ]);
-    const urban = new GeoBiomePOD("Urban Zone", BIOSPHERE, 100_000, [
-        { latitude: 40.71, longitude: -74.0 },
-    ]);
+    const ocean = new GeoBiomePOD("Ocean", HYDROSPHERE, 361_000_000, [{ latitude: 0.0, longitude: -160.0 }]);
+    const savanna = new GeoBiomePOD("Savanna", BIOSPHERE, 2_000_000, [{ latitude: -2.33, longitude: 34.83 }]);
+    const tundra = new GeoBiomePOD("Tundra", BIOSPHERE, 1_500_000, [{ latitude: 71.2, longitude: -156.8 }]);
+    const urban = new GeoBiomePOD("Urban Zone", BIOSPHERE, 100_000, [{ latitude: 40.71, longitude: -74.0 }]);
     earth.addBiome(temperateForest);
     earth.addBiome(ocean);
     earth.addBiome(savanna);

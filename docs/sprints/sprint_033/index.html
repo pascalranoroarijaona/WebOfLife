@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@3.7.2"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 033: Invalid Character Error Throwing for H3 Non-Hexadecimal Tokens</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+  <canvas id="simCanvas"></canvas>
+
+  <div id="topbar">
+    <h1>Sprint 033: H3 Non-Hex Validation</h1>
+    <h2>Thermodynamic Web of Life - Spatial Rigor</h2>
+    <p>
+      Ensuring strict validation on H3 indices. Tokens containing non-hexadecimal characters immediately throw an <span class="highlight">InvalidCharacterError</span> before spatial lookup.
+    </p>
+    <div class="social-links">
+      <a href="01_RFC.md" target="_blank">📄 RFC 033</a>
+      <a href="02_METHODS.md" target="_blank">🔬 Methods</a>
+      <a href="05_ACADEMIC_PREPRINT.pdf" target="_blank">🎓 Preprint PDF</a>
+    </div>
+  </div>
+
+  <div id="controls">
+    <input type="text" id="search" placeholder="Test H3 index (e.g. 891f1d467ffffff or INVALID)..." />
+    <button id="validateBtn">Validate Token</button>
+    <div class="zoom-container">
+      <span>Zoom</span>
+      <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1" />
+    </div>
+    <label class="debug-container">
+      <input type="checkbox" id="debugToggle" checked />
+      <span>Debug Grid</span>
+    </label>
+    <button id="resetView">Reset View</button>
+  </div>
+
+  <div id="sprint-telemetry">
+    <h4>Telemetry & Validation</h4>
+    <div class="telemetry-row">
+      <span>Last Checked:</span>
+      <span id="telToken" style="color: var(--sun);">None</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Validation Status:</span>
+      <span id="telStatus" style="color: var(--flora);">Ready</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Error Count:</span>
+      <span id="telErrors">0</span>
+    </div>
+    <div class="telemetry-row">
+      <span>Active Hexes:</span>
+      <span id="telHexes">120</span>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as h3 from 'h3-js';
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const searchInput = document.getElementById('search');
+    const validateBtn = document.getElementById('validateBtn');
+    const telToken = document.getElementById('telToken');
+    const telStatus = document.getElementById('telStatus');
+    const telErrors = document.getElementById('telErrors');
+    const telHexes = document.getElementById('telHexes');
+    const zoomRange = document.getElementById('zoomRange');
+    const debugToggle = document.getElementById('debugToggle');
+    const resetViewBtn = document.getElementById('resetView');
+
+    let errorCount = 0;
+    let zoom = 1;
+    let panX = 0;
+    let panY = 0;
+    let testedToken = '';
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // H3 validation function implementing strict non-hex detection
+    function validateH3Token(token) {
+      if (typeof token !== 'string' || token.length === 0) {
+        throw new TypeError('H3 token must be a non-empty string.');
+      }
+      // Hex check: valid H3 index consists of lowercase/uppercase hex chars
+      const hexRegex = /^[0-9a-fA-F]+$/;
+      if (!hexRegex.test(token)) {
+        const err = new Error(`InvalidCharacterError: H3 token contains non-hexadecimal characters: "${token}"`);
+        err.name = 'InvalidCharacterError';
+        throw err;
+      }
+      return true;
+    }
+
+    function handleValidation() {
+      const val = searchInput.value.trim();
+      if (!val) return;
+      testedToken = val;
+      telToken.textContent = val.length > 14 ? val.slice(0, 14) + '...' : val;
+      
+      try {
+        validateH3Token(val);
+        // Also verify with h3-js if valid length/format
+        if (h3.isValidCell(val)) {
+          telStatus.textContent = 'Valid H3 Cell';
+          telStatus.style.color = 'var(--flora)';
+        } else {
+          telStatus.textContent = 'Valid Hex, Invalid Cell';
+          telStatus.style.color = 'var(--sun)';
+        }
+      } catch (err) {
+        errorCount++;
+        telErrors.textContent = errorCount;
+        telStatus.textContent = err.name || 'Error';
+        telStatus.style.color = 'var(--danger)';
+        console.warn('Caught expected H3 validation exception:', err.message);
+      }
+    }
+
+    validateBtn.addEventListener('click', handleValidation);
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleValidation();
+    });
+
+    zoomRange.addEventListener('input', (e) => {
+      zoom = parseFloat(e.target.value);
+    });
+
+    resetViewBtn.addEventListener('click', () => {
+      zoom = 1;
+      panX = 0;
+      panY = 0;
+      zoomRange.value = 1;
+    });
+
+    // Render loop simulating thermodynamic grid
+    let angle = 0;
+    function render() {
+      ctx.fillStyle = '#02050a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (debugToggle.checked) {
+        ctx.save();
+        ctx.translate(canvas.width / 2 + panX, canvas.height / 2 + panY);
+        ctx.scale(zoom, zoom);
+
+        // Draw simulated hexagonal mesh
+        const hexRadius = 45;
+        const dx = hexRadius * Math.sqrt(3);
+        const dy = hexRadius * 1.5;
+
+        for (let q = -5; q <= 5; q++) {
+          for (let r = -5; r <= 5; r++) {
+            const x = dx * (q + r / 2);
+            const y = dy * r;
+
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+              const a = (Math.PI / 3) * i + angle * 0.05;
+              const hx = x + hexRadius * 0.85 * Math.cos(a);
+              const hy = y + hexRadius * 0.85 * Math.sin(a);
+              if (i === 0) ctx.moveTo(hx, hy);
+              else ctx.lineTo(hx, hy);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = 'rgba(0, 225, 255, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(100, 216, 255, 0.02)';
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      angle += 0.01;
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
