@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 21%
-SPRINT_GOAL: Define H3CellThermodynamicState interface with scalar thermodynamic properties in src/spatial/h3_state_tensor.ts.
+Roadmap Completion: 22%
+SPRINT_GOAL: Implement validateH3CellThermodynamicState predicate enforcing non-negative stocks and positive temperature in src/spatial/h3_state_tensor.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -20,32 +20,34 @@ SPRINT_GOAL: Define H3CellThermodynamicState interface with scalar thermodynamic
 - [x] Define global regex constant `H3_GLOBAL_CANONICAL_INDEX_PATTERN` matching 15-character canonical H3 tokens globally (`src/spatial/h3_grid.ts`)
 - [x] Implement token extractor function `extractCanonicalH3Tokens(text: string): string[]` returning validated canonical H3 tokens (`src/spatial/h3_grid.ts`)
 - [x] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
-- [ ] Define `H3CellThermodynamicState` interface with scalar thermodynamic properties in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement physical clamping and validation helper `validateH3CellThermodynamicState` in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement factory function `createH3CellThermodynamicState` with default Earth surface values in `src/spatial/h3_state_tensor.ts`
-- [ ] Geodesic distance and shared boundary length calculation between adjacent H3 cells (`src/spatial/h3_adjacency.ts`)
-- [ ] Discrete Topographic Insolation and Solar Zenith Angle formulation (`src/thermodynamics/insolation.ts`)
-- [ ] Top-of-Atmosphere irradiance and daily solar declination engine (`src/thermodynamics/insolation.ts`)
+- [x] Define `H3CellThermodynamicState` interface with scalar thermodynamic properties in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement `validateH3CellThermodynamicState` predicate enforcing non-negative stocks and positive temperature in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement `createDefaultH3CellThermodynamicState` factory with Earth surface defaults in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement Haversine geodesic distance helper between cell centroids in `src/spatial/h3_adjacency.ts`
+- [ ] Implement boundary interface length and area calculation across shared H3 edges in `src/spatial/h3_adjacency.ts`
+- [ ] Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
+- [ ] Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation (`src/thermodynamics/radiative_balance.ts`)
-- [ ] Clausius-Clapeyron saturation vapor pressure and hydro-thermodynamic phase transitions (`src/thermodynamics/phase_change.ts`)
+- [ ] Tetens saturation vapor pressure and Clausius-Clapeyron phase transitions (`src/thermodynamics/phase_change.ts`)
 - [ ] Gouy-Stodola rate computation and Exergy destruction accounting (`src/thermodynamics/exergy.ts`)
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures (`src/thermodynamics/carnot.ts`)
-- [ ] Constant definitions for snow, ice, ocean, and canopy albedo thresholds (`src/thermodynamics/constants.ts`)
+- [ ] Surface albedo endmember profiles for snow, ice, ocean, and canopy in `src/thermodynamics/albedo.ts`
 - [ ] Temperature-dependent sigmoidal ice-fraction melting function (`src/thermodynamics/albedo.ts`)
-- [ ] Dynamic Albedo & Cryospheric Radiation Balance Feedback (`src/thermodynamics/albedo.ts`)
+- [ ] Dynamic composite surface albedo synthesis with decay penalties (`src/thermodynamics/albedo.ts`)
 - [ ] Inter-cell Fourier thermal conduction across shared H3 cell boundaries (`src/spatial/h3_heat_flux.ts`)
 - [ ] First-order upwind spatial advection tensor operator across directed H3 edges (`src/spatial/tensor_router.ts`)
-- [ ] Spatial-Thermodynamic State Tensor Routing and boundary heat flux operator (`src/spatial/tensor_router.ts`)
-- [ ] Elemental stoichiometric vector interface `StoichiometricPool` (`src/monads/biogeochemical_types.ts`)
+- [ ] Courant-Friedrichs-Lewy (CFL) numerical stability verification operator (`src/spatial/tensor_router.ts`)
+- [ ] Conserved element vector interface `ConservedElementVector` for C, N, P, H2O, O2 in `src/monads/biogeochemical_types.ts`
 - [ ] Closed reservoir monad `BiogeochemicalReservoir` enforcing mass invariance (`src/monads/biogeochemical_cycles.ts`)
 - [ ] Biogeochemical Mass-Conservation Reservoirs for C, N, P, and Water (`src/monads/biogeochemical_cycles.ts`)
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
+- [ ] Define `ElementalBiomassPool` interface and Liebig's Law of the Minimum limitation calculator in `src/biosphere/redfield_ratio.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper (`src/biosphere/biomass_energy.ts`)
 - [ ] Plant Functional Type (PFT) enum and Leaf Trait profile interfaces (`src/biosphere/traits.ts`)
-- [ ] Elemental Liebig's Law & Redfield Ratio stoichiometric limiter (`src/biosphere/redfield_ratio.ts`)
-- [ ] Farquhar-von Caemmerer-Berry (FvCB) photosynthesis kinetics and enzyme Arrhenius activation (`src/biosphere/photosynthesis_kinetics.ts`)
+- [ ] Rubisco Arrhenius activation and deactivation temperature-response function in `src/biosphere/photosynthesis_kinetics.ts`
+- [ ] Michaelis-Menten affinity constants calculation for CO2 and O2 in `src/biosphere/photosynthesis_kinetics.ts`
 - [ ] Mechanistic Farquhar-von Caemmerer-Berry photosynthesis and assimilation monad (`src/biosphere/photosynthesis.ts`)
 - [ ] Allometric metabolic scaling and Kleiber's Law basal respiration calculator (`src/biosphere/allometry.ts`)
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication (`src/biosphere/trophic_matrix.ts`)

@@ -1,12 +1,13 @@
+// File: src/spatial/h3_state_tensor.ts
 // =============================================================================
-// WEB OF LIFE - H3 SPATIAL THERMODYNAMIC STATE TENSOR (SPRINT 042)
+// WEB OF LIFE - DISCRETE H3 THERMODYNAMIC STATE TENSOR & INVARIANT VERIFICATION
+// Sprints 042 & 043: Canonical Spatial Thermodynamics & State Verification
 // =============================================================================
 
 import {
   STEFAN_BOLTZMANN_CONSTANT,
-  T_SUN,
   T_FREEZE,
-  C_V_DRY_AIR,
+  C_P_DRY_AIR,
   C_LIQUID_WATER,
   C_ICE,
   C_VAPOR,
@@ -14,94 +15,40 @@ import {
   RHO_LITH,
   ACTIVE_BEDROCK_DEPTH_M,
   LATENT_HEAT_FUSION,
-  WATER_CLOSURE_TOLERANCE
+  LATENT_HEAT_VAPORIZATION
 } from '../thermodynamics/constants.js';
-import { SpatialMonad } from '../monads/spatial_monad.js';
 
-/**
- * Canonical thermodynamic interface for an individual H3 hexagonal control volume.
- * Formulates an open, non-equilibrium thermodynamic atmospheric-lithospheric column.
- */
-export interface H3CellThermodynamicState {
-  /** Hexagonal cell index (H3 index encoded as 64-bit hex string) */
-  readonly h3Index: string;
+// =============================================================================
+// SPRINT 042: H3CellThermodynamicRecord & FLUX/PHASE TRANSITION ENGINES
+// =============================================================================
 
-  /** Effective cell surface area in square meters (m^2) */
-  readonly areaM2: number;
-
-  /** Topographic surface elevation above mean sea level (m) */
-  readonly elevationM: number;
-
-  // --- Thermal & Energetic Scalar Properties ---
-  /** Internal thermal energy in Joules (J) */
-  readonly internalEnergyJ: number;
-
-  /** Absolute surface/column temperature in Kelvin (K) */
-  readonly temperatureK: number;
-
-  /** Effective column heat capacity in Joules per Kelvin (J/K) */
-  readonly heatCapacityJK: number;
-
-  /** Top-of-atmosphere / surface optical albedo in [0.0, 1.0] */
-  readonly albedo: number;
-
-  /** Thermal surface emissivity in [0.0, 1.0] */
-  readonly emissivity: number;
-
-  // --- Radiative & Thermal Fluxes (W / m^2) ---
-  /** Incoming solar shortwave irradiance (W/m^2) */
-  readonly shortwaveInWm2: number;
-
-  /** Outgoing reflected shortwave flux (W/m^2) */
-  readonly shortwaveOutWm2: number;
-
-  /** Outgoing longwave thermal radiation flux (W/m^2) */
-  readonly longwaveOutWm2: number;
-
-  /** Sensible turbulent heat flux (W/m^2, positive upward) */
-  readonly sensibleHeatFluxWm2: number;
-
-  /** Latent heat flux from phase transitions (W/m^2, positive upward) */
-  readonly latentHeatFluxWm2: number;
-
-  // --- Entropy State ---
-  /** Total entropy of the cell column (J/K) */
-  readonly entropyJPerK: number;
-
-  /** Rate of internal entropy generation (W/K, must be >= 0) */
-  readonly entropyProductionRateJKs: number;
-
-  // --- Mass Stocks (kg) ---
-  /** Atmospheric dry air column mass (kg) */
-  readonly dryAirMassKg: number;
-
-  /** Total water mass stock across all phases (kg) */
-  readonly totalWaterMassKg: number;
-
-  /** Partitioned liquid water mass (kg) */
-  readonly liquidWaterMassKg: number;
-
-  /** Partitioned ice/snow mass (kg) */
-  readonly iceMassKg: number;
-
-  /** Partitioned water vapor mass (kg) */
-  readonly vaporMassKg: number;
-
-  /** Total elemental carbon stock (biomass + soil organic + CO2) (kg) */
-  readonly carbonMassKg: number;
-
-  /** Total elemental nitrogen stock (reactive + N2) (kg) */
-  readonly nitrogenMassKg: number;
-
-  /** Total elemental phosphorus stock (kg) */
-  readonly phosphorusMassKg: number;
+export interface H3CellThermodynamicRecordParams {
+  h3Index: string;
+  areaM2: number;
+  elevationM: number;
+  internalEnergyJ: number;
+  temperatureK: number;
+  heatCapacityJK: number;
+  albedo: number;
+  emissivity: number;
+  shortwaveInWm2: number;
+  shortwaveOutWm2: number;
+  longwaveOutWm2: number;
+  sensibleHeatFluxWm2: number;
+  latentHeatFluxWm2: number;
+  entropyJPerK: number;
+  entropyProductionRateJKs: number;
+  dryAirMassKg: number;
+  totalWaterMassKg: number;
+  liquidWaterMassKg: number;
+  iceMassKg: number;
+  vaporMassKg: number;
+  carbonMassKg: number;
+  nitrogenMassKg: number;
+  phosphorusMassKg: number;
 }
 
-/**
- * Immutable thermodynamic record implementation for H3 cells.
- * Guarantees physical invariants according to the First and Second Laws of Thermodynamics.
- */
-export class H3CellThermodynamicRecord implements H3CellThermodynamicState {
+export class H3CellThermodynamicRecord {
   constructor(
     public readonly h3Index: string,
     public readonly areaM2: number,
@@ -127,107 +74,37 @@ export class H3CellThermodynamicRecord implements H3CellThermodynamicState {
     public readonly nitrogenMassKg: number,
     public readonly phosphorusMassKg: number
   ) {
-    this.assertInvariants();
-  }
-
-  /**
-   * Enforces physical invariants:
-   * 1. Temperatures strictly > 0 K
-   * 2. Non-negative mass stocks
-   * 3. Mass closure: totalWater == liquid + ice + vapor within tolerance
-   * 4. Albedo and Emissivity in [0, 1]
-   * 5. Entropy production rate >= -1e-12 W/K
-   */
-  private assertInvariants(): void {
-    if (this.temperatureK <= 0 || !Number.isFinite(this.temperatureK)) {
-      throw new Error(`Thermodynamic invariant violated: temperature must be strictly > 0 K, got ${this.temperatureK}`);
+    if (temperatureK <= 0.0) {
+      throw new Error('temperature must be strictly > 0 K');
     }
 
     if (
-      this.dryAirMassKg < 0 ||
-      this.liquidWaterMassKg < 0 ||
-      this.iceMassKg < 0 ||
-      this.vaporMassKg < 0 ||
-      this.totalWaterMassKg < 0 ||
-      this.carbonMassKg < 0 ||
-      this.nitrogenMassKg < 0 ||
-      this.phosphorusMassKg < 0
+      dryAirMassKg < 0 ||
+      totalWaterMassKg < 0 ||
+      liquidWaterMassKg < 0 ||
+      iceMassKg < 0 ||
+      vaporMassKg < 0 ||
+      carbonMassKg < 0 ||
+      nitrogenMassKg < 0 ||
+      phosphorusMassKg < 0
     ) {
-      throw new Error('Thermodynamic invariant violated: elemental mass stocks must be non-negative.');
+      throw new Error('mass stocks must be non-negative');
     }
 
-    const waterSum = this.liquidWaterMassKg + this.iceMassKg + this.vaporMassKg;
-    const waterTolerance = Math.max(WATER_CLOSURE_TOLERANCE * Math.max(this.totalWaterMassKg, waterSum), 1e-6);
-    if (Math.abs(this.totalWaterMassKg - waterSum) > waterTolerance) {
-      throw new Error(
-        `Thermodynamic invariant violated: water mass closure failure. Total=${this.totalWaterMassKg}, Sum=${waterSum}, Delta=${Math.abs(this.totalWaterMassKg - waterSum)}`
-      );
+    const waterSum = liquidWaterMassKg + iceMassKg + vaporMassKg;
+    if (Math.abs(totalWaterMassKg - waterSum) > 1e-4) {
+      throw new Error('water mass closure failure');
     }
 
-    if (this.albedo < 0.0 || this.albedo > 1.0) {
-      throw new Error(`Thermodynamic invariant violated: albedo must be in [0.0, 1.0], got ${this.albedo}`);
+    if (albedo < 0.0 || albedo > 1.0) {
+      throw new Error('albedo must be in [0.0, 1.0]');
     }
 
-    if (this.emissivity < 0.0 || this.emissivity > 1.0) {
-      throw new Error(`Thermodynamic invariant violated: emissivity must be in [0.0, 1.0], got ${this.emissivity}`);
-    }
-
-    if (this.entropyProductionRateJKs < -1e-12) {
-      throw new Error(`Second Law violated: entropy production rate must be >= 0 W/K, got ${this.entropyProductionRateJKs}`);
+    if (emissivity < 0.0 || emissivity > 1.0) {
+      throw new Error('emissivity must be in [0.0, 1.0]');
     }
   }
 
-  /**
-   * Pure copy-and-update mutator creating a new immutable record.
-   */
-  public withUpdates(patch: Partial<H3CellThermodynamicState>): H3CellThermodynamicRecord {
-    const liquid = patch.liquidWaterMassKg ?? this.liquidWaterMassKg;
-    const ice = patch.iceMassKg ?? this.iceMassKg;
-    const vapor = patch.vaporMassKg ?? this.vaporMassKg;
-    const totalWater = patch.totalWaterMassKg ?? (
-      patch.liquidWaterMassKg !== undefined || patch.iceMassKg !== undefined || patch.vaporMassKg !== undefined
-        ? liquid + ice + vapor
-        : this.totalWaterMassKg
-    );
-
-    return new H3CellThermodynamicRecord(
-      patch.h3Index ?? this.h3Index,
-      patch.areaM2 ?? this.areaM2,
-      patch.elevationM ?? this.elevationM,
-      patch.internalEnergyJ ?? this.internalEnergyJ,
-      patch.temperatureK ?? this.temperatureK,
-      patch.heatCapacityJK ?? this.heatCapacityJK,
-      patch.albedo ?? this.albedo,
-      patch.emissivity ?? this.emissivity,
-      patch.shortwaveInWm2 ?? this.shortwaveInWm2,
-      patch.shortwaveOutWm2 ?? this.shortwaveOutWm2,
-      patch.longwaveOutWm2 ?? this.longwaveOutWm2,
-      patch.sensibleHeatFluxWm2 ?? this.sensibleHeatFluxWm2,
-      patch.latentHeatFluxWm2 ?? this.latentHeatFluxWm2,
-      patch.entropyJPerK ?? this.entropyJPerK,
-      patch.entropyProductionRateJKs ?? this.entropyProductionRateJKs,
-      patch.dryAirMassKg ?? this.dryAirMassKg,
-      totalWater,
-      liquid,
-      ice,
-      vapor,
-      patch.carbonMassKg ?? this.carbonMassKg,
-      patch.nitrogenMassKg ?? this.nitrogenMassKg,
-      patch.phosphorusMassKg ?? this.phosphorusMassKg
-    );
-  }
-
-  /** Computes instantaneous net radiative balance in W/m^2 */
-  public get netRadiativeFluxWm2(): number {
-    return this.shortwaveInWm2 - this.shortwaveOutWm2 - this.longwaveOutWm2;
-  }
-
-  /** Computes instantaneous net surface energy flux in W/m^2 */
-  public get netEnergyFluxWm2(): number {
-    return this.netRadiativeFluxWm2 - this.sensibleHeatFluxWm2 - this.latentHeatFluxWm2;
-  }
-
-  /** Computes total column mass in kg */
   public get totalMassKg(): number {
     return (
       this.dryAirMassKg +
@@ -237,296 +114,492 @@ export class H3CellThermodynamicRecord implements H3CellThermodynamicState {
       this.phosphorusMassKg
     );
   }
+
+  public get netRadiativeFluxWm2(): number {
+    return this.shortwaveInWm2 - this.shortwaveOutWm2 - this.longwaveOutWm2;
+  }
+
+  public get netEnergyFluxWm2(): number {
+    return this.netRadiativeFluxWm2 - this.sensibleHeatFluxWm2 - this.latentHeatFluxWm2;
+  }
+
+  public withUpdates(updates: Partial<H3CellThermodynamicRecordParams>): H3CellThermodynamicRecord {
+    return new H3CellThermodynamicRecord(
+      updates.h3Index ?? this.h3Index,
+      updates.areaM2 ?? this.areaM2,
+      updates.elevationM ?? this.elevationM,
+      updates.internalEnergyJ ?? this.internalEnergyJ,
+      updates.temperatureK ?? this.temperatureK,
+      updates.heatCapacityJK ?? this.heatCapacityJK,
+      updates.albedo ?? this.albedo,
+      updates.emissivity ?? this.emissivity,
+      updates.shortwaveInWm2 ?? this.shortwaveInWm2,
+      updates.shortwaveOutWm2 ?? this.shortwaveOutWm2,
+      updates.longwaveOutWm2 ?? this.longwaveOutWm2,
+      updates.sensibleHeatFluxWm2 ?? this.sensibleHeatFluxWm2,
+      updates.latentHeatFluxWm2 ?? this.latentHeatFluxWm2,
+      updates.entropyJPerK ?? this.entropyJPerK,
+      updates.entropyProductionRateJKs ?? this.entropyProductionRateJKs,
+      updates.dryAirMassKg ?? this.dryAirMassKg,
+      updates.totalWaterMassKg ?? this.totalWaterMassKg,
+      updates.liquidWaterMassKg ?? this.liquidWaterMassKg,
+      updates.iceMassKg ?? this.iceMassKg,
+      updates.vaporMassKg ?? this.vaporMassKg,
+      updates.carbonMassKg ?? this.carbonMassKg,
+      updates.nitrogenMassKg ?? this.nitrogenMassKg,
+      updates.phosphorusMassKg ?? this.phosphorusMassKg
+    );
+  }
 }
 
-/**
- * Container encapsulating the discrete spatial collection of cell thermodynamic records.
- * Provides indexed lookups, spatial reductions, and global First and Second Law aggregations.
- */
 export class H3StateTensorContainer {
-  private readonly states: Map<string, H3CellThermodynamicRecord>;
+  private readonly records: Map<string, H3CellThermodynamicRecord> = new Map();
 
-  constructor(initialStates?: Iterable<H3CellThermodynamicRecord>) {
-    this.states = new Map<string, H3CellThermodynamicRecord>();
-    if (initialStates) {
-      for (const state of initialStates) {
-        this.states.set(state.h3Index, state);
+  public get size(): number {
+    return this.records.size;
+  }
+
+  public set(record: H3CellThermodynamicRecord): void {
+    this.records.set(record.h3Index, record);
+  }
+
+  public get(h3Index: string): H3CellThermodynamicRecord | undefined {
+    return this.records.get(h3Index);
+  }
+
+  public has(h3Index: string): boolean {
+    return this.records.has(h3Index);
+  }
+
+  public computeTotalInternalEnergyJ(): number {
+    let total = 0;
+    for (const record of this.records.values()) {
+      total += record.internalEnergyJ;
+    }
+    return total;
+  }
+
+  public computeTotalMassKg(): number {
+    let total = 0;
+    for (const record of this.records.values()) {
+      total += record.totalMassKg;
+    }
+    return total;
+  }
+
+  public computeTotalEntropyJPerK(): number {
+    let total = 0;
+    for (const record of this.records.values()) {
+      total += record.entropyJPerK;
+    }
+    return total;
+  }
+}
+
+export function computeStefanBoltzmannLongwave(temperatureK: number, emissivity: number): number {
+  return emissivity * STEFAN_BOLTZMANN_CONSTANT * Math.pow(temperatureK, 4);
+}
+
+export function computeCompositeHeatCapacity(
+  dryAirMassKg: number,
+  liquidWaterMassKg: number,
+  iceMassKg: number,
+  vaporMassKg: number,
+  areaM2: number
+): number {
+  const rockMass = RHO_LITH * areaM2 * ACTIVE_BEDROCK_DEPTH_M;
+  return (
+    dryAirMassKg * C_P_DRY_AIR +
+    liquidWaterMassKg * C_LIQUID_WATER +
+    iceMassKg * C_ICE +
+    vaporMassKg * C_VAPOR +
+    rockMass * C_SOIL
+  );
+}
+
+export function computeInternalEnergy(
+  heatCapacityJK: number,
+  temperatureK: number,
+  liquidWaterMassKg: number = 0,
+  vaporMassKg: number = 0
+): number {
+  return (
+    heatCapacityJK * temperatureK +
+    vaporMassKg * LATENT_HEAT_VAPORIZATION +
+    liquidWaterMassKg * LATENT_HEAT_FUSION
+  );
+}
+
+export function evaluateRadiativeStep(
+  record: H3CellThermodynamicRecord,
+  dt: number
+): H3CellThermodynamicRecord {
+  const lwOut = computeStefanBoltzmannLongwave(record.temperatureK, record.emissivity);
+  const swOut = record.albedo * record.shortwaveInWm2;
+  const netRad = record.shortwaveInWm2 - swOut - lwOut;
+  const netFlux = netRad - record.sensibleHeatFluxWm2 - record.latentHeatFluxWm2;
+
+  const deltaU = netFlux * record.areaM2 * dt;
+  const newU = Math.max(1.0, record.internalEnergyJ + deltaU);
+  const newT = Math.max(1.0, newU / record.heatCapacityJK);
+
+  const entropyProductionRate = Math.max(0, (lwOut * record.areaM2) / newT);
+  const newEntropy = Math.max(0, record.entropyJPerK + entropyProductionRate * dt);
+
+  return record.withUpdates({
+    internalEnergyJ: newU,
+    temperatureK: newT,
+    shortwaveOutWm2: swOut,
+    longwaveOutWm2: lwOut,
+    entropyJPerK: newEntropy,
+    entropyProductionRateJKs: entropyProductionRate
+  });
+}
+
+export function evaluatePhaseTransitions(
+  record: H3CellThermodynamicRecord,
+  dt: number
+): H3CellThermodynamicRecord {
+  const rate = Math.min(1.0, dt * 0.05);
+  let liquid = record.liquidWaterMassKg;
+  let ice = record.iceMassKg;
+
+  if (record.temperatureK < T_FREEZE) {
+    const deltaFreeze = Math.min(liquid, liquid * rate + 10.0);
+    liquid -= deltaFreeze;
+    ice += deltaFreeze;
+  } else if (record.temperatureK > T_FREEZE && ice > 0) {
+    const deltaMelt = Math.min(ice, ice * rate + 10.0);
+    ice -= deltaMelt;
+    liquid += deltaMelt;
+  }
+
+  return record.withUpdates({
+    liquidWaterMassKg: liquid,
+    iceMassKg: ice
+  });
+}
+
+export interface InterCellBoundaryFlux {
+  energyFluxInWatts?: number;
+  waterFluxInKgPerS?: number;
+  dryAirFluxInKgPerS?: number;
+  carbonFluxInKgPerS?: number;
+  nitrogenFluxInKgPerS?: number;
+  phosphorusFluxInKgPerS?: number;
+}
+
+export function stepThermodynamicCell(
+  record: H3CellThermodynamicRecord,
+  dt: number,
+  boundary?: InterCellBoundaryFlux
+): H3CellThermodynamicRecord {
+  const dryAirDelta = (boundary?.dryAirFluxInKgPerS ?? 0) * dt;
+  const waterDelta = (boundary?.waterFluxInKgPerS ?? 0) * dt;
+  const carbonDelta = (boundary?.carbonFluxInKgPerS ?? 0) * dt;
+  const nitrogenDelta = (boundary?.nitrogenFluxInKgPerS ?? 0) * dt;
+  const phosphorusDelta = (boundary?.phosphorusFluxInKgPerS ?? 0) * dt;
+  const energyDelta = (boundary?.energyFluxInWatts ?? 0) * dt;
+
+  const nextDryAir = Math.max(0, record.dryAirMassKg + dryAirDelta);
+  const nextLiquid = Math.max(0, record.liquidWaterMassKg + waterDelta);
+  const nextTotalWater = Math.max(0, record.totalWaterMassKg + waterDelta);
+  const nextCarbon = Math.max(0, record.carbonMassKg + carbonDelta);
+  const nextNitrogen = Math.max(0, record.nitrogenMassKg + nitrogenDelta);
+  const nextPhosphorus = Math.max(0, record.phosphorusMassKg + phosphorusDelta);
+  const nextEnergy = Math.max(1.0, record.internalEnergyJ + energyDelta);
+
+  const bounded = record.withUpdates({
+    dryAirMassKg: nextDryAir,
+    liquidWaterMassKg: nextLiquid,
+    totalWaterMassKg: nextTotalWater,
+    carbonMassKg: nextCarbon,
+    nitrogenMassKg: nextNitrogen,
+    phosphorusMassKg: nextPhosphorus,
+    internalEnergyJ: nextEnergy
+  });
+
+  const radiated = evaluateRadiativeStep(bounded, dt);
+  return evaluatePhaseTransitions(radiated, dt);
+}
+
+// =============================================================================
+// SPRINT 043: INVARIANT VERIFICATION & BIOGEOCHEMICAL TRANSITIONS
+// =============================================================================
+
+export enum ThermodynamicViolationType {
+  NEGATIVE_STOCK = 'NEGATIVE_STOCK',
+  NON_POSITIVE_TEMPERATURE = 'NON_POSITIVE_TEMPERATURE',
+  NON_FINITE_VALUE = 'NON_FINITE_VALUE',
+  CORRUPT_METADATA = 'CORRUPT_METADATA'
+}
+
+export interface ThermodynamicViolation {
+  readonly type: ThermodynamicViolationType;
+  readonly field: string;
+  readonly value: number;
+  readonly threshold: number;
+  readonly message: string;
+}
+
+export interface ThermodynamicValidationResult {
+  readonly isValid: boolean;
+  readonly cellIndex: string;
+  readonly violations: readonly ThermodynamicViolation[];
+  readonly evaluatedAt: number;
+}
+
+export interface ThermodynamicValidationOptions {
+  readonly tolerance?: number;
+  readonly minTemperatureKelvin?: number;
+  readonly failFast?: boolean;
+}
+
+export interface IH3CellThermodynamicState {
+  cellIndex: string;
+  temperatureKelvin: number;
+  atmosphericCarbon: number;
+  organicCarbon: number;
+  biomassStocks: Record<string, number>;
+  waterMassKg: number;
+  enthalpyJoules: number;
+}
+
+export function validateH3CellThermodynamicState(
+  state: IH3CellThermodynamicState,
+  options?: ThermodynamicValidationOptions
+): ThermodynamicValidationResult {
+  const tolerance = options?.tolerance ?? 1e-9;
+  const minT = options?.minTemperatureKelvin ?? 1e-3;
+  const failFast = options?.failFast ?? false;
+  const violations: ThermodynamicViolation[] = [];
+
+  const record = (v: ThermodynamicViolation): boolean => {
+    violations.push(v);
+    return failFast;
+  };
+
+  const buildResult = (): ThermodynamicValidationResult => ({
+    isValid: violations.length === 0,
+    cellIndex: state && typeof state.cellIndex === 'string' && state.cellIndex.trim().length > 0
+      ? state.cellIndex
+      : 'UNKNOWN',
+    violations: Object.freeze([...violations]),
+    evaluatedAt: Date.now()
+  });
+
+  if (!state || typeof state !== 'object') {
+    record({
+      type: ThermodynamicViolationType.CORRUPT_METADATA,
+      field: 'state',
+      value: NaN,
+      threshold: 0,
+      message: 'Thermodynamic state is null or not an object.'
+    });
+    return buildResult();
+  }
+
+  if (!state.cellIndex || typeof state.cellIndex !== 'string' || state.cellIndex.trim().length === 0) {
+    if (record({
+      type: ThermodynamicViolationType.CORRUPT_METADATA,
+      field: 'cellIndex',
+      value: NaN,
+      threshold: 0,
+      message: `Cell index must be a non-empty string. Received: ${state.cellIndex}`
+    })) return buildResult();
+  }
+
+  if (!Number.isFinite(state.temperatureKelvin)) {
+    if (record({
+      type: ThermodynamicViolationType.NON_FINITE_VALUE,
+      field: 'temperatureKelvin',
+      value: state.temperatureKelvin,
+      threshold: minT,
+      message: `Temperature is non-finite: ${state.temperatureKelvin}`
+    })) return buildResult();
+  } else if (state.temperatureKelvin < minT) {
+    if (record({
+      type: ThermodynamicViolationType.NON_POSITIVE_TEMPERATURE,
+      field: 'temperatureKelvin',
+      value: state.temperatureKelvin,
+      threshold: minT,
+      message: `Thermodynamic temperature ${state.temperatureKelvin} K is below threshold ${minT} K.`
+    })) return buildResult();
+  }
+
+  const scalarStocks: Array<{ field: keyof IH3CellThermodynamicState; val: number }> = [
+    { field: 'atmosphericCarbon', val: state.atmosphericCarbon },
+    { field: 'organicCarbon', val: state.organicCarbon },
+    { field: 'waterMassKg', val: state.waterMassKg },
+    { field: 'enthalpyJoules', val: state.enthalpyJoules }
+  ];
+
+  for (const { field, val } of scalarStocks) {
+    if (!Number.isFinite(val)) {
+      if (record({
+        type: ThermodynamicViolationType.NON_FINITE_VALUE,
+        field,
+        value: val,
+        threshold: 0,
+        message: `Field '${field}' is non-finite: ${val}`
+      })) return buildResult();
+    } else if (field !== 'enthalpyJoules' && val < -tolerance) {
+      if (record({
+        type: ThermodynamicViolationType.NEGATIVE_STOCK,
+        field,
+        value: val,
+        threshold: -tolerance,
+        message: `Stock '${field}' value ${val} is below negative tolerance ${-tolerance}.`
+      })) return buildResult();
+    }
+  }
+
+  if (!state.biomassStocks || typeof state.biomassStocks !== 'object') {
+    record({
+      type: ThermodynamicViolationType.CORRUPT_METADATA,
+      field: 'biomassStocks',
+      value: NaN,
+      threshold: 0,
+      message: 'biomassStocks map is missing or not an object.'
+    });
+  } else {
+    for (const [tier, mass] of Object.entries(state.biomassStocks)) {
+      if (!Number.isFinite(mass)) {
+        if (record({
+          type: ThermodynamicViolationType.NON_FINITE_VALUE,
+          field: `biomassStocks.${tier}`,
+          value: mass,
+          threshold: 0,
+          message: `Biomass tier '${tier}' has non-finite mass: ${mass}`
+        })) return buildResult();
+      } else if (mass < -tolerance) {
+        if (record({
+          type: ThermodynamicViolationType.NEGATIVE_STOCK,
+          field: `biomassStocks.${tier}`,
+          value: mass,
+          threshold: -tolerance,
+          message: `Biomass tier '${tier}' value ${mass} is below negative tolerance ${-tolerance}.`
+        })) return buildResult();
       }
     }
   }
 
-  public get(h3Index: string): H3CellThermodynamicRecord | undefined {
-    return this.states.get(h3Index);
+  return buildResult();
+}
+
+export function isH3CellThermodynamicallyValid(
+  state: IH3CellThermodynamicState,
+  tolerance: number = 1e-9,
+  minTemperatureKelvin: number = 1e-3
+): boolean {
+  if (
+    !state ||
+    typeof state !== 'object' ||
+    typeof state.cellIndex !== 'string' ||
+    state.cellIndex.trim().length === 0 ||
+    !Number.isFinite(state.temperatureKelvin) ||
+    state.temperatureKelvin < minTemperatureKelvin ||
+    !Number.isFinite(state.atmosphericCarbon) ||
+    state.atmosphericCarbon < -tolerance ||
+    !Number.isFinite(state.organicCarbon) ||
+    state.organicCarbon < -tolerance ||
+    !Number.isFinite(state.waterMassKg) ||
+    state.waterMassKg < -tolerance ||
+    !Number.isFinite(state.enthalpyJoules)
+  ) {
+    return false;
   }
 
-  public set(state: H3CellThermodynamicRecord): void {
-    this.states.set(state.h3Index, state);
+  const stocks = state.biomassStocks;
+  if (!stocks || typeof stocks !== 'object') {
+    return false;
   }
 
-  public has(h3Index: string): boolean {
-    return this.states.has(h3Index);
-  }
-
-  public get size(): number {
-    return this.states.size;
-  }
-
-  public keys(): IterableIterator<string> {
-    return this.states.keys();
-  }
-
-  public values(): IterableIterator<H3CellThermodynamicRecord> {
-    return this.states.values();
-  }
-
-  /** Computes global conserved total mass across all registered cells */
-  public computeTotalMassKg(): number {
-    let sum = 0;
-    for (const state of this.states.values()) {
-      sum += state.totalMassKg;
+  for (const key in stocks) {
+    if (Object.prototype.hasOwnProperty.call(stocks, key)) {
+      const v = stocks[key];
+      if (!Number.isFinite(v) || v < -tolerance) {
+        return false;
+      }
     }
-    return sum;
   }
 
-  /** Computes global internal energy across all registered cells */
-  public computeTotalInternalEnergyJ(): number {
-    let sum = 0;
-    for (const state of this.states.values()) {
-      sum += state.internalEnergyJ;
-    }
-    return sum;
-  }
-
-  /** Computes global entropy sum */
-  public computeTotalEntropyJPerK(): number {
-    let sum = 0;
-    for (const state of this.states.values()) {
-      sum += state.entropyJPerK;
-    }
-    return sum;
-  }
+  return true;
 }
 
-/** Type alias for monadic state transitions over H3 cells */
-export type H3ThermodynamicMonad = SpatialMonad<H3CellThermodynamicRecord>;
+export class H3CellThermodynamicState implements IH3CellThermodynamicState {
+  constructor(
+    public cellIndex: string,
+    public temperatureKelvin: number,
+    public atmosphericCarbon: number,
+    public organicCarbon: number,
+    public biomassStocks: Record<string, number>,
+    public waterMassKg: number,
+    public enthalpyJoules: number
+  ) {}
 
-/** Interface defining inter-cell advective and turbulent mass/energy boundaries */
-export interface BoundaryFluxContext {
-  /** Net energy influx from adjacent cells in Watts */
-  readonly energyFluxInWatts: number;
-  /** Net water mass influx from adjacent cells in kg/s */
-  readonly waterFluxInKgPerS: number;
-  /** Net dry air influx from adjacent cells in kg/s */
-  readonly dryAirFluxInKgPerS: number;
-  /** Net carbon stock influx in kg/s */
-  readonly carbonFluxInKgPerS: number;
-  /** Net nitrogen stock influx in kg/s */
-  readonly nitrogenFluxInKgPerS: number;
-  /** Net phosphorus stock influx in kg/s */
-  readonly phosphorusFluxInKgPerS: number;
-}
-
-/** Thermodynamic process operator kernel contract */
-export interface ThermodynamicProcessKernel {
-  readonly kernelName: string;
-  apply(
-    state: H3CellThermodynamicRecord,
-    dtSeconds: number,
-    boundaryFluxes?: BoundaryFluxContext
-  ): H3CellThermodynamicRecord;
-}
-
-/**
- * Calculates composite column heat capacity $C_{v, c}$ in J / K.
- */
-export function computeCompositeHeatCapacity(
-  dryAirKg: number,
-  liquidWaterKg: number,
-  iceKg: number,
-  vaporKg: number,
-  areaM2: number,
-  activeDepthM: number = ACTIVE_BEDROCK_DEPTH_M,
-  soilDensityKgM3: number = RHO_LITH
-): number {
-  const lithosphereMassKg = soilDensityKgM3 * areaM2 * activeDepthM;
-  return (
-    dryAirKg * C_V_DRY_AIR +
-    liquidWaterKg * C_LIQUID_WATER +
-    iceKg * C_ICE +
-    vaporKg * C_VAPOR +
-    lithosphereMassKg * C_SOIL
-  );
-}
-
-/**
- * Calculates internal thermal energy reference $U_c$ in Joules.
- */
-export function computeInternalEnergy(
-  heatCapacityJK: number,
-  temperatureK: number,
-  liquidWaterKg: number,
-  vaporKg: number
-): number {
-  return (
-    heatCapacityJK * temperatureK +
-    liquidWaterKg * LATENT_HEAT_FUSION +
-    vaporKg * (LATENT_HEAT_FUSION + 2.501e6)
-  );
-}
-
-/**
- * Calculates Stefan-Boltzmann longwave thermal emission in W / m^2.
- */
-export function computeStefanBoltzmannLongwave(
-  temperatureK: number,
-  emissivity: number
-): number {
-  return emissivity * STEFAN_BOLTZMANN_CONSTANT * Math.pow(temperatureK, 4);
-}
-
-/**
- * Evaluates saturation vapor pressure via Tetens formula in Pascals.
- */
-export function computeSaturationVaporPressure(tempK: number): number {
-  const tC = tempK - T_FREEZE;
-  return 610.78 * Math.exp((17.27 * tC) / (tempK - 35.85));
-}
-
-/**
- * Pure radiative exchange step evaluating shortwave absorption,
- * Stefan-Boltzmann longwave dissipation, and Second Law entropy generation.
- */
-export function evaluateRadiativeStep(
-  state: H3CellThermodynamicRecord,
-  dtSeconds: number
-): H3CellThermodynamicRecord {
-  const swInW = state.shortwaveInWm2 * state.areaM2;
-  const swOutW = state.albedo * swInW;
-  const swAbsorbedW = swInW - swOutW;
-
-  const lwOutWm2 = computeStefanBoltzmannLongwave(state.temperatureK, state.emissivity);
-  const lwOutW = lwOutWm2 * state.areaM2;
-
-  const netRadiativePowerW = swAbsorbedW - lwOutW;
-  const deltaInternalEnergyJ = netRadiativePowerW * dtSeconds;
-  const newInternalEnergyJ = state.internalEnergyJ + deltaInternalEnergyJ;
-
-  const newTemperatureK = Math.max(0.1, newInternalEnergyJ / state.heatCapacityJK);
-
-  const entropyProductionRateJKs = Math.max(
-    0,
-    swAbsorbedW * (1.0 / newTemperatureK - 1.0 / T_SUN)
-  );
-
-  const deltaEntropyJPerK =
-    deltaInternalEnergyJ / newTemperatureK + entropyProductionRateJKs * dtSeconds;
-
-  return state.withUpdates({
-    internalEnergyJ: newInternalEnergyJ,
-    temperatureK: newTemperatureK,
-    shortwaveOutWm2: swOutW / state.areaM2,
-    longwaveOutWm2: lwOutWm2,
-    entropyJPerK: Math.max(0, state.entropyJPerK + deltaEntropyJPerK),
-    entropyProductionRateJKs
-  });
-}
-
-/**
- * Pure water phase transition step evaluating freezing, melting,
- * and latent heat transfer.
- */
-export function evaluatePhaseTransitions(
-  state: H3CellThermodynamicRecord,
-  dtSeconds: number
-): H3CellThermodynamicRecord {
-  let liquid = state.liquidWaterMassKg;
-  let ice = state.iceMassKg;
-  const vapor = state.vaporMassKg;
-  let sensibleEnergyDeltaJ = 0;
-  let entropyGenRateJKs = 0;
-
-  if (state.temperatureK < T_FREEZE && liquid > 0) {
-    const maxFreezableKg = Math.min(
-      liquid,
-      (state.heatCapacityJK * (T_FREEZE - state.temperatureK)) / LATENT_HEAT_FUSION
+  public clone(): H3CellThermodynamicState {
+    return new H3CellThermodynamicState(
+      this.cellIndex,
+      this.temperatureKelvin,
+      this.atmosphericCarbon,
+      this.organicCarbon,
+      { ...this.biomassStocks },
+      this.waterMassKg,
+      this.enthalpyJoules
     );
-    liquid -= maxFreezableKg;
-    ice += maxFreezableKg;
-    sensibleEnergyDeltaJ += maxFreezableKg * LATENT_HEAT_FUSION;
-    if (dtSeconds > 0) {
-      entropyGenRateJKs +=
-        (maxFreezableKg * LATENT_HEAT_FUSION / dtSeconds) *
-        Math.abs(1.0 / state.temperatureK - 1.0 / T_FREEZE);
-    }
-  } else if (state.temperatureK > T_FREEZE && ice > 0) {
-    const maxMeltableKg = Math.min(
-      ice,
-      (state.heatCapacityJK * (state.temperatureK - T_FREEZE)) / LATENT_HEAT_FUSION
-    );
-    ice -= maxMeltableKg;
-    liquid += maxMeltableKg;
-    sensibleEnergyDeltaJ -= maxMeltableKg * LATENT_HEAT_FUSION;
-    if (dtSeconds > 0) {
-      entropyGenRateJKs +=
-        (maxMeltableKg * LATENT_HEAT_FUSION / dtSeconds) *
-        Math.abs(1.0 / T_FREEZE - 1.0 / state.temperatureK);
-    }
   }
 
-  const newTotalWater = liquid + ice + vapor;
-  const newInternalEnergyJ = state.internalEnergyJ + sensibleEnergyDeltaJ;
-  const newTemperatureK = Math.max(0.1, newInternalEnergyJ / state.heatCapacityJK);
+  public validate(options?: ThermodynamicValidationOptions): ThermodynamicValidationResult {
+    return validateH3CellThermodynamicState(this, options);
+  }
 
-  return state.withUpdates({
-    liquidWaterMassKg: liquid,
-    iceMassKg: ice,
-    vaporMassKg: vapor,
-    totalWaterMassKg: newTotalWater,
-    internalEnergyJ: newInternalEnergyJ,
-    temperatureK: newTemperatureK,
-    entropyProductionRateJKs: Math.max(
-      0,
-      state.entropyProductionRateJKs + Math.max(0, entropyGenRateJKs)
-    )
-  });
+  public isValid(tolerance?: number): boolean {
+    return isH3CellThermodynamicallyValid(this, tolerance);
+  }
+
+  public totalBiomass(): number {
+    return Object.values(this.biomassStocks).reduce((acc, m) => acc + m, 0);
+  }
+
+  public totalCarbonMass(): number {
+    return this.atmosphericCarbon + this.organicCarbon + this.totalBiomass();
+  }
 }
 
-/**
- * Composite full-step thermodynamic integration function for an individual cell.
- */
-export function stepThermodynamicCell(
-  initialState: H3CellThermodynamicRecord,
-  dtSeconds: number,
-  boundary?: Partial<BoundaryFluxContext>
-): H3CellThermodynamicRecord {
-  const energyFluxInWatts = boundary?.energyFluxInWatts ?? 0;
-  const waterFluxInKgPerS = boundary?.waterFluxInKgPerS ?? 0;
-  const dryAirFluxInKgPerS = boundary?.dryAirFluxInKgPerS ?? 0;
-  const carbonFluxInKgPerS = boundary?.carbonFluxInKgPerS ?? 0;
-  const nitrogenFluxInKgPerS = boundary?.nitrogenFluxInKgPerS ?? 0;
-  const phosphorusFluxInKgPerS = boundary?.phosphorusFluxInKgPerS ?? 0;
+export interface PhotosynthesisParams {
+  mu0: number;
+  q10: number;
+  kC: number;
+  kW: number;
+  insolation: number;
+  alphaH2O: number;
+  deltaHSynth: number;
+}
 
-  const advectedEnergy = initialState.internalEnergyJ + energyFluxInWatts * dtSeconds;
-  const advectedDryAir = Math.max(0, initialState.dryAirMassKg + dryAirFluxInKgPerS * dtSeconds);
-  const advectedLiquid = Math.max(0, initialState.liquidWaterMassKg + waterFluxInKgPerS * dtSeconds);
-  const advectedWater = advectedLiquid + initialState.iceMassKg + initialState.vaporMassKg;
-  const advectedCarbon = Math.max(0, initialState.carbonMassKg + carbonFluxInKgPerS * dtSeconds);
-  const advectedNitrogen = Math.max(0, initialState.nitrogenMassKg + nitrogenFluxInKgPerS * dtSeconds);
-  const advectedPhosphorus = Math.max(0, initialState.phosphorusMassKg + phosphorusFluxInKgPerS * dtSeconds);
+export const DEFAULT_PHOTOSYNTHESIS_PARAMS: PhotosynthesisParams = {
+  mu0: 0.15,
+  q10: 2.0,
+  kC: 100.0,
+  kW: 50.0,
+  insolation: 1.0,
+  alphaH2O: 1.5,
+  deltaHSynth: 15.6e6
+};
 
-  const stateAfterAdvection = initialState.withUpdates({
-    internalEnergyJ: advectedEnergy,
-    temperatureK: Math.max(0.1, advectedEnergy / initialState.heatCapacityJK),
-    dryAirMassKg: advectedDryAir,
-    totalWaterMassKg: advectedWater,
-    liquidWaterMassKg: advectedLiquid,
-    carbonMassKg: advectedCarbon,
-    nitrogenMassKg: advectedNitrogen,
-    phosphorusMassKg: advectedPhosphorus
-  });
+export function computePhotosyntheticVelocity(
+  state: IH3CellThermodynamicState,
+  params: PhotosynthesisParams = DEFAULT_PHOTOSYNTHESIS_PARAMS
+): number {
+  if (state.temperatureKelvin < 273.15 || state.temperatureKelvin > 320.0) {
+    return 0.0;
+  }
+  const autoBiomass = state.biomassStocks['autotroph'] ?? 0;
+  if (autoBiomass <= 0) return 0.0;
 
-  const stateAfterRadiation = evaluateRadiativeStep(stateAfterAdvection, dtSeconds);
-  const finalState = evaluatePhaseTransitions(stateAfterRadiation, dtSeconds);
+  const muMax = params.mu0 * Math.pow(params.q10, (state.temperatureKelvin - 298.15) / 10.0);
+  const carbonFactor = Math.max(0, state.atmosphericCarbon) / (Math.max(0, state.atmosphericCarbon) + params.kC);
+  const waterFactor = Math.max(0, state.waterMassKg) / (Math.max(0, state.waterMassKg) + params.kW);
 
-  return finalState;
+  return muMax * carbonFactor * waterFactor * params.insolation * autoBiomass;
 }

@@ -1,0 +1,187 @@
+```Code snippet
+@startuml
+title Web of Life - Sprint 043: Discrete H3 Thermodynamic State Validation Architecture
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam roundcorner 6
+skinparam shadowing false
+
+package "Domain Core: Spatial State Tensor (src/spatial)" {
+  interface IH3CellThermodynamicState {
+    + cellIndex: string
+    + temperatureKelvin: number
+    + atmosphericCarbon: number
+    + organicCarbon: number
+    + biomassStocks: Record<string, number>
+    + waterMassKg: number
+    + enthalpyJoules: number
+  }
+
+  enum ThermodynamicViolationType {
+    NEGATIVE_STOCK
+    NON_POSITIVE_TEMPERATURE
+    NON_FINITE_VALUE
+    CORRUPT_METADATA
+  }
+
+  interface ThermodynamicViolation {
+    + type: ThermodynamicViolationType
+    + field: string
+    + value: number
+    + threshold: number
+    + message: string
+  }
+
+  interface ThermodynamicValidationResult {
+    + isValid: boolean
+    + cellIndex: string
+    + violations: ReadonlyArray<ThermodynamicViolation>
+    + evaluatedAt: number
+  }
+
+  interface ThermodynamicValidationOptions {
+    + tolerance?: number
+    + minTemperatureKelvin?: number
+    + failFast?: boolean
+  }
+
+  class ThermodynamicStateValidator <<pure-function>> {
+    + validateH3CellThermodynamicState(state: IH3CellThermodynamicState, options?: ThermodynamicValidationOptions): ThermodynamicValidationResult
+    + isH3CellThermodynamicallyValid(state: IH3CellThermodynamicState, tolerance?: number): boolean
+    - guardFiniteValues(state: IH3CellThermodynamicState): List<ThermodynamicViolation>
+    - guardTemperature(state: IH3CellThermodynamicState, minTemp: number): List<ThermodynamicViolation>
+    - guardScalarStocks(state: IH3CellThermodynamicState, tol: number): List<ThermodynamicViolation>
+    - guardBiomassStocks(state: IH3CellThermodynamicState, tol: number): List<ThermodynamicViolation>
+  }
+}
+
+package "Monadic Pipeline Integration (src/monads)" {
+  class SpatialStateMonad<T extends IH3CellThermodynamicState> {
+    - state: T
+    + bind(fn: (s: T) => SpatialStateMonad<T>): SpatialStateMonad<T>
+    + assertInvariants(options?: ThermodynamicValidationOptions): SpatialStateMonad<T>
+    + extract(): T
+  }
+
+  class TrophicTransitionStage {
+    + execute(s: IH3CellThermodynamicState): IH3CellThermodynamicState
+  }
+
+  class ClimateAdvectionStage {
+    + execute(s: IH3CellThermodynamicState): IH3CellThermodynamicState
+  }
+}
+
+package "Relational Ledger Schema (db/schema.sql)" {
+  entity h3_grid_cells {
+    * cell_index: VARCHAR(15) <<PK>>
+    --
+    resolution: INTEGER
+    centroid_lat: DOUBLE
+    centroid_lon: DOUBLE
+    surface_area_m2: DOUBLE
+    is_active: BOOLEAN
+  }
+
+  entity blockchain_blocks {
+    * block_height: BIGINT <<PK>>
+    --
+    block_hash: CHAR(64)
+    parent_hash: CHAR(64)
+    state_root: CHAR(64)
+    thermodynamic_entropy_merkle_root: CHAR(64)
+    total_enthalpy_joules: DOUBLE
+    total_carbon_mass_kg: DOUBLE
+    total_water_mass_kg: DOUBLE
+    timestamp: BIGINT
+    validator_signature: VARCHAR(130)
+  }
+
+  entity h3_cell_thermodynamic_states {
+    * state_id: BIGSERIAL <<PK>>
+    --
+    * block_height: BIGINT <<FK>>
+    * cell_index: VARCHAR(15) <<FK>>
+    temperature_kelvin: DOUBLE [> 0]
+    atmospheric_carbon: DOUBLE [>= -1e-9]
+    organic_carbon: DOUBLE [>= -1e-9]
+    water_mass_kg: DOUBLE [>= -1e-9]
+    enthalpy_joules: DOUBLE
+    is_thermodynamically_valid: BOOLEAN
+    snapshot_timestamp: BIGINT
+  }
+
+  entity h3_cell_biomass_stocks {
+    * stock_id: BIGSERIAL <<PK>>
+    --
+    * state_id: BIGINT <<FK>>
+    trophic_tier: VARCHAR(64)
+    biomass_mass_kg: DOUBLE [>= -1e-9]
+  }
+
+  entity h3_thermodynamic_validation_events {
+    * validation_id: BIGSERIAL <<PK>>
+    --
+    * block_height: BIGINT <<FK>>
+    * cell_index: VARCHAR(15) <<FK>>
+    is_valid: BOOLEAN
+    tolerance: DOUBLE
+    min_temperature_kelvin: DOUBLE
+    violation_count: INTEGER
+    evaluated_at: BIGINT
+  }
+
+  entity h3_thermodynamic_violations {
+    * violation_id: BIGSERIAL <<PK>>
+    --
+    * validation_id: BIGINT <<FK>>
+    violation_type: VARCHAR(32)
+    field_name: VARCHAR(128)
+    observed_value: DOUBLE
+    threshold_value: DOUBLE
+    diagnostic_message: TEXT
+  }
+
+  entity thermodynamic_stock_transitions {
+    * transition_id: BIGSERIAL <<PK>>
+    --
+    * block_height: BIGINT <<FK>>
+    * cell_index: VARCHAR(15) <<FK>>
+    monad_stage: VARCHAR(64)
+    delta_atmospheric_carbon: DOUBLE
+    delta_organic_carbon: DOUBLE
+    delta_water_mass_kg: DOUBLE
+    delta_enthalpy_joules: DOUBLE
+    entropy_generated_joules_per_kelvin: DOUBLE [>= 0]
+    post_state_hash: CHAR(64)
+    pre_validation_passed: BOOLEAN
+    post_validation_passed: BOOLEAN
+  }
+}
+
+' Domain Associations
+ThermodynamicStateValidator ..> IH3CellThermodynamicState : evaluates
+ThermodynamicStateValidator ..> ThermodynamicValidationOptions : configured by
+ThermodynamicStateValidator ..> ThermodynamicValidationResult : produces
+ThermodynamicValidationResult *-- "0..*" ThermodynamicViolation : contains
+ThermodynamicViolation *-- "1" ThermodynamicViolationType : classifies
+
+SpatialStateMonad --> IH3CellThermodynamicState : encapsulates
+SpatialStateMonad ..> ThermodynamicStateValidator : invokes assertion
+
+' Relational Ledger Associations
+h3_grid_cells ||--o{ h3_cell_thermodynamic_states : indexes
+blockchain_blocks ||--o{ h3_cell_thermodynamic_states : records
+h3_cell_thermodynamic_states ||--o{ h3_cell_biomass_stocks : partitions
+blockchain_blocks ||--o{ h3_thermodynamic_validation_events : commits
+h3_grid_cells ||--o{ h3_thermodynamic_validation_events : monitors
+h3_thermodynamic_validation_events ||--o{ h3_thermodynamic_violations : details
+blockchain_blocks ||--o{ thermodynamic_stock_transitions : binds
+h3_grid_cells ||--o{ thermodynamic_stock_transitions : experiences
+
+' TypeScript to Relational Mapping
+IH3CellThermodynamicState .. h3_cell_thermodynamic_states : persists as
+ThermodynamicValidationResult .. h3_thermodynamic_validation_events : logged as
+ThermodynamicViolation .. h3_thermodynamic_violations : materialized as
+@enduml
