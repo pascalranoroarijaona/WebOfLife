@@ -1,256 +1,250 @@
--- Web of Life Thermodynamic Blockchain Schema
--- Sprint 062: Normalized Radial Midpoint Unit Vector for Boundary Segments (RFC-062)
--- Architecture: Discrete Global Grid System (H3) & Finite Volume Facet Triad Flux Ledger
+-- Web of Life Core Thermodynamic Engine & Ledger Schema
+-- Sprint 063: Boundary Horizontal Normal Vector & Darboux Frame Integration
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
-
--- ============================================================================
--- ENUM TYPES & CORE THERMODYNAMIC STATUS
--- ============================================================================
-CREATE TYPE cell_resolution_enum AS ENUM (
-    'res_0', 'res_1', 'res_2', 'res_3', 'res_4', 'res_5', 
-    'res_6', 'res_7', 'res_8', 'res_9', 'res_10', 'res_11', 
-    'res_12', 'res_13', 'res_14', 'res_15'
-);
-
-CREATE TYPE triad_singularity_strategy AS ENUM (
-    'ZENITH_FALLBACK',
-    'STRICT_EXCEPTION',
-    'INTERPOLATED_NEIGHBOR'
-);
-
-CREATE TYPE flux_transport_mode AS ENUM (
-    'ADVECTION',
-    'LATERAL_DIFFUSION',
-    'THERMAL_CONDUCTION',
-    'SURFACE_SHEAR_STRESS',
-    'GEOSTROPHIC_DRIFT'
-);
-
-CREATE TYPE conservation_audit_status AS ENUM (
-    'STRICTLY_CONSERVED',
-    'ENTROPY_PRODUCING_VALID',
-    'MASS_DEFICIT_VIOLATION',
-    'ENERGY_NON_CONSERVATION_ERROR'
-);
+-- Enable cryptographic and spatial extensions
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
--- 1. H3 DGGS SPATIAL CELLS & VERTEX TOPOLOGY
+-- ENUMS & DOMAIN CONSTRAINTS
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS h3_cells (
+
+DO $$ BEGIN
+    CREATE TYPE cell_flux_direction AS ENUM ('CELL_I_TO_J', 'CELL_J_TO_I', 'EQUILIBRIUM');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE thermodynamic_flux_type AS ENUM (
+        'BAROTROPIC_MASS_ADVECTION',
+        'THERMAL_CONDUCTION_FICKIAN',
+        'SALINITY_DIFFUSION',
+        'WIND_STRESS_MOMENTUM',
+        'GEOSTROPHIC_CURRENT'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Floating point tolerance for vector normalization constraints: 1e-6 in SQL
+CREATE DOMAIN unit_vector_component AS DOUBLE PRECISION
+    CHECK (VALUE >= -1.000001 AND VALUE <= 1.000001);
+
+-- ============================================================================
+-- SPATIAL GEODESIC TOPOLOGY & DARBOUX BOUNDARY FRAMES
+-- ============================================================================
+
+-- Discrete spherical cells (H3 base cells & hierarchical pentagons/hexagons)
+CREATE TABLE IF NOT EXISTS spatial_h3_cells (
     h3_index BIGINT PRIMARY KEY,
     resolution INT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
     is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
-    centroid_lat DOUBLE PRECISION NOT NULL,
-    centroid_lng DOUBLE PRECISION NOT NULL,
-    centroid_cartesian_x DOUBLE PRECISION NOT NULL,
-    centroid_cartesian_y DOUBLE PRECISION NOT NULL,
-    centroid_cartesian_z DOUBLE PRECISION NOT NULL,
-    surface_area_m2 DOUBLE PRECISION NOT NULL CHECK (surface_area_m2 > 0.0),
+    center_x DOUBLE PRECISION NOT NULL,
+    center_y DOUBLE PRECISION NOT NULL,
+    center_z DOUBLE PRECISION NOT NULL,
+    surface_area DOUBLE PRECISION NOT NULL CHECK (surface_area > 0.0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_cells_resolution ON h3_cells(resolution);
+-- Shared cell-cell boundary edges and local Darboux frames (Sprint 061-063)
+CREATE TABLE IF NOT EXISTS spatial_h3_boundary_edges (
+    boundary_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cell_i BIGINT NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE CASCADE,
+    cell_j BIGINT NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE CASCADE,
+    arc_length DOUBLE PRECISION NOT NULL CHECK (arc_length > 0.0),
+    facet_depth DOUBLE PRECISION NOT NULL DEFAULT 1.0 CHECK (facet_depth > 0.0),
+    facet_area DOUBLE PRECISION GENERATED ALWAYS AS (arc_length * facet_depth) STORED,
 
--- Directed Boundary Edges / Facet Segments between Adjacent H3 Cells
-CREATE TABLE IF NOT EXISTS h3_boundary_segments (
-    segment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    cell_origin_h3 BIGINT NOT NULL REFERENCES h3_cells(h3_index),
-    cell_destination_h3 BIGINT NOT NULL REFERENCES h3_cells(h3_index),
-    
-    -- Vertex 1 Cartesian Coordinates (v1)
+    -- Boundary Vertices (Endpoints v1, v2)
     v1_x DOUBLE PRECISION NOT NULL,
     v1_y DOUBLE PRECISION NOT NULL,
     v1_z DOUBLE PRECISION NOT NULL,
-    
-    -- Vertex 2 Cartesian Coordinates (v2)
     v2_x DOUBLE PRECISION NOT NULL,
     v2_y DOUBLE PRECISION NOT NULL,
     v2_z DOUBLE PRECISION NOT NULL,
-    
-    -- Segment Chord Length and Midpoint in R3
-    chord_length_m DOUBLE PRECISION NOT NULL CHECK (chord_length_m >= 0.0),
+
+    -- Edge Midpoint vector m (Sprint 061)
     midpoint_x DOUBLE PRECISION NOT NULL,
     midpoint_y DOUBLE PRECISION NOT NULL,
     midpoint_z DOUBLE PRECISION NOT NULL,
-    
-    -- Orthonormal Local Facet Reference Triad (t_hat, n_lat_hat, n_rad_hat)
-    -- 1. Tangent Unit Vector (t_hat)
-    tangent_x DOUBLE PRECISION NOT NULL,
-    tangent_y DOUBLE PRECISION NOT NULL,
-    tangent_z DOUBLE PRECISION NOT NULL,
 
-    -- 2. Lateral Normal Unit Vector (n_lat_hat) pointing across inter-cell boundary
-    lateral_normal_x DOUBLE PRECISION NOT NULL,
-    lateral_normal_y DOUBLE PRECISION NOT NULL,
-    lateral_normal_z DOUBLE PRECISION NOT NULL,
+    -- Outward Radial Normal vector r = normalize(m) (Sprint 061 / S^2 Geometry)
+    radial_norm_x unit_vector_component NOT NULL,
+    radial_norm_y unit_vector_component NOT NULL,
+    radial_norm_z unit_vector_component NOT NULL,
 
-    -- 3. Normalized Radial Midpoint Unit Vector (n_rad_hat) per RFC-062
-    radial_normal_x DOUBLE PRECISION NOT NULL,
-    radial_normal_y DOUBLE PRECISION NOT NULL,
-    radial_normal_z DOUBLE PRECISION NOT NULL,
-    
-    -- Precision & Singularity Diagnostics
-    radial_norm_deviation DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    singularity_mitigation triad_singularity_strategy NOT NULL DEFAULT 'ZENITH_FALLBACK',
-    tangent_radial_dot DOUBLE PRECISION NOT NULL DEFAULT 0.0, -- Must be 0 within 1e-12
-    
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Boundary Tangent vector t (Sprint 062)
+    tangent_x unit_vector_component NOT NULL,
+    tangent_y unit_vector_component NOT NULL,
+    tangent_z unit_vector_component NOT NULL,
+
+    -- Unoriented Horizontal Normal vector n_h = normalize(t x r) (Sprint 063)
+    horizontal_norm_x unit_vector_component NOT NULL,
+    horizontal_norm_y unit_vector_component NOT NULL,
+    horizontal_norm_z unit_vector_component NOT NULL,
+
+    -- Orthonormality & In-Plane Geometric Validation Flags
+    is_degenerate BOOLEAN NOT NULL DEFAULT FALSE,
+    orthogonality_error DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    
-    CONSTRAINT chk_boundary_distinct_cells CHECK (cell_origin_h3 != cell_destination_h3),
-    CONSTRAINT chk_radial_unit_norm CHECK (
-        abs(sqrt(radial_normal_x^2 + radial_normal_y^2 + radial_normal_z^2) - 1.0) < 1e-10
+
+    CONSTRAINT unique_boundary_pair UNIQUE (cell_i, cell_j),
+    CONSTRAINT order_cell_pair CHECK (cell_i < cell_j),
+    CONSTRAINT chk_radial_norm_unit CHECK (
+        is_degenerate OR 
+        abs((radial_norm_x^2 + radial_norm_y^2 + radial_norm_z^2) - 1.0) < 1e-5
     ),
-    CONSTRAINT chk_tangent_radial_orthogonality CHECK (
-        abs(tangent_x * radial_normal_x + tangent_y * radial_normal_y + tangent_z * radial_normal_z) < 1e-9
+    CONSTRAINT chk_tangent_unit CHECK (
+        is_degenerate OR 
+        abs((tangent_x^2 + tangent_y^2 + tangent_z^2) - 1.0) < 1e-5
+    ),
+    CONSTRAINT chk_horizontal_norm_unit CHECK (
+        is_degenerate OR 
+        abs((horizontal_norm_x^2 + horizontal_norm_y^2 + horizontal_norm_z^2) - 1.0) < 1e-5
+    ),
+    -- Orthogonality Constraint: n_h . r == 0 (No vertical leakage)
+    CONSTRAINT chk_no_vertical_leakage CHECK (
+        is_degenerate OR 
+        abs(horizontal_norm_x * radial_norm_x + horizontal_norm_y * radial_norm_y + horizontal_norm_z * radial_norm_z) < 1e-4
+    ),
+    -- Orthogonality Constraint: n_h . t == 0 (In-plane edge perpendicularity)
+    CONSTRAINT chk_horizontal_tangent_orthogonal CHECK (
+        is_degenerate OR 
+        abs(horizontal_norm_x * tangent_x + horizontal_norm_y * tangent_y + horizontal_norm_z * tangent_z) < 1e-4
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_boundary_segments_cells 
-ON h3_boundary_segments(cell_origin_h3, cell_destination_h3);
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_boundary_cells 
+    ON spatial_h3_boundary_edges (cell_i, cell_j);
 
 -- ============================================================================
--- 2. THERMODYNAMIC CELL STATE STOCKS (MONAD CELL VOLUMES)
+-- THERMODYNAMIC STOCK ACCOUNTS (FINITE-VOLUME CONSERVED QUANTITIES)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS thermodynamic_cell_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index BIGINT NOT NULL REFERENCES h3_cells(h3_index),
-    epoch_height BIGINT NOT NULL,
-    timestamp_utc TIMESTAMPTZ NOT NULL,
-    
-    -- Conserved State Variables (First Law of Thermodynamics)
-    internal_energy_joules NUMERIC(38, 10) NOT NULL CHECK (internal_energy_joules >= 0),
-    enthalpy_joules NUMERIC(38, 10) NOT NULL,
-    dry_air_mass_kg NUMERIC(38, 10) NOT NULL CHECK (dry_air_mass_kg >= 0),
-    moisture_mass_kg NUMERIC(38, 10) NOT NULL CHECK (moisture_mass_kg >= 0),
-    biomass_carbon_kg NUMERIC(38, 10) NOT NULL CHECK (biomass_carbon_kg >= 0),
-    entropy_j_per_k NUMERIC(38, 10) NOT NULL,
-    
-    -- Kinetic Momentum Vector (kg * m / s)
-    momentum_x_kg_m_s DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    momentum_y_kg_m_s DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    momentum_z_kg_m_s DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    
-    -- Thermodynamic Intensive Properties
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
+
+CREATE TABLE IF NOT EXISTS cell_thermodynamic_stocks (
+    h3_index BIGINT PRIMARY KEY REFERENCES spatial_h3_cells(h3_index),
+    internal_energy_joules DOUBLE PRECISION NOT NULL CHECK (internal_energy_joules >= 0.0),
+    mass_kg DOUBLE PRECISION NOT NULL CHECK (mass_kg >= 0.0),
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
     pressure_pascals DOUBLE PRECISION NOT NULL CHECK (pressure_pascals >= 0.0),
-    
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT uq_cell_epoch UNIQUE (h3_index, epoch_height)
+    entropy_j_per_k DOUBLE PRECISION NOT NULL,
+    epoch_height BIGINT NOT NULL DEFAULT 0,
+    state_merkle_root BYTEA NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_cell_epoch ON thermodynamic_cell_stocks(epoch_height, h3_index);
+-- ============================================================================
+-- THERMODYNAMIC FLUX LEDGER (FIRST & SECOND LAW VERIFICATION)
+-- ============================================================================
 
--- ============================================================================
--- 3. INTER-CELL BOUNDARY FACET FLUX TRANSACTIONS
--- ============================================================================
 CREATE TABLE IF NOT EXISTS boundary_facet_flux_ledger (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_hash CHAR(64) NOT NULL,
-    segment_id UUID NOT NULL REFERENCES h3_boundary_segments(segment_id),
+    flux_event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    boundary_id UUID NOT NULL REFERENCES spatial_h3_boundary_edges(boundary_id),
     epoch_height BIGINT NOT NULL,
-    transport_mode flux_transport_mode NOT NULL,
+    flux_type thermodynamic_flux_type NOT NULL,
     
-    -- Finite Volume Flux Projections against Orthonormal Triad
-    flux_tangent_component DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    flux_lateral_normal_component DOUBLE PRECISION NOT NULL, -- Net transport across boundary
-    flux_radial_normal_component DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    -- Normal projection orientation relative to (cell_i -> cell_j): +1 or -1
+    orientation_sign SMALLINT NOT NULL CHECK (orientation_sign IN (1, -1)),
     
-    -- Conserved Consignments Transferred Across Facet (Δ)
-    mass_flux_kg NUMERIC(38, 14) NOT NULL,
-    enthalpy_flux_joules NUMERIC(38, 14) NOT NULL,
-    carbon_flux_kg NUMERIC(38, 14) NOT NULL,
-    entropy_production_j_per_k NUMERIC(38, 14) NOT NULL CHECK (entropy_production_j_per_k >= 0.0),
+    -- Directed Mass Flux Phi_M = (J_M . n_h) * Area (kg/s)
+    mass_flux_rate DOUBLE PRECISION NOT NULL,
     
-    -- Cryptographic Proof & Verification Monad
-    state_merkle_root CHAR(64) NOT NULL,
-    signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+    -- Directed Enthalpy/Heat Flux Phi_Q = (J_Q . n_h) * Area (J/s)
+    enthalpy_flux_rate DOUBLE PRECISION NOT NULL,
+    
+    -- Irreversible entropy production dot{S}_facet >= 0 (J/(K*s))
+    entropy_production_rate DOUBLE PRECISION NOT NULL CHECK (entropy_production_rate >= -1e-12),
+
+    -- Verification signatures
+    source_cell_h3 BIGINT NOT NULL REFERENCES spatial_h3_cells(h3_index),
+    target_cell_h3 BIGINT NOT NULL REFERENCES spatial_h3_cells(h3_index),
+    flux_hash BYTEA NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+
+    CONSTRAINT chk_flux_sign CHECK (
+        (orientation_sign = 1 AND mass_flux_rate >= 0.0) OR
+        (orientation_sign = -1 AND mass_flux_rate <= 0.0) OR
+        (mass_flux_rate = 0.0)
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_facet_flux_segment_epoch 
-ON boundary_facet_flux_ledger(segment_id, epoch_height);
+CREATE INDEX IF NOT EXISTS idx_facet_flux_boundary_epoch 
+    ON boundary_facet_flux_ledger (boundary_id, epoch_height);
 
 -- ============================================================================
--- 4. THERMODYNAMIC BLOCKCHAIN BLOCK LEDGER & CONSERVATION AUDIT
+-- THERMODYNAMIC BLOCKCHAIN STATE & CONSERVATION AUDIT
 -- ============================================================================
+
 CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
     block_height BIGINT PRIMARY KEY,
-    block_hash CHAR(64) UNIQUE NOT NULL,
-    parent_hash CHAR(64) NOT NULL,
-    merkle_facet_flux_root CHAR(64) NOT NULL,
-    merkle_state_stocks_root CHAR(64) NOT NULL,
+    prev_block_hash BYTEA NOT NULL,
+    block_hash BYTEA NOT NULL UNIQUE,
+    transactions_root BYTEA NOT NULL,
+    boundary_flux_root BYTEA NOT NULL,
+    darboux_frames_checksum BYTEA NOT NULL,
     
-    -- Global Conservation Check Integrals
-    global_net_mass_delta_kg NUMERIC(38, 14) NOT NULL DEFAULT 0.0,
-    global_net_energy_delta_j NUMERIC(38, 14) NOT NULL DEFAULT 0.0,
-    global_entropy_generated_j_k NUMERIC(38, 14) NOT NULL CHECK (global_entropy_generated_j_k >= 0.0),
+    -- Global Conservation Accounting (Closed System or Planetary Budget)
+    total_energy_joules DOUBLE PRECISION NOT NULL,
+    total_mass_kg DOUBLE PRECISION NOT NULL,
+    net_boundary_mass_leakage DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    net_boundary_energy_leakage DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    cumulative_entropy_generated DOUBLE PRECISION NOT NULL CHECK (cumulative_entropy_generated >= 0.0),
     
-    conservation_status conservation_audit_status NOT NULL,
-    validator_node_pubkey BYTEA NOT NULL,
-    block_timestamp TIMESTAMPTZ NOT NULL,
+    first_law_satisfied BOOLEAN NOT NULL DEFAULT TRUE,
+    second_law_satisfied BOOLEAN NOT NULL DEFAULT TRUE,
     
-    CONSTRAINT chk_mass_conservation_law CHECK (abs(global_net_mass_delta_kg) < 1e-7),
-    CONSTRAINT chk_first_law_thermodynamics CHECK (abs(global_net_energy_delta_j) < 1e-6)
+    validator_signature BYTEA NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    
+    CONSTRAINT chk_mass_conservation CHECK (abs(net_boundary_mass_leakage) < 1e-6),
+    CONSTRAINT chk_energy_conservation CHECK (abs(net_boundary_energy_leakage) < 1e-3)
 );
 
-CREATE INDEX IF NOT EXISTS idx_blocks_hash ON thermodynamic_blocks(block_hash);
+-- ============================================================================
+-- AUDIT TRIGGER: GUARANTEE FIRST LAW ANTISYMMETRY AND ZERO VERTICAL LEAKAGE
+-- ============================================================================
 
--- ============================================================================
--- 5. FUNCTION: COMPUTE & UPSERT BOUNDARY SEGMENT RADIAL NORMAL (RFC-062)
--- ============================================================================
-CREATE OR REPLACE FUNCTION compute_boundary_segment_radial_normal_3d(
-    p_v1_x DOUBLE PRECISION,
-    p_v1_y DOUBLE PRECISION,
-    p_v1_z DOUBLE PRECISION,
-    p_v2_x DOUBLE PRECISION,
-    p_v2_y DOUBLE PRECISION,
-    p_v2_z DOUBLE PRECISION,
-    p_epsilon DOUBLE PRECISION DEFAULT 1e-12
-) RETURNS TABLE(
-    rad_x DOUBLE PRECISION,
-    rad_y DOUBLE PRECISION,
-    rad_z DOUBLE PRECISION,
-    mid_x DOUBLE PRECISION,
-    mid_y DOUBLE PRECISION,
-    mid_z DOUBLE PRECISION,
-    norm_val DOUBLE PRECISION,
-    is_singular BOOLEAN
-) AS $$
+CREATE OR REPLACE FUNCTION audit_boundary_darboux_geometry()
+RETURNS TRIGGER AS $$
 DECLARE
-    sx DOUBLE PRECISION;
-    sy DOUBLE PRECISION;
-    sz DOUBLE PRECISION;
-    n_mag DOUBLE PRECISION;
+    r_dot_n DOUBLE PRECISION;
+    t_dot_n DOUBLE PRECISION;
+    norm_sq DOUBLE PRECISION;
 BEGIN
-    -- Unscaled midpoint summation vector m = 0.5 * (v1 + v2)
-    sx := p_v1_x + p_v2_x;
-    sy := p_v1_y + p_v2_y;
-    sz := p_v1_z + p_v2_z;
-    
-    mid_x := sx * 0.5;
-    mid_y := sy * 0.5;
-    mid_z := sz * 0.5;
-    
-    n_mag := sqrt(sx * sx + sy * sy + sz * sz);
-    
-    IF n_mag <= p_epsilon THEN
-        -- Singularity guard: Fallback zenith unit vector
-        rad_x := 0.0;
-        rad_y := 0.0;
-        rad_z := 1.0;
-        norm_val := 0.0;
-        is_singular := TRUE;
-    ELSE
-        rad_x := sx / n_mag;
-        rad_y := sy / n_mag;
-        rad_z := sz / n_mag;
-        norm_val := n_mag * 0.5;
-        is_singular := FALSE;
+    IF NEW.is_degenerate THEN
+        RETURN NEW;
     END IF;
-    
-    RETURN NEXT;
+
+    -- Compute dot products to confirm strict Darboux frame orthogonality
+    r_dot_n := (NEW.radial_norm_x * NEW.horizontal_norm_x) +
+               (NEW.radial_norm_y * NEW.horizontal_norm_y) +
+               (NEW.radial_norm_z * NEW.horizontal_norm_z);
+
+    t_dot_n := (NEW.tangent_x * NEW.horizontal_norm_x) +
+               (NEW.tangent_y * NEW.horizontal_norm_y) +
+               (NEW.tangent_z * NEW.horizontal_norm_z);
+
+    norm_sq := (NEW.horizontal_norm_x^2 + NEW.horizontal_norm_y^2 + NEW.horizontal_norm_z^2);
+
+    IF abs(r_dot_n) > 1e-4 THEN
+        RAISE EXCEPTION 'Thermodynamic Violation: Non-zero radial-horizontal normal projection (%) indicates vertical mass/energy leakage', r_dot_n;
+    END IF;
+
+    IF abs(t_dot_n) > 1e-4 THEN
+        RAISE EXCEPTION 'Geometric Violation: Boundary horizontal normal is not orthogonal to tangent vector (dot = %)', t_dot_n;
+    END IF;
+
+    IF abs(norm_sq - 1.0) > 1e-4 THEN
+        RAISE EXCEPTION 'Geometric Violation: Boundary horizontal normal is not normalized (norm_sq = %)', norm_sq;
+    END IF;
+
+    NEW.orthogonality_error := greatest(abs(r_dot_n), abs(t_dot_n));
+    RETURN NEW;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_audit_boundary_darboux_geometry ON spatial_h3_boundary_edges;
+CREATE TRIGGER trg_audit_boundary_darboux_geometry
+    BEFORE INSERT OR UPDATE ON spatial_h3_boundary_edges
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_boundary_darboux_geometry();

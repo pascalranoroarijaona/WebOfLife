@@ -1,0 +1,157 @@
+```Code snippet
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam classAttributeIconSize 0
+skinparam fontName "JetBrains Mono"
+skinparam defaultFontSize 11
+skinparam classHeaderBackgroundColor #E8EEF5
+skinparam classBorderColor #2B4C7E
+
+package "Spatial Geodesic Manifold & Local Darboux Frame (src/spatial)" {
+
+    class Vector3D <<(M, #6DB33F) Value Object>> {
+        + x: number
+        + y: number
+        + z: number
+        + norm(): number
+        + dot(other: Vector3D): number
+        + cross(other: Vector3D): Vector3D
+        + normalize(epsilon: number): Vector3D
+        + isZero(epsilon: number): boolean
+    }
+
+    class BoundaryDarbouxFrame3D <<(E,#2B4C7E) Entity>> {
+        + midpoint: Vector3D
+        + radialNormal: Vector3D
+        + tangent: Vector3D
+        + horizontalNormal: Vector3D
+        + isDegenerate: boolean
+        + verifyOrthonormality(tolerance: number): boolean
+        + orientationToCell(targetCenter: Vector3D, sourceCenter: Vector3D): number
+    }
+
+    class H3AdjacencyService <<(S, #E5A93C) Service>> {
+        + computeSharedBoundaryMidpoint3D(v1: Vector3D, v2: Vector3D): Vector3D
+        + computeBoundaryTangentVector3D(v1: Vector3D, v2: Vector3D): Vector3D
+        + computeBoundaryHorizontalNormal3D(tangent: Vector3D, radial: Vector3D, eps: number): Vector3D
+        + computeBoundaryHorizontalNormalFromEndpoints3D(v1: Vector3D, v2: Vector3D, midpoint: Vector3D, eps: number): Vector3D
+        + constructDarbouxFrame(v1: Vector3D, v2: Vector3D): BoundaryDarbouxFrame3D
+    }
+
+    class SpatialBoundaryEdge <<(T, #4A7BB0) Table>> {
+        + boundary_id: UUID [PK]
+        + cell_i: BIGINT [FK]
+        + cell_j: BIGINT [FK]
+        + arc_length: DOUBLE PRECISION
+        + facet_depth: DOUBLE PRECISION
+        + facet_area: DOUBLE PRECISION
+        + midpoint: Vector3D
+        + radial_norm: Vector3D
+        + tangent: Vector3D
+        + horizontal_norm: Vector3D
+        + orthogonality_error: DOUBLE PRECISION
+        + is_degenerate: BOOLEAN
+    }
+
+    Vector3D <.. BoundaryDarbouxFrame3D : composed of
+    H3AdjacencyService ..> BoundaryDarbouxFrame3D : constructs
+    BoundaryDarbouxFrame3D <.. SpatialBoundaryEdge : persisted as
+}
+
+package "Thermodynamic State & Finite Volume Flux (src/thermo)" {
+
+    enum ThermodynamicFluxType {
+        BAROTROPIC_MASS_ADVECTION
+        THERMAL_CONDUCTION_FICKIAN
+        SALINITY_DIFFUSION
+        WIND_STRESS_MOMENTUM
+        GEOSTROPHIC_CURRENT
+    }
+
+    class CellThermodynamicStocks <<(T, #4A7BB0) Table>> {
+        + h3_index: BIGINT [PK]
+        + internal_energy_joules: DOUBLE PRECISION
+        + mass_kg: DOUBLE PRECISION
+        + temperature_kelvin: DOUBLE PRECISION
+        + pressure_pascals: DOUBLE PRECISION
+        + entropy_j_per_k: DOUBLE PRECISION
+        + epoch_height: BIGINT
+        + state_merkle_root: BYTEA
+    }
+
+    class BoundaryFacetFluxLedger <<(T, #4A7BB0) Table>> {
+        + flux_event_id: UUID [PK]
+        + boundary_id: UUID [FK]
+        + epoch_height: BIGINT
+        + flux_type: ThermodynamicFluxType
+        + orientation_sign: SMALLINT
+        + mass_flux_rate: DOUBLE PRECISION
+        + enthalpy_flux_rate: DOUBLE PRECISION
+        + entropy_production_rate: DOUBLE PRECISION
+        + flux_hash: BYTEA
+    }
+
+    class FiniteVolumeFacetSolver <<(S, #E5A93C) Service>> {
+        + computeMassFlux(stateI: CellThermodynamicStocks, stateJ: CellThermodynamicStocks, frame: BoundaryDarbouxFrame3D): number
+        + computeThermalFlux(stateI: CellThermodynamicStocks, stateJ: CellThermodynamicStocks, frame: BoundaryDarbouxFrame3D): number
+        + computeEntropyProduction(stateI: CellThermodynamicStocks, stateJ: CellThermodynamicStocks, length: number, depth: number): number
+    }
+
+    SpatialBoundaryEdge "1" *-- "0..*" BoundaryFacetFluxLedger : defines geometry for
+    CellThermodynamicStocks "1" *-- "0..*" BoundaryFacetFluxLedger : source/target cells
+    FiniteVolumeFacetSolver ..> BoundaryFacetFluxLedger : emits events to
+}
+
+package "Thermodynamic Blockchain & Consensus Ledger (db/blockchain)" {
+
+    class ThermodynamicBlock <<(T, #4A7BB0) Table>> {
+        + block_height: BIGINT [PK]
+        + prev_block_hash: BYTEA
+        + block_hash: BYTEA [UQ]
+        + transactions_root: BYTEA
+        + boundary_flux_root: BYTEA
+        + darboux_frames_checksum: BYTEA
+        + total_energy_joules: DOUBLE PRECISION
+        + total_mass_kg: DOUBLE PRECISION
+        + net_boundary_mass_leakage: DOUBLE PRECISION
+        + net_boundary_energy_leakage: DOUBLE PRECISION
+        + cumulative_entropy_generated: DOUBLE PRECISION
+        + first_law_satisfied: BOOLEAN
+        + second_law_satisfied: BOOLEAN
+        + validator_signature: BYTEA
+        + timestamp: TIMESTAMPTZ
+    }
+
+    class ThermodynamicLedgerAuditor <<(S, #E5A93C) Engine>> {
+        + verifyFirstLawAntisymmetry(block: ThermodynamicBlock): boolean
+        + verifyZeroVerticalLeakage(frame: BoundaryDarbouxFrame3D): boolean
+        + verifyEntropyNonDecrease(block: ThermodynamicBlock): boolean
+        + commitBlock(block: ThermodynamicBlock): void
+    }
+
+    BoundaryFacetFluxLedger "0..*" --o "1" ThermodynamicBlock : aggregated in Merkle tree
+    ThermodynamicLedgerAuditor ..> ThermodynamicBlock : validates
+}
+
+note right of SpatialBoundaryEdge
+  <b>Darboux Triad Orthogonality:</b>
+  * <b>t</b> = unit boundary tangent
+  * <b>r</b> = unit radial normal
+  * <b>n_h</b> = normalize(t x r)
+  * <n_h, r> = 0 (Zero vertical leakage)
+  * <n_h, t> = 0 (In-plane edge normal)
+  * ||n_h|| = 1.0 (Unit norm)
+end note
+
+note right of BoundaryFacetFluxLedger
+  <b>Thermodynamic Governance:</b>
+  * Mass Flux: Phi_M = (J_M . n_h) * L * dz
+  * Antisymmetry: Phi_ij = -Phi_ji
+  * Entropy Dissipation:
+    dot{S} = L * dz * kappa * (T_i - T_j)^2 / (T_i * T_j * d) >= 0
+end note
+
+@enduml

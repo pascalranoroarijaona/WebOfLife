@@ -1,0 +1,141 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{cite}
+
+\geometry{margin=1in}
+
+\title{\textbf{Local Darboux Frame Completion and In-Plane Normal Vector Projection on Discrete Geodesic 2-Sphere Manifolds for Conservative Earth System Modeling}}
+\author{
+  \textbf{Pascal Ranoroarijaona} \\
+  The Web of Life Project \\
+  \url{https://github.com/pascalranoroarijaona/WebOfLife}
+}
+\date{\textbf{Sprint 063 Technical Report} --- March 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Discrete global grid systems (DGGS) formulated on the two-sphere $S^2 \subset \mathbb{R}^3$ are critical for singularity-free atmospheric and oceanic general circulation models. Finite-volume formulations on Voronoi and hexagonal tessellations require accurate evaluation of horizontal normal flux vectors across shared boundary facets. In this paper, we present the formulation, implementation, and physical conservation verification of \texttt{computeBoundaryHorizontalNormal3D}, completing the local orthonormal Darboux frame $(\hat{\mathbf{t}}, \hat{\mathbf{n}}_h, \hat{\mathbf{r}})$ at discrete cell boundary midpoints. Defined as the normalized cross product $\hat{\mathbf{n}}_h = \operatorname{normalize}(\hat{\mathbf{t}} \times \hat{\mathbf{r}})$, the horizontal normal satisfies strict radial orthogonality $\hat{\mathbf{n}}_h \cdot \hat{\mathbf{r}} \equiv 0$, eliminating fictitious numerical vertical leakage from horizontal advective fluxes. We demonstrate exact first-law mass and enthalpy conservation across shared facets under first-order Godunov upwinding, establish non-negative entropy production bounds for Fourier-Fickian dissipation, and verify machine-precision accuracy across degenerate and non-degenerate geodesic configurations.
+\end{abstract}
+
+\section{Introduction}
+Geodesic discrete global grid systems, such as icosahedral hexagonal-pentagonal grids, eliminate the coordinate singularities associated with traditional latitude-longitude discretization. However, solving the Navier-Stokes and scalar transport equations in discrete finite-volume form requires accurate local geometric projections across polygon boundaries.
+
+On a spherical shell $S^2_R \subset \mathbb{R}^3$ of radius $R$, transport between adjacent Voronoi cells $c_i$ and $c_j$ across a shared boundary edge $e_{ij} = \partial c_i \cap \partial c_j$ requires resolving flux normal to the boundary arc. Following the development of shared boundary midpoint identification (Sprint 061) and edge tangent vector extraction (Sprint 062), Sprint 063 establishes the local boundary horizontal normal vector $\hat{\mathbf{n}}_h \in T_{\mathbf{m}}S^2_R$ via \texttt{computeBoundaryHorizontalNormal3D}.
+
+\section{Mathematical Formalism}
+
+\subsection{Darboux Orthonormal Basis on the Spherical Boundary}
+Let $\mathbf{v}_1, \mathbf{v}_2 \in S^2_R$ denote the Cartesian coordinates of the vertices defining the shared boundary segment between cells $c_i$ and $c_j$. The boundary midpoint $\mathbf{m}$ and local radial surface unit normal $\hat{\mathbf{r}}$ are given by:
+\begin{equation}
+\mathbf{m} = R \frac{\mathbf{v}_1 + \mathbf{v}_2}{\|\mathbf{v}_1 + \mathbf{v}_2\|}, \qquad \hat{\mathbf{r}} = \frac{\mathbf{m}}{\|\mathbf{m}\|}
+\end{equation}
+
+The unit tangent vector $\hat{\mathbf{t}}$ along the geodesic edge arc satisfies:
+\begin{equation}
+\hat{\mathbf{t}} = \frac{\mathbf{v}_2 - (\mathbf{v}_2 \cdot \hat{\mathbf{r}})\hat{\mathbf{r}}}{\|\mathbf{v}_2 - (\mathbf{v}_2 \cdot \hat{\mathbf{r}})\hat{\mathbf{r}}\|}, \quad \text{such that } \langle \hat{\mathbf{t}}, \hat{\mathbf{r}} \rangle = 0, \; \|\hat{\mathbf{t}}\| = 1
+\end{equation}
+
+The unoriented horizontal boundary unit normal vector $\hat{\mathbf{n}}_h$ is defined by the cross product of the edge tangent and the radial normal:
+\begin{equation}
+\mathbf{n}_{\text{raw}} = \hat{\mathbf{t}} \times \hat{\mathbf{r}} = \begin{pmatrix}
+t_y r_z - t_z r_y \\
+t_z r_x - t_x r_z \\
+t_x r_y - t_y r_x
+\end{pmatrix}
+\end{equation}
+
+To guard against floating-point catastrophic cancellation, the vector is normalized:
+\begin{equation}
+\hat{\mathbf{n}}_h = \begin{cases}
+\frac{\mathbf{n}_{\text{raw}}}{\|\mathbf{n}_{\text{raw}}\|}, & \|\mathbf{n}_{\text{raw}}\| > \varepsilon \\
+\mathbf{0}, & \text{otherwise}
+\end{cases}
+\end{equation}
+where $\varepsilon = 10^{-12}$.
+
+\subsection{Properties of the Orthonormal Basis}
+Because $\hat{\mathbf{t}}$ and $\hat{\mathbf{r}}$ are orthogonal unit vectors, the triad $(\hat{\mathbf{t}}, \hat{\mathbf{n}}_h, \hat{\mathbf{r}})$ forms an exact right-handed orthonormal basis for $\mathbb{R}^3$:
+\begin{equation}
+\langle \hat{\mathbf{t}}, \hat{\mathbf{n}}_h \rangle = 0, \qquad \langle \hat{\mathbf{n}}_h, \hat{\mathbf{r}} \rangle = 0, \qquad \langle \hat{\mathbf{t}}, \hat{\mathbf{r}} \rangle = 0
+\end{equation}
+\begin{equation}
+\|\hat{\mathbf{t}}\| = \|\hat{\mathbf{n}}_h\| = \|\hat{\mathbf{r}}\| = 1, \qquad \det([\hat{\mathbf{t}} \; \hat{\mathbf{n}}_h \; \hat{\mathbf{r}}]) = +1
+\end{equation}
+
+\subsection{Directed Facet Orientation}
+The unoriented normal $\hat{\mathbf{n}}_h$ is projected to a directed interface normal $\hat{\mathbf{n}}_{ij}$ from cell $c_i$ to cell $c_j$ with centroid positions $\mathbf{x}_i, \mathbf{x}_j$:
+\begin{equation}
+\sigma_{ij} = \operatorname{sgn}(\langle \hat{\mathbf{n}}_h, \mathbf{x}_j - \mathbf{x}_i \rangle), \qquad \hat{\mathbf{n}}_{ij} = \sigma_{ij} \hat{\mathbf{n}}_h
+\end{equation}
+This enforces the anti-symmetry relation $\hat{\mathbf{n}}_{ji} = -\hat{\mathbf{n}}_{ij}$.
+
+\section{Thermodynamic Transport and Conservation Laws}
+
+\subsection{Advective Flux Formulation}
+For layer depth $\Delta z$ and geodesic arc length $L_{ij} = R \arccos\left(\frac{\mathbf{v}_1 \cdot \mathbf{v}_2}{R^2}\right)$, facet area is $A_{f, ij} = L_{ij} \Delta z$. Given local horizontal fluid velocity $\mathbf{u} \in T_{\mathbf{m}}S^2_R$, the normal velocity is:
+\begin{equation}
+u_{n, ij} = \mathbf{u} \cdot \hat{\mathbf{n}}_{ij}
+\end{equation}
+
+Under Godunov first-order upwind discretization:
+\begin{equation}
+\dot{M}_{ij} = \rho^*_{ij} u_{n, ij} A_{f, ij}, \quad \text{where } \rho^*_{ij} = \begin{cases}
+\rho_i, & u_{n, ij} \ge 0 \\
+\rho_j, & u_{n, ij} < 0
+\end{cases}
+\end{equation}
+
+Mass transfer for species $k$ over discrete time step $\Delta t$ is:
+\begin{equation}
+\Delta M_{k, ij} = \chi^*_{k, ij} \dot{M}_{ij} \Delta t
+\end{equation}
+where $\chi^*_{k, ij}$ is the upwind mass fraction.
+
+\subsection{First Law of Thermodynamics: Exact Conservation}
+Because $\hat{\mathbf{n}}_{ji} = -\hat{\mathbf{n}}_{ij}$, normal velocity is anti-symmetric: $u_{n, ji} = -u_{n, ij}$. Consequently, advective mass and enthalpy fluxes are conservative across all interior edges $\mathcal{E}_{\text{int}}$:
+\begin{equation}
+\Delta M_{k, ij} + \Delta M_{k, ji} = 0 \implies \sum_{e \in \mathcal{E}_{\text{int}}} \Delta M_{k, e} \equiv 0
+\end{equation}
+
+\subsection{Elimination of Fictitious Radial Leakage}
+In hydrostatic and quasi-geostrophic models, horizontal flows must not create spurious vertical currents through misaligned normals. Strict orthogonality ensures:
+\begin{equation}
+\hat{\mathbf{n}}_h \cdot \hat{\mathbf{r}} = 0 \implies \int_{e_{ij}} (\mathbf{u}_h \cdot \hat{\mathbf{n}}_{ij}) (\hat{\mathbf{r}} \cdot \hat{\mathbf{k}}) \, dA_f \equiv 0
+\end{equation}
+preventing cross-talk between horizontal barotropic circulation and vertical diapycnal transport.
+
+\subsection{Second Law of Thermodynamics: Irreversible Dissipation}
+Diffusive thermal conduction across the facet obeys Fourier's law along the horizontal normal:
+\begin{equation}
+\dot{Q}_{\text{diff}, ij} = k_{\text{thermal}} A_{f, ij} \frac{T_i - T_j}{d_{ij}}
+\end{equation}
+where $d_{ij} = R \arccos\left(\frac{\mathbf{x}_i \cdot \mathbf{x}_j}{R^2}\right)$. The resulting rate of entropy production is unconditionally non-negative:
+\begin{equation}
+\dot{S}_{\text{facet}, ij} = \dot{Q}_{\text{diff}, ij} \left( \frac{1}{T_j} - \frac{1}{T_i} \right) = k_{\text{thermal}} A_{f, ij} \frac{(T_i - T_j)^2}{T_i T_j d_{ij}} \ge 0
+\end{equation}
+guaranteeing thermodynamic consistency and numerical stability.
+
+\section{Computational Verification}
+The implementation of \texttt{computeBoundaryHorizontalNormal3D} was verified through automated test suites (\texttt{tests/sprint\_063.test.ts}) written in TypeScript:
+\begin{itemize}
+  \item \textbf{Canonical Alignments}: Equatorial and meridional edges verified against exact analytical cross products with zero error.
+  \item \textbf{Orthonormality Invariants}: Across arbitrary geodesic orientations, $|\langle \hat{\mathbf{n}}_h, \hat{\mathbf{t}} \rangle| < 10^{-12}$ and $|\langle \hat{\mathbf{n}}_h, \hat{\mathbf{r}} \rangle| < 10^{-12}$.
+  \item \textbf{Degenerate Vector Protection}: Parallel, antiparallel, and vanishing inputs return null vector $(0, 0, 0)$ without generating floating-point exceptions or $\mathrm{NaN}$ values.
+\end{itemize}
+
+\section{Conclusion}
+Sprint 063 completes the boundary Darboux frame for discrete geodesic polygonal grids on $S^2$. The algorithm guarantees zero radial vertical flux leakage, strict anti-symmetry, and thermodynamic consistency, providing the core geometric foundation for advective and diffusive transport in the Web of Life simulation engine.
+
+\section*{Code and Data Availability}
+The full source code, test suites, and documentation are available under the open-source MIT License at: \\
+\url{https://github.com/pascalranoroarijaona/WebOfLife}.
+
+\end{document}

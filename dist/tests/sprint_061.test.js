@@ -1,19 +1,19 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { computeBoundarySegmentVector3D, createBoundarySegment3D, computeFacetMetrics, evaluateInterfacialFlux, latLngToVector3D, H3AdjacencyGraph, MEAN_EARTH_RADIUS_METERS, GEOMETRIC_EPSILON } from '../src/spatial/h3_adjacency.js';
+import { computeBoundarySegmentVector3D, createBoundarySegment3D, computeFacetMetrics, evaluateInterfacialFlux, latLngToVector3D, createVec3D, H3AdjacencyGraph, MEAN_EARTH_RADIUS_METERS, GEOMETRIC_EPSILON } from '../src/spatial/h3_adjacency.js';
 describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulation', () => {
     describe('1. Orthogonal Basis & Core Vector Calculation', () => {
         it('computes displacement between orthogonal basis points', () => {
-            const v1 = { x: 1, y: 0, z: 0 };
-            const v2 = { x: 0, y: 1, z: 0 };
+            const v1 = createVec3D(1, 0, 0);
+            const v2 = createVec3D(0, 1, 0);
             const delta = computeBoundarySegmentVector3D(v1, v2);
             assert.strictEqual(delta.x, -1);
             assert.strictEqual(delta.y, 1);
             assert.strictEqual(delta.z, 0);
         });
         it('computes displacement from origin to arbitrary coordinate', () => {
-            const origin = { x: 0, y: 0, z: 0 };
-            const target = { x: 12.5, y: -45.2, z: 88.0 };
+            const origin = createVec3D(0, 0, 0);
+            const target = createVec3D(12.5, -45.2, 88.0);
             const delta = computeBoundarySegmentVector3D(origin, target);
             assert.strictEqual(delta.x, 12.5);
             assert.strictEqual(delta.y, -45.2);
@@ -22,8 +22,8 @@ describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulatio
     });
     describe('2. Algebraic Antisymmetry Property', () => {
         it('strictly satisfies delta_BA === -delta_AB to machine precision', () => {
-            const vA = { x: 4500000.12, y: 1200000.56, z: 4200000.89 };
-            const vB = { x: 4500500.44, y: 1200300.22, z: 4199500.11 };
+            const vA = createVec3D(4500000.12, 1200000.56, 4200000.89);
+            const vB = createVec3D(4500500.44, 1200300.22, 4199500.11);
             const lab = computeBoundarySegmentVector3D(vA, vB);
             const lba = computeBoundarySegmentVector3D(vB, vA);
             assert.strictEqual(lab.x, -lba.x);
@@ -36,7 +36,7 @@ describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulatio
     });
     describe('3. Degenerate Point Boundary Handling', () => {
         it('returns exact zero vector without error for coincident vertices', () => {
-            const v = { x: 3000000, y: 2000000, z: 5000000 };
+            const v = createVec3D(3000000, 2000000, 5000000);
             const zeroVec = computeBoundarySegmentVector3D(v, v);
             assert.strictEqual(zeroVec.x, 0);
             assert.strictEqual(zeroVec.y, 0);
@@ -86,7 +86,7 @@ describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulatio
     describe('6. Input Validation & Robustness Guards', () => {
         it('throws descriptive error on NaN or non-finite inputs', () => {
             const badV1 = { x: NaN, y: 0, z: 0 };
-            const validV2 = { x: 1, y: 2, z: 3 };
+            const validV2 = createVec3D(1, 2, 3);
             assert.throws(() => computeBoundarySegmentVector3D(badV1, validV2), /All vertex coordinates must be finite numbers/);
             const badV2 = { x: 0, y: Infinity, z: 0 };
             assert.throws(() => computeBoundarySegmentVector3D(validV2, badV2), /All vertex coordinates must be finite numbers/);
@@ -117,7 +117,7 @@ describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulatio
             const heatCapacityI = 4e6; // J / K => T_I = 250 K
             const heatCapacityJ = 4e6; // J / K => T_J = 200 K
             const centroidDist = 12000;
-            const fluidVelocity = { x: 0.1, y: 0.05, z: 0 };
+            const fluidVelocity = createVec3D(0.1, 0.05, 0);
             const coeffs = {
                 water: 1e-4,
                 carbon: 1e-5,
@@ -141,11 +141,11 @@ describe('Sprint 061 - Spherical Boundary Segment Displacement Vector Formulatio
     describe('8. H3AdjacencyGraph Integration', () => {
         it('manages cell boundaries and segments consistently', () => {
             const graph = new H3AdjacencyGraph();
-            const vA = { x: 1, y: 0, z: 0 };
-            const vB = { x: 0, y: 1, z: 0 };
-            const vC = { x: 0, y: 0, z: 1 };
+            const vA = createVec3D(1, 0, 0);
+            const vB = createVec3D(0, 1, 0);
+            const vC = createVec3D(0, 0, 1);
             graph.addCell('cell_1', [vA, vB, vC]);
-            graph.addCell('cell_2', [vB, vA, { x: -1, y: 0, z: 0 }]);
+            graph.addCell('cell_2', [vB, vA, createVec3D(-1, 0, 0)]);
             graph.connect('cell_1', 'cell_2');
             assert.deepStrictEqual(graph.getNeighbors('cell_1'), ['cell_2']);
             assert.deepStrictEqual(graph.getNeighbors('cell_2'), ['cell_1']);

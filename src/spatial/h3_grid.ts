@@ -6,6 +6,9 @@
 import * as h3 from 'h3-js';
 import {
   Vector3D,
+  Vector3DInput,
+  createVec3D,
+  toVec3D,
   projectVectorOntoSphereTangentSpace,
   computeFacetNormalTangentBasis,
   dotProduct,
@@ -114,9 +117,9 @@ export interface CellStocks {
 
 export interface CellAdvectionState {
   readonly h3Index: string;
-  readonly centroid: Vector3D;
+  readonly centroid: Vector3DInput;
   readonly area: number;
-  readonly velocity: Vector3D;
+  readonly velocity: Vector3DInput;
   readonly stocks: CellStocks;
 }
 
@@ -789,11 +792,13 @@ export function computeInterfaceAdvectiveTransfer(
   const facetBasis = computeFacetNormalTangentBasis(cellA.centroid, cellB.centroid);
   const vA_tan = projectVectorOntoSphereTangentSpace(cellA.velocity, cellA.centroid);
   const vB_tan = projectVectorOntoSphereTangentSpace(cellB.velocity, cellB.centroid);
-  const vMidRaw: Vector3D = [
-    (vA_tan[0] + vB_tan[0]) * 0.5,
-    (vA_tan[1] + vB_tan[1]) * 0.5,
-    (vA_tan[2] + vB_tan[2]) * 0.5,
-  ];
+  const va = toVec3D(vA_tan);
+  const vb = toVec3D(vB_tan);
+  const vMidRaw: Vector3D = createVec3D(
+    (va[0] + vb[0]) * 0.5,
+    (va[1] + vb[1]) * 0.5,
+    (va[2] + vb[2]) * 0.5
+  );
   const vMid_tan = projectVectorOntoSphereTangentSpace(vMidRaw, facetBasis.midpoint);
   const u_ab = dotProduct(vMid_tan, facetBasis.tangentNormal);
 

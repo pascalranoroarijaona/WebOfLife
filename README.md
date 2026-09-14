@@ -206,7 +206,7 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 32%
-SPRINT_GOAL: Implement computeBoundarySegmentRadialNormal3D calculating normalized radial midpoint unit vector for a boundary segment in src/spatial/h3_adjacency.ts.
+SPRINT_GOAL: Implement computeBoundaryHorizontalNormal3D computing unoriented cross product of midpoint tangent and radial normal in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -247,8 +247,10 @@ SPRINT_GOAL: Implement computeBoundarySegmentRadialNormal3D calculating normaliz
 - [x] Implement `projectVectorOntoSphereTangentSpace` removing radial projection component along origin vector in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundarySegmentVector3D` calculating unnormalized displacement vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundarySegmentRadialNormal3D` calculating normalized radial midpoint unit vector for a boundary segment in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryOutwardNormal3D` computing outward spherical unit normal vector across adjacent H3 cell boundaries in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundarySegmentRadialNormal3D` calculating normalized radial midpoint unit vector for a boundary segment in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryHorizontalNormal3D` computing unoriented cross product of midpoint tangent and radial normal in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `orientVectorTowardsTarget3D` applying sign flip if dot product with displacement vector is negative in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeBoundaryOutwardNormal3D` assembling oriented horizontal unit normal vector between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
@@ -276,9 +278,10 @@ SPRINT_GOAL: Implement computeBoundarySegmentRadialNormal3D calculating normaliz
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
 - [ ] Define `BiomassStoichiometryVector` interface with Redfield canonical ratios in `src/biosphere/stoichiometry_types.ts`
+- [ ] Implement `assertValidStoichiometryVector` validator enforcing non-negative elemental ratios in `src/biosphere/stoichiometry_types.ts`
 - [ ] Implement `evaluateLiebigMinimumFactor` across discrete elemental availability pools in `src/biosphere/stoichiometric_limitation.ts`
-- [ ] Implement Sterner-Elser homeostatic regulation function and dynamic overflow respiration in `src/biosphere/homeostatic_regulation.ts`
-- [ ] Implement Liebig's Law of the Minimum and Droop cell quota limitation operators in `src/biosphere/stoichiometric_limitation.ts`
+- [ ] Implement Droop cell quota regulation `computeDroopGrowthMultiplier` in `src/biosphere/stoichiometric_limitation.ts`
+- [ ] Implement Sterner-Elser dynamic overflow respiration `computeOverflowRespiration` in `src/biosphere/homeostatic_regulation.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper in `src/biosphere/biomass_energy.ts`
 - [ ] Plant Functional Type (PFT) enum and `CanopyTraitProfile` interface in `src/biosphere/traits.ts`
 - [ ] Implement canopy light extinction via Beer-Lambert formulation with sunlit/shaded leaf partitioning in `src/biosphere/canopy_radiation.ts`
@@ -293,16 +296,15 @@ SPRINT_GOAL: Implement computeBoundarySegmentRadialNormal3D calculating normaliz
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication in `src/biosphere/trophic_matrix.ts`
 - [ ] Gauss-Seidel steady-state biomass solver updating node biomass stocks in `src/biosphere/trophic_solver.ts`
 - [ ] Spectral radius and relative residual convergence checks in `src/biosphere/trophic_solver.ts`
-- [ ] Define `HyphalNode` and directed `HyphalEdge` graph structure in `src/biosphere/mycorrhizal_types.ts`
+- [ ] Define `MycorrhizalGuild` enum, `HyphalNode`, and directed `HyphalEdge` graph structure in `src/biosphere/mycorrhizal_types.ts`
 - [ ] Mutualistic carbon-for-nutrient exchange and fungal sink strength calculation in `src/biosphere/mycorrhizal_network.ts`
 - [ ] Spatial hyphal network conductivity matrix mapping carbon translocation efficiency in `src/biosphere/hyphal_transport.ts`
-- [ ] Fungal maintenance respiration penalty function factoring in temperature-dependent soil enzyme activation energies in `src/biosphere/mycorrhizal_decay.ts`
+- [ ] Fungal necromass decomposition rate and turnover calculator in `src/biosphere/mycorrhizal_decay.ts`
 - [ ] Dual-pool soil organic matter tracking distinguishing MAOM vs POM in `src/geobiome/soil_organic_matter.ts`
 - [ ] Microbial Carbon Use Efficiency (CUE) and decomposition kinetics in `src/geobiome/microbial_kinetics.ts`
 - [ ] Hill numbers multidimensional diversity evaluation ($^qD$) across spatial H3 node communities in `src/biosphere/diversity_metrics.ts`
-- [ ] Simpson's dominance and Pielou's evenness index calculator in `src/biosphere/diversity_metrics.ts`
 - [ ] Rao's quadratic entropy functional diversity metric calculator in `src/biosphere/diversity_metrics.ts`
-- [ ] Stochastic Extinction, Allee effect, and Minimum Viable Population engine in `src/biosphere/population_viability.ts`
+- [ ] Allee effect population growth modifier and stochastic demographic extinction engine in `src/biosphere/population_viability.ts`
 
 ### Phase 3: Technosphere & Industrial Metabolism
 - [ ] Define `StandardChemicalSpecies` enum and NASA 7-coefficient polynomials for thermodynamic species enthalpy and entropy in `src/technosphere/thermochemistry.ts`
