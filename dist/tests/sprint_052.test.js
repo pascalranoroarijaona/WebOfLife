@@ -103,9 +103,13 @@ describe('Sprint 052: Spherical Unit Vector Projections (latLngToUnitVector3D)',
         assert.throws(() => latLngToUnitVector3D(-90.1, 0.0), RangeError);
         // Boundary tolerance clamp within 1e-7 deg of poles
         const nearNorth = latLngToUnitVector3D(90.00000005, 45.0);
-        assert.deepStrictEqual(nearNorth, [0.0, 0.0, 1.0]);
+        assert.strictEqual(nearNorth[0], 0.0);
+        assert.strictEqual(nearNorth[1], 0.0);
+        assert.strictEqual(nearNorth[2], 1.0);
         const nearSouth = latLngToUnitVector3D(-90.00000005, -75.0);
-        assert.deepStrictEqual(nearSouth, [0.0, 0.0, -1.0]);
+        assert.strictEqual(nearSouth[0], 0.0);
+        assert.strictEqual(nearSouth[1], 0.0);
+        assert.strictEqual(nearSouth[2], -1.0);
     });
     it('7. H3AdjacencyMatrix Compressed Sparse Row Construction', () => {
         const geomA = {
@@ -131,7 +135,7 @@ describe('Sprint 052: Spherical Unit Vector Projections (latLngToUnitVector3D)',
         assert.deepStrictEqual(adj.getNeighbors(0), [1]);
         assert.deepStrictEqual(adj.getNeighbors(1), [0]);
         const dist = adj.getDistance(0, 1);
-        assert.ok(dist !== null && dist > 0);
+        assert.ok(dist !== null && dist !== undefined && dist > 0);
         // 1 deg at equator ~ 111,195 m
         assert.ok(Math.abs(dist - 111195) < 500);
     });

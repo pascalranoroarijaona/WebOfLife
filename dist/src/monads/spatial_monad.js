@@ -1,10 +1,10 @@
 /**
  * Planetary Thermodynamic Spatial Monad Kernel
- * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 062)
+ * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 064)
  */
 import { H3ErrorCode, SpatialGuardClauseException, } from '../spatial/h3_types.js';
 import { isValidH3Index, validateH3Token, assertCanonicalH3Pattern, assertH3Resolution, matchesCanonicalH3Pattern, } from '../spatial/h3_grid.js';
-import { calculateH3BoundaryContactArea, computeAdvectiveEdgeTransfer, computeAdvectiveTransfer, projectVectorOntoSphereTangentSpace, dotProduct, } from '../spatial/h3_adjacency.js';
+import { calculateH3BoundaryContactArea, computeAdvectiveEdgeTransfer, computeAdvectiveTransfer, projectVectorOntoSphereTangentSpace, dotProduct, toVec3D, } from '../spatial/h3_adjacency.js';
 import { SOLAR_CONSTANT_W_M2 } from '../thermodynamics/constants.js';
 import { applyThermodynamicOverrides } from '../spatial/h3_state_tensor.js';
 export { SOLAR_CONSTANT_W_M2, };
@@ -463,12 +463,16 @@ export class SpatialMonad {
             for (const idB of cellA.neighbors) {
                 const cellB = this.cellsMap.get(idB);
                 if (cellB && idA < idB) {
-                    const vA = cellA.velocity;
-                    const vB = cellB.velocity;
+                    const vA = toVec3D(cellA.velocity);
+                    const vB = toVec3D(cellB.velocity);
+                    const cA = toVec3D(cellA.centroid);
+                    const cB = toVec3D(cellB.centroid);
                     const midVel = [(vA[0] + vB[0]) * 0.5, (vA[1] + vB[1]) * 0.5, (vA[2] + vB[2]) * 0.5];
-                    const diff = [cellB.centroid[0] - cellA.centroid[0], cellB.centroid[1] - cellA.centroid[1], cellB.centroid[2] - cellA.centroid[2]];
-                    const dist = Math.sqrt(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
-                    const normal = dist > 1e-12 ? [diff[0] / dist, diff[1] / dist, diff[2] / dist] : [1, 0, 0];
+                    const dx = cB[0] - cA[0];
+                    const dy = cB[1] - cA[1];
+                    const dz = cB[2] - cA[2];
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    const normal = dist > 1e-12 ? [dx / dist, dy / dist, dz / dist] : [1, 0, 0];
                     const uNormal = dotProduct(midVel, normal);
                     if (Math.abs(uNormal) > 1e-12) {
                         const edgeLen = 10000.0;

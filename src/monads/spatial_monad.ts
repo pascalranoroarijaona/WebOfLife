@@ -1,11 +1,13 @@
 /**
  * Planetary Thermodynamic Spatial Monad Kernel
- * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 062)
+ * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 064)
  */
 
 import {
   Vec3D,
+  Vector3D,
   Vector3DInput,
+  Vector3Tuple,
   H3ErrorCode,
   SpatialGuardClauseException,
   CellThermodynamicStocks,
@@ -35,6 +37,7 @@ import {
   SpatialHexCell,
   projectVectorOntoSphereTangentSpace,
   dotProduct,
+  toVec3D,
 } from '../spatial/h3_adjacency.js';
 
 import { SOLAR_CONSTANT_W_M2 } from '../thermodynamics/constants.js';
@@ -142,9 +145,9 @@ export interface ISpatialThermodynamicState {
 
 export interface CellNodeData {
   h3Index: string;
-  centroid: [number, number, number];
+  centroid: Vector3D;
   area: number;
-  velocity: [number, number, number];
+  velocity: Vector3D;
   stocks: any;
   neighbors: string[];
 }
@@ -608,7 +611,7 @@ export class SpatialMonad<T = any> {
     this.cellsMap.set(data.h3Index, { ...data, velocity: vTan });
   }
 
-  public setVelocity(cellId: string, vel: [number, number, number]): void {
+  public setVelocity(cellId: string, vel: Vector3D): void {
     const cell = this.cellsMap.get(cellId);
     if (cell) {
       cell.velocity = projectVectorOntoSphereTangentSpace(vel, cell.centroid);
@@ -640,12 +643,16 @@ export class SpatialMonad<T = any> {
       for (const idB of cellA.neighbors) {
         const cellB = this.cellsMap.get(idB);
         if (cellB && idA < idB) {
-          const vA = cellA.velocity;
-          const vB = cellB.velocity;
+          const vA = toVec3D(cellA.velocity);
+          const vB = toVec3D(cellB.velocity);
+          const cA = toVec3D(cellA.centroid);
+          const cB = toVec3D(cellB.centroid);
           const midVel: [number, number, number] = [(vA[0] + vB[0]) * 0.5, (vA[1] + vB[1]) * 0.5, (vA[2] + vB[2]) * 0.5];
-          const diff: [number, number, number] = [cellB.centroid[0] - cellA.centroid[0], cellB.centroid[1] - cellA.centroid[1], cellB.centroid[2] - cellA.centroid[2]];
-          const dist = Math.sqrt(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
-          const normal: [number, number, number] = dist > 1e-12 ? [diff[0] / dist, diff[1] / dist, diff[2] / dist] : [1, 0, 0];
+          const dx = cB[0] - cA[0];
+          const dy = cB[1] - cA[1];
+          const dz = cB[2] - cA[2];
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const normal: [number, number, number] = dist > 1e-12 ? [dx / dist, dy / dist, dz / dist] : [1, 0, 0];
           const uNormal = dotProduct(midVel, normal);
 
           if (Math.abs(uNormal) > 1e-12) {

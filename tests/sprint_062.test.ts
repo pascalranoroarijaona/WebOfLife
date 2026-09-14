@@ -11,26 +11,32 @@ import {
   computeBoundarySegmentLateralNormal3D,
   computeBoundaryFacetFrame3D,
   createBoundarySegment3D,
+  toVec3D,
 } from '../src/spatial/h3_adjacency.js';
 import { Vector3D } from '../src/spatial/h3_types.js';
 
 const EPSILON_TOLERANCE = 1e-12;
 
 function assertVectorClose(actual: Vector3D, expected: Vector3D, tolerance: number = EPSILON_TOLERANCE) {
+  const act = toVec3D(actual);
+  const exp = toVec3D(expected);
   for (let i = 0; i < 3; i++) {
     assert.ok(
-      Math.abs(actual[i] - expected[i]) <= tolerance,
-      `Component [${i}] mismatch: actual=${actual[i]}, expected=${expected[i]}, diff=${Math.abs(actual[i] - expected[i])}`
+      Math.abs(act[i] - exp[i]) <= tolerance,
+      `Component [${i}] mismatch: actual=${act[i]}, expected=${exp[i]}, diff=${Math.abs(act[i] - exp[i])}`
     );
   }
 }
 
 function vectorLength(v: Vector3D): number {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  const arr = toVec3D(v);
+  return Math.sqrt(arr[0] * arr[0] + arr[1] * arr[1] + arr[2] * arr[2]);
 }
 
 function dotProduct(a: Vector3D, b: Vector3D): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const va = toVec3D(a);
+  const vb = toVec3D(b);
+  return va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2];
 }
 
 describe('Sprint 062: RFC-062 Boundary Segment Radial Normal 3D Unit Vector', () => {

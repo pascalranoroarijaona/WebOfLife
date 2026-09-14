@@ -1,0 +1,192 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FAFAFA
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam roundcorner 6
+skinparam defaultFontName "Courier"
+skinparam defaultFontSize 11
+
+title Web of Life - Sprint 064: 3D Vector Target Orientation & Thermodynamic Adjacency Model
+
+package "Spatial Monad & Adjacency System (src/spatial)" #ECEFF1 {
+    enum ParityOrientationState {
+        UNMODIFIED_ALIGNED
+        ORTHOGONAL_TANGENT
+        PARITY_FLIPPED_INVERTED
+        DEGENERATE_ZERO
+    }
+
+    class Vector3D << (T,#E1BEE7) Type >> {
+        +x: number
+        +y: number
+        +z: number
+        --
+        +norm(): number
+        +dot(other: Vector3D): number
+        +negate(): Vector3D
+        +toArray(): [number, number, number]
+    }
+
+    class H3Centroid3D {
+        +h3Index: string
+        +resolution: number
+        +position: Vector3D
+        +elevationM: number
+        +surfaceAreaM2: number
+        --
+        +distanceTo(other: H3Centroid3D): number
+        +displacementTo(target: H3Centroid3D): Vector3D
+    }
+
+    class H3Edge {
+        +edgeId: string
+        +origin: H3Centroid3D
+        +target: H3Centroid3D
+        +displacement: Vector3D
+        +interfaceLengthM: number
+        --
+        +getDirectedDisplacement(): Vector3D
+    }
+
+    class H3AdjacencyGraph {
+        -nodes: Map<string, H3Centroid3D>
+        -edges: Map<string, H3Edge>
+        --
+        +registerCell(h3Index: string, centroid: Vector3D): void
+        +registerAdjacency(originH3: string, targetH3: string, length: number): H3Edge
+        +getEdge(originH3: string, targetH3: string): H3Edge
+        +orientEdgeFluxVector(edgeId: string, fluxVector: [number, number, number]): [number, number, number]
+        +orientVectorTowardsTarget3D(v: [number, number, number], d: [number, number, number]): [number, number, number]
+        +orientVectorTowardsTarget3D(v: [number, number, number], origin: [number, number, number], target: [number, number, number]): [number, number, number]
+    }
+
+    class VectorParityEngine << (F,#BBDEFB) Functional Contract >> {
+        {static} +orientVectorTowardsTarget3D(v: Vector3D, d: Vector3D): [Vector3D, ParityOrientationState]
+        {static} +dotProduct(a: Vector3D, b: Vector3D): number
+        {static} +isometryVerified(initial: Vector3D, oriented: Vector3D, epsilon: number): boolean
+    }
+}
+
+package "Thermodynamic State & Stocks (src/monads)" #E8F5E9 {
+    abstract class ThermodynamicStock {
+        +h3Index: string
+        +epochHeight: number
+        +updatedAt: Date
+        --
+        {abstract} +getConservedQuantity(): number
+        {abstract} +applyFlux(delta: number): void
+    }
+
+    class SensibleHeatStock {
+        +enthalpyJoules: number
+        +temperatureKelvin: number
+        +heatCapacityCp: number
+        --
+        +getConservedQuantity(): number
+        +applyFlux(deltaJoules: number): void
+    }
+
+    class BiomassTrophicStock {
+        +biomassKg: number
+        +carbonEquivalentKg: number
+        +trophicLevel: number
+        --
+        +getConservedQuantity(): number
+        +applyFlux(deltaKg: number): void
+    }
+
+    class DissolvedCarbonStock {
+        +dissolvedCo2Mol: number
+        +detritusMassKg: number
+        --
+        +getConservedQuantity(): number
+        +applyFlux(deltaMol: number): void
+    }
+
+    class SpatialMonad<TStock extends ThermodynamicStock> {
+        +h3Index: string
+        +stocks: Map<string, TStock>
+        +adjacency: H3AdjacencyGraph
+        --
+        +bind(fn: (s: TStock) => SpatialMonad<TStock>): SpatialMonad<TStock>
+        +evaluateAdvectiveTransfer(edgeId: string, candidateFlux: Vector3D): Vector3D
+        +commitThermodynamicStep(epoch: number): ThermodynamicProof
+    }
+}
+
+package "Thermodynamic Blockchain & Conservation Ledger (db/schema.sql)" #FFF3E0 {
+    class ThermodynamicFluxRecord {
+        +fluxId: UUID
+        +edgeId: string
+        +rawVector: Vector3D
+        +displacement: Vector3D
+        +innerProduct: number
+        +orientationState: ParityOrientationState
+        +orientedVector: Vector3D
+        +massFluxKg: number
+        +enthalpyFluxJoules: number
+        +entropyProductionJPerK: number
+        --
+        +verifyFirstLaw(): boolean
+        +verifySecondLaw(): boolean
+    }
+
+    class BlockchainBlock {
+        +blockHeight: number
+        +blockHash: string
+        +parentHash: string
+        +merkleRootStocks: string
+        +merkleRootFluxes: string
+        +totalEnergyJoules: number
+        +totalMassKg: number
+        +netEntropyProduction: number
+        +parityAdjustmentsCount: number
+        +signature: string
+        --
+        +validateBlockConservation(): boolean
+    }
+
+    class BlockchainTransaction {
+        +txHash: string
+        +blockHeight: number
+        +fluxRecordId: UUID
+        +senderH3: string
+        +recipientH3: string
+        +deltaQuantity: number
+        +conservationProofHash: string
+        --
+        +verifyExecution(): boolean
+    }
+}
+
+' Relationships & Invariants
+H3AdjacencyGraph "1" *-- "many" H3Edge : manages
+H3Edge "1" o-- "2" H3Centroid3D : origin / target
+H3Centroid3D *-- "1" Vector3D : 3D Cartesian Position
+H3Edge *-- "1" Vector3D : Displacement d = target - origin
+
+H3AdjacencyGraph ..> VectorParityEngine : delegates orientation
+VectorParityEngine ..> ParityOrientationState : emits classification
+
+SpatialMonad "1" o-- "1" H3AdjacencyGraph : topological substrate
+SpatialMonad "1" *-- "many" ThermodynamicStock : contains states
+ThermodynamicStock <|-- SensibleHeatStock
+ThermodynamicStock <|-- BiomassTrophicStock
+ThermodynamicStock <|-- DissolvedCarbonStock
+
+SpatialMonad ..> ThermodynamicFluxRecord : produces oriented exchange
+ThermodynamicFluxRecord *-- "1" ParityOrientationState : registers
+BlockchainBlock "1" *-- "many" BlockchainTransaction : sequences
+BlockchainTransaction "1" o-- "1" ThermodynamicFluxRecord : proves validity
+
+note bottom of VectorParityEngine
+  **RFC-064 Parity Operator:**
+  <v, d> < 0  => v* = -v  (Parity Inverted)
+  <v, d> >= 0 => v* =  v  (Aligned / Tangent)
+  **Invariants:**
+  ||v*||_2 == ||v||_2 (Isometry)
+  Entropy Production sigma_ij >= 0
+end note
+
+@enduml

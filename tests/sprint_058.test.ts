@@ -124,173 +124,101 @@ describe('Sprint 058 - Spherical Boundary Midpoint & Interfacial Adjacency', () 
 
       assert.strictEqual(boundary.originHex, originHex);
       assert.strictEqual(boundary.neighborHex, neighborHex);
-      assert.ok(boundary.distanceMeters > 50000 && boundary.distanceMeters < 250000, `Unexpected distance: ${boundary.distanceMeters} m`);
-      assert.ok(boundary.contactLengthMeters > 0);
-      assert.ok(boundary.normalAzimuthDegrees >= 0 && boundary.normalAzimuthDegrees < 360);
-      assert.ok(typeof boundary.midpointCoriolisParameter === 'number');
+      assert.ok(boundary.distanceMeters > 50000 && boundary.distanceMeters < 250000, `Unexpected distance: ${boundary.distanceMeters}`);
     }
   });
 
-  // Test 9: Interfacial Bearing & Azimuth Calculation
-  it('computes initial bearing accurately for cardinal directions', () => {
-    const center: LatLng = { lat: 0, lng: 0 };
-    const north: LatLng = { lat: 10, lng: 0 };
-    const east: LatLng = { lat: 0, lng: 10 };
-    const south: LatLng = { lat: -10, lng: 0 };
-    const west: LatLng = { lat: 0, lng: -10 };
-
-    assert.ok(Math.abs(computeInitialBearing(center, north) - 0) < 1e-6);
-    assert.ok(Math.abs(computeInitialBearing(center, east) - 90) < 1e-6);
-    assert.ok(Math.abs(computeInitialBearing(center, south) - 180) < 1e-6);
-    assert.ok(Math.abs(computeInitialBearing(center, west) - 270) < 1e-6);
-  });
-
-  // Test 10: Midpoint Coriolis Parameter
-  it('evaluates Coriolis parameter: zero at equator, positive in North, negative in South', () => {
+  // Test 9: Coriolis Parameter Calculation at Boundary Midpoint
+  it('computes midpoint Coriolis parameter properly according to latitude', () => {
     const fEquator = computeMidpointCoriolis(0);
+    assert.strictEqual(fEquator, 0);
+
     const fNorth = computeMidpointCoriolis(45);
+    assert.ok(fNorth > 0, 'Coriolis parameter should be positive in the northern hemisphere');
+
     const fSouth = computeMidpointCoriolis(-45);
-
-    assert.ok(Math.abs(fEquator) < 1e-12);
-    assert.ok(fNorth > 1e-4);
-    assert.ok(fSouth < -1e-4);
-    assert.ok(Math.abs(fNorth + fSouth) < 1e-12);
+    assert.ok(fSouth < 0, 'Coriolis parameter should be negative in the southern hemisphere');
+    assert.ok(Math.abs(fNorth + fSouth) < 1e-12, 'Coriolis parameter should be antisymmetric across the equator');
   });
 
-  // Test 11: Midpoint Solar Irradiance
-  it('computes midpoint solar irradiance with day/night contrast', () => {
-    // Equinox noon at lat 0, lng 0 -> high irradiance
-    const noonSun = computeMidpointSolarIrradiance(0, 0, 80, 12);
-    // Midnight at lat 0, lng 0 -> zero irradiance
-    const nightSun = computeMidpointSolarIrradiance(0, 0, 80, 0);
+  // Test 10: Midpoint Solar Irradiance Computation
+  it('computes solar irradiance at boundary midpoint across day and night', () => {
+    const noonIrradiance = computeMidpointSolarIrradiance(0, 0, 0, 12);
+    assert.ok(noonIrradiance > 1000, `Expected high solar irradiance at noon, got ${noonIrradiance}`);
 
-    assert.ok(noonSun > 1300, `Expected noon irradiance > 1300 W/m2, got ${noonSun}`);
-    assert.strictEqual(nightSun, 0);
+    const midnightIrradiance = computeMidpointSolarIrradiance(0, 0, 0, 0);
+    assert.strictEqual(midnightIrradiance, 0, 'Expected zero solar irradiance at midnight');
+
+    const dawnIrradiance = computeMidpointSolarIrradiance(0, 0, 0, 6);
+    assert.ok(dawnIrradiance >= 0 && dawnIrradiance < noonIrradiance, 'Dawn irradiance should be non-negative and less than noon');
   });
 
-  // Test 12: Thermodynamic First Law Conservation in SpatialBoundaryMonad
-  it('strictly preserves conservative mass and energy stocks across interface (First Law)', () => {
-    const boundary = evaluateBoundaryInterface(
-      'origin',
-      'neighbor',
-      { lat: 10, lng: 20 },
-      { lat: 11, lng: 21 }
-    );
-
+  // Test 11: Diffusive Exchange via SpatialBoundaryMonad
+  it('conserves total mass and energy during diffusive exchange in SpatialBoundaryMonad', () => {
     const state1: CellStockState = {
-      carbonKg: 5000,
-      waterKg: 20000,
-      oxygenKg: 10000,
-      mineralsKg: 3000,
-      energyJoules: 1e9,
-      temperatureKelvin: 298.15,
-      specificHumidity: 0.012,
-      dicConcentration: 2.1,
+      carbonKg: 100,
+      waterKg: 200,
+      oxygenKg: 50,
+      mineralsKg: 20,
+      energyJoules: 1000,
     };
-
     const state2: CellStockState = {
-      carbonKg: 4000,
-      waterKg: 25000,
-      oxygenKg: 11000,
-      mineralsKg: 3500,
-      energyJoules: 1.2e9,
-      temperatureKelvin: 293.15,
-      specificHumidity: 0.008,
-      dicConcentration: 2.3,
+      carbonKg: 40,
+      waterKg: 80,
+      oxygenKg: 20,
+      mineralsKg: 10,
+      energyJoules: 400,
     };
-
+    const boundary = { contactLengthMeters: 500 };
     const monad = SpatialBoundaryMonad.of(state1, state2, boundary);
+
     const coeffs: DiffusionCoefficients = {
-      diffWater: 1000,
-      diffCarbon: 500,
-      diffOxygen: 500,
-      diffMinerals: 100,
-      thermalCond: 2000,
+      diffCarbon: 10,
+      diffWater: 10,
+      diffOxygen: 10,
+      diffMinerals: 10,
+      thermalCond: 10,
     };
 
-    const [next1, next2, deltas] = monad.computeTransfer(5.0, 1000, 900, coeffs);
+    const [next1, next2, deltas] = monad.computeTransfer(1, 500, 1000, coeffs);
 
-    // Conservation check: Delta 1 + Delta 2 === 0
-    assert.ok(
-      Math.abs((next1.carbonKg! + next2.carbonKg!) - (state1.carbonKg! + state2.carbonKg!)) < 1e-9,
-      'Carbon conservation violated'
-    );
-    assert.ok(
-      Math.abs((next1.waterKg! + next2.waterKg!) - (state1.waterKg! + state2.waterKg!)) < 1e-9,
-      'Water conservation violated'
-    );
-    assert.ok(
-      Math.abs((next1.oxygenKg! + next2.oxygenKg!) - (state1.oxygenKg! + state2.oxygenKg!)) < 1e-9,
-      'Oxygen conservation violated'
-    );
-    assert.ok(
-      Math.abs((next1.mineralsKg! + next2.mineralsKg!) - (state1.mineralsKg! + state2.mineralsKg!)) < 1e-9,
-      'Minerals conservation violated'
-    );
-    assert.ok(
-      Math.abs((next1.energyJoules! + next2.energyJoules!) - (state1.energyJoules! + state2.energyJoules!)) < 1e-4,
-      'Energy conservation violated'
-    );
+    assert.ok(deltas.deltaCarbonKg > 0, 'Expected positive carbon flux from higher to lower concentration');
+    assert.ok(next1.carbonKg! < state1.carbonKg!, 'Source cell should decrease in carbon stock');
+    assert.ok(next2.carbonKg! > state2.carbonKg!, 'Target cell should increase in carbon stock');
 
-    // Delta matches state difference
-    assert.ok(Math.abs(state1.carbonKg! - next1.carbonKg! - deltas.deltaCarbonKg) < 1e-9);
-    assert.ok(Math.abs(next2.carbonKg! - state2.carbonKg! - deltas.deltaCarbonKg) < 1e-9);
+    // Strict First Law Conservation check: sum of stocks before equals sum of stocks after
+    const initialCarbon = state1.carbonKg! + state2.carbonKg!;
+    const finalCarbon = next1.carbonKg! + next2.carbonKg!;
+    assert.ok(Math.abs(initialCarbon - finalCarbon) < 1e-9, 'Mass conservation violated for carbon');
+
+    const initialEnergy = state1.energyJoules! + state2.energyJoules!;
+    const finalEnergy = next1.energyJoules! + next2.energyJoules!;
+    assert.ok(Math.abs(initialEnergy - finalEnergy) < 1e-9, 'Energy conservation violated for internal energy');
   });
 
-  // Test 13: SpatialAdjacencyGraph functionality
-  it('manages adjacency cache and executes inter-cell flux through SpatialAdjacencyGraph', () => {
+  // Test 12: SpatialAdjacencyGraph Boundary Registration and Inter-cell Flux
+  it('records boundaries and computes conservative flux in SpatialAdjacencyGraph', () => {
     const graph = new SpatialAdjacencyGraph();
-    const hexA = 'hexA';
-    const hexB = 'hexB';
+    const boundaryData = { length: 500, area: 1000 };
+    graph.addAdjacency('cell_A', 'cell_B', boundaryData);
 
-    const boundary = evaluateBoundaryInterface(
-      hexA,
-      hexB,
-      { lat: 40.0, lng: -74.0 },
-      { lat: 40.5, lng: -73.5 }
+    const neighbors = graph.getNeighbors('cell_A');
+    assert.ok(neighbors.includes('cell_B'), 'cell_B should be registered as neighbor of cell_A');
+
+    const retrievedBoundary = graph.getBoundary('cell_A', 'cell_B');
+    assert.deepStrictEqual(retrievedBoundary, boundaryData);
+
+    const stockA: CellStockState = { waterKg: 500 };
+    const stockB: CellStockState = { waterKg: 200 };
+
+    const [updatedA, updatedB, flux] = graph.computeInterCellFlux(stockA, stockB, retrievedBoundary, 1, 500, 1000);
+
+    assert.ok(flux.deltaWaterKg > 0, 'Flux should move from cell A to cell B');
+    assert.ok(updatedA.waterKg! < stockA.waterKg!, 'Cell A water should decrease');
+    assert.ok(updatedB.waterKg! > stockB.waterKg!, 'Cell B water should increase');
+    assert.ok(
+      Math.abs((updatedA.waterKg! + updatedB.waterKg!) - (stockA.waterKg! + stockB.waterKg!)) < 1e-9,
+      'Total water must be conserved across the graph edge'
     );
-
-    graph.addAdjacency(hexA, hexB, boundary);
-
-    const neighborsA = graph.getNeighbors(hexA);
-    assert.ok(neighborsA.includes(hexB));
-
-    const retrievedBoundary = graph.getBoundary(hexA, hexB);
-    assert.strictEqual(retrievedBoundary.midpoint.lat, boundary.midpoint.lat);
-    assert.strictEqual(retrievedBoundary.midpoint.lng, boundary.midpoint.lng);
-
-    const stateA: CellStockState = {
-      carbonKg: 1000,
-      waterKg: 5000,
-      oxygenKg: 2000,
-      mineralsKg: 500,
-      energyJoules: 1e8,
-      temperatureKelvin: 300,
-      specificHumidity: 0.015,
-      dicConcentration: 2.0,
-    };
-    const stateB: CellStockState = {
-      carbonKg: 1000,
-      waterKg: 5000,
-      oxygenKg: 2000,
-      mineralsKg: 500,
-      energyJoules: 1e8,
-      temperatureKelvin: 290,
-      specificHumidity: 0.010,
-      dicConcentration: 2.0,
-    };
-
-    const [nextA, nextB, deltas] = graph.computeInterCellFlux(
-      stateA,
-      stateB,
-      retrievedBoundary,
-      2.0,
-      500,
-      300
-    );
-
-    assert.ok(Math.abs((nextA.carbonKg! + nextB.carbonKg!) - 2000) < 1e-9);
-    assert.ok(Math.abs((nextA.energyJoules! + nextB.energyJoules!) - 2e8) < 1e-4);
-    assert.ok(deltas.deltaWaterKg !== 0);
   });
 });

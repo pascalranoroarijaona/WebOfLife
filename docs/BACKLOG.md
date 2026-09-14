@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 32%
-SPRINT_GOAL: Implement computeBoundaryHorizontalNormal3D computing unoriented cross product of midpoint tangent and radial normal in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 34%
+SPRINT_GOAL: Implement orientVectorTowardsTarget3D applying sign flip if dot product with displacement vector is negative in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -42,7 +42,7 @@ SPRINT_GOAL: Implement computeBoundaryHorizontalNormal3D computing unoriented cr
 - [x] Implement `computeBoundarySegmentVector3D` calculating unnormalized displacement vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundarySegmentTangent3D` computing unit tangent vector between spherical boundary vertices in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundarySegmentRadialNormal3D` calculating normalized radial midpoint unit vector for a boundary segment in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryHorizontalNormal3D` computing unoriented cross product of midpoint tangent and radial normal in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundaryHorizontalNormal3D` computing unoriented cross product of midpoint tangent and radial normal in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `orientVectorTowardsTarget3D` applying sign flip if dot product with displacement vector is negative in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `computeBoundaryOutwardNormal3D` assembling oriented horizontal unit normal vector between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
