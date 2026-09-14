@@ -1,94 +1,77 @@
 -- ============================================================================
--- Web of Life Database Schema & Thermodynamic Ledger (Sprint 024)
+-- Web of Life Database Schema & Thermodynamic Ledger (Sprint 025 Update)
+-- Incorporating H3 Resolution Tiers (0-15), Spatial Monad States, 
+-- and Thermodynamic Conservation Constraints (Law 1 & Law 2).
 -- ============================================================================
 
--- Enable TimescaleDB extension for time-series spatial stock tracking
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+BEGIN;
 
--- ----------------------------------------------------------------------------
--- 1. Spatial Resolution & H3 Grid Tiers
--- ----------------------------------------------------------------------------
-CREATE TABLE spatial_resolution_tiers (
-    resolution_tier INT PRIMARY KEY CHECK (resolution_tier BETWEEN 0 AND 15),
-    description VARCHAR(255) NOT NULL,
-    average_edge_length_km NUMERIC(10, 4) NOT NULL,
-    average_area_km2 NUMERIC(12, 4) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- 1. Spatial Resolution Lookup Table (Enforcing H3 Tiers 0-15)
+CREATE TABLE IF NOT EXISTS h3_resolution_tiers (
+    resolution_tier SMALLINT PRIMARY KEY CHECK (resolution_tier BETWEEN 0 AND 15),
+    average_area_km2 DOUBLE PRECISION NOT NULL,
+    average_edge_length_km DOUBLE PRECISION NOT NULL,
+    trophic_energy_scaling_factor DOUBLE PRECISION NOT NULL DEFAULT 7.0
 );
 
--- Seed H3 resolution bounds (0-15)
-INSERT INTO spatial_resolution_tiers (resolution_tier, description, average_edge_length_km, average_area_km2) VALUES
-(0, 'Global root cells', 1107.7125910, 4250546.8480),
-(1, 'Sub-continental', 418.6760055, 607998.2926),
-(2, 'Large regional', 158.2449572, 86802.7749),
-(3, 'Regional / Country-scale', 59.8109690, 12399.5441),
-(4, 'Sub-regional', 22.6074149, 1771.3635),
-(5, 'Metropolitan / Large Basin', 8.5444083, 253.0762),
-(6, 'County / Watershed', 3.2294828, 36.1557),
-(7, 'Municipal / Forest tract', 1.2206305, 5.1612),
-(8, 'Neighborhood / Ecological site', 0.4613547, 0.7374),
-(9, 'Sub-neighborhood', 0.1743757, 0.1053),
-(10, 'Hectare-scale', 0.0659078, 0.0150),
-(11, 'Plot-scale', 0.0249105, 0.0021),
-(12, 'Sub-plot scale', 0.0094154, 0.00030),
-(13, 'Micro-site', 0.0035590, 0.000044),
-(14, 'Sub-micro site', 0.0013459, 0.0000063),
-(15, 'Fine organism level', 0.0005086, 0.0000009);
+-- Seed H3 Resolution Tiers with theoretical geometric metrics
+INSERT INTO h3_resolution_tiers (resolution_tier, average_area_km2, average_edge_length_km, trophic_energy_scaling_factor) VALUES
+(0, 4250546.847, 1107.712, 1.0),
+(1, 607220.978, 418.676, 7.0),
+(2, 86745.854, 158.226, 49.0),
+(3, 12392.265, 59.811, 343.0),
+(4, 1770.324, 22.611, 2401.0),
+(5, 252.903, 8.544, 16807.0),
+(6, 36.129, 3.227, 117649.0),
+(7, 5.161, 1.219, 823543.0),
+(8, 0.737, 0.461, 5764801.0),
+(9, 0.105, 0.174, 40353607.0),
+(10, 0.015, 0.066, 282475249.0),
+(11, 0.0021, 0.025, 1977326743.0),
+(12, 0.00031, 0.0094, 13841287201.0),
+(13, 0.000044, 0.0035, 96889000407.0),
+(14, 0.0000063, 0.0013, 678223002849.0),
+(15, 0.0000009, 0.0005, 4747561019943.0)
+ON CONFLICT (resolution_tier) DO NOTHING;
 
--- ----------------------------------------------------------------------------
--- 2. Spatial Monads & Ecological Stocks (Matter & Energy Conservation)
--- ----------------------------------------------------------------------------
-CREATE TABLE spatial_monads (
-    monad_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- 2. Spatial Monad State Table
+CREATE TABLE IF NOT EXISTS spatial_monad_states (
+    monad_id UUID PRIMARY KEY,
     h3_index VARCHAR(15) NOT NULL,
-    resolution_tier INT NOT NULL REFERENCES spatial_resolution_tiers(resolution_tier),
-    energy_stock_joules NUMERIC(20, 4) NOT NULL CHECK (energy_stock_joules >= 0),
-    biomass_stock_kg NUMERIC(20, 4) NOT NULL CHECK (biomass_stock_kg >= 0),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    resolution SMALLINT NOT NULL REFERENCES h3_resolution_tiers(resolution_tier),
+    biomass_stock_kg DOUBLE PRECISION NOT NULL CHECK (biomass_stock_kg >= 0.0),
+    enthalpy_joules DOUBLE PRECISION NOT NULL,
+    entropy_joules_per_k DOUBLE PRECISION NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Hypertable for spatial monad time-series tracking
-SELECT create_hypertable('spatial_monads', 'created_at', if_not_exists => TRUE);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic State Transitions & Refinement Flows
--- ----------------------------------------------------------------------------
-CREATE TABLE spatial_transitions (
-    transition_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_monad_id UUID REFERENCES spatial_monads(monad_id),
-    target_monad_id UUID REFERENCES spatial_monads(monad_id),
-    transition_type VARCHAR(50) NOT NULL CHECK (transition_type IN ('REFINE', 'COMPACT', 'SOLAR_FLUX_IN', 'THERMAL_DISSIPATION')),
-    energy_delta_joules NUMERIC(20, 4) NOT NULL,
-    biomass_delta_kg NUMERIC(20, 4) NOT NULL,
-    -- First Law constraint verification: Biomass delta across subdivision must sum to 0
-    CONSTRAINT check_matter_conservation CHECK (biomass_delta_kg = 0),
-    executed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Blockchain Ledger Signatures
--- ----------------------------------------------------------------------------
-CREATE TABLE thermodynamic_blocks (
-    block_height BIGSERIAL PRIMARY KEY,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
-    parent_hash VARCHAR(64) NOT NULL,
-    solar_flux_input_joules NUMERIC(24, 4) NOT NULL CHECK (solar_flux_input_joules >= 0),
-    thermal_dissipation_joules NUMERIC(24, 4) NOT NULL CHECK (thermal_dissipation_joules >= 0),
-    state_root VARCHAR(64) NOT NULL,
-    miner_node_id VARCHAR(128) NOT NULL,
-    minted_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE block_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT REFERENCES thermodynamic_blocks(block_height),
-    transition_id UUID REFERENCES spatial_transitions(transition_id),
+-- 3. Thermodynamic Stock Transactions (Law 1 & Law 2 Ledger)
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    transaction_id UUID PRIMARY KEY,
+    block_height BIGINT NOT NULL,
+    source_monad_id UUID REFERENCES spatial_monad_states(monad_id),
+    target_monad_id UUID REFERENCES spatial_monad_states(monad_id),
+    energy_delta_joules DOUBLE PRECISION NOT NULL,
+    solar_flux_import_joules DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    entropy_change DOUBLE PRECISION NOT NULL CHECK (entropy_change >= 0.0),
     signature VARCHAR(128) NOT NULL,
-    payload_hash VARCHAR(64) NOT NULL
+    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexing for performance
-CREATE INDEX idx_spatial_monads_h3 ON spatial_monads(h3_index, resolution_tier);
-CREATE INDEX idx_spatial_transitions_type ON spatial_transitions(transition_type);
-CREATE INDEX idx_blocks_minted ON thermodynamic_blocks(minted_at);
+-- 4. Blockchain Ledger Block Signatures
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    block_height BIGINT PRIMARY KEY,
+    previous_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    validator_node_id UUID NOT NULL,
+    thermodynamic_checksum DOUBLE PRECISION NOT NULL,
+    minted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance and spatial integrity
+CREATE INDEX IF NOT EXISTS idx_spatial_monad_resolution ON spatial_monad_states(resolution);
+CREATE INDEX IF NOT EXISTS idx_spatial_monad_h3 ON spatial_monad_states(h3_index);
+CREATE INDEX IF NOT EXISTS idx_thermo_tx_block ON thermodynamic_transactions(block_height);
+
+COMMIT;

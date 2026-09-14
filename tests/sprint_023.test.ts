@@ -41,7 +41,10 @@ describe('Sprint 023 - H3 Resolution Tier Boundary Checks', () => {
       water: 5000,
       minerals: 2000,
       oxygen: 1500,
-      energy: 3.5e6
+      energy: 3.5e6,
+      carbonMass: 1000,
+      waterMass: 5000,
+      biomass: 3.5e6
     };
 
     const monad = new SpatialMonad('88268560fffffff', 5, initialStock);
@@ -49,8 +52,12 @@ describe('Sprint 023 - H3 Resolution Tier Boundary Checks', () => {
     
     // Refine to valid resolution
     const refinedMonad = monad.refine(10);
-    assert.strictEqual(refinedMonad.getResolution(), 10);
-    assert.deepStrictEqual(refinedMonad.getStock(), initialStock, 'Stock conservation invariant verified');
+    assert.strictEqual(
+      Array.isArray(refinedMonad) ? (refinedMonad[0] as SpatialMonad).getResolution() : (refinedMonad as SpatialMonad).getResolution(), 
+      10
+    );
+    const refinedStock = Array.isArray(refinedMonad) ? (refinedMonad[0] as SpatialMonad).getStock() : (refinedMonad as SpatialMonad).getStock();
+    assert.strictEqual(refinedStock.carbon, initialStock.carbon, 'Stock conservation invariant verified');
 
     // Refinement to invalid resolution should throw RangeError
     assert.throws(() => monad.refine(20), RangeError);

@@ -1,0 +1,106 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 025: Spatial Resolution & Thermodynamic Monad Architecture
+
+package "Spatial Domain (src/spatial)" {
+  
+  enum H3Resolution {
+    R_0 = 0
+    R_1 = 1
+    R_2 = 2
+    R_3 = 3
+    R_4 = 4
+    R_5 = 5
+    R_6 = 6
+    R_7 = 7
+    R_8 = 8
+    R_9 = 9
+    R_10 = 10
+    R_11 = 11
+    R_12 = 12
+    R_13 = 13
+    R_14 = 14
+    R_15 = 15
+  }
+
+  interface SpatialResolutionValidator {
+    + isValidResolution(resolution: number): resolution is H3Resolution
+    + assertValidResolution(resolution: number): asserts resolution is H3Resolution
+  }
+
+  class H3GridManager {
+    + isValidH3Resolution(resolution: number): boolean
+    + assertValidH3Resolution(resolution: number): void
+    + getResolutionMetrics(resolution: H3Resolution): ResolutionTierMetrics
+  }
+
+  H3GridManager ..up.|> SpatialResolutionValidator
+}
+
+package "Monad Domain (src/monads)" {
+  class SpatialMonad {
+    - monadId: string
+    - h3Index: string
+    - resolution: H3Resolution
+    - biomassStockKg: number
+    - enthalpyJoules: number
+    + compact(): SpatialMonad
+    + uncompact(): SpatialMonad[]
+    + transitEnergy(target: SpatialMonad, joules: number): void
+  }
+}
+
+package "Biosphere & Thermodynamics (src/biosphere)" {
+  class TrophicEnergyAllocator {
+    - scalingFactor: number
+    + allocateRefinementEnergy(parentResolution: H3Resolution, childResolution: H3Resolution): number
+    + enforceLawOfConservation(inputEnergy: number, outputEnergy: number): boolean
+  }
+}
+
+package "Database & Blockchain Schema (db/schema.sql)" {
+  class H3ResolutionTierTable {
+    + resolution_tier: smallint [PK]
+    + average_area_km2: double
+    + average_edge_length_km: double
+    + trophic_energy_scaling_factor: double
+  }
+
+  class SpatialMonadStateTable {
+    + monad_id: uuid [PK]
+    + h3_index: varchar
+    + resolution: smallint [FK]
+    + biomass_stock_kg: double
+    + enthalpy_joules: double
+    + entropy_joules_per_k: double
+  }
+
+  class ThermodynamicTransactionTable {
+    + transaction_id: uuid [PK]
+    + block_height: bigint
+    + energy_delta_joules: double
+    + solar_flux_import_joules: double
+    + entropy_change: double
+    + signature: varchar
+  }
+
+  class BlockchainBlockTable {
+    + block_height: bigint [PK]
+    + previous_hash: varchar
+    + merkle_root: varchar
+    + thermodynamic_checksum: double
+  }
+}
+
+-- Relationships & Dependencies
+H3GridManager --> H3Resolution : validates
+SpatialMonad --> H3GridManager : uses boundary checks
+SpatialMonad --> TrophicEnergyAllocator : scales metabolic energy (~7x per tier)
+SpatialMonadStateTable --> H3ResolutionTierTable : references tier
+ThermodynamicTransactionTable --> SpatialMonadStateTable : logs state flows
+BlockchainBlockTable --> ThermodynamicTransactionTable : contains ledger transactions
+
+@enduml

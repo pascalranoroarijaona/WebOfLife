@@ -10,37 +10,49 @@ import {
 describe('Sprint 022: H3 Spatial Resolution Tier Boundary Validation', () => {
     it('TC-01: Validates lower boundary resolution 0', () => {
         assert.strictEqual(validateResolution(0), true);
-        assert.doesNotThrow(() => assertValidResolution(0));
+        assert.doesNotThrow(() => {
+            const r: number = 0;
+            assertValidResolution(r);
+        });
     });
 
     it('TC-02: Validates mid-range resolution 7', () => {
         assert.strictEqual(validateResolution(7), true);
-        assert.doesNotThrow(() => assertValidResolution(7));
+        assert.doesNotThrow(() => {
+            const r: number = 7;
+            assertValidResolution(r);
+        });
     });
 
     it('TC-03: Validates upper boundary resolution 15', () => {
         assert.strictEqual(validateResolution(15), true);
-        assert.doesNotThrow(() => assertValidResolution(15));
+        assert.doesNotThrow(() => {
+            const r: number = 15;
+            assertValidResolution(r);
+        });
     });
 
     it('TC-04: Rejects negative resolution -1', () => {
         assert.strictEqual(validateResolution(-1), false);
         assert.throws(() => {
-            assertValidResolution(-1);
+            const r: number = -1;
+            assertValidResolution(r);
         }, /Thermodynamic Spatial Boundary Violation/);
     });
 
     it('TC-05: Rejects out-of-bounds resolution 16', () => {
         assert.strictEqual(validateResolution(16), false);
         assert.throws(() => {
-            assertValidResolution(16);
+            const r: number = 16;
+            assertValidResolution(r);
         }, /Thermodynamic Spatial Boundary Violation/);
     });
 
     it('TC-06: Rejects decimal resolution 3.5', () => {
         assert.strictEqual(validateResolution(3.5), false);
         assert.throws(() => {
-            assertValidResolution(3.5);
+            const r: number = 3.5;
+            assertValidResolution(r);
         }, /Thermodynamic Spatial Boundary Violation/);
     });
 

@@ -24,11 +24,11 @@ describe('Sprint 24: Spatial Resolution Tier Boundary Validation & Monad Integra
   });
 
   it('SpatialMonad Integration & Refinement', () => {
-    const stock = { biomass: 100, energy: 5000 };
+    const stock = { carbon: 100, water: 200, minerals: 50, biomass: 100, energy: 5000 };
     const monad = new SpatialMonad('881f185805fffff', 4, stock);
     assert.strictEqual(monad.resolution, 4);
 
-    const refined = monad.refine(8);
+    const refined = monad.refine(8) as SpatialMonad;
     assert.strictEqual(refined.resolution, 8);
     assert.strictEqual(refined.stock.biomass, 100);
 

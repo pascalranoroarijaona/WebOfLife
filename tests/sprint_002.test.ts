@@ -63,9 +63,9 @@ describe('Sprint 002: Uber H3 Spatial Indexing and Adjacency Mappings', () => {
         assert.ok(monadResult instanceof SpatialMonad);
 
         const updated = monadResult.extract();
-        assert.notStrictEqual(updated.carbonMass, centerState.carbonMass);
-        assert.notStrictEqual(updated.waterMass, centerState.waterMass);
-        assert.ok(updated.carbonMass >= 0);
-        assert.ok(updated.waterMass >= 0);
+        assert.notStrictEqual(updated.carbonMass!, centerState.carbonMass);
+        assert.notStrictEqual(updated.waterMass!, centerState.waterMass);
+        assert.ok(updated.carbonMass! >= 0);
+        assert.ok(updated.waterMass! >= 0);
     });
 });

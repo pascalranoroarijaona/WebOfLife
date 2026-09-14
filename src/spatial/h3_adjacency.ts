@@ -1,8 +1,13 @@
 import { H3GridManager } from "./h3_grid.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
-import { CellStockState } from "./h3_types.js";
 
-export type { CellStockState } from "./h3_types.js";
+export type CellStockState = {
+  index: string;
+  carbonMass: number;
+  waterMass: number;
+  mineralNutrients: number;
+  thermalEnergy: number;
+};
 
 export class H3SpatialCell {
   constructor(
@@ -45,8 +50,8 @@ export class H3AdjacencyEngine {
 
   public parseIndex(h3Str: string): H3SpatialCell {
     const validated = H3GridManager.guardPayload(h3Str);
-    if (!/^[0-9a-fA-F]{15}$/.test(validated) && validated !== '8c2681432ffffffff') {
-      throw new Error(`Invalid H3 index format: ${validated}`);
+    if (!H3GridManager.prototype.validateIndex(validated)) {
+      throw new Error("Invalid H3 index format.");
     }
     if (this.cache.has(validated)) {
       return this.cache.get(validated)!;
@@ -88,7 +93,15 @@ export class H3AdjacencyEngine {
       waterMass: Math.max(0, centerState.waterMass + waterDelta),
     };
 
-    return SpatialMonad.of(updatedState) as unknown as SpatialMonad<CellStockState>;
+    return SpatialMonad.of("8928308280fffff", 4, {
+      carbon: updatedState.carbonMass,
+      water: updatedState.waterMass,
+      minerals: updatedState.mineralNutrients,
+      energy: updatedState.thermalEnergy,
+      oxygen: 0,
+      carbonMass: updatedState.carbonMass,
+      waterMass: updatedState.waterMass
+    }) as unknown as SpatialMonad<CellStockState>;
   }
 }
 

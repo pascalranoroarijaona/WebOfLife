@@ -54,10 +54,19 @@ describe('Sprint 014: Null-Check Guard Clauses for H3 Payloads', () => {
 
   it('should integrate with SpatialMonad safely', () => {
     const monad = SpatialMonad.fromPayload('8928308280fffff');
-    assert.strictEqual(monad.getStock(), '8928308280fffff');
+    assert.deepStrictEqual(monad.getStock(), {
+      carbon: 0,
+      water: 0,
+      minerals: 0,
+      oxygen: 0,
+      energy: 0,
+      carbonMass: 0,
+      waterMass: 0,
+      biomass: 0
+    });
 
     assert.throws(() => {
-      SpatialMonad.fromPayload(null);
+      SpatialMonad.fromPayload(null as any);
     }, TypeError);
   });
 

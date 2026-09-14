@@ -39,8 +39,8 @@ export class H3AdjacencyEngine {
     cache = new Map();
     parseIndex(h3Str) {
         const validated = H3GridManager.guardPayload(h3Str);
-        if (!/^[0-9a-fA-F]{15}$/.test(validated) && validated !== '8c2681432ffffffff') {
-            throw new Error(`Invalid H3 index format: ${validated}`);
+        if (!H3GridManager.prototype.validateIndex(validated)) {
+            throw new Error("Invalid H3 index format.");
         }
         if (this.cache.has(validated)) {
             return this.cache.get(validated);
@@ -71,7 +71,15 @@ export class H3AdjacencyEngine {
             carbonMass: Math.max(0, centerState.carbonMass + carbonDelta),
             waterMass: Math.max(0, centerState.waterMass + waterDelta),
         };
-        return SpatialMonad.of(updatedState);
+        return SpatialMonad.of("8928308280fffff", 4, {
+            carbon: updatedState.carbonMass,
+            water: updatedState.waterMass,
+            minerals: updatedState.mineralNutrients,
+            energy: updatedState.thermalEnergy,
+            oxygen: 0,
+            carbonMass: updatedState.carbonMass,
+            waterMass: updatedState.waterMass
+        });
     }
 }
 export class H3Adjacency {

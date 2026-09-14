@@ -229,9 +229,9 @@ SPRINT_GOAL: Implement resolution tier (0-15) boundary check function (`src/spat
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
-- [ ] Compressed sparse row (CSR) conversion utility for sparse trophic adjacency weights (`src/biosphere/trophic_matrix.ts`)
-- [ ] Matrix vector multiplication methods for rapid parallel energy flux propagation across spatial nodes (`src/biosphere/trophic_matrix.ts`)
-- [ ] Gauss-Seidel iterative linear solver to compute steady-state biomass distributions across $N$-tier food webs (`src/biosphere/trophic_solver.ts`)
+- [ ] Implement `CSRMatrix` data structure with values, columnIndex, and rowOffsets arrays (`src/biosphere/trophic_matrix.ts`)
+- [ ] Implement `csrMultiplyVector` for parallel energy flux propagation across H3 nodes (`src/biosphere/trophic_matrix.ts`)
+- [ ] Implement Gauss-Seidel steady-state biomass solver with spectral radius checks (`src/biosphere/trophic_solver.ts`)
 - [ ] Convergence criteria checking based on maximum residual error tolerance ($\epsilon < 10^{-6}$) (`src/biosphere/trophic_solver.ts`)
 - [ ] Holling Type II predator ingestion rate function with handling time parameters (`src/biosphere/holling_kinetics.ts`)
 - [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds (`src/biosphere/holling_kinetics.ts`)
@@ -246,8 +246,7 @@ SPRINT_GOAL: Implement resolution tier (0-15) boundary check function (`src/spat
 - [ ] Microbial necromass respiration and temperature-dependent decomposition kinetics (`src/geobiome/soil_matrix.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
-- [ ] Gibbs free energy of mixing calculation helper for ambient gas streams (`src/technosphere/dac_thermodynamics.ts`)
-- [ ] Minimum theoretical separation work calculator using Gibbs free energy of mixing for ambient CO2 (`src/technosphere/dac_thermodynamics.ts`)
+- [ ] Implement minimum theoretical separation work calculation $\Delta G_{\text{sep}} = -RT \sum y_i \ln(y_i)$ (`src/technosphere/dac_thermodynamics.ts`)
 - [ ] Solid-sorbent thermal regeneration energy requirement function for TSA cycles (`src/technosphere/dac.ts`)
 - [ ] Liquid-solvent calcium carbonate calcination enthalpy balance for caustic recovery (`src/technosphere/dac.ts`)
 - [ ] Parasitic electrical and thermal load simulation routing for solid and liquid DAC monads (`src/technosphere/dac.ts`)
@@ -264,8 +263,8 @@ SPRINT_GOAL: Implement resolution tier (0-15) boundary check function (`src/spat
 - [ ] Technospheric thermal waste routing interface into planetary boundary layers and biogeochemical cycles (`src/monads/technosphere_coupling.ts`)
 
 ### Phase 4: Blockchain Ledger & AI Symbiosis
+- [ ] Implement RFC 8785 key-sorting and whitespace-stripping deterministic canonicalization (`src/ledger/vortex_serialization.ts`)
 - [ ] Thermodynamic Vortex Block Chaining (`src/ledger/vortex_ledger.ts`)
-- [ ] Deterministic JSON canonicalization (RFC 8785) for state monad payloads to generate SHA-256 Merkle root hashes (`src/ledger/vortex_serialization.ts`)
 - [ ] Verification middleware independently re-executing First and Second Law checks across block transactions (`src/ledger/poew_validator.ts`)
 - [ ] Proof of Ecological Work (PoEW) validation middleware (`src/ledger/poew.ts`)
 - [ ] SQLite schema definitions for append-only temporal vortex blocks (`db/schema.sql`)
