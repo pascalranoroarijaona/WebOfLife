@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@4.1.0"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 002: Uber H3 Spatial Adjacency</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#inspector {
+  position: fixed;
+  z-index: 20;
+  top: 18px;
+  right: 18px;
+  width: min(400px, calc(100vw - 36px));
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  display: none;
+  background: var(--panel);
+  border: 1px solid #315064;
+  border-radius: 10px;
+  box-shadow: 0 0 40px #000;
+  backdrop-filter: blur(12px);
+}
+
+#inspector.open {
+  display: block;
+}
+
+.inspector-header {
+  position: relative;
+  padding: 15px;
+  border-bottom: 1px solid #315064;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inspector-header h3 {
+  color: #00e1ff;
+  font-size: 0.95rem;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  padding: 2px 6px;
+}
+
+.close-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.inspector-body {
+  padding: 15px;
+  font-size: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dashed rgba(117, 151, 168, 0.2);
+}
+
+.stat-key {
+  color: var(--muted);
+}
+
+.stat-val {
+  color: var(--text);
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>THERMODYNAMIC WEB OF LIFE</h1>
+  <h2>Sprint 002: Uber H3 Spatial Adjacency &amp; Thermodynamic Flow Matrix</h2>
+  <p>
+    Simulating planetary-scale energy flow across <span class="highlight">Uber H3 discrete global hexagonal grid cells</span>.
+    Observe how solar photon inputs cascade through trophic networks, carbon and water cycles, and entropy dissipation.
+  </p>
+  <div class="social-links">
+    <a href="01_RFC.md" target="_blank">📄 Sprint 002 RFC</a>
+    <a href="02_METHODS.md" target="_blank">🔬 Methods &amp; Math</a>
+    <a href="../../../docs/sprints/sprint_001/index.html" target="_blank">⏪ Sprint 1 View</a>
+    <a href="https://github.com/web-of-life/gaia" target="_blank">⭐ GitHub Repository</a>
+  </div>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search H3 index or species..." />
+  
+  <div class="zoom-container">
+    <span>Zoom</span>
+    <input type="range" id="zoomRange" min="0.5" max="3" step="0.1" value="1" />
+  </div>
+
+  <div class="debug-container">
+    <input type="checkbox" id="h3Toggle" checked />
+    <label for="h3Toggle">H3 Mesh</label>
+  </div>
+
+  <div class="debug-container">
+    <input type="checkbox" id="thermoToggle" checked />
+    <label for="thermoToggle">Thermo Flows</label>
+  </div>
+
+  <button id="pauseBtn">Pause</button>
+  <button id="stepBtn">Step</button>
+  <button id="resetBtn">Reset</button>
+</div>
+
+<div id="inspector">
+  <div class="inspector-header">
+    <h3 id="inspectorTitle">H3 Hexagon Cell</h3>
+    <button class="close-btn" id="closeInspector">&times;</button>
+  </div>
+  <div class="inspector-body" id="inspectorBody">
+    <div class="stat-row">
+      <span class="stat-key">H3 Index</span>
+      <span class="stat-val" id="valH3">-</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-key">Biomass</span>
+      <span class="stat-val" id="valBiomass">-</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-key">Entropy (S)</span>
+      <span class="stat-val" id="valEntropy">-</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-key">Solar Flux</span>
+      <span class="stat-val" id="valSolar">-</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-key">Adjoining Nodes</span>
+      <span class="stat-val" id="valNeighbors">-</span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { latLngToCell, cellToLatLng, gridDisk, cellToBoundary } from 'h3-js';
+
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  // Simulation State
+  let paused = false;
+  let zoom = 1;
+  let panX = width / 2;
+  let panY = height / 2;
+  let showH3 = true;
+  let showThermo = true;
+
+  // Center H3 cell (resolution 3 for planetary overview)
+  // lat 0, lng 0 approx center
+  const centerHex = latLngToCell(0, 0, 3);
+  const ringCells = gridDisk(centerHex, 2);
+
+  // Map ring cells to simulated nodes with thermodynamic attributes
+  const nodes = ringCells.map((h3Index, idx) => {
+    const [lat, lng] = cellToLatLng(h3Index);
+    return {
+      h3Index,
+      lat,
+      lng,
+      biomass: 50 + Math.random() * 150,
+      entropy: 10 + Math.random() * 30,
+      solarFlux: 1000 * Math.max(0.1, Math.cos((lng * Math.PI) / 180)),
+      neighbors: gridDisk(h3Index, 1).filter(n => n !== h3Index)
+    };
+  });
+
+  // Interaction
+  let selectedNode = null;
+  const inspector = document.getElementById('inspector');
+  const closeInspector = document.getElementById('closeInspector');
+
+  closeInspector.addEventListener('click', () => {
+    inspector.classList.remove('open');
+    selectedNode = null;
+  });
+
+  // Convert lat/lng to screen coords with pan/zoom
+  function project(lat, lng) {
+    const x = panX + (lng * width) / 360 * zoom;
+    const y = panY - (lat * height) / 180 * zoom;
+    return { x, y };
+  }
+
+  // UI bindings
+  document.getElementById('zoomRange').addEventListener('input', (e) => {
+    zoom = parseFloat(e.target.value);
+  });
+  document.getElementById('h3Toggle').addEventListener('change', (e) => {
+    showH3 = e.target.checked;
+  });
+  document.getElementById('thermoToggle').addEventListener('change', (e) => {
+    showThermo = e.target.checked;
+  });
+  document.getElementById('pauseBtn').addEventListener('click', () => {
+    paused = !paused;
+    document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+  });
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    zoom = 1;
+    panX = width / 2;
+    panY = height / 2;
+  });
+
+  // Canvas click detection for inspection
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    let closest = null;
+    let minDist = 40;
+
+    for (const node of nodes) {
+      const pos = project(node.lat, node.lng);
+      const dist = Math.hypot(pos.x - mouseX, pos.y - mouseY);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = node;
+      }
+    }
+
+    if (closest) {
+      selectedNode = closest;
+      inspector.classList.add('open');
+      document.getElementById('valH3').textContent = closest.h3Index;
+      document.getElementById('valBiomass').textContent = closest.biomass.toFixed(1) + ' Gt';
+      document.getElementById('valEntropy').textContent = closest.entropy.toFixed(1) + ' kJ/K';
+      document.getElementById('valSolar').textContent = closest.solarFlux.toFixed(1) + ' W/m²';
+      document.getElementById('valNeighbors').textContent = closest.neighbors.length;
+    }
+  });
+
+  // Simulation tick
+  function update() {
+    if (paused) return;
+    for (const node of nodes) {
+      // Thermodynamic fluctuation
+      node.biomass += (Math.random() - 0.48) * 1.5;
+      node.biomass = Math.max(10, Math.min(500, node.biomass));
+      node.entropy += (Math.random() - 0.5) * 0.8;
+      node.entropy = Math.max(5, Math.min(100, node.entropy));
+    }
+  }
+
+  // Render loop
+  function render() {
+    ctx.fillStyle = '#02050a';
+    ctx.fillRect(0, 0, width, height);
+
+    // Render H3 adjacency mesh and energy flows
+    if (showH3) {
+      for (const node of nodes) {
+        const pos = project(node.lat, node.lng);
+        
+        // Draw links to neighbors in nodes set
+        if (showThermo) {
+          ctx.strokeStyle = 'rgba(0, 225, 255, 0.15)';
+          ctx.lineWidth = 1;
+          for (const neighborH3 of node.neighbors) {
+            const target = nodes.find(n => n.h3Index === neighborH3);
+            if (target) {
+              const tPos = project(target.lat, target.lng);
+              ctx.beginPath();
+              ctx.moveTo(pos.x, pos.y);
+              ctx.lineTo(tPos.x, tPos.y);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Draw Cell Hexagon boundary approximately
+        ctx.beginPath();
+        const radius = 28 * zoom;
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI) / 3;
+          const hx = pos.x + radius * Math.cos(angle);
+          const hy = pos.y + radius * Math.sin(angle);
+          if (i === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+        ctx.fillStyle = selectedNode === node ? 'rgba(0, 225, 255, 0.25)' : 'rgba(16, 35, 49, 0.6)';
+        ctx.fill();
+        ctx.strokeStyle = selectedNode === node ? '#00e1ff' : '#315064';
+        ctx.lineWidth = selectedNode === node ? 2 : 1;
+        ctx.stroke();
+
+        // Node center marker
+        ctx.fillStyle = '#00ffe1';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = '#7597a8';
+        ctx.font = '10px Courier New';
+        ctx.fillText(`H3: ${node.h3Index.substring(0, 6)}...`, pos.x + 12, pos.y + 4);
+      }
+    }
+
+    update();
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+</script>
+</body>
+</html>

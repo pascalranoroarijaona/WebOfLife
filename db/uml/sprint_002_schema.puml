@@ -1,0 +1,95 @@
+```Code snippet
+@startuml
+skinparam ClassAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 002: H3 Spatial Adjacency & Thermodynamic Blockchain Architecture
+
+package "Spatial Namespace (src/spatial)" {
+    interface IH3SpatialCell {
+        + readonly index: string
+        + readonly resolution: number
+        + readonly baseCell: number
+        + getEdgeNeighbors(): string[]
+        + getKRing(k: number): string[]
+    }
+
+    interface IH3AdjacencyEngine {
+        + parseIndex(h3Str: string): IH3SpatialCell
+        + generateKRing(center: IH3SpatialCell, k: number): string[][]
+        + getEdgeNeighbors(cell: IH3SpatialCell): Map<number, string>
+    }
+
+    class H3SpatialCell {
+        - index: string
+        - resolution: number
+        - baseCell: number
+        - isPentagon: boolean
+        + getEdgeNeighbors(): string[]
+        + getKRing(k: number): string[]
+    }
+
+    class H3AdjacencyEngine {
+        - cache: Map<string, IH3SpatialCell>
+        + parseIndex(h3Str: string): IH3SpatialCell
+        + generateKRing(center: IH3SpatialCell, k: number): string[][]
+        + getEdgeNeighbors(cell: IH3SpatialCell): Map<number, string>
+    }
+
+    IH3SpatialCell <|.. H3SpatialCell
+    IH3AdjacencyEngine <|.. H3AdjacencyEngine
+    H3AdjacencyEngine --> H3SpatialCell : creates/manages
+}
+
+package "Database & Blockchain Models" {
+    class H3SpatialCellRecord {
+        + index: string
+        + resolution: number
+        + base_cell: number
+        + is_pentagon: boolean
+    }
+
+    class ThermodynamicControlVolume {
+        + volume_id: UUID
+        + h3_index: string
+        + mass_stock: numeric
+        + energy_stock: numeric
+        + entropy_stock: numeric
+        + solar_input_flux: numeric
+    }
+
+    class SpatialFluxTransaction {
+        + transaction_id: UUID
+        + source_volume_id: UUID
+        + target_volume_id: UUID
+        + mass_transferred: numeric
+        + energy_transferred: numeric
+        + entropy_generated: numeric
+        + h3_edge_direction: integer
+    }
+
+    class BlockchainBlock {
+        + block_height: long
+        + block_hash: string
+        + previous_block_hash: string
+        + merkle_root: string
+        + state_root: string
+        + validator_signature: string
+    }
+
+    class BlockTransaction {
+        + tx_hash: string
+        + block_height: long
+        + spatial_flux_id: UUID
+        + monad_state_pre: bytes
+        + monad_state_post: bytes
+        + proof_signature: string
+    }
+
+    H3SpatialCellRecord "1" -- "0..*" ThermodynamicControlVolume : maps to control volume
+    ThermodynamicControlVolume "1" o-- "0..*" SpatialFluxTransaction : participates in flux
+    BlockchainBlock "1" *-- "1..*" BlockTransaction : contains
+    BlockTransaction "1" --> "1" SpatialFluxTransaction : secures ledger entry
+}
+
+@enduml
