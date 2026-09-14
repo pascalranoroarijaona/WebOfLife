@@ -1,5 +1,5 @@
 {
-  "current_sprint": 12,
+  "current_sprint": 13,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -55,6 +55,11 @@
       "sprint": 11,
       "goal": "Implement character set verification (hexadecimal [0-9a-f]) for Uber H3 index strings in src/spatial/h3_grid.ts.",
       "timestamp": "2026-09-14T06:00:45.332397+00:00"
+    },
+    {
+      "sprint": 12,
+      "goal": "Implement null-check guard clauses for incoming H3 string payloads in src/spatial/h3_grid.ts.",
+      "timestamp": "2026-09-14T06:05:05.356633+00:00"
     }
   ]
 }

@@ -4,8 +4,8 @@
  * and robust monadic validation pipelines.
  */
 
-import { H3GridManager, H3GridParser, GeoCoordinate, H3ValidationResult, H3Validator, IH3Validator } from "../spatial/h3_grid.js";
-import { H3ErrorCode } from "../spatial/h3_types.js";
+import { H3GridManager, H3GridParser, GeoCoordinate, H3ValidationResult, H3Validator } from "../spatial/h3_grid.js";
+import { H3ErrorCode, IH3Validator } from "../spatial/h3_types.js";
 
 export interface ThermodynamicStock {
   carbonKg: number;

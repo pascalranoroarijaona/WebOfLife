@@ -1,0 +1,60 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 012 Architecture: H3 Guard Clauses & Spatial Monad
+
+package "src.spatial" {
+  interface IH3GuardContract {
+    +validatePayload(h3Index: string | null | undefined): void
+  }
+
+  class H3GridManager {
+    -gridResolution: integer
+    +guardH3Payload(h3Index: string | null | undefined): void
+    +resolveSpatialTopology(h3Index: string): SpatialMonadState
+  }
+
+  IH3GuardContract <|.. H3GridManager
+}
+
+package "src.monads" {
+  class SpatialMonad {
+    -omegaIn: string | null | undefined
+    -energyStock: number
+    -entropyStock: number
+    +bind(fn: Function): SpatialMonad
+    +chain(fn: Function): SpatialMonad
+    +extract(): SpatialMonadState
+  }
+}
+
+package "Database & Ledger" {
+  class Block {
+    +block_height: BIGINT
+    +block_hash: VARCHAR
+    +thermodynamic_entropy: NUMERIC
+    +total_energy_joules: NUMERIC
+  }
+
+  class SpatialMonadStateTable {
+    +state_id: UUID
+    +h3_index: VARCHAR
+    +validation_status: VARCHAR
+    +energy_stock: NUMERIC
+    +entropy_stock: NUMERIC
+    +error_message: TEXT
+  }
+
+  class ThermodynamicStockFlow {
+    +flow_id: UUID
+    +joules_transferred: NUMERIC
+    +guard_assertion_passed: BOOLEAN
+  }
+}
+
+SpatialMonad --> H3GridManager : delegates payload validation
+H3GridManager --> SpatialMonadStateTable : persists state validation
+Block "1" *-- "*" SpatialMonadStateTable : anchors transactions
+
+@enduml
