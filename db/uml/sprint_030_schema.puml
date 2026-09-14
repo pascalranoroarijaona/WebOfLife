@@ -1,0 +1,67 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+
+title Web of Life - Sprint 030: H3 Spatial Grid Verification & Thermodynamic Ledger
+
+package "Spatial Monads (src/spatial)" {
+    class AbstractSpatialMonad {
+        +monadId: UUID
+        +rawIndexString: String
+        +currentState: SpatialMonadState
+        +verify(): Boolean
+    }
+
+    class H3Grid {
+        -regexPattern: RegExp
+        +isValidH3Index(index: string): boolean
+        +transitionState(): SpatialMonadState
+    }
+
+    AbstractSpatialMonad <|-- H3Grid
+}
+
+package "Database Schema & Ledger (db/schema.sql)" {
+    enum SpatialMonadState {
+        S0_UNVERIFIED
+        V_VERIFICATION_GATE
+        S1_VALIDATED
+    }
+
+    class H3SpatialMonadsTable {
+        +monad_id: UUID
+        +raw_index_string: VARCHAR
+        +current_state: SpatialMonadState
+        +is_valid: BOOLEAN
+        +solar_energy_consumed: NUMERIC
+        +entropy_delta: NUMERIC
+        +verified_at: TIMESTAMPTZ
+    }
+
+    class ThermodynamicStockTransactions {
+        +transaction_id: UUID
+        +monad_id: UUID
+        +initial_state: SpatialMonadState
+        +final_state: SpatialMonadState
+        +matter_delta_kg: NUMERIC
+        +energy_joules: NUMERIC
+    }
+
+    class BlockchainBlocks {
+        +block_height: INT
+        +block_hash: VARCHAR
+        +merkle_root: VARCHAR
+        +spatial_validator_signature: VARCHAR
+        +total_system_energy: NUMERIC
+        +total_system_entropy: NUMERIC
+    }
+}
+
+H3Grid --> SpatialMonadState : evaluates regex ^[a-fA-F0-9]{15}$
+H3SpatialMonadsTable --> SpatialMonadState : stores state
+ThermodynamicStockTransactions --> H3SpatialMonadsTable : tracks state transition (S0 -> V -> S1)
+BlockchainBlocks --> H3SpatialMonadsTable : anchors proof-of-work & entropy
+
+@enduml

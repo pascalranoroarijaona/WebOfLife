@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { isValidH3Hex, SpatialMonad, H3GridManager } from '../src/spatial/h3_grid.js';
 describe('Sprint 029: Hexadecimal Character Set Verification Helper Regex', () => {
     it('should correctly validate standard lowercase hex strings', () => {
-        assert.strictEqual(isValidH3Hex('891f1d68唉' in {} ? '' : '891f1d6801ffffffff'), true);
+        assert.strictEqual(isValidH3Hex('891f1d6801ffffffff'), true);
         assert.strictEqual(isValidH3Hex('8928308280fffff'), true);
         assert.strictEqual(isValidH3Hex('abcdef0123456789'), true);
     });
