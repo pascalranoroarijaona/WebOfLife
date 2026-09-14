@@ -1,0 +1,198 @@
+@startuml sprint_042_schema
+!theme plain
+skinparam roundcorner 6
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam linetype ortho
+
+title Web of Life - Sprint 042: Spatial Thermodynamic State Tensor & Ledger Architecture
+
+package "TypeScript Spatial Thermodynamics Layer (src/spatial/)" {
+    
+    interface H3CellThermodynamicState <<Interface>> {
+        +h3Index: string
+        +areaM2: number
+        +elevationM: number
+        -- Thermal & Energy Properties --
+        +internalEnergyJ: number
+        +temperatureK: number
+        +heatCapacityJK: number
+        +albedo: number
+        +emissivity: number
+        -- Radiative & Heat Fluxes (W/m^2) --
+        +shortwaveInWm2: number
+        +shortwaveOutWm2: number
+        +longwaveOutWm2: number
+        +sensibleHeatFluxWm2: number
+        +latentHeatFluxWm2: number
+        -- Entropy Dynamics --
+        +entropyJPerK: number
+        +entropyProductionRateJKs: number
+        -- Mass Stocks (kg) --
+        +dryAirMassKg: number
+        +totalWaterMassKg: number
+        +liquidWaterMassKg: number
+        +iceMassKg: number
+        +vaporMassKg: number
+        +carbonMassKg: number
+        +nitrogenMassKg: number
+        +phosphorusMassKg: number
+    }
+
+    class H3CellThermodynamicRecord implements H3CellThermodynamicState {
+        -assertInvariants(): void
+        +withUpdates(patch: Partial<H3CellThermodynamicState>): H3CellThermodynamicRecord
+        +netRadiativeFluxWm2(): number
+        +totalMassKg(): number
+    }
+
+    class H3StateTensorContainer {
+        -states: Map<string, H3CellThermodynamicRecord>
+        +get(h3Index: string): H3CellThermodynamicRecord
+        +set(state: H3CellThermodynamicRecord): void
+        +has(h3Index: string): boolean
+        +size(): number
+        +keys(): IterableIterator<string>
+        +values(): IterableIterator<H3CellThermodynamicRecord>
+        +computeTotalMassKg(): number
+        +computeTotalInternalEnergyJ(): number
+        +computeTotalEntropyJPerK(): number
+    }
+
+    class "SpatialMonad<T>" as SpatialMonad {
+        +unit(value: T): SpatialMonad<T>
+        +bind<U>(transform: (state: T) => SpatialMonad<U>): SpatialMonad<U>
+        +run(): T
+    }
+
+    class "H3ThermodynamicMonad" as H3ThermodynamicMonad {
+        <<type alias>>
+        SpatialMonad<H3CellThermodynamicRecord>
+    }
+}
+
+package "Database & Blockchain Ledger Schema (db/schema.sql)" {
+
+    class h3_spatial_cells <<Table>> {
+        *h3_index: h3_index_t [PK]
+        --
+        resolution: SMALLINT
+        area_m2: NUMERIC(18, 4)
+        elevation_m: NUMERIC(10, 3)
+        centroid_lat: NUMERIC(10, 7)
+        centroid_lon: NUMERIC(11, 7)
+        created_at: TIMESTAMPTZ
+    }
+
+    class blockchain_blocks <<Table>> {
+        *block_height: BIGINT [PK]
+        --
+        block_hash: sha256_hash_t [UQ]
+        previous_block_hash: sha256_hash_t
+        epoch_tick: BIGINT
+        timestamp: TIMESTAMPTZ
+        tensor_merkle_root: sha256_hash_t
+        total_cells: INTEGER
+        total_internal_energy_j: NUMERIC(38, 6)
+        total_entropy_j_k: NUMERIC(38, 6)
+        total_mass_kg: NUMERIC(38, 6)
+        entropy_production_rate_w_k: NUMERIC(38, 6)
+        validator_pubkey: TEXT
+        signature: TEXT
+        created_at: TIMESTAMPTZ
+    }
+
+    class h3_cell_thermodynamic_states <<Table / Hypertable>> {
+        *block_height: BIGINT [PK, FK]
+        *h3_index: h3_index_t [PK, FK]
+        --
+        state_id: UUID
+        timestamp: TIMESTAMPTZ
+        area_m2: NUMERIC(18, 4)
+        elevation_m: NUMERIC(10, 3)
+        internal_energy_j: NUMERIC(24, 6)
+        temperature_k: NUMERIC(12, 6)
+        heat_capacity_j_k: NUMERIC(22, 6)
+        albedo: unit_interval_t
+        emissivity: unit_interval_t
+        shortwave_in_wm2: NUMERIC(14, 6)
+        shortwave_out_wm2: NUMERIC(14, 6)
+        longwave_out_wm2: NUMERIC(14, 6)
+        sensible_heat_flux_wm2: NUMERIC(14, 6)
+        latent_heat_flux_wm2: NUMERIC(14, 6)
+        entropy_j_per_k: NUMERIC(24, 6)
+        entropy_production_rate_jks: NUMERIC(18, 8)
+        dry_air_mass_kg: NUMERIC(20, 6)
+        total_water_mass_kg: NUMERIC(20, 6)
+        liquid_water_mass_kg: NUMERIC(20, 6)
+        ice_mass_kg: NUMERIC(20, 6)
+        vapor_mass_kg: NUMERIC(20, 6)
+        carbon_mass_kg: NUMERIC(20, 6)
+        nitrogen_mass_kg: NUMERIC(20, 6)
+        phosphorus_mass_kg: NUMERIC(20, 6)
+        total_mass_kg: NUMERIC(22, 6) [STORED]
+        net_radiative_flux_wm2: NUMERIC(16, 6) [STORED]
+        state_leaf_hash: sha256_hash_t
+    }
+
+    class h3_cell_boundary_flux_ledger <<Table>> {
+        *transaction_id: UUID [PK]
+        --
+        block_height: BIGINT [FK]
+        source_h3: h3_index_t [FK]
+        target_h3: h3_index_t [FK]
+        energy_flux_j: NUMERIC(20, 6)
+        water_flux_kg: NUMERIC(18, 6)
+        carbon_flux_kg: NUMERIC(18, 6)
+        nitrogen_flux_kg: NUMERIC(18, 6)
+        phosphorus_flux_kg: NUMERIC(18, 6)
+        entropy_transfer_j_k: NUMERIC(20, 6)
+        tx_signature: TEXT
+        created_at: TIMESTAMPTZ
+    }
+
+    class spatial_tensor_ledger_commitments <<Table>> {
+        *commitment_id: UUID [PK]
+        --
+        block_height: BIGINT [UQ, FK]
+        tensor_root_hash: sha256_hash_t
+        computed_total_u_j: NUMERIC(38, 6)
+        computed_total_m_kg: NUMERIC(38, 6)
+        computed_total_s_jk: NUMERIC(38, 6)
+        first_law_delta_u: NUMERIC(24, 6)
+        first_law_residual_norm: NUMERIC(16, 8)
+        second_law_entropy_rate: NUMERIC(24, 8)
+        is_conserved: BOOLEAN
+        verified_at: TIMESTAMPTZ
+    }
+}
+
+' TypeScript Relationships
+H3StateTensorContainer o-- H3CellThermodynamicRecord : aggregates
+SpatialMonad <.. H3ThermodynamicMonad : specializes
+H3ThermodynamicMonad --> H3CellThermodynamicRecord : binds / transforms
+
+' Relational & Foreign Key Mappings
+blockchain_blocks "1" <-- "N" h3_cell_thermodynamic_states : commits state snapshot
+h3_spatial_cells "1" <-- "N" h3_cell_thermodynamic_states : projects geometry
+h3_spatial_cells "1" <-- "N" h3_cell_boundary_flux_ledger : source_cell
+h3_spatial_cells "1" <-- "N" h3_cell_boundary_flux_ledger : target_cell
+blockchain_blocks "1" <-- "N" h3_cell_boundary_flux_ledger : contains edge fluxes
+blockchain_blocks "1" <-- "1" spatial_tensor_ledger_commitments : certifies invariants
+
+' Code to Data Realization
+H3CellThermodynamicRecord ..> h3_cell_thermodynamic_states : maps 1:1 to row
+H3StateTensorContainer ..> blockchain_blocks : aggregates to block header
+H3StateTensorContainer ..> spatial_tensor_ledger_commitments : verifies global invariants
+
+note bottom of h3_cell_thermodynamic_states
+  <b>First Law Validation:</b>
+  ΔU = Φ_sw^in - Φ_sw^out - Φ_lw^out + Σ J_E
+  M_total = M_air + M_h2o + M_C + M_N + M_P
+  |M_h2o - (liquid + ice + vapor)| <= ε
+
+  <b>Second Law Validation:</b>
+  entropy_production_rate_jks >= 0
+end note
+
+@enduml

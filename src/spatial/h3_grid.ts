@@ -1,6 +1,6 @@
 /**
  * Web of Life - Planetary Spatial Substrate & H3 Grid Helper
- * RFC-041 and Complete Retro-Compatibility Layer (Sprints 001 - 041)
+ * RFC-041 and Complete Retro-Compatibility Layer (Sprints 001 - 042)
  */
 
 import {
@@ -74,10 +74,10 @@ export class InvalidLengthError extends H3ValidationError {
   }
 }
 
-export class InvalidH3TokenError extends Error {
+export class InvalidH3TokenError extends H3ValidationError {
   constructor(token: string) {
-    super(`Invalid H3 token contains non-hexadecimal symbols: "${token}"`);
-    this.name = 'InvalidH3TokenError';
+    super(token, `Invalid H3 token contains non-hexadecimal symbols: "${token}"`);
+    this.name = 'H3ValidationError';
     Object.setPrototypeOf(this, InvalidH3TokenError.prototype);
   }
 }
@@ -116,7 +116,9 @@ export function isValidH3Resolution(resolution: number): resolution is H3Resolut
 
 export function assertH3Resolution(resolution: number): asserts resolution is H3Resolution {
   if (!isValidH3Resolution(resolution)) {
-    throw new ThermodynamicSpatialError(resolution);
+    throw new RangeError(
+      `Thermodynamic Spatial Invariant Violation: Invalid H3 resolution tier: ${resolution}. Must be an integer between 0 and 15.`
+    );
   }
 }
 
@@ -292,11 +294,11 @@ export function guardH3Payload(payload: unknown): string {
 }
 
 export function validateH3Token(token: string): void {
-  if (!token || typeof token !== 'string') {
-    throw new H3ValidationError(token as any, 'H3 token must be a non-empty string.');
+  if (!token || typeof token !== 'string' || token.trim() === '') {
+    throw new H3ValidationError(token as any, `H3 token must be a non-empty string: "${token}"`);
   }
   if (token.includes(' ') || token.includes('-') || token.includes('!') || !/^[0-9a-fA-F]+$/.test(token)) {
-    throw new InvalidH3TokenError(token);
+    throw new H3ValidationError(token, `Invalid H3 token contains non-hexadecimal symbols: "${token}"`);
   }
 }
 

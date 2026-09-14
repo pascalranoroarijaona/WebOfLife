@@ -82,7 +82,7 @@ export class H3AdjacencyEngine {
             carbonMass: Math.max(0, totalCarbon),
             waterMass: Math.max(0, totalWater)
         };
-        return SpatialMonad.of(centerState.index, updated);
+        return SpatialMonad.unit(updated);
     }
 }
 export class H3Adjacency {

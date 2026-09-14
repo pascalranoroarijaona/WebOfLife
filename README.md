@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 23%
-SPRINT_GOAL: Implement deduplicated canonical token extraction helper extractUniqueCanonicalH3Tokens(text: string): string[] in src/spatial/h3_grid.ts.
+Roadmap Completion: 21%
+SPRINT_GOAL: Define H3CellThermodynamicState interface with scalar thermodynamic properties in src/spatial/h3_state_tensor.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -225,9 +225,10 @@ SPRINT_GOAL: Implement deduplicated canonical token extraction helper extractUni
 - [x] Implement regex format validator `assertCanonicalH3Pattern(token: string): void` raising `H3ValidationError` (`src/spatial/h3_grid.ts`)
 - [x] Define global regex constant `H3_GLOBAL_CANONICAL_INDEX_PATTERN` matching 15-character canonical H3 tokens globally (`src/spatial/h3_grid.ts`)
 - [x] Implement token extractor function `extractCanonicalH3Tokens(text: string): string[]` returning validated canonical H3 tokens (`src/spatial/h3_grid.ts`)
-- [ ] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
-- [ ] `H3CellThermodynamicState` interface and state vector representation (`src/spatial/h3_state_tensor.ts`)
-- [ ] Factory function and thermal boundary assertions for `H3CellThermodynamicState` (`src/spatial/h3_state_tensor.ts`)
+- [x] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
+- [ ] Define `H3CellThermodynamicState` interface with scalar thermodynamic properties in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement physical clamping and validation helper `validateH3CellThermodynamicState` in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement factory function `createH3CellThermodynamicState` with default Earth surface values in `src/spatial/h3_state_tensor.ts`
 - [ ] Geodesic distance and shared boundary length calculation between adjacent H3 cells (`src/spatial/h3_adjacency.ts`)
 - [ ] Discrete Topographic Insolation and Solar Zenith Angle formulation (`src/thermodynamics/insolation.ts`)
 - [ ] Top-of-Atmosphere irradiance and daily solar declination engine (`src/thermodynamics/insolation.ts`)

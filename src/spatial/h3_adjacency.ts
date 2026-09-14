@@ -125,7 +125,7 @@ export class H3AdjacencyEngine implements IH3AdjacencyEngine {
       waterMass: Math.max(0, totalWater)
     };
 
-    return SpatialMonad.of(centerState.index, updated);
+    return SpatialMonad.unit<CellStockState>(updated);
   }
 }
 
