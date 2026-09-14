@@ -139,8 +139,8 @@ describe('Sprint 054: RFC-054 Longitude Boundary Wrapping & Normalization', () =
       assert.strictEqual(nextState.massKg.minerals, initial.massKg.minerals);
       assert.strictEqual(nextState.massKg.oxygen, initial.massKg.oxygen);
 
-      const totalMassBefore = Object.values(initial.massKg).reduce((a, b) => a + b, 0);
-      const totalMassAfter = Object.values(nextState.massKg).reduce((a, b) => a + b, 0);
+      const totalMassBefore = Object.values(initial.massKg).reduce((a: number, b: number) => a + b, 0);
+      const totalMassAfter = Object.values(nextState.massKg).reduce((a: number, b: number) => a + b, 0);
       assert.strictEqual(totalMassBefore, totalMassAfter);
 
       // Energy conservation check

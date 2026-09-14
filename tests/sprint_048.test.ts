@@ -62,7 +62,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
       const origin = latLngToH3Cell(0.0, 0.0, 2);
       const disk2 = getGridDisk(origin, 2);
       const disk1 = new Set(getGridDisk(origin, 1));
-      const twoRingCell = disk2.find((c) => !disk1.has(c));
+      const twoRingCell = disk2.find((c: string) => !disk1.has(c));
 
       assert.ok(twoRingCell, "Should identify a 2-ring cell");
       const length = calculateH3SharedBoundaryLength(origin, twoRingCell);
@@ -79,7 +79,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
       for (const res of resolutions) {
         const origin = latLngToH3Cell(45.0, 10.0, res);
         const disk1 = getGridDisk(origin, 1);
-        const neighbor = disk1.find((c) => c !== origin && areNeighbors(origin, c));
+        const neighbor = disk1.find((c: string) => c !== origin && areNeighbors(origin, c));
 
         assert.ok(neighbor, `Found valid neighbor at res ${res}`);
         const length = calculateH3SharedBoundaryLength(origin, neighbor);
@@ -95,7 +95,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
 
     it("should enforce exact mathematical symmetry L_ij === L_ji for all adjacent pairs", () => {
       const origin = latLngToH3Cell(52.52, 13.405, 3);
-      const neighbors = getGridDisk(origin, 1).filter((c) => c !== origin);
+      const neighbors = getGridDisk(origin, 1).filter((c: string) => c !== origin);
 
       for (const neighbor of neighbors) {
         const lAB = calculateH3SharedBoundaryLength(origin, neighbor);
@@ -121,7 +121,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
       assert.strictEqual(pentagons.length, 12, "H3 resolution 1 must contain exactly 12 pentagons");
 
       for (const pentagon of pentagons) {
-        const neighbors = getGridDisk(pentagon, 1).filter((c) => c !== pentagon);
+        const neighbors = getGridDisk(pentagon, 1).filter((c: string) => c !== pentagon);
         assert.strictEqual(
           neighbors.length,
           5,
@@ -153,7 +153,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
     it("H3BoundaryCalculator and H3AdjacencyGraph should calculate and cache boundaries correctly", () => {
       const graph = new H3AdjacencyGraph();
       const origin = latLngToH3Cell(35.6762, 139.6503, 2);
-      const neighbor = getGridDisk(origin, 1).find((c) => c !== origin)!;
+      const neighbor = getGridDisk(origin, 1).find((c: string) => c !== origin)!;
 
       graph.addAdjacency(origin, neighbor);
       const neighbors = graph.getNeighbors(origin);
@@ -169,7 +169,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
   describe("Thermodynamic Conservation & First Law Invariant", () => {
     it("should strictly conserve thermal energy (sum of deltas = 0) in closed lateral transport", () => {
       const origin = latLngToH3Cell(0.0, 0.0, 3);
-      const neighbors = getGridDisk(origin, 1).filter((c) => c !== origin);
+      const neighbors = getGridDisk(origin, 1).filter((c: string) => c !== origin);
 
       const cells = new Map<string, CellThermodynamicState>();
       const adjacencyList = new Map<string, string[]>();
@@ -243,7 +243,7 @@ describe("Sprint 048 - Geometric Interface Contact Calculator (RFC-048)", () => 
     it("SpatialMonad step applies conservative state transitions across multiple steps", () => {
       const monad = new SpatialMonad();
       const origin = latLngToH3Cell(10.0, 10.0, 3);
-      const neighbor = getGridDisk(origin, 1).find((c) => c !== origin)!;
+      const neighbor = getGridDisk(origin, 1).find((c: string) => c !== origin)!;
 
       monad.registerCell({
         h3Index: origin,

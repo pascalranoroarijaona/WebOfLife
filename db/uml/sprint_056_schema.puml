@@ -1,0 +1,213 @@
+@startuml sprint_056_schema
+!theme plain
+skinparam monochrome false
+skinparam shadowing true
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam roundcorner 8
+
+title Web of Life - Spatial Adjacency Boundary Validation & Thermodynamic State Architecture (Sprint 056)
+
+' ============================================================================
+' Spatial Coordinate Domain & Validation
+' ============================================================================
+package "Spatial Domain & Boundary Checking (src/spatial/)" {
+    interface ICoordinatePair {
+        +lat: number
+        +lon: number
+    }
+
+    interface IExtendedCoordinatePair {
+        +latitude: number
+        +longitude: number
+    }
+
+    class CoordinateValidationOptions <<interface>> {
+        +context?: string
+        +allowNormalizedPositiveLon?: boolean
+        +epsilon?: number
+    }
+
+    class CoordinateBoundaryError <<Error>> {
+        +latitude: number
+        +longitude: number
+        +violationContext?: string
+        +constructor(message: string, lat: number, lon: number, context?: string)
+    }
+
+    class H3CoordinateAssertionHelper <<utility>> {
+        +{static} assertValidCoordinatePair(lat: number, lon: number, options?: CoordinateValidationOptions | string): void
+        +{static} assertValidCoordinatePair(coords: ICoordinatePair | IExtendedCoordinatePair, options?: CoordinateValidationOptions | string): void
+        +{static} isValidCoordinatePair(lat: number, lon: number, options?: CoordinateValidationOptions): boolean
+    }
+
+    CoordinateBoundaryError --|> RangeError
+    H3CoordinateAssertionHelper ..> CoordinateBoundaryError : throws
+    H3CoordinateAssertionHelper ..> CoordinateValidationOptions : inspects
+    H3CoordinateAssertionHelper ..> ICoordinatePair : validates
+    H3CoordinateAssertionHelper ..> IExtendedCoordinatePair : validates
+}
+
+' ============================================================================
+' Spatial Services & State Tensors
+' ============================================================================
+package "Spatial Graph & Monads (src/spatial/ & src/monads/)" {
+    class H3AdjacencyService <<Service>> {
+        +getGreatCircleDistance(lat1: number, lon1: number, lat2: number, lon2: number): number
+        +latLonToBearing(fromLat: number, fromLon: number, toLat: number, toLon: number): number
+        +findKNearestNeighbors(centerLat: number, centerLon: number, k: number): string[]
+        +getAdjacencyMatrix(cellIds: string[]): number[][]
+    }
+
+    class H3StateTensor {
+        +cellId: string
+        +centroid: ICoordinatePair
+        +carbonStockKg: number
+        +nitrogenStockKg: number
+        +phosphorusStockKg: number
+        +waterStockKg: number
+        +internalEnergyJoules: number
+        +temperatureKelvin: number
+        +entropyJoulesPerKelvin: number
+        +computeEntropyProduction(neighborTensor: H3StateTensor, flux: number): number
+        +serializeHash(): Uint8Array
+    }
+
+    class SpatialMonad<T> <<Monad>> {
+        -cellId: string
+        -centroid: ICoordinatePair
+        -tensor: T
+        +constructor(cellId: string, centroid: ICoordinatePair, tensor: T)
+        +updateCentroid(lat: number, lon: number): SpatialMonad<T>
+        +bind<U>(transform: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+        +evaluateThermodynamics(): T
+    }
+
+    H3AdjacencyService ..> H3CoordinateAssertionHelper : enforces
+    SpatialMonad ..> H3CoordinateAssertionHelper : enforces on mutation
+    SpatialMonad *-- ICoordinatePair
+    SpatialMonad *-- H3StateTensor
+}
+
+' ============================================================================
+' Database Persistence & Ledger Schema
+' ============================================================================
+package "Relational & Ledger Schema (db/schema.sql)" {
+    class spatial_h3_cells <<Table>> {
+        +cell_id: VARCHAR(15) [PK]
+        +resolution: SMALLINT
+        +centroid_lat: wgs84_latitude
+        +centroid_lon: wgs84_longitude
+        +boundary_wkt: TEXT
+        +surface_area_m2: NUMERIC(18,4)
+        +is_active: BOOLEAN
+        +created_at: TIMESTAMPTZ
+        +updated_at: TIMESTAMPTZ
+    }
+
+    class spatial_adjacency_edges <<Table>> {
+        +edge_id: UUID [PK]
+        +source_cell_id: VARCHAR(15) [FK]
+        +target_cell_id: VARCHAR(15) [FK]
+        +direction_azimuth: NUMERIC(6,3)
+        +great_circle_distance_m: NUMERIC(14,4)
+        +conductance_coefficient: NUMERIC(12,6)
+        +is_bidirectional: BOOLEAN
+    }
+
+    class spatial_coordinate_audit <<Table>> {
+        +audit_id: BIGSERIAL [PK]
+        +invocation_context: VARCHAR(128)
+        +raw_latitude: NUMERIC
+        +raw_longitude: NUMERIC
+        +is_finite: BOOLEAN
+        +is_nan: BOOLEAN
+        +epsilon_applied: NUMERIC(10,9)
+        +clamped: BOOLEAN
+        +validation_status: VARCHAR(32)
+        +error_message: TEXT
+        +reported_at: TIMESTAMPTZ
+    }
+
+    class cell_thermodynamic_tensors <<Table>> {
+        +tensor_id: UUID [PK]
+        +cell_id: VARCHAR(15) [FK]
+        +epoch_timestamp: TIMESTAMPTZ
+        +mass_carbon_kg: conserved_mass_kg
+        +mass_nitrogen_kg: conserved_mass_kg
+        +mass_phosphorus_kg: conserved_mass_kg
+        +mass_water_kg: conserved_mass_kg
+        +thermal_energy_joules: thermodynamic_joules
+        +temperature_kelvin: NUMERIC(8,4)
+        +entropy_j_per_k: entropy_joules_per_kelvin
+        +state_tensor_hash: BYTEA
+    }
+
+    class trophic_spatial_fluxes <<Table>> {
+        +flux_id: UUID [PK]
+        +edge_id: UUID [FK]
+        +epoch_timestamp: TIMESTAMPTZ
+        +flux_carbon_kg_s: NUMERIC(20,8)
+        +flux_nitrogen_kg_s: NUMERIC(20,8)
+        +flux_phosphorus_kg_s: NUMERIC(20,8)
+        +flux_water_kg_s: NUMERIC(20,8)
+        +heat_flux_watts: NUMERIC(24,6)
+        +entropy_production_rate_w_k: NUMERIC(24,6)
+        +created_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_ledger_blocks <<Table>> {
+        +block_number: BIGSERIAL [PK]
+        +previous_block_hash: BYTEA
+        +block_hash: BYTEA [UQ]
+        +merkle_state_root: BYTEA
+        +merkle_flux_root: BYTEA
+        +total_conserved_mass_kg: NUMERIC(32,8)
+        +total_thermal_energy_joules: NUMERIC(32,8)
+        +net_entropy_delta_j_per_k: NUMERIC(28,8)
+        +coordinate_assertions_passed: INTEGER
+        +coordinate_assertions_failed: INTEGER
+        +validator_signature: BYTEA
+        +committed_at: TIMESTAMPTZ
+    }
+
+    class spatial_state_transitions <<Table>> {
+        +tx_id: UUID [PK]
+        +block_number: BIGINT [FK]
+        +cell_id: VARCHAR(15) [FK]
+        +origin_centroid_lat: wgs84_latitude
+        +origin_centroid_lon: wgs84_longitude
+        +transition_type: VARCHAR(64)
+        +mass_delta_kg: NUMERIC(24,8)
+        +energy_delta_joules: NUMERIC(24,8)
+        +entropy_generated_j_k: NUMERIC(24,8)
+        +tx_signature: BYTEA
+    }
+
+    spatial_h3_cells "1" -- "0..*" spatial_adjacency_edges : "source"
+    spatial_h3_cells "1" -- "0..*" spatial_adjacency_edges : "target"
+    spatial_h3_cells "1" -- "0..*" cell_thermodynamic_tensors : "records state"
+    spatial_adjacency_edges "1" -- "0..*" trophic_spatial_fluxes : "carries"
+    thermodynamic_ledger_blocks "1" -- "0..*" spatial_state_transitions : "contains"
+    spatial_h3_cells "1" -- "0..*" spatial_state_transitions : "mutates"
+}
+
+' ============================================================================
+' Sequence Flow: Coordinate Invariant Assertion & Flux Transition
+' ============================================================================
+note as SequenceNote
+<b>Invariant Gatekeeping Workflow</b>
+1. Client calls <i>updateCentroid(lat, lon)</i> or <i>getGreatCircleDistance(lat1, lon1, lat2, lon2)</i>.
+2. <b>assertValidCoordinatePair</b> tests IEEE 754 finiteness and spherical range:
+   - Latitude in [-90, +90]
+   - Longitude in [-180, +180] (or [0, 360] if allowed)
+3. If violated: throws <b>CoordinateBoundaryError</b>; written to <i>spatial_coordinate_audit</i>.
+4. If valid: Thermodynamic advection fluxes compute non-negative entropy delta:
+   $$\Delta S = J_{ij} \left(\frac{1}{T_j} - \frac{1}{T_i}\right) \ge 0$$
+5. Transaction hashed and committed to <i>thermodynamic_ledger_blocks</i>.
+end note
+
+H3AdjacencyService .. SequenceNote
+H3CoordinateAssertionHelper .. SequenceNote
+
+@enduml

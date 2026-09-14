@@ -266,19 +266,19 @@ describe('Sprint 049: Topological Pentagon Cell Validation', () => {
       },
     ];
 
-    const initialTotalWater = initialStates.reduce((acc, s) => acc + (s.waterKg ?? 0), 0);
-    const initialTotalCarbon = initialStates.reduce((acc, s) => acc + (s.carbonKg ?? 0), 0);
-    const initialTotalEnergy = initialStates.reduce((acc, s) => acc + (s.thermalEnergyJoules ?? 0), 0);
+    const initialTotalWater = initialStates.reduce((acc: number, s: CellStockState) => acc + (s.waterKg ?? 0), 0);
+    const initialTotalCarbon = initialStates.reduce((acc: number, s: CellStockState) => acc + (s.carbonKg ?? 0), 0);
+    const initialTotalEnergy = initialStates.reduce((acc: number, s: CellStockState) => acc + (s.thermalEnergyJoules ?? 0), 0);
 
     let monad = new SpatialAdvectionDiffusionMonad(initialStates);
 
     const neighborMap = new Map<bigint, bigint[]>([
-      [pentagonId, [n1, n2, n3, n4, n5]],
-      [n1, [pentagonId, n2, n5]],
-      [n2, [pentagonId, n1, n3]],
-      [n3, [pentagonId, n2, n4]],
-      [n4, [pentagonId, n3, n5]],
-      [n5, [pentagonId, n4, n1]],
+      [BigInt(pentagonId), [BigInt(n1), BigInt(n2), BigInt(n3), BigInt(n4), BigInt(n5)]],
+      [BigInt(n1), [BigInt(pentagonId), BigInt(n2), BigInt(n5)]],
+      [BigInt(n2), [BigInt(pentagonId), BigInt(n1), BigInt(n3)]],
+      [BigInt(n3), [BigInt(pentagonId), BigInt(n2), BigInt(n4)]],
+      [BigInt(n4), [BigInt(pentagonId), BigInt(n3), BigInt(n5)]],
+      [BigInt(n5), [BigInt(pentagonId), BigInt(n4), BigInt(n1)]],
     ]);
 
     const getValidNeighbors = (id: bigint): bigint[] => neighborMap.get(id) ?? [];
@@ -297,9 +297,9 @@ describe('Sprint 049: Topological Pentagon Cell Validation', () => {
     }
 
     const finalStates = monad.getAllStates();
-    const finalTotalWater = finalStates.reduce((acc, s) => acc + (s.waterKg ?? 0), 0);
-    const finalTotalCarbon = finalStates.reduce((acc, s) => acc + (s.carbonKg ?? 0), 0);
-    const finalTotalEnergy = finalStates.reduce((acc, s) => acc + (s.thermalEnergyJoules ?? 0), 0);
+    const finalTotalWater = finalStates.reduce((acc: number, s: CellStockState) => acc + (s.waterKg ?? 0), 0);
+    const finalTotalCarbon = finalStates.reduce((acc: number, s: CellStockState) => acc + (s.carbonKg ?? 0), 0);
+    const finalTotalEnergy = finalStates.reduce((acc: number, s: CellStockState) => acc + (s.thermalEnergyJoules ?? 0), 0);
 
     const waterDeviation = Math.abs(finalTotalWater - initialTotalWater);
     const carbonDeviation = Math.abs(finalTotalCarbon - initialTotalCarbon);

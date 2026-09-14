@@ -1,143 +1,169 @@
 -- ============================================================================
--- Web of Life: Planetary Thermodynamic Ledger & Spatial State Schema
--- Sprint 055: Angular Normalization Wrapper (normalizeAngleRadians) & Geodesic Advection
+-- Web of Life: Planetary Ecosystem & Thermodynamic Blockchain Ledger Schema
+-- Sprint 056: Coordinate Boundary Assertion & Geodesic Adjacency Integrity
 -- ============================================================================
 
--- Extensions for high-precision arithmetic, spatial geometries, and cryptographic security
+-- Enable PostGIS and cryptographic extensions if available
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Domain definitions for angular and spatial coordinates
--- PI constant: 3.14159265358979323846
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'normalized_radians') THEN
-        CREATE DOMAIN normalized_radians AS DOUBLE PRECISION
-            CHECK (VALUE >= -3.14159265358979323846 AND VALUE < 3.14159265358979323846);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'h3_index_varchar') THEN
-        CREATE DOMAIN h3_index_varchar AS VARCHAR(16)
-            CHECK (VALUE ~ '^[0-9a-fA-F]{15,16}$');
-    END IF;
-END $$;
+-- ----------------------------------------------------------------------------
+-- Domain Constraints: Geodesic Coordinates & Numerical Tolerances
+-- ----------------------------------------------------------------------------
+CREATE DOMAIN wgs84_latitude AS NUMERIC(10, 7)
+    CHECK (VALUE >= -90.0000000 AND VALUE <= 90.0000000);
+
+CREATE DOMAIN wgs84_longitude AS NUMERIC(11, 7)
+    CHECK (VALUE >= -180.0000000 AND VALUE <= 180.0000000);
+
+CREATE DOMAIN thermodynamic_joules AS NUMERIC(28, 8)
+    CHECK (VALUE >= 0.0);
+
+CREATE DOMAIN conserved_mass_kg AS NUMERIC(28, 8)
+    CHECK (VALUE >= 0.0);
+
+CREATE DOMAIN entropy_joules_per_kelvin AS NUMERIC(28, 8)
+    CHECK (VALUE >= 0.0);
 
 -- ----------------------------------------------------------------------------
--- 1. Thermodynamic Blockchain Ledger: Blocks & State Hashes
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_height BIGINT PRIMARY KEY,
-    block_hash VARCHAR(64) NOT NULL UNIQUE,
-    previous_hash VARCHAR(64) NOT NULL,
-    merkle_state_root VARCHAR(64) NOT NULL,
-    thermodynamic_entropy_flux DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    kinetic_energy_conserved BOOLEAN NOT NULL DEFAULT TRUE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_blockchain_entropy_flux_non_negative CHECK (thermodynamic_entropy_flux >= 0.0)
-);
-
-CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_hash ON blockchain_blocks(block_hash);
-
--- ----------------------------------------------------------------------------
--- 2. Hexagonal DGGS Cell Topology & Spatial Index
+-- H3 Hexagonal Spatial Cells (Topological Riemannian Manifold)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS spatial_h3_cells (
-    cell_index h3_index_varchar PRIMARY KEY,
+    cell_id VARCHAR(15) PRIMARY KEY,                    -- H3 Index as 15-char hex string
     resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lon DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
-    altitude_meters DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    centroid_lat wgs84_latitude NOT NULL,
+    centroid_lon wgs84_longitude NOT NULL,
+    boundary_wkt TEXT,                                  -- Well-Known Text geometry representation
+    surface_area_m2 NUMERIC(18, 4) NOT NULL CHECK (surface_area_m2 > 0),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_coords ON spatial_h3_cells(centroid_lat, centroid_lon);
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_coords 
+    ON spatial_h3_cells (centroid_lat, centroid_lon);
 
 -- ----------------------------------------------------------------------------
--- 3. Spherical Hexagonal Adjacency & Normalized Angular Bearings
--- Implements RFC 055: canonical half-open domain [-π, π)
+-- Spatial Adjacency Edges (Manifold Advection & Neighbor Graph)
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_adjacency_bearings (
-    origin_cell h3_index_varchar NOT NULL REFERENCES spatial_h3_cells(cell_index) ON DELETE RESTRICT,
-    target_cell h3_index_varchar NOT NULL REFERENCES spatial_h3_cells(cell_index) ON DELETE RESTRICT,
-    raw_bearing_radians DOUBLE PRECISION NOT NULL,
-    normalized_bearing_radians normalized_radians NOT NULL,
-    geodesic_distance_meters DOUBLE PRECISION NOT NULL CHECK (geodesic_distance_meters > 0.0),
-    is_canonical_neighbor BOOLEAN NOT NULL DEFAULT TRUE,
-    computed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (origin_cell, target_cell),
-    CONSTRAINT chk_no_self_adjacency CHECK (origin_cell <> target_cell)
+CREATE TABLE IF NOT EXISTS spatial_adjacency_edges (
+    edge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_cell_id VARCHAR(15) NOT NULL REFERENCES spatial_h3_cells(cell_id) ON DELETE RESTRICT,
+    target_cell_id VARCHAR(15) NOT NULL REFERENCES spatial_h3_cells(cell_id) ON DELETE RESTRICT,
+    direction_azimuth NUMERIC(6, 3) NOT NULL CHECK (direction_azimuth >= 0.0 AND direction_azimuth < 360.0),
+    great_circle_distance_m NUMERIC(14, 4) NOT NULL CHECK (great_circle_distance_m > 0.0),
+    conductance_coefficient NUMERIC(12, 6) NOT NULL DEFAULT 1.0 CHECK (conductance_coefficient >= 0.0),
+    is_bidirectional BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_non_self_adjacent CHECK (source_cell_id <> target_cell_id),
+    CONSTRAINT uq_spatial_adjacency_pair UNIQUE (source_cell_id, target_cell_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_adjacency_origin ON spatial_adjacency_bearings(origin_cell);
-CREATE INDEX IF NOT EXISTS idx_spatial_adjacency_target ON spatial_adjacency_bearings(target_cell);
-CREATE INDEX IF NOT EXISTS idx_spatial_adjacency_norm_bearing ON spatial_adjacency_bearings(normalized_bearing_radians);
+CREATE INDEX IF NOT EXISTS idx_spatial_adjacency_source ON spatial_adjacency_edges (source_cell_id);
+CREATE INDEX IF NOT EXISTS idx_spatial_adjacency_target ON spatial_adjacency_edges (target_cell_id);
 
 -- ----------------------------------------------------------------------------
--- 4. Spatial Monad Vector Field & Thermodynamic Fluxes
--- Advective transport decomposing momentum & kinetic energy along normalized bearings
+-- Spatial Coordinate Boundary Audit Log
+-- Tracks IEEE 754 anomalies, boundary overflows, and epsilon-clamped inputs
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hexagonal_advection_fluxes (
+CREATE TABLE IF NOT EXISTS spatial_coordinate_audit (
+    audit_id BIGSERIAL PRIMARY KEY,
+    invocation_context VARCHAR(128) NOT NULL,           -- e.g., 'H3AdjacencyService.getGreatCircleDistance'
+    raw_latitude NUMERIC,
+    raw_longitude NUMERIC,
+    is_finite BOOLEAN NOT NULL,
+    is_nan BOOLEAN NOT NULL,
+    epsilon_applied NUMERIC(10, 9) DEFAULT 0.000000001,
+    clamped BOOLEAN NOT NULL DEFAULT FALSE,
+    validation_status VARCHAR(32) NOT NULL 
+        CHECK (validation_status IN ('VALID', 'CLAMPED', 'REJECTED_OUT_OF_BOUNDS', 'REJECTED_NON_FINITE')),
+    error_message TEXT,
+    reported_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_spatial_coord_audit_status ON spatial_coordinate_audit (validation_status, reported_at);
+
+-- ----------------------------------------------------------------------------
+-- Cell Thermodynamic State Tensors (Conserved Scalar Stocks)
+-- First Law: Mass & Energy State per Spatial Cell
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cell_thermodynamic_tensors (
+    tensor_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cell_id VARCHAR(15) NOT NULL REFERENCES spatial_h3_cells(cell_id) ON DELETE RESTRICT,
+    epoch_timestamp TIMESTAMPTZ NOT NULL,
+    mass_carbon_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    mass_nitrogen_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    mass_phosphorus_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    mass_water_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    thermal_energy_joules thermodynamic_joules NOT NULL DEFAULT 0.0,
+    temperature_kelvin NUMERIC(8, 4) NOT NULL CHECK (temperature_kelvin > 0.0),
+    entropy_j_per_k entropy_joules_per_kelvin NOT NULL DEFAULT 0.0,
+    state_tensor_hash BYTEA NOT NULL,                   -- SHA-256 state serialization hash
+    CONSTRAINT uq_cell_epoch UNIQUE (cell_id, epoch_timestamp)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cell_thermo_epoch ON cell_thermodynamic_tensors (epoch_timestamp);
+
+-- ----------------------------------------------------------------------------
+-- Trophic & Physical Spatial Advection Fluxes (Inter-Cell Transfer Ledger)
+-- Second Law: Non-negative entropy production on gradient transfers
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS trophic_spatial_fluxes (
     flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    origin_cell h3_index_varchar NOT NULL,
-    target_cell h3_index_varchar NOT NULL,
-    velocity_magnitude DOUBLE PRECISION NOT NULL CHECK (velocity_magnitude >= 0.0),
-    advection_bearing_radians normalized_radians NOT NULL,
-    velocity_u DOUBLE PRECISION NOT NULL, -- Longitudinal component (u = |v| * cos(θ))
-    velocity_v DOUBLE PRECISION NOT NULL, -- Latitudinal component (v = |v| * sin(θ))
-    mass_flux_kg_per_sec DOUBLE PRECISION NOT NULL CHECK (mass_flux_kg_per_sec >= 0.0),
-    kinetic_energy_flux_watts DOUBLE PRECISION NOT NULL CHECK (kinetic_energy_flux_watts >= 0.0),
-    dissipation_entropy_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (dissipation_entropy_delta >= 0.0),
-    FOREIGN KEY (origin_cell, target_cell) REFERENCES spatial_adjacency_bearings(origin_cell, target_cell),
-    CONSTRAINT chk_cartesian_decomposition CHECK (
-        abs((velocity_u * velocity_u + velocity_v * velocity_v) - (velocity_magnitude * velocity_magnitude)) < 1e-9
-    )
+    edge_id UUID NOT NULL REFERENCES spatial_adjacency_edges(edge_id) ON DELETE RESTRICT,
+    epoch_timestamp TIMESTAMPTZ NOT NULL,
+    flux_carbon_kg_s NUMERIC(20, 8) NOT NULL DEFAULT 0.0,
+    flux_nitrogen_kg_s NUMERIC(20, 8) NOT NULL DEFAULT 0.0,
+    flux_phosphorus_kg_s NUMERIC(20, 8) NOT NULL DEFAULT 0.0,
+    flux_water_kg_s NUMERIC(20, 8) NOT NULL DEFAULT 0.0,
+    heat_flux_watts NUMERIC(24, 6) NOT NULL DEFAULT 0.0,
+    entropy_production_rate_w_k NUMERIC(24, 6) NOT NULL CHECK (entropy_production_rate_w_k >= 0.0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_hex_fluxes_block ON hexagonal_advection_fluxes(block_height);
-CREATE INDEX IF NOT EXISTS idx_hex_fluxes_cells ON hexagonal_advection_fluxes(origin_cell, target_cell);
+CREATE INDEX IF NOT EXISTS idx_spatial_fluxes_epoch ON trophic_spatial_fluxes (epoch_timestamp);
+CREATE INDEX IF NOT EXISTS idx_spatial_fluxes_edge ON trophic_spatial_fluxes (edge_id);
 
 -- ----------------------------------------------------------------------------
--- 5. Thermodynamic Stock Ledgers (First & Second Law Verification)
+-- Thermodynamic Blockchain Blocks & Cryptographic Seals
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
+CREATE TABLE IF NOT EXISTS thermodynamic_ledger_blocks (
+    block_number BIGSERIAL PRIMARY KEY,
+    previous_block_hash BYTEA NOT NULL,
+    block_hash BYTEA NOT NULL UNIQUE,
+    merkle_state_root BYTEA NOT NULL,                   -- Merkle root of all cell tensors in epoch
+    merkle_flux_root BYTEA NOT NULL,                    -- Merkle root of advection fluxes
+    total_conserved_mass_kg NUMERIC(32, 8) NOT NULL,
+    total_thermal_energy_joules NUMERIC(32, 8) NOT NULL,
+    net_entropy_delta_j_per_k NUMERIC(28, 8) NOT NULL CHECK (net_entropy_delta_j_per_k >= 0.0),
+    solar_insolation_inflow_joules NUMERIC(32, 8) NOT NULL,
+    blackbody_radiation_outflow_joules NUMERIC(32, 8) NOT NULL,
+    coordinate_assertions_passed INTEGER NOT NULL CHECK (coordinate_assertions_passed >= 0),
+    coordinate_assertions_failed INTEGER NOT NULL CHECK (coordinate_assertions_failed >= 0),
+    epoch_start TIMESTAMPTZ NOT NULL,
+    epoch_end TIMESTAMPTZ NOT NULL,
+    validator_signature BYTEA NOT NULL,
+    committed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_thermo_block_hash ON thermodynamic_ledger_blocks (block_hash);
+
+-- ----------------------------------------------------------------------------
+-- Blockchain Transaction Ledger: Monadic State Transitions
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spatial_state_transitions (
     tx_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    cell_index h3_index_varchar NOT NULL REFERENCES spatial_h3_cells(cell_index),
-    internal_energy_joules DOUBLE PRECISION NOT NULL,
-    enthalpy_joules DOUBLE PRECISION NOT NULL,
-    entropy_joules_per_kelvin DOUBLE PRECISION NOT NULL CHECK (entropy_joules_per_kelvin >= 0.0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
-    pressure_pascals DOUBLE PRECISION NOT NULL CHECK (pressure_pascals >= 0.0),
-    mass_kg DOUBLE PRECISION NOT NULL CHECK (mass_kg >= 0.0),
-    tx_signature VARCHAR(128) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    block_number BIGINT NOT NULL REFERENCES thermodynamic_ledger_blocks(block_number) ON DELETE RESTRICT,
+    cell_id VARCHAR(15) NOT NULL REFERENCES spatial_h3_cells(cell_id) ON DELETE RESTRICT,
+    origin_centroid_lat wgs84_latitude NOT NULL,
+    origin_centroid_lon wgs84_longitude NOT NULL,
+    transition_type VARCHAR(64) NOT NULL,               -- e.g., 'SpatialMonad.updateCentroid', 'AdvectiveTransfer'
+    mass_delta_kg NUMERIC(24, 8) NOT NULL,
+    energy_delta_joules NUMERIC(24, 8) NOT NULL,
+    entropy_generated_j_k NUMERIC(24, 8) NOT NULL CHECK (entropy_generated_j_k >= 0.0),
+    tx_signature BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_tx_cell_block ON thermodynamic_stock_transactions(cell_index, block_height);
-
--- ----------------------------------------------------------------------------
--- 6. Angular Normalization Verification Function (Mirroring TypeScript RFC)
--- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION normalize_angle_radians(radians DOUBLE PRECISION)
-RETURNS DOUBLE PRECISION AS $$
-DECLARE
-    two_pi CONSTANT DOUBLE PRECISION := 6.28318530717958647692;
-    pi_val CONSTANT DOUBLE PRECISION := 3.14159265358979323846;
-    ang DOUBLE PRECISION;
-BEGIN
-    IF radians IS NULL OR radians = 'NaN'::DOUBLE PRECISION OR radians = 'Infinity'::DOUBLE PRECISION OR radians = '-Infinity'::DOUBLE PRECISION THEN
-        RETURN radians;
-    END IF;
-
-    -- Shift domain to [0, 2pi), apply modulo, and shift back to [-pi, pi)
-    ang := (radians + pi_val) - (two_pi * FLOOR((radians + pi_val) / two_pi));
-    
-    -- Remainder boundary adjustment
-    ang := ang - pi_val;
-    IF ang >= pi_val THEN
-        ang := -pi_val;
-    END IF;
-
-    RETURN ang;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+CREATE INDEX IF NOT EXISTS idx_spatial_state_tx_block ON spatial_state_transitions (block_number);
+CREATE INDEX IF NOT EXISTS idx_spatial_state_tx_cell ON spatial_state_transitions (cell_id);

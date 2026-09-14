@@ -49,7 +49,7 @@ describe('Sprint 002: Uber H3 Spatial Indexing and Adjacency Mappings', () => {
 
         const neighborMap = new Map<string, CellStockState>();
         const neighbors = centerCell.getEdgeNeighbors();
-        neighbors.forEach((nbrId, idx) => {
+        neighbors.forEach((nbrId: string, idx: number) => {
             neighborMap.set(nbrId, {
                 index: nbrId,
                 carbonMass: 800 + idx * 10,

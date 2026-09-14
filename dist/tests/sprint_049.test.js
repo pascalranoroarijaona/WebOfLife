@@ -199,12 +199,12 @@ describe('Sprint 049: Topological Pentagon Cell Validation', () => {
         const initialTotalEnergy = initialStates.reduce((acc, s) => acc + (s.thermalEnergyJoules ?? 0), 0);
         let monad = new SpatialAdvectionDiffusionMonad(initialStates);
         const neighborMap = new Map([
-            [pentagonId, [n1, n2, n3, n4, n5]],
-            [n1, [pentagonId, n2, n5]],
-            [n2, [pentagonId, n1, n3]],
-            [n3, [pentagonId, n2, n4]],
-            [n4, [pentagonId, n3, n5]],
-            [n5, [pentagonId, n4, n1]],
+            [BigInt(pentagonId), [BigInt(n1), BigInt(n2), BigInt(n3), BigInt(n4), BigInt(n5)]],
+            [BigInt(n1), [BigInt(pentagonId), BigInt(n2), BigInt(n5)]],
+            [BigInt(n2), [BigInt(pentagonId), BigInt(n1), BigInt(n3)]],
+            [BigInt(n3), [BigInt(pentagonId), BigInt(n2), BigInt(n4)]],
+            [BigInt(n4), [BigInt(pentagonId), BigInt(n3), BigInt(n5)]],
+            [BigInt(n5), [BigInt(pentagonId), BigInt(n4), BigInt(n1)]],
         ]);
         const getValidNeighbors = (id) => neighborMap.get(id) ?? [];
         const diffusionCoeffs = {
