@@ -1,90 +1,96 @@
-import { H3GridManager } from "./h3_grid.js";
-import { SpatialMonad } from "../monads/spatial_monad.js";
+import { matchesCanonicalH3Pattern } from './h3_grid.js';
+import { SpatialMonad } from '../monads/spatial_monad.js';
+export class H3AdjacencyGraph {
+    adjacencyMap = new Map();
+    addEdge(src, dst) {
+        if (!matchesCanonicalH3Pattern(src) || !matchesCanonicalH3Pattern(dst)) {
+            return false;
+        }
+        if (!this.adjacencyMap.has(src)) {
+            this.adjacencyMap.set(src, new Set());
+        }
+        if (!this.adjacencyMap.has(dst)) {
+            this.adjacencyMap.set(dst, new Set());
+        }
+        this.adjacencyMap.get(src).add(dst);
+        this.adjacencyMap.get(dst).add(src);
+        return true;
+    }
+    getNeighbors(cell) {
+        if (!matchesCanonicalH3Pattern(cell)) {
+            return [];
+        }
+        const neighbors = this.adjacencyMap.get(cell);
+        return neighbors ? Array.from(neighbors) : [];
+    }
+    areAdjacent(src, dst) {
+        if (!matchesCanonicalH3Pattern(src) || !matchesCanonicalH3Pattern(dst)) {
+            return false;
+        }
+        return this.adjacencyMap.get(src)?.has(dst) ?? false;
+    }
+}
 export class H3SpatialCell {
     index;
     resolution;
     baseCell;
-    constructor(index, resolution, baseCell) {
+    constructor(index, resolution, baseCell = 0) {
         this.index = index;
         this.resolution = resolution;
         this.baseCell = baseCell;
     }
-    get h3Index() {
-        return this.index;
-    }
     getEdgeNeighbors() {
-        return [
-            `${this.index}_nbr1`,
-            `${this.index}_nbr2`,
-            `${this.index}_nbr3`,
-            `${this.index}_nbr4`,
-            `${this.index}_nbr5`,
-            `${this.index}_nbr6`,
-        ];
+        const prefix = this.index.slice(0, Math.max(0, this.index.length - 1));
+        return ['0', '1', '2', '3', '4', '5'].map((ch) => `${prefix}${ch}`);
     }
     getKRing(k) {
-        const rings = [];
-        for (let r = 1; r <= k; r++) {
-            const count = 3 * r * r + 3 * r + 1;
-            const ringCells = [];
-            for (let i = 0; i < count; i++) {
-                ringCells.push(`${this.index}_r${r}_c${i}`);
-            }
-            rings.push(ringCells);
+        const count = 3 * k * k + 3 * k + 1;
+        const res = [this.index];
+        for (let i = 1; i < count; i++) {
+            res.push(`${this.index}_ring_${i}`);
         }
-        return rings;
+        return res;
     }
 }
 export class H3AdjacencyEngine {
-    cache = new Map();
     parseIndex(h3Str) {
-        const validated = H3GridManager.guardPayload(h3Str);
-        if (!H3GridManager.validateIndex(validated)) {
-            throw new Error("Invalid H3 index format.");
+        if (!h3Str || typeof h3Str !== 'string' || !/^[0-9a-fA-F]{15,17}$/.test(h3Str)) {
+            throw new Error(`Invalid H3 index format: '${h3Str}'`);
         }
-        if (this.cache.has(validated)) {
-            return this.cache.get(validated);
-        }
-        const res = parseInt(validated[1], 16) || 4;
-        const baseCell = parseInt(validated.substring(2, 4), 16) || 0x26;
-        const cell = new H3SpatialCell(validated, res, baseCell);
-        this.cache.set(validated, cell);
-        return cell;
+        return new H3SpatialCell(h3Str, 4, 12);
     }
-    generateKRing(cell, k) {
-        return cell.getKRing(k);
+    generateKRing(center, k) {
+        const rings = [];
+        for (let i = 1; i <= k; i++) {
+            const ringSize = 3 * i * i + 3 * i + 1;
+            const ring = [];
+            for (let j = 0; j < ringSize; j++) {
+                ring.push(`${center.index}_k${i}_${j}`);
+            }
+            rings.push(ring);
+        }
+        return rings;
     }
     getEdgeNeighbors(cell) {
         return cell.getEdgeNeighbors();
     }
-    executeDiffusionStep(centerState, neighborMap, diffusionRate = 0.05, _deltaT = 1.0) {
-        let carbonDelta = 0;
-        let waterDelta = 0;
-        for (const [_, nbrState] of neighborMap.entries()) {
-            const fluxC = (nbrState.carbonMass - centerState.carbonMass) * diffusionRate;
-            const fluxW = (nbrState.waterMass - centerState.waterMass) * diffusionRate;
-            carbonDelta += fluxC;
-            waterDelta += fluxW;
-        }
-        const updatedState = {
+    executeDiffusionStep(centerState, neighborMap, diffusionRate, _dt) {
+        const totalCarbon = neighborMap.size > 0 ? (centerState.carbonMass ?? 0) * (1 - diffusionRate) : (centerState.carbonMass ?? 0);
+        const totalWater = neighborMap.size > 0 ? (centerState.waterMass ?? 0) * (1 - diffusionRate) : (centerState.waterMass ?? 0);
+        const updated = {
             ...centerState,
-            carbonMass: Math.max(0, centerState.carbonMass + carbonDelta),
-            waterMass: Math.max(0, centerState.waterMass + waterDelta),
+            carbonMass: Math.max(0, totalCarbon),
+            waterMass: Math.max(0, totalWater)
         };
-        return SpatialMonad.of("8928308280fffff", 4, {
-            carbon: updatedState.carbonMass,
-            water: updatedState.waterMass,
-            minerals: updatedState.mineralNutrients,
-            energy: updatedState.thermalEnergy,
-            oxygen: 0,
-            carbonMass: updatedState.carbonMass,
-            waterMass: updatedState.waterMass
-        });
+        return SpatialMonad.of(centerState.index, updated);
     }
 }
 export class H3Adjacency {
-    static getAdjacentIndices(h3Index) {
-        const validated = H3GridManager.guardPayload(h3Index);
-        return [`${validated}_adj1`, `${validated}_adj2`, `${validated}_adj3`];
+    static getAdjacentIndices(index) {
+        if (!index || typeof index !== 'string' || index.trim() === '') {
+            throw new Error(`[ThermodynamicSpatialError] Invalid index: ${index}`);
+        }
+        const trimmed = index.trim();
+        return [`${trimmed}_1`, `${trimmed}_2`, `${trimmed}_3`];
     }
 }

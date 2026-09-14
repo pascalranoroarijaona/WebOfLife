@@ -1,0 +1,212 @@
+@startuml sprint_038_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam handwritten false
+skinparam shadowing false
+
+title Web of Life - Architecture & Class Hierarchy\nSprint 038: Canonical H3 Pattern Validation & Monadic Spatial Stocks
+
+package "Spatial Subsystem (src/spatial)" {
+    class H3PatternEngine <<utility>> {
+        + {static} CANONICAL_H3_REGEX: RegExp = /^[0-9a-f]{15}$/
+        + {static} matchesCanonicalH3Pattern(token: string): boolean
+        + {static} isValidH3Index(index: string): boolean
+    }
+
+    class H3Index <<(B,#FF7700) Branded Type>> {
+        + value: string
+        .. Invariant ..
+        matchesCanonicalH3Pattern(value) == true
+    }
+
+    enum H3Resolution {
+        RES_0 = 0
+        ...
+        RES_8 = 8
+        ...
+        RES_15 = 15
+    }
+
+    class H3Grid {
+        - resolution: H3Resolution
+        - activeCells: Map<H3Index, SpatialCellState>
+        + registerCell(token: string): H3Index
+        + getNeighbors(cell: H3Index): Set<H3Index>
+        + validateOrThrow(token: string): H3Index
+    }
+}
+
+package "Thermodynamic Monad Layer (src/monads)" {
+    interface IMonad<T> {
+        + bind<U>(fn: (val: T) => IMonad<U>): IMonad<U>
+        + map<U>(fn: (val: T) => U): IMonad<U>
+    }
+
+    class SpatialMonad<T> {
+        - cellIndex: H3Index
+        - state: T
+        + {static} of(token: string, state: T): SpatialMonad<T>
+        + bind<U>(fn: (val: T, cell: H3Index) => SpatialMonad<U>): SpatialMonad<U>
+        + map<U>(fn: (val: T) => U): SpatialMonad<U>
+        + extract(): T
+        + getCellIndex(): H3Index
+    }
+
+    class ThermodynamicStock {
+        + carbon_kg: number
+        + nitrogen_kg: number
+        + phosphorus_kg: number
+        + water_kg: number
+        + enthalpy_kj: number
+        + entropy_j_k: number
+        + totalMass(): number
+        + assertConservation(previous: ThermodynamicStock): boolean
+    }
+
+    class TrophicWebMonad {
+        - podId: string
+        - gridStocks: Map<H3Index, ThermodynamicStock>
+        + step(dt: number): TrophicWebMonad
+        + diffuseStocks(source: H3Index, target: H3Index, ratio: number): TrophicWebMonad
+        + computeTotalMass(): number
+        + computeTotalEntropy(): number
+    }
+}
+
+package "Planetary Pod & Ledger Core (src/ledger)" {
+    class EarthPod {
+        + podId: string
+        + currentEpoch: number
+        + spatialGrid: H3Grid
+        + trophicState: TrophicWebMonad
+        + executeCycle(): ThermodynamicBlock
+    }
+
+    class ThermodynamicBlock {
+        + blockHeight: number
+        + blockHash: string
+        + previousBlockHash: string
+        + stateMerkleRoot: string
+        + transactionsMerkleRoot: string
+        + planetaryMassChecksum: number
+        + netEntropyProduction: number
+        + validatorSignature: string
+    }
+
+    class SpatialFlowTransaction {
+        + txId: string
+        + blockHeight: number
+        + sourceCell: H3Index
+        + targetCell: H3Index
+        + deltaMass: ThermodynamicStock
+        + enthalpyDeltaKj: number
+        + entropyGeneratedJK: number
+        + signature: string
+    }
+}
+
+package "Database Schema & Invariants (db/schema.sql)" {
+    entity spatial_cells <<TABLE>> {
+        * h3_index : canonical_h3_index [PK]
+        --
+        * resolution : h3_resolution_level
+        * base_cell_num : SMALLINT
+        * centroid_lat : DOUBLE PRECISION
+        * centroid_lon : DOUBLE PRECISION
+        centroid_geom : GEOMETRY(Point, 4326)
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity spatial_cell_stocks <<TABLE>> {
+        * stock_id : UUID [PK]
+        --
+        * h3_index : canonical_h3_index [FK]
+        * epoch_tick : BIGINT
+        * carbon_kg : conserved_mass_kg
+        * nitrogen_kg : conserved_mass_kg
+        * phosphorus_kg : conserved_mass_kg
+        * water_kg : conserved_mass_kg
+        total_mass_kg : conserved_mass_kg [GENERATED]
+        * enthalpy_kj : NUMERIC(36, 12)
+        * entropy_j_k : thermodynamic_entropy
+        * insolation_w_m2 : NUMERIC(12, 4)
+        * state_merkle_hash : CHAR(64)
+        * updated_at : TIMESTAMPTZ
+    }
+
+    entity thermodynamic_blocks <<TABLE>> {
+        * block_height : BIGINT [PK]
+        --
+        * block_hash : CHAR(64)
+        * previous_block_hash : CHAR(64)
+        * state_merkle_root : CHAR(64)
+        * transactions_merkle_root : CHAR(64)
+        * total_planetary_carbon_kg : conserved_mass_kg
+        * total_planetary_nitrogen_kg : conserved_mass_kg
+        * total_planetary_phosphorus_kg : conserved_mass_kg
+        * total_planetary_water_kg : conserved_mass_kg
+        total_planetary_mass_kg : conserved_mass_kg [GENERATED]
+        * total_planetary_enthalpy_kj : NUMERIC(36, 12)
+        * net_entropy_production_j_k : thermodynamic_entropy
+        * validator_pod_signature : TEXT
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity spatial_flow_transactions <<TABLE>> {
+        * tx_id : UUID [PK]
+        --
+        * block_height : BIGINT [FK]
+        * source_h3 : canonical_h3_index [FK]
+        * target_h3 : canonical_h3_index [FK]
+        * carbon_delta_kg : NUMERIC(36, 12)
+        * nitrogen_delta_kg : NUMERIC(36, 12)
+        * phosphorus_delta_kg : NUMERIC(36, 12)
+        * water_delta_kg : NUMERIC(36, 12)
+        * enthalpy_transferred_kj : NUMERIC(36, 12)
+        * entropy_generated_j_k : thermodynamic_entropy
+        * flow_vector : JSONB
+        * tx_signature : TEXT
+        * created_at : TIMESTAMPTZ
+    }
+}
+
+' =================== Relationships ===================
+IMonad <|.. SpatialMonad
+SpatialMonad ..> H3PatternEngine : enforces syntactic match
+SpatialMonad *-- H3Index : bounds to
+SpatialMonad *-- ThermodynamicStock : wraps
+
+H3Grid o-- H3Index : indexes
+H3Grid ..> H3PatternEngine : uses matchesCanonicalH3Pattern
+H3Grid *-- H3Resolution
+
+EarthPod *-- H3Grid
+EarthPod *-- TrophicWebMonad
+TrophicWebMonad o-- SpatialMonad : aggregates state
+TrophicWebMonad ..> SpatialFlowTransaction : produces flows
+
+EarthPod ..> ThermodynamicBlock : mints per cycle
+ThermodynamicBlock "1" *-- "0..*" SpatialFlowTransaction : confirms
+
+spatial_cells "1" <-- "0..*" spatial_cell_stocks : records stocks
+spatial_cells "1" <-- "0..*" spatial_flow_transactions : source_cell
+spatial_cells "1" <-- "0..*" spatial_flow_transactions : target_cell
+thermodynamic_blocks "1" <-- "0..*" spatial_flow_transactions : aggregates
+
+note bottom of H3PatternEngine
+  Syntactic Pattern Gate:
+  token ~ ^[0-9a-f]{15}$
+  Guarantees O(1) ReDoS resilience
+  and bi-unique spatial mapping.
+end note
+
+note right of SpatialFlowTransaction
+  Thermodynamic Invariants:
+  1. Sum(M_target) + Sum(M_source) = const
+  2. Entropy delta S_irr >= 0
+end note
+
+@enduml

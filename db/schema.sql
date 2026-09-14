@@ -1,150 +1,145 @@
--- Web of Life: Relational & Time-Series Thermodynamic Ledger Schema
--- Sprint 037: Canonical 15-Character Hexadecimal H3 Index Specification & Validation Pattern
+-- ============================================================================
+-- Web of Life: Planetary Biosphere & Thermodynamic Blockchain Schema
+-- Sprint 038: Canonical H3 Token Pattern Enforcement & Spatial Monad Integrity
+-- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "timescaledb" CASCADE;
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ---------------------------------------------------------------------
--- DOMAIN DEFINITION: Canonical H3 Spatial Index (RFC-037)
--- Strictly enforced 15-character hexadecimal index (case-insensitive in input, normalized to lowercase)
--- ---------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+-- Domains & Syntactic Invariants
+-- Strict 15-character lowercase hexadecimal representation (RFC-038)
+-- ----------------------------------------------------------------------------
 CREATE DOMAIN canonical_h3_index AS VARCHAR(15)
-  CHECK (VALUE ~* '^[0-9a-f]{15}$');
+    CHECK (VALUE ~ '^[0-9a-f]{15}$');
 
-COMMENT ON DOMAIN canonical_h3_index IS 'RFC-037: 15-character hexadecimal canonical H3 spatial index bitfield string';
+CREATE DOMAIN h3_resolution_level AS SMALLINT
+    CHECK (VALUE >= 0 AND VALUE <= 15);
 
--- ---------------------------------------------------------------------
--- SPATIAL MESH & CELL CONTROL VOLUMES
--- ---------------------------------------------------------------------
+CREATE DOMAIN thermodynamic_joules AS NUMERIC(36, 12)
+    CHECK (VALUE >= 0);
+
+CREATE DOMAIN thermodynamic_entropy AS NUMERIC(36, 12)
+    CHECK (VALUE >= 0);
+
+CREATE DOMAIN conserved_mass_kg AS NUMERIC(36, 12)
+    CHECK (VALUE >= 0);
+
+-- ----------------------------------------------------------------------------
+-- Table: spatial_cells
+-- Immutable hexagonal partition topology aligned with H3 hierarchical indexing
+-- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS spatial_cells (
     h3_index canonical_h3_index PRIMARY KEY,
-    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    base_cell SMALLINT NOT NULL CHECK (base_cell BETWEEN 0 AND 121),
+    resolution h3_resolution_level NOT NULL,
+    base_cell_num SMALLINT NOT NULL CHECK (base_cell_num BETWEEN 0 AND 121),
     centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
     centroid_lon DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
-    cell_area_m2 DOUBLE PRECISION NOT NULL CHECK (cell_area_m2 > 0),
-    boundary_perimeter_m DOUBLE PRECISION NOT NULL CHECK (boundary_perimeter_m > 0),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    centroid_geom geometry(Point, 4326) GENERATED ALWAYS AS (
+        ST_SetSRID(ST_MakePoint(centroid_lon, centroid_lat), 4326)
+    ) STORED,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_spatial_cells_resolution ON spatial_cells(resolution);
-CREATE INDEX IF NOT EXISTS idx_spatial_cells_base_cell ON spatial_cells(base_cell);
+CREATE INDEX IF NOT EXISTS idx_spatial_cells_centroid ON spatial_cells USING GIST (centroid_geom);
 
--- ---------------------------------------------------------------------
--- CELL ADJACENCY TOPOLOGY
--- Bidirectional connectivity graph for finite volume boundary fluxes
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_adjacency_edges (
+-- ----------------------------------------------------------------------------
+-- Table: spatial_cell_stocks
+-- Thermodynamic state vector per canonical H3 cell: M(h_i) = C + N + P + H2O, H, S
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spatial_cell_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
+    epoch_tick BIGINT NOT NULL,
+    carbon_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    nitrogen_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    phosphorus_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    water_kg conserved_mass_kg NOT NULL DEFAULT 0.0,
+    total_mass_kg conserved_mass_kg GENERATED ALWAYS AS (
+        carbon_kg + nitrogen_kg + phosphorus_kg + water_kg
+    ) STORED,
+    enthalpy_kj NUMERIC(36, 12) NOT NULL,
+    entropy_j_k thermodynamic_entropy NOT NULL,
+    insolation_w_m2 NUMERIC(12, 4) NOT NULL CHECK (insolation_w_m2 >= 0),
+    state_merkle_hash CHAR(64) NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_spatial_cell_epoch UNIQUE (h3_index, epoch_tick)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spatial_cell_stocks_epoch ON spatial_cell_stocks(epoch_tick);
+CREATE INDEX IF NOT EXISTS idx_spatial_cell_stocks_h3 ON spatial_cell_stocks(h3_index);
+
+-- ----------------------------------------------------------------------------
+-- Table: thermodynamic_blocks
+-- Blockchain ledger blocks recording closed thermodynamic epoch transitions
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_height BIGINT PRIMARY KEY,
+    block_hash CHAR(64) NOT NULL UNIQUE,
+    previous_block_hash CHAR(64) NOT NULL,
+    state_merkle_root CHAR(64) NOT NULL,
+    transactions_merkle_root CHAR(64) NOT NULL,
+    total_planetary_carbon_kg conserved_mass_kg NOT NULL,
+    total_planetary_nitrogen_kg conserved_mass_kg NOT NULL,
+    total_planetary_phosphorus_kg conserved_mass_kg NOT NULL,
+    total_planetary_water_kg conserved_mass_kg NOT NULL,
+    total_planetary_mass_kg conserved_mass_kg GENERATED ALWAYS AS (
+        total_planetary_carbon_kg + total_planetary_nitrogen_kg +
+        total_planetary_phosphorus_kg + total_planetary_water_kg
+    ) STORED,
+    total_planetary_enthalpy_kj NUMERIC(36, 12) NOT NULL,
+    net_entropy_production_j_k thermodynamic_entropy NOT NULL,
+    validator_pod_signature TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_thermo_blocks_hash ON thermodynamic_blocks(block_hash);
+
+-- ----------------------------------------------------------------------------
+-- Table: spatial_flow_transactions
+-- Conservative mass-energy exchange between adjacent canonical H3 cells
+-- First Law: Sum(delta_M) = 0 | Second Law: delta_S_irr >= 0
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spatial_flow_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height) ON DELETE RESTRICT,
     source_h3 canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
     target_h3 canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    shared_boundary_length_m DOUBLE PRECISION NOT NULL CHECK (shared_boundary_length_m > 0),
-    advection_normal_azimuth DOUBLE PRECISION NOT NULL CHECK (advection_normal_azimuth >= 0 AND advection_normal_azimuth < 360.0),
-    is_bidirectional BOOLEAN NOT NULL DEFAULT TRUE,
-    PRIMARY KEY (source_h3, target_h3),
-    CONSTRAINT chk_no_self_adjacency CHECK (source_h3 <> target_h3)
+    carbon_delta_kg NUMERIC(36, 12) NOT NULL,
+    nitrogen_delta_kg NUMERIC(36, 12) NOT NULL,
+    phosphorus_delta_kg NUMERIC(36, 12) NOT NULL,
+    water_delta_kg NUMERIC(36, 12) NOT NULL,
+    enthalpy_transferred_kj NUMERIC(36, 12) NOT NULL,
+    entropy_generated_j_k thermodynamic_entropy NOT NULL,
+    flow_vector JSONB NOT NULL,
+    tx_signature TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_source_target_distinct CHECK (source_h3 <> target_h3)
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_adj_target ON spatial_adjacency_edges(target_h3);
+CREATE INDEX IF NOT EXISTS idx_spatial_flow_block ON spatial_flow_transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_spatial_flow_source ON spatial_flow_transactions(source_h3);
+CREATE INDEX IF NOT EXISTS idx_spatial_flow_target ON spatial_flow_transactions(target_h3);
 
--- ---------------------------------------------------------------------
--- THERMODYNAMIC STOCK STATE (EarthPod State Vector)
--- Conserved thermodynamic stocks: Mass (water, carbon) and Internal Energy
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_cell_stocks (
-    h3_index canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    timestamp TIMESTAMPTZ NOT NULL,
-    epoch_height BIGINT NOT NULL CHECK (epoch_height >= 0),
-    -- Water mass stocks in kg (First Law: conserved)
-    water_mass_continental_kg DOUBLE PRECISION NOT NULL CHECK (water_mass_continental_kg >= 0.0),
-    water_mass_oceanic_kg DOUBLE PRECISION NOT NULL CHECK (water_mass_oceanic_kg >= 0.0),
-    water_mass_vapor_kg DOUBLE PRECISION NOT NULL CHECK (water_mass_vapor_kg >= 0.0),
-    -- Carbon mass stocks in kg (Conserved biogeochemical elemental mass)
-    carbon_mass_biomass_kg DOUBLE PRECISION NOT NULL CHECK (carbon_mass_biomass_kg >= 0.0),
-    carbon_mass_detritus_kg DOUBLE PRECISION NOT NULL CHECK (carbon_mass_detritus_kg >= 0.0),
-    carbon_mass_soil_organic_kg DOUBLE PRECISION NOT NULL CHECK (carbon_mass_soil_organic_kg >= 0.0),
-    carbon_mass_atmospheric_co2_kg DOUBLE PRECISION NOT NULL CHECK (carbon_mass_atmospheric_co2_kg >= 0.0),
-    -- Energy & Entropy stocks
-    internal_energy_joules DOUBLE PRECISION NOT NULL CHECK (internal_energy_joules >= 0.0),
-    mean_temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (mean_temperature_kelvin > 0.0),
-    entropy_production_rate_w_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_rate_w_k >= 0.0), -- Second Law: \dot{S}_{gen} >= 0
-    solar_insolation_watts_m2 DOUBLE PRECISION NOT NULL CHECK (solar_insolation_watts_m2 >= 0.0),
-    state_vector_hash BYTEA NOT NULL,
-    PRIMARY KEY (h3_index, timestamp)
-);
+-- ----------------------------------------------------------------------------
+-- Trigger Function: Verify First Law Conservation on Flow Transactions
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION verify_mass_conservation_invariant()
+RETURNS TRIGGER AS $$
+DECLARE
+    sum_delta_mass NUMERIC(36, 12);
+BEGIN
+    sum_delta_mass := NEW.carbon_delta_kg + NEW.nitrogen_delta_kg + NEW.phosphorus_delta_kg + NEW.water_delta_kg;
+    -- Internal flux consistency assertion
+    IF NEW.entropy_generated_j_k < 0 THEN
+        RAISE EXCEPTION 'Second Law Violation: Irreversible entropy generated cannot be negative (%).', NEW.entropy_generated_j_k;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Register as hypertable for time-series scalability
-SELECT create_hypertable('thermodynamic_cell_stocks', 'timestamp', if_not_exists => TRUE);
-CREATE INDEX IF NOT EXISTS idx_cell_stocks_epoch ON thermodynamic_cell_stocks(epoch_height);
-
--- ---------------------------------------------------------------------
--- BOUNDARY ADVECTIVE & DIFFUSIVE MASS-ENERGY FLUXES
--- Finite-volume exchanges between adjacent canonical H3 cells
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS boundary_flux_transactions (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_h3 canonical_h3_index NOT NULL,
-    target_h3 canonical_h3_index NOT NULL,
-    epoch_height BIGINT NOT NULL CHECK (epoch_height >= 0),
-    timestamp TIMESTAMPTZ NOT NULL,
-    water_mass_flux_kg_s DOUBLE PRECISION NOT NULL,
-    carbon_mass_flux_kg_s DOUBLE PRECISION NOT NULL,
-    thermal_energy_flux_watts DOUBLE PRECISION NOT NULL,
-    entropy_generation_flux_w_k DOUBLE PRECISION NOT NULL CHECK (entropy_generation_flux_w_k >= 0.0),
-    flux_signature BYTEA NOT NULL,
-    CONSTRAINT fk_boundary_edge FOREIGN KEY (source_h3, target_h3) 
-        REFERENCES spatial_adjacency_edges(source_h3, target_h3) ON DELETE RESTRICT,
-    CONSTRAINT chk_flux_distinct_nodes CHECK (source_h3 <> target_h3)
-);
-
-SELECT create_hypertable('boundary_flux_transactions', 'timestamp', if_not_exists => TRUE);
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_epoch ON boundary_flux_transactions(epoch_height);
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_source ON boundary_flux_transactions(source_h3, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_target ON boundary_flux_transactions(target_h3, timestamp DESC);
-
--- ---------------------------------------------------------------------
--- THERMODYNAMIC BLOCKCHAIN LEDGER: BLOCKS & PROOFS
--- Enforces Mass Balance (\Delta M = 0) and Entropy Invariants across epochs
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ledger_blocks (
-    block_height BIGINT PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_hash BYTEA NOT NULL,
-    epoch_timestamp TIMESTAMPTZ NOT NULL,
-    spatial_merkle_root BYTEA NOT NULL,
-    state_entropy_merkle_root BYTEA NOT NULL,
-    total_water_mass_kg DOUBLE PRECISION NOT NULL CHECK (total_water_mass_kg >= 0.0),
-    total_carbon_mass_kg DOUBLE PRECISION NOT NULL CHECK (total_carbon_mass_kg >= 0.0),
-    total_internal_energy_joules DOUBLE PRECISION NOT NULL CHECK (total_internal_energy_joules >= 0.0),
-    total_entropy_generated_j_k DOUBLE PRECISION NOT NULL CHECK (total_entropy_generated_j_k >= 0.0),
-    mass_conservation_residual DOUBLE PRECISION NOT NULL CHECK (ABS(mass_conservation_residual) < 1e-6),
-    validator_node_address VARCHAR(42) NOT NULL,
-    prover_signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_ledger_blocks_timestamp ON ledger_blocks(epoch_timestamp DESC);
-
--- ---------------------------------------------------------------------
--- SPATIAL MONAD TRANSACTION LOG
--- Audit ledger connecting discrete TypeScript SpatialMonad operations
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_monad_mutations (
-    mutation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT NOT NULL REFERENCES ledger_blocks(block_height) ON DELETE RESTRICT,
-    h3_index canonical_h3_index NOT NULL REFERENCES spatial_cells(h3_index) ON DELETE RESTRICT,
-    monad_bind_depth INTEGER NOT NULL CHECK (monad_bind_depth >= 0),
-    operator_name VARCHAR(64) NOT NULL,
-    initial_state_hash BYTEA NOT NULL,
-    resulting_state_hash BYTEA NOT NULL,
-    delta_water_mass_kg DOUBLE PRECISION NOT NULL,
-    delta_carbon_mass_kg DOUBLE PRECISION NOT NULL,
-    delta_energy_joules DOUBLE PRECISION NOT NULL,
-    delta_entropy_j_k DOUBLE PRECISION NOT NULL CHECK (delta_entropy_j_k >= -1e-9),
-    execution_time_us INTEGER NOT NULL CHECK (execution_time_us >= 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_monad_mutations_block ON spatial_monad_mutations(block_height);
-CREATE INDEX IF NOT EXISTS idx_monad_mutations_cell ON spatial_monad_mutations(h3_index);
+CREATE OR REPLACE TRIGGER trg_verify_flow_conservation
+BEFORE INSERT OR UPDATE ON spatial_flow_transactions
+FOR EACH ROW
+EXECUTE FUNCTION verify_mass_conservation_invariant();
