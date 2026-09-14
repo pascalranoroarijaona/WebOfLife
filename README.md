@@ -206,7 +206,7 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 25%
-SPRINT_GOAL: Implement calculateHaversineDistance geodesic metric helper between cell centroids in src/spatial/h3_adjacency.ts.
+SPRINT_GOAL: Implement calculateH3EdgeLengthMeters spherical geodesic edge scaling function in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -230,8 +230,10 @@ SPRINT_GOAL: Implement calculateHaversineDistance geodesic metric helper between
 - [x] Implement `validateH3CellThermodynamicState` predicate enforcing non-negative stocks and positive temperature in `src/spatial/h3_state_tensor.ts`
 - [x] Implement `createDefaultH3CellThermodynamicState` factory returning baseline STP thermodynamic state in `src/spatial/h3_state_tensor.ts`
 - [x] Implement applyThermodynamicOverrides helper for partial cell state mutations in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement calculateHaversineDistance geodesic metric helper between cell centroids in `src/spatial/h3_adjacency.ts`
+- [x] Implement calculateHaversineDistance geodesic metric helper between cell centroids in `src/spatial/h3_adjacency.ts`
+- [ ] Implement calculateH3EdgeLengthMeters spherical geodesic edge scaling function in `src/spatial/h3_adjacency.ts`
 - [ ] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
+- [ ] Implement calculateH3BoundaryContactArea interface calculator in `src/spatial/h3_adjacency.ts`
 - [ ] Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
 - [ ] Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation (`src/thermodynamics/radiative_balance.ts`)
@@ -269,11 +271,13 @@ SPRINT_GOAL: Implement calculateHaversineDistance geodesic metric helper between
 - [ ] Fungal maintenance respiration penalty function factoring in temperature-dependent soil enzyme activation energies (`src/biosphere/mycorrhizal_flows.ts`)
 - [ ] Shannon-Wiener entropy and Hill numbers diversity evaluation across spatial H3 node communities (`src/biosphere/diversity_metrics.ts`)
 - [ ] Simpson's dominance and Pielou's evenness index calculator (`src/biosphere/diversity_metrics.ts`)
+- [ ] Rao's quadratic entropy functional diversity metric calculator (`src/biosphere/diversity_metrics.ts`)
 - [ ] Stochastic Extinction, Bottleneck, and Minimum Viable Population engine (`src/biosphere/population_genetics.ts`)
 - [ ] Dual-pool Soil Organic Matter tracking (`src/geobiome/soil_matrix.ts`)
 - [ ] Microbial necromass and temperature-dependent decomposition kinetics (`src/geobiome/soil_matrix.ts`, `src/geobiome/soil_microbial_loop.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
+- [ ] Define chemical specie vector and concentration map with unit-sum invariants (`src/technosphere/species.ts`)
 - [ ] Define `MaterialStream` interface tracking mass flow, enthalpy, and species vectors (`src/technosphere/material_stream.ts`)
 - [ ] Implement adiabatic material stream mixing function conserving mass and enthalpy (`src/technosphere/material_stream.ts`)
 - [ ] Define `EnergyCarrier` interface with Carnot exergetic quality factor (`src/technosphere/energy_carrier.ts`)

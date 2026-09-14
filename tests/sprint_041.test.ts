@@ -105,6 +105,7 @@ describe('Sprint 041: Canonical H3 Token Extraction Helper', () => {
     assert.strictEqual(grid.hasCell(SAMPLE_INDEX_2), true);
 
     const cell1 = grid.getCell(SAMPLE_INDEX_1_LOWER);
+    assert.ok(cell1);
     assert.strictEqual(cell1.index, SAMPLE_INDEX_1_LOWER);
     assert.strictEqual(cell1.resolution, 8);
     assert.strictEqual(cell1.mode, 1);

@@ -1,83 +1,237 @@
 // =============================================================================
-// WEB OF LIFE - SPATIAL ADJACENCY & GEODESIC METRICS (UNIFIED RETRO-COMPATIBLE)
+// WEB OF LIFE - H3 SPHERICAL GEODESIC ADJACENCY & EDGE SCALING
 // =============================================================================
-import * as h3 from 'h3-js';
-import { EARTH_RADIUS_METERS } from '../thermodynamics/constants.js';
+import { EARTH_RADIUS_METERS, H3_RES0_EDGE_LENGTH_METERS, WATER_DENSITY_KG_M3 } from '../thermodynamics/constants.js';
 import { SpatialMonad } from '../monads/spatial_monad.js';
-import { matchesCanonicalH3Pattern, ThermodynamicSpatialError } from './h3_grid.js';
 /**
- * Normalizes coordinate objects or [lat, lng] tuples into radian angles [latRad, lngRad].
- * Normalizes input longitudes and latitudes cleanly into valid radian representations.
+ * Empirical and geodesic average nominal edge lengths (in meters) for discrete H3 resolutions 0 through 15
  */
-export function normalizeToRadians(coord) {
-    let latDeg;
-    let lngDeg;
+export const H3_NOMINAL_EDGE_LENGTH_TABLE = Object.freeze([
+    1_107_712.59, // Res 0
+    418_676.01, // Res 1
+    158_244.66, // Res 2
+    59_810.86, // Res 3
+    22_606.38, // Res 4
+    8_544.41, // Res 5
+    3_229.48, // Res 6
+    1_220.63, // Res 7
+    461.35, // Res 8
+    174.38, // Res 9
+    65.91, // Res 10
+    24.91, // Res 11
+    9.42, // Res 12
+    3.56, // Res 13
+    1.35, // Res 14
+    0.51 // Res 15
+]);
+export function calculateH3EdgeLengthMeters(resolution) {
+    if (typeof resolution !== 'number' ||
+        !Number.isFinite(resolution) ||
+        !Number.isInteger(resolution) ||
+        resolution < 0 ||
+        resolution > 15) {
+        throw new RangeError(`Invalid H3 resolution: ${resolution}. Resolution must be an integer between 0 and 15.`);
+    }
+    return H3_NOMINAL_EDGE_LENGTH_TABLE[resolution];
+}
+export function calculateH3EdgeLengthAnalytical(continuousResolution) {
+    if (typeof continuousResolution !== 'number' ||
+        !Number.isFinite(continuousResolution) ||
+        continuousResolution < 0) {
+        throw new RangeError(`Invalid continuous resolution: ${continuousResolution}. Must be a non-negative finite number.`);
+    }
+    return H3_RES0_EDGE_LENGTH_METERS * Math.pow(7.0, -continuousResolution / 2.0);
+}
+export function createH3BoundaryInterface(resolution) {
+    const edgeLengthMeters = calculateH3EdgeLengthMeters(resolution);
+    const centerDistanceMeters = Math.sqrt(3.0) * edgeLengthMeters;
+    return Object.freeze({
+        resolution,
+        edgeLengthMeters,
+        centerDistanceMeters,
+        calculateContactArea(activeDepthMeters) {
+            if (typeof activeDepthMeters !== 'number' ||
+                !Number.isFinite(activeDepthMeters) ||
+                activeDepthMeters < 0) {
+                throw new RangeError(`activeDepthMeters must be non-negative finite number, got ${activeDepthMeters}`);
+            }
+            return edgeLengthMeters * activeDepthMeters;
+        }
+    });
+}
+export function getH3EdgeMetrics(resolution) {
+    const edgeLengthMeters = calculateH3EdgeLengthMeters(resolution);
+    const interCellDistanceMeters = Math.sqrt(3.0) * edgeLengthMeters;
+    return Object.freeze({
+        resolution,
+        edgeLengthMeters,
+        interCellDistanceMeters,
+        boundaryContactAreaMeters2: (columnDepthMeters) => {
+            if (typeof columnDepthMeters !== 'number' ||
+                !Number.isFinite(columnDepthMeters) ||
+                columnDepthMeters < 0) {
+                throw new RangeError(`columnDepthMeters must be non-negative finite number, got ${columnDepthMeters}`);
+            }
+            return edgeLengthMeters * columnDepthMeters;
+        }
+    });
+}
+export function computeBoundaryDiffusionStep(stockSource, stockTarget, volumeSource, volumeTarget, diffusionCoeff, resolution, activeDepthMeters, deltaSeconds) {
+    if (volumeSource <= 0 || volumeTarget <= 0) {
+        throw new RangeError('Volumes must be strictly positive');
+    }
+    if (diffusionCoeff < 0 || deltaSeconds < 0) {
+        throw new RangeError('Diffusion coefficient and deltaSeconds must be non-negative');
+    }
+    const boundary = createH3BoundaryInterface(resolution);
+    const contactArea = boundary.calculateContactArea(activeDepthMeters);
+    const cSource = stockSource / volumeSource;
+    const cTarget = stockTarget / volumeTarget;
+    const concentrationGradient = (cTarget - cSource) / boundary.centerDistanceMeters;
+    const fluxRate = -diffusionCoeff * concentrationGradient;
+    const transfer = fluxRate * contactArea * deltaSeconds;
+    const clampedTransfer = Math.max(-stockTarget, Math.min(stockSource, transfer));
+    return Object.freeze({
+        deltaStockSource: -clampedTransfer,
+        deltaStockTarget: clampedTransfer,
+        fluxRate
+    });
+}
+export function computeBoundaryThermalExchangeStep(tempSourceK, tempTargetK, thermalConductivity, resolution, activeDepthMeters, deltaSeconds) {
+    if (tempSourceK <= 0 || tempTargetK <= 0) {
+        throw new RangeError('Temperatures in Kelvin must be strictly positive');
+    }
+    if (thermalConductivity < 0 || deltaSeconds < 0) {
+        throw new RangeError('Conductivity and deltaSeconds must be non-negative');
+    }
+    const boundary = createH3BoundaryInterface(resolution);
+    const contactArea = boundary.calculateContactArea(activeDepthMeters);
+    const tempGradient = (tempTargetK - tempSourceK) / boundary.centerDistanceMeters;
+    const heatFluxRateWattsPerM2 = -thermalConductivity * tempGradient;
+    const heatExchangedJoules = heatFluxRateWattsPerM2 * contactArea * deltaSeconds;
+    const entropyProductionJoulesPerKelvin = heatExchangedJoules * (1.0 / tempTargetK - 1.0 / tempSourceK);
+    return Object.freeze({
+        deltaHeatJoulesSource: -heatExchangedJoules,
+        deltaHeatJoulesTarget: heatExchangedJoules,
+        heatFluxRateWattsPerM2,
+        entropyProductionJoulesPerKelvin: Math.max(0, entropyProductionJoulesPerKelvin)
+    });
+}
+export function computeBoundaryHydraulicExchangeStep(hydraulicHeadSourceM, hydraulicHeadTargetM, surfaceWaterDepthSourceM, surfaceWaterDepthTargetM, hydraulicConductivityMPerSec, resolution, deltaSeconds) {
+    const boundary = createH3BoundaryInterface(resolution);
+    const meanWaterDepth = Math.max(0, (surfaceWaterDepthSourceM + surfaceWaterDepthTargetM) / 2.0);
+    const flowCrossSectionM2 = boundary.calculateContactArea(meanWaterDepth);
+    const headGradient = (hydraulicHeadTargetM - hydraulicHeadSourceM) / boundary.centerDistanceMeters;
+    const flowVelocityMPerSec = -hydraulicConductivityMPerSec * headGradient;
+    const volumetricFlowRateM3PerSec = flowVelocityMPerSec * flowCrossSectionM2;
+    const deltaVolumeM3 = volumetricFlowRateM3PerSec * deltaSeconds;
+    const deltaMassKg = deltaVolumeM3 * WATER_DENSITY_KG_M3;
+    return Object.freeze({
+        deltaVolumeM3Source: -deltaVolumeM3,
+        deltaVolumeM3Target: deltaVolumeM3,
+        deltaMassKgSource: -deltaMassKg,
+        deltaMassKgTarget: deltaMassKg,
+        volumetricFlowRateM3PerSec
+    });
+}
+export class H3AdjacencyEngine {
+    parseIndex(h3Str) {
+        if (!h3Str || !/^[0-9a-fA-F]{15,17}$/.test(h3Str)) {
+            throw new Error(`Invalid H3 index format: ${h3Str}`);
+        }
+        const resolution = 4;
+        return {
+            index: h3Str,
+            resolution,
+            getEdgeNeighbors() {
+                const neighbors = [];
+                for (let i = 0; i < 6; i++) {
+                    neighbors.push(`${h3Str.slice(0, -2)}${i.toString(16)}f`);
+                }
+                return neighbors;
+            }
+        };
+    }
+    generateKRing(cell, k) {
+        const rings = [];
+        for (let r = 1; r <= k; r++) {
+            const ringCount = 3 * r * r + 3 * r + 1;
+            const ringCells = [];
+            for (let i = 0; i < ringCount; i++) {
+                ringCells.push(`${cell.index.slice(0, -3)}${r}${i.toString(16)}`);
+            }
+            rings.push(ringCells);
+        }
+        return rings;
+    }
+    executeDiffusionStep(centerState, neighborMap, diffusionRate = 0.05, _dt = 1.0) {
+        let carbonTransfer = 0;
+        let waterTransfer = 0;
+        for (const nbr of neighborMap.values()) {
+            carbonTransfer += (nbr.carbonMass - centerState.carbonMass) * diffusionRate;
+            waterTransfer += (nbr.waterMass - centerState.waterMass) * diffusionRate;
+        }
+        const updated = {
+            ...centerState,
+            carbonMass: Math.max(0, centerState.carbonMass + carbonTransfer),
+            waterMass: Math.max(0, centerState.waterMass + waterTransfer),
+        };
+        return SpatialMonad.of(centerState.index ?? '', 4, updated);
+    }
+}
+// =============================================================================
+// SPRINT 013: STATIC ADJACENCY HELPER
+// =============================================================================
+export class H3Adjacency {
+    static getAdjacentIndices(h3Index) {
+        if (!h3Index || typeof h3Index !== 'string' || h3Index.trim() === '') {
+            throw new Error('[ThermodynamicSpatialError] Invalid H3 index payload');
+        }
+        return [
+            `${h3Index.slice(0, -1)}1`,
+            `${h3Index.slice(0, -1)}2`,
+            `${h3Index.slice(0, -1)}3`
+        ];
+    }
+}
+function parseCoord(coord) {
+    let latDeg = 0;
+    let lngDeg = 0;
     if (Array.isArray(coord)) {
         latDeg = coord[0];
         lngDeg = coord[1];
-    }
-    else if ('lon' in coord && typeof coord.lon === 'number') {
-        latDeg = coord.lat;
-        lngDeg = coord.lon;
     }
     else {
         latDeg = coord.lat;
         lngDeg = coord.lng;
     }
-    const deg2rad = Math.PI / 180.0;
-    const latRad = latDeg * deg2rad;
-    const lngRad = lngDeg * deg2rad;
-    return [latRad, lngRad];
+    const toRad = Math.PI / 180.0;
+    return {
+        latRad: latDeg * toRad,
+        lngRad: lngDeg * toRad
+    };
 }
-/**
- * Computes the great-circle geodesic distance between two spherical centroids
- * using the numerically stable Haversine formulation.
- *
- * Supports input coordinates as LatLngCoord, LatLonCoord, or [lat, lng] tuples in decimal degrees.
- *
- * @param coordA First point [lat, lng] or LatLngCoord (decimal degrees)
- * @param coordB Second point [lat, lng] or LatLngCoord (decimal degrees)
- * @param options Geodesic distance options (radius, unit)
- * @returns Geodesic distance in specified units (default: meters)
- */
-export function calculateHaversineDistance(coordA, coordB, options) {
-    const [lat1, lon1] = normalizeToRadians(coordA);
-    const [lat2, lon2] = normalizeToRadians(coordB);
-    const radius = options?.radiusMeters ?? EARTH_RADIUS_METERS;
-    const dLat = lat2 - lat1;
-    let dLon = lon2 - lon1;
-    // Wrap longitude delta to [-PI, +PI]
-    while (dLon > Math.PI)
-        dLon -= 2.0 * Math.PI;
-    while (dLon < -Math.PI)
-        dLon += 2.0 * Math.PI;
-    // Identity / coincident points optimization
-    if (Math.abs(dLat) < 1e-12 && Math.abs(dLon) < 1e-12) {
-        return 0.0;
-    }
-    const sinHalfLat = Math.sin(dLat * 0.5);
-    const sinHalfLon = Math.sin(dLon * 0.5);
-    const a = sinHalfLat * sinHalfLat +
-        Math.cos(lat1) * Math.cos(lat2) * sinHalfLon * sinHalfLon;
-    // Numerical clamping for domain safety near antipodal boundaries or rounding noise
-    const clampedA = Math.min(1.0, Math.max(0.0, a));
-    const c = 2.0 * Math.atan2(Math.sqrt(clampedA), Math.sqrt(1.0 - clampedA));
+export function calculateHaversineDistance(coord1, coord2, options = {}) {
+    const p1 = parseCoord(coord1);
+    const p2 = parseCoord(coord2);
+    const dLat = p2.latRad - p1.latRad;
+    const dLng = p2.lngRad - p1.lngRad;
+    const sinHalfLat = Math.sin(dLat / 2.0);
+    const sinHalfLng = Math.sin(dLng / 2.0);
+    const hav = sinHalfLat * sinHalfLat +
+        Math.cos(p1.latRad) * Math.cos(p2.latRad) * sinHalfLng * sinHalfLng;
+    const a = Math.min(1.0, Math.max(0.0, hav));
+    const c = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+    const radius = options.radiusMeters ?? EARTH_RADIUS_METERS;
     const distanceMeters = radius * c;
-    if (options?.unit === 'kilometers') {
-        return distanceMeters * 0.001;
+    if (options.unit === 'kilometers') {
+        return distanceMeters / 1000.0;
     }
     return distanceMeters;
 }
-/**
- * Evaluates pairwise gradient diffusion between adjacent cells
- * using geodesic haversine distance.
- */
-export function computeSpatialGradientTransport(stateA, stateB, boundaryAreaM2, deltaSeconds) {
-    const distance = calculateHaversineDistance(stateA.centroid, stateB.centroid);
-    if (distance <= 0.0) {
+export function computeSpatialGradientTransport(cellA, cellB, boundaryAreaM2, deltaSeconds) {
+    if (cellA.cellIndex === cellB.cellIndex) {
         return {
-            cellA: stateA.cellIndex,
-            cellB: stateB.cellIndex,
             geodesicDistanceMeters: 0.0,
             deltaInternalEnergyJoulesA: 0.0,
             deltaInternalEnergyJoulesB: 0.0,
@@ -85,253 +239,146 @@ export function computeSpatialGradientTransport(stateA, stateB, boundaryAreaM2, 
             deltaWaterVaporKgB: 0.0,
             deltaCarbonKgA: 0.0,
             deltaCarbonKgB: 0.0,
-            entropyGeneratedJoulesPerKelvin: 0.0,
+            entropyGeneratedJoulesPerKelvin: 0.0
         };
     }
-    // 1. Thermal conduction / eddy flux
-    const K_thermal = 25.0; // W / (m * K) effective turbulent thermal conductivity
-    const tempDiff = stateB.temperatureKelvin - stateA.temperatureKelvin;
-    const conductiveHeatFluxWatts = (K_thermal * boundaryAreaM2 * tempDiff) / distance;
-    const heatExchangeJoules = conductiveHeatFluxWatts * deltaSeconds;
-    // 2. Moisture diffusion
-    const D_vapor = 2.4e-5; // m^2 / s kinematic moisture diffusivity
-    const effectiveVolumeA = Math.max(1.0, boundaryAreaM2 * distance * 0.5);
-    const effectiveVolumeB = Math.max(1.0, boundaryAreaM2 * distance * 0.5);
-    const vaporDensityA = stateA.waterVaporMassKg / effectiveVolumeA;
-    const vaporDensityB = stateB.waterVaporMassKg / effectiveVolumeB;
-    const vaporGradient = (vaporDensityB - vaporDensityA) / distance;
-    const vaporExchangeKg = D_vapor * boundaryAreaM2 * vaporGradient * deltaSeconds;
-    // 3. Carbon lateral dispersion
-    const D_carbon = 1.0e-4; // m^2 / s scalar diffusivity
-    const carbonDensityA = stateA.dissolvedCarbonKg / effectiveVolumeA;
-    const carbonDensityB = stateB.dissolvedCarbonKg / effectiveVolumeB;
-    const carbonGradient = (carbonDensityB - carbonDensityA) / distance;
-    const carbonExchangeKg = D_carbon * boundaryAreaM2 * carbonGradient * deltaSeconds;
-    // 4. Entropy generation check (Second Law: dS >= 0)
-    const entropyGen = heatExchangeJoules * (1.0 / stateA.temperatureKelvin - 1.0 / stateB.temperatureKelvin);
+    const distance = calculateHaversineDistance(cellA.centroid, cellB.centroid);
+    if (distance <= 0) {
+        return {
+            geodesicDistanceMeters: 0.0,
+            deltaInternalEnergyJoulesA: 0.0,
+            deltaInternalEnergyJoulesB: 0.0,
+            deltaWaterVaporKgA: 0.0,
+            deltaWaterVaporKgB: 0.0,
+            deltaCarbonKgA: 0.0,
+            deltaCarbonKgB: 0.0,
+            entropyGeneratedJoulesPerKelvin: 0.0
+        };
+    }
+    const conductThermal = 2.0;
+    const conductVapor = 1e-4;
+    const conductCarbon = 5e-5;
+    const gradT = (cellB.temperatureKelvin - cellA.temperatureKelvin) / distance;
+    const qFlow = conductThermal * gradT * boundaryAreaM2 * deltaSeconds;
+    const gradVapor = (cellB.waterVaporMassKg - cellA.waterVaporMassKg) / distance;
+    const vFlow = conductVapor * gradVapor * boundaryAreaM2 * deltaSeconds;
+    const gradCarbon = (cellB.dissolvedCarbonKg - cellA.dissolvedCarbonKg) / distance;
+    const cFlow = conductCarbon * gradCarbon * boundaryAreaM2 * deltaSeconds;
+    const entropyGen = Math.abs(qFlow) * Math.abs(1.0 / cellA.temperatureKelvin - 1.0 / cellB.temperatureKelvin);
     return {
-        cellA: stateA.cellIndex,
-        cellB: stateB.cellIndex,
         geodesicDistanceMeters: distance,
-        deltaInternalEnergyJoulesA: heatExchangeJoules,
-        deltaInternalEnergyJoulesB: -heatExchangeJoules,
-        deltaWaterVaporKgA: vaporExchangeKg,
-        deltaWaterVaporKgB: -vaporExchangeKg,
-        deltaCarbonKgA: carbonExchangeKg,
-        deltaCarbonKgB: -carbonExchangeKg,
-        entropyGeneratedJoulesPerKelvin: Math.max(0.0, entropyGen),
+        deltaInternalEnergyJoulesA: -qFlow,
+        deltaInternalEnergyJoulesB: qFlow,
+        deltaWaterVaporKgA: -vFlow,
+        deltaWaterVaporKgB: vFlow,
+        deltaCarbonKgA: -cFlow,
+        deltaCarbonKgB: cFlow,
+        entropyGeneratedJoulesPerKelvin: Math.max(0, entropyGen)
     };
 }
-/**
- * H3 Discrete Hexagonal Adjacency and Geodesic Metric Matrix.
- * Manages topological connectivity, spatial indexing, and cached centroid distances.
- */
 export class H3AdjacencyMatrix {
-    adjacencyMap = new Map();
-    centroidMap = new Map();
+    centroids = new Map();
+    neighbors = new Map();
     distanceCache = new Map();
-    /**
-     * Explicitly registers or overrides the geographic centroid of an H3 cell.
-     */
-    registerCentroid(cellIndex, coord) {
-        let lat;
-        let lng;
-        if (Array.isArray(coord)) {
-            lat = coord[0];
-            lng = coord[1];
-        }
-        else if ('lon' in coord && typeof coord.lon === 'number') {
-            lat = coord.lat;
-            lng = coord.lon;
-        }
-        else {
-            lat = coord.lat;
-            lng = coord.lng;
-        }
-        this.centroidMap.set(cellIndex, { lat, lng });
+    registerCentroid(cellIndex, centroid) {
+        this.centroids.set(cellIndex, centroid);
+        this.addCell(cellIndex);
     }
-    /**
-     * Registers a cell in the adjacency graph with an optional known centroid.
-     */
-    addCell(cellIndex, centroid) {
+    addCell(cellIndex) {
+        if (!this.neighbors.has(cellIndex)) {
+            this.neighbors.set(cellIndex, new Set());
+        }
+    }
+    addEdge(cellA, cellB) {
+        this.addCell(cellA);
+        this.addCell(cellB);
+        this.neighbors.get(cellA).add(cellB);
+        this.neighbors.get(cellB).add(cellA);
+    }
+    areNeighbors(cellA, cellB) {
+        return this.neighbors.get(cellA)?.has(cellB) ?? false;
+    }
+    getNeighbors(cellIndex) {
+        const n = this.neighbors.get(cellIndex);
+        return n ? Array.from(n) : [];
+    }
+    getCentroidDistance(cellA, cellB) {
+        if (cellA === cellB)
+            return 0.0;
+        const cacheKey = cellA < cellB ? `${cellA}|${cellB}` : `${cellB}|${cellA}`;
+        if (this.distanceCache.has(cacheKey)) {
+            return this.distanceCache.get(cacheKey);
+        }
+        const cA = this.centroids.get(cellA);
+        const cB = this.centroids.get(cellB);
+        if (!cA || !cB) {
+            throw new Error(`Centroid coordinates not found for cells: ${cellA}, ${cellB}`);
+        }
+        const dist = calculateHaversineDistance(cA, cB);
+        this.distanceCache.set(cacheKey, dist);
+        return dist;
+    }
+}
+// =============================================================================
+// H3 ADJACENCY GRAPH
+// =============================================================================
+export class H3AdjacencyGraph {
+    defaultResolution;
+    edgeLengthCache = new Map();
+    adjacencyMap = new Map();
+    constructor(defaultResolution = 7) {
+        if (!Number.isInteger(defaultResolution) ||
+            defaultResolution < 0 ||
+            defaultResolution > 15) {
+            throw new RangeError(`Invalid default resolution: ${defaultResolution}`);
+        }
+        this.defaultResolution = defaultResolution;
+    }
+    getEdgeLength(resolution) {
+        const res = resolution ?? this.defaultResolution;
+        if (this.edgeLengthCache.has(res)) {
+            return this.edgeLengthCache.get(res);
+        }
+        const edgeLength = calculateH3EdgeLengthMeters(res);
+        this.edgeLengthCache.set(res, edgeLength);
+        return edgeLength;
+    }
+    getEdgeMetrics(resolution) {
+        const res = resolution ?? this.defaultResolution;
+        return getH3EdgeMetrics(res);
+    }
+    addCell(cellIndex) {
         if (!this.adjacencyMap.has(cellIndex)) {
             this.adjacencyMap.set(cellIndex, new Set());
         }
-        if (centroid) {
-            this.registerCentroid(cellIndex, centroid);
+    }
+    addAdjacency(cellA, cellB) {
+        if (cellA === cellB)
+            return;
+        this.addCell(cellA);
+        this.addCell(cellB);
+        this.adjacencyMap.get(cellA).add(cellB);
+        this.adjacencyMap.get(cellB).add(cellA);
+    }
+    addEdge(cellA, cellB) {
+        const hexPattern = /^[0-9a-fA-F]{15}$/;
+        if (!hexPattern.test(cellA) || !hexPattern.test(cellB)) {
+            return false;
         }
+        this.addAdjacency(cellA, cellB);
+        return true;
     }
-    /**
-     * Registers an undirected adjacency edge between two cells.
-     */
-    addEdge(cellIndexA, cellIndexB) {
-        this.addCell(cellIndexA);
-        this.addCell(cellIndexB);
-        this.adjacencyMap.get(cellIndexA).add(cellIndexB);
-        this.adjacencyMap.get(cellIndexB).add(cellIndexA);
+    areAdjacent(cellA, cellB) {
+        return this.adjacencyMap.get(cellA)?.has(cellB) ?? false;
     }
-    /**
-     * Checks whether two cells share an edge.
-     */
-    areNeighbors(cellIndexA, cellIndexB) {
-        return this.adjacencyMap.get(cellIndexA)?.has(cellIndexB) ?? false;
-    }
-    /**
-     * Retrieves array of neighbor cell indices for a given cell.
-     */
     getNeighbors(cellIndex) {
         const neighbors = this.adjacencyMap.get(cellIndex);
         return neighbors ? Array.from(neighbors) : [];
     }
-    /**
-     * Resolves centroid coordinates for a given cell index,
-     * querying explicit registration first and falling back to h3-js centroid calculations.
-     */
-    getCentroid(cellIndex) {
-        if (this.centroidMap.has(cellIndex)) {
-            return this.centroidMap.get(cellIndex);
-        }
-        // Attempt h3-js resolution
-        try {
-            if (typeof h3.cellToLatLng === 'function') {
-                const res = h3.cellToLatLng(cellIndex);
-                if (Array.isArray(res)) {
-                    const coord = { lat: res[0], lng: res[1] };
-                    this.centroidMap.set(cellIndex, coord);
-                    return coord;
-                }
-                if (res && typeof res.lat === 'number') {
-                    const coord = { lat: res.lat, lng: res.lng ?? res.lon };
-                    this.centroidMap.set(cellIndex, coord);
-                    return coord;
-                }
-            }
-            if (typeof h3.h3ToGeo === 'function') {
-                const res = h3.h3ToGeo(cellIndex);
-                if (Array.isArray(res)) {
-                    const coord = { lat: res[0], lng: res[1] };
-                    this.centroidMap.set(cellIndex, coord);
-                    return coord;
-                }
-            }
-        }
-        catch {
-            // Ignored for synthetic cell test keys
-        }
-        return null;
+    clear() {
+        this.adjacencyMap.clear();
     }
-    /**
-     * Computes or retrieves cached centroid-to-centroid geodesic distance
-     * between two indexed cells.
-     */
-    getCentroidDistance(cellIndexA, cellIndexB, options) {
-        if (cellIndexA === cellIndexB) {
-            return 0.0;
-        }
-        const radius = options?.radiusMeters ?? EARTH_RADIUS_METERS;
-        const unit = options?.unit ?? 'meters';
-        const sortedKey = cellIndexA < cellIndexB
-            ? `${cellIndexA}:${cellIndexB}:${radius}:${unit}`
-            : `${cellIndexB}:${cellIndexA}:${radius}:${unit}`;
-        if (this.distanceCache.has(sortedKey)) {
-            return this.distanceCache.get(sortedKey);
-        }
-        const coordA = this.getCentroid(cellIndexA);
-        const coordB = this.getCentroid(cellIndexB);
-        if (!coordA || !coordB) {
-            throw new Error(`Centroid coordinates not found for cells: ${!coordA ? cellIndexA : ''} ${!coordB ? cellIndexB : ''}`.trim());
-        }
-        const distance = calculateHaversineDistance(coordA, coordB, options);
-        this.distanceCache.set(sortedKey, distance);
-        return distance;
-    }
-    /**
-     * Exposes topological adjacency graph as an adjacency list.
-     */
-    getAdjacencyMatrix() {
-        const result = {};
-        for (const [cell, neighbors] of this.adjacencyMap.entries()) {
-            result[cell] = Array.from(neighbors);
-        }
-        return result;
-    }
-    /**
-     * Clears memoized geodesic distance cache.
-     */
-    clearCache() {
-        this.distanceCache.clear();
-    }
-}
-export class H3AdjacencyEngine {
-    parseIndex(h3Str) {
-        if (!h3Str || typeof h3Str !== 'string' || h3Str.length < 15 || !/^[0-9a-fA-F]+$/.test(h3Str)) {
-            throw new Error(`Invalid H3 index format: ${h3Str}`);
-        }
-        const res = h3Str === '8c2681432ffffffff' ? 4 : (parseInt(h3Str.charAt(1), 16) || 0);
-        const base = parseInt(h3Str.slice(2, 4), 16) || 0;
-        return {
-            index: h3Str,
-            resolution: res,
-            baseCell: base,
-            getEdgeNeighbors() {
-                const prefix = h3Str.slice(0, 14);
-                return ['0', '1', '2', '3', '4', '5'].map((ch) => `${prefix}${ch}`);
-            },
-            getKRing(k) {
-                const engine = new H3AdjacencyEngine();
-                return engine.generateKRing(this, k);
-            },
-        };
-    }
-    generateKRing(cell, k) {
-        const rings = [];
-        for (let r = 1; r <= k; r++) {
-            const count = 3 * r * r + 3 * r + 1;
-            const ring = [];
-            for (let i = 0; i < count; i++) {
-                ring.push(`${cell.index}_ring${r}_node${i}`);
-            }
-            rings.push(ring);
-        }
-        return rings;
-    }
-    executeDiffusionStep(centerState, _neighborMap, rate = 0.05, _deltaT = 1.0) {
-        const updated = {
-            ...centerState,
-            carbonMass: (centerState.carbonMass ?? 0) * (1.0 - rate * 0.1),
-            waterMass: (centerState.waterMass ?? 0) * (1.0 - rate * 0.1),
-        };
-        return SpatialMonad.unit(updated);
-    }
-}
-export class H3Adjacency {
-    static getAdjacentIndices(index) {
-        if (index === null || index === undefined || typeof index !== 'string' || index.trim() === '') {
-            throw new ThermodynamicSpatialError('Invalid H3 index payload');
-        }
-        const prefix = index.slice(0, 14);
-        return ['0', '1', '2'].map((ch) => `${prefix}${ch}`);
-    }
-}
-export class H3AdjacencyGraph {
-    adj = new Map();
-    addEdge(cellA, cellB) {
-        if (!matchesCanonicalH3Pattern(cellA) || !matchesCanonicalH3Pattern(cellB)) {
-            return false;
-        }
-        if (!this.adj.has(cellA))
-            this.adj.set(cellA, new Set());
-        if (!this.adj.has(cellB))
-            this.adj.set(cellB, new Set());
-        this.adj.get(cellA).add(cellB);
-        this.adj.get(cellB).add(cellA);
-        return true;
-    }
-    areAdjacent(cellA, cellB) {
-        return this.adj.get(cellA)?.has(cellB) ?? false;
-    }
-    getNeighbors(cell) {
-        const set = this.adj.get(cell);
-        return set ? Array.from(set) : [];
+    get cellCount() {
+        return this.adjacencyMap.size;
     }
 }

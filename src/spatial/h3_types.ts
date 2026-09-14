@@ -1,71 +1,20 @@
 // =============================================================================
-// WEB OF LIFE - SPATIAL H3 & GEODESIC TYPE DEFINITIONS (UNIFIED RETRO-COMPATIBLE)
+// WEB OF LIFE - H3 DGGS SPATIAL TYPES
 // =============================================================================
 
 /**
- * Coordinate pair representing geographic position in decimal degrees.
+ * Valid H3 discrete global grid resolutions (integers 0 to 15).
  */
-export interface LatLngCoord {
-  readonly lat: number; // Latitude [-90, +90]
-  readonly lng: number; // Longitude [-180, +180]
-}
+export type H3Resolution = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+export type H3ResolutionTier = H3Resolution;
 
 /**
- * Alternate coordinate pair supporting 'lon' key naming.
+ * String identifier for an H3 index (hexadecimal representation).
  */
-export interface LatLonCoord {
-  readonly lat: number; // Latitude [-90, +90]
-  readonly lon: number; // Longitude [-180, +180]
-}
+export type H3IndexString = string;
 
 /**
- * Centroid distance query configuration options.
- */
-export interface GeodesicDistanceOptions {
-  /**
-   * Planetary reference radius in meters.
-   * Defaults to EARTH_RADIUS_METERS (6,371,007 m).
-   */
-  readonly radiusMeters?: number;
-
-  /**
-   * Desired distance unit: 'meters' | 'kilometers'.
-   * Defaults to 'meters'.
-   */
-  readonly unit?: 'meters' | 'kilometers';
-}
-
-/**
- * Geographic polygon representation of an H3 cell facet.
- */
-export interface H3CellBoundary {
-  readonly cellIndex: string;
-  readonly vertices: LatLngCoord[];
-}
-
-/**
- * Canonical H3 index string identifier representation.
- */
-export type H3Index = string;
-
-/**
- * Structural descriptor for an active H3 cell.
- */
-export interface H3Cell {
-  readonly index: string;
-  readonly resolution: number;
-  readonly mode?: number;
-}
-
-/**
- * Contract for token extraction from unstructured payload text.
- */
-export interface IH3TokenExtractor {
-  extractTokens(text: string): string[];
-}
-
-/**
- * Enumeration of standardized H3 spatial validation error codes.
+ * Error codes for H3 string validation.
  */
 export enum H3ErrorCode {
   SUCCESS = 'H3_SUCCESS',
@@ -79,11 +28,11 @@ export enum H3ErrorCode {
   ERR_H3_INVALID_CHARACTERS = 0x03,
   ERR_H3_INVALID_RESOLUTION = 0x04,
   ERR_H3_INVALID_BASE_CELL = 0x05,
-  ERR_H3_OUT_OF_RANGE = 0x06,
+  ERR_H3_OUT_OF_RANGE = 0x06
 }
 
 /**
- * Domain-specific exception thrown on spatial guard clause violations.
+ * Domain exception for spatial guard clause violations.
  */
 export class SpatialGuardClauseException extends Error {
   constructor(message: string) {
@@ -94,100 +43,110 @@ export class SpatialGuardClauseException extends Error {
 }
 
 /**
- * H3 grid query configuration parameters.
+ * Spherical coordinate representation.
  */
-export interface IH3GridQuery {
-  resolution: number;
-  baseIndexes?: string[];
-  bounds?: { north: number; south: number; east: number; west: number };
+export interface ISphericalCoordinate {
+  readonly latitude: number;
+  readonly longitude: number;
 }
 
 /**
- * Cell metadata container for H3 grid engines.
+ * Formal metrics interface for an H3 cell edge interface.
  */
-export interface IH3CellData {
-  h3Index: string;
-  resolution: number;
-  centroid?: { lat: number; lng: number };
-  boundary?: Array<{ lat: number; lng: number }>;
-  areaKm2?: number;
-  solarIrradiance?: number;
-  carbonStock?: number;
+export interface IH3EdgeMetrics {
+  readonly resolution: number;
+  readonly edgeLengthMeters: number;
+  readonly boundaryContactAreaMeters2: (columnDepthMeters: number) => number;
+  readonly interCellDistanceMeters: number;
 }
 
 /**
- * Structural validation result for H3 indices.
+ * Geometric boundary contact interface between two adjacent H3 cells.
  */
-export interface H3ValidationResult {
-  isValid: boolean;
-  errorCode?: string | H3ErrorCode;
-  resolution?: number;
-  baseCell?: number;
+export interface IH3BoundaryInterface {
+  readonly resolution: number;
+  readonly edgeLengthMeters: number;
+  readonly centerDistanceMeters: number;
+  calculateContactArea(activeDepthMeters: number): number;
 }
 
 /**
- * Typed validation result contract.
+ * Exchange delta pair satisfying pairwise anti-symmetry and First Law conservation.
  */
-export interface IH3ValidationResult {
-  isValid: boolean;
-  code: H3ErrorCode;
-  message: string;
-  resolution?: number;
-  baseCell?: number;
+export interface IDiffusionExchangeResult {
+  readonly deltaStockSource: number;
+  readonly deltaStockTarget: number;
+  readonly fluxRate: number;
 }
 
 /**
- * Resolution tier validation interface contract.
+ * Fourier conductive thermal exchange result.
  */
-export interface IResolutionTierValidator {
-  validateResolution(resolution: number): boolean;
-  assertValidResolution(resolution: number): void;
+export interface IThermalExchangeResult {
+  readonly deltaHeatJoulesSource: number;
+  readonly deltaHeatJoulesTarget: number;
+  readonly heatFluxRateWattsPerM2: number;
+  readonly entropyProductionJoulesPerKelvin: number;
 }
 
 /**
- * H3 valid resolution tier literal union type (0 through 15).
+ * Hydraulic edge transfer result across adjacent columns.
  */
-export type H3ResolutionTier =
-  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+export interface IHydraulicExchangeResult {
+  readonly deltaVolumeM3Source: number;
+  readonly deltaVolumeM3Target: number;
+  readonly deltaMassKgSource: number;
+  readonly deltaMassKgTarget: number;
+  readonly volumetricFlowRateM3PerSec: number;
+}
 
-/**
- * Type alias for H3 numerical resolution.
- */
-export type H3Resolution = number;
+// =============================================================================
+// SPRINT 045: STATE TENSOR OVERRIDE TYPES & THERMODYNAMIC CHANNELS
+// =============================================================================
 
-/**
- * Contiguous channel layout definition for H3StateTensor.
- */
 export enum ThermodynamicChannel {
   TEMPERATURE_KELVIN = 0,
-  WATER_MASS_KG = 1,
-  SOIL_ORGANIC_CARBON_KG = 2,
-  VEGETATION_BIOMASS_KG = 3,
-  ATMOSPHERIC_CO2_KG = 4,
-  MINERAL_NITROGEN_KG = 5,
-  ALBEDO = 6,
-  SENSIBLE_HEAT_JOULES = 7,
-  CHANNEL_COUNT = 8,
+  SENSIBLE_HEAT_JOULES = 1,
+  WATER_MASS_KG = 2,
+  SOIL_ORGANIC_CARBON_KG = 3,
+  VEGETATION_BIOMASS_KG = 4,
+  ATMOSPHERIC_CO2_KG = 5,
+  MINERAL_NITROGEN_KG = 6,
+  ALBEDO = 7,
+  CHANNEL_COUNT = 8
 }
 
-/**
- * Partial thermodynamic override payload per cell.
- */
+export const THERMODYNAMIC_CONSTANTS = {
+  DEFAULT_REGOLITH_MASS_KG: 50.0,
+  MIN_TEMPERATURE_KELVIN: 2.7315,
+  SPECIFIC_HEAT: {
+    REGOLITH: 840.0,
+    WATER: 4184.0,
+    SOIL_ORGANIC_CARBON: 1800.0,
+    VEGETATION_BIOMASS: 1900.0,
+    ATMOSPHERIC_CO2: 846.0,
+    MINERAL_NITROGEN: 1200.0
+  },
+  SPECIFIC_ENTHALPY: {
+    WATER: -15.87e6,
+    SOIL_ORGANIC_CARBON: -32.79e6,
+    VEGETATION_BIOMASS: -17.50e6,
+    ATMOSPHERIC_CO2: -8.94e6,
+    MINERAL_NITROGEN: -2.85e6
+  }
+} as const;
+
 export interface CellThermodynamicOverride {
   temperatureKelvin?: number;
+  sensibleHeatJoules?: number;
   waterMassKg?: number;
   soilOrganicCarbonKg?: number;
   vegetationBiomassKg?: number;
   atmosphericCo2Kg?: number;
   mineralNitrogenKg?: number;
   albedo?: number;
-  sensibleHeatJoules?: number;
 }
 
-/**
- * Individual cell delta report produced by applyThermodynamicOverrides.
- */
 export interface CellThermodynamicDeltaRecord {
   h3Index: string;
   cellIndex: number;
@@ -198,9 +157,6 @@ export interface CellThermodynamicDeltaRecord {
   overriddenFields: (keyof CellThermodynamicOverride)[];
 }
 
-/**
- * Consolidated ledger report produced by applyThermodynamicOverrides.
- */
 export interface ThermodynamicOverrideReport {
   timestamp: number;
   cellCountModified: number;
@@ -211,16 +167,10 @@ export interface ThermodynamicOverrideReport {
   cellReports: CellThermodynamicDeltaRecord[];
 }
 
-/**
- * Key-value mapping of H3 indices to their respective partial overrides.
- */
 export type H3ThermodynamicOverridesMap =
   | Map<string, CellThermodynamicOverride>
   | Record<string, CellThermodynamicOverride>;
 
-/**
- * Execution options for partial thermodynamic override applications.
- */
 export interface OverrideOptions {
   strictThermodynamicBounds?: boolean;
   minTemperatureKelvin?: number;
@@ -229,34 +179,3 @@ export interface OverrideOptions {
   includeChemicalEnthalpy?: boolean;
   allowMassDestruction?: boolean;
 }
-
-/**
- * Thermodynamic and specific heat constants for state tensor calculations.
- */
-export const THERMODYNAMIC_CONSTANTS = {
-  MIN_TEMPERATURE_KELVIN: 2.7315,
-  DEFAULT_REGOLITH_MASS_KG: 50000.0,
-  SPECIFIC_HEAT: {
-    WATER: 4184.0,
-    SOIL_ORGANIC_CARBON: 1800.0,
-    VEGETATION_BIOMASS: 1900.0,
-    ATMOSPHERIC_CO2: 846.0,
-    MINERAL_NITROGEN: 1200.0,
-    REGOLITH: 840.0,
-  },
-  SPECIFIC_ENTHALPY: {
-    WATER: -15.87e6,
-    SOIL_ORGANIC_CARBON: -32.79e6,
-    VEGETATION_BIOMASS: -17.50e6,
-    ATMOSPHERIC_CO2: -8.94e6,
-    MINERAL_NITROGEN: -2.85e6,
-    REGOLITH: 0.0,
-  },
-  STEFAN_BOLTZMANN: 5.670374419e-8,
-  SOLAR_CONSTANT_TOA: 1361.0,
-  ZERO_CELSIUS_IN_KELVIN: 273.15,
-  DEFAULT_ALBEDO: 0.3,
-  GAS_CONSTANT_R: 8.314462618,
-  PLANETARY_TEMP_MIN_K: 200.0,
-  PLANETARY_TEMP_MAX_K: 350.0,
-};

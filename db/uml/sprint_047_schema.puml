@@ -1,0 +1,143 @@
+@startuml sprint_047_schema
+!theme plain
+skinparam roundcorner 8
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam classFontStyle bold
+skinparam arrowColor #1B4F72
+skinparam classBorderColor #2C3E50
+
+title Web of Life: Sprint 047 - Spherical Geodesic Edge Scaling & Boundary Flux Architecture
+
+package "Database Relational & Time-Series Ledger" <<Database>> {
+    class h3_resolution_metrics <<Table>> {
+        + resolution: SMALLINT [PK, 0..15]
+        + nominal_edge_length_meters: NUMERIC(12,4)
+        + nominal_cell_area_km2: NUMERIC(16,6)
+        + nominal_inter_cell_distance_meters: NUMERIC(12,4)
+        + aperture_scaling_factor: NUMERIC(10,8)
+        + created_at: TIMESTAMPTZ
+    }
+
+    class h3_cell_interfaces <<Table>> {
+        + interface_id: UUID [PK]
+        + resolution: SMALLINT [FK]
+        + cell_index_origin: VARCHAR(16)
+        + cell_index_destination: VARCHAR(16)
+        + edge_length_meters: NUMERIC(12,4)
+        + inter_cell_distance_meters: NUMERIC(12,4)
+        + column_depth_meters: NUMERIC(10,3)
+        + contact_area_meters2: NUMERIC(16,4) [GENERATED]
+        + is_active: BOOLEAN
+        + created_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_blocks <<Table>> {
+        + block_height: BIGINT [PK]
+        + block_hash: CHAR(64) [UQ]
+        + parent_hash: CHAR(64)
+        + state_merkle_root: CHAR(64)
+        + transaction_merkle_root: CHAR(64)
+        + net_entropy_production_joules_per_kelvin: NUMERIC(24,8)
+        + total_fickian_mass_flux_kg: NUMERIC(24,8)
+        + total_thermal_flux_joules: NUMERIC(24,8)
+        + timestamp: TIMESTAMPTZ
+    }
+
+    class thermodynamic_boundary_fluxes <<Hypertable>> {
+        + transaction_id: UUID [PK]
+        + block_height: BIGINT [FK]
+        + interface_id: UUID [FK]
+        + cell_index_origin: VARCHAR(16)
+        + cell_index_destination: VARCHAR(16)
+        + delta_time_seconds: NUMERIC(10,4)
+        + edge_length_meters: NUMERIC(12,4)
+        + contact_area_meters2: NUMERIC(16,4)
+        + inter_cell_distance_meters: NUMERIC(12,4)
+        + temperature_origin_kelvin: NUMERIC(10,4)
+        + temperature_destination_kelvin: NUMERIC(10,4)
+        + concentration_origin_mol_m3: NUMERIC(16,8)
+        + concentration_destination_mol_m3: NUMERIC(16,8)
+        + thermal_conductivity_kappa: NUMERIC(12,6)
+        + mass_diffusion_d: NUMERIC(16,10)
+        + fourier_thermal_flux_joules: NUMERIC(24,8)
+        + fickian_mass_flux_kg: NUMERIC(24,8)
+        + entropy_production_joules_per_kelvin: NUMERIC(24,8)
+        + signature_tx: CHAR(128)
+        + timestamp: TIMESTAMPTZ [PK]
+    }
+}
+
+package "Domain Layer: Spatial & Geodesic DGGS (src/spatial)" <<Node>> {
+    interface IH3EdgeMetrics {
+        + resolution: number
+        + edgeLengthMeters: number
+        + boundaryContactAreaMeters2(columnDepthMeters: number): number
+        + interCellDistanceMeters: number
+    }
+
+    class H3AdjacencyGraph {
+        - resolution: number
+        - edgeLengthCache: Map<number, number>
+        + calculateH3EdgeLengthMeters(resolution: number): number
+        + getEdgeLength(resolution?: number): number
+        + getBoundaryConductance(interfaceContactArea: number, distance: number, kappa: number): number
+        + computeInterfaceCrossSection(edgeLength: number, depth: number): number
+        + verifyPairwiseAntiSymmetry(fluxForward: number, fluxBackward: number): boolean
+    }
+
+    class H3EdgeMetricsImpl implements IH3EdgeMetrics {
+        + resolution: number
+        + edgeLengthMeters: number
+        + interCellDistanceMeters: number
+        + boundaryContactAreaMeters2(columnDepthMeters: number): number
+    }
+}
+
+package "Functional Monads & Thermodynamics (src/monads)" <<Node>> {
+    interface IThermodynamicState {
+        + cellIndex: string
+        + temperatureKelvin: number
+        + concentrationMolM3: number
+        + exergyJoules: number
+        + entropyJoulesPerKelvin: number
+    }
+
+    class SpatialMonad<T> {
+        - value: T
+        - resolution: number
+        + unit(value: T, resolution: number): SpatialMonad<T>
+        + bind<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+        + applyFickianDiffusionKernel(adjacency: H3AdjacencyGraph, diffCoeff: number, dt: number): SpatialMonad<T>
+        + applyFourierThermalDissipation(adjacency: H3AdjacencyGraph, conductivity: number, dt: number): SpatialMonad<T>
+        + extract(): T
+    }
+
+    class ThermodynamicFluxTransaction {
+        + transactionId: string
+        + blockHeight: bigint
+        + interfaceId: string
+        + edgeLengthMeters: number
+        + contactAreaMeters2: number
+        + thermalFluxJoules: number
+        + massFluxKg: number
+        + entropyProduction: number
+        + computeLocalEntropyProduction(): number
+        + signTransaction(privateKey: string): string
+    }
+}
+
+' Relational Database Relationships
+h3_resolution_metrics "1" -- "0..*" h3_cell_interfaces : defines_scale >
+h3_cell_interfaces "1" -- "0..*" thermodynamic_boundary_fluxes : routes_flux >
+thermodynamic_blocks "1" -- "0..*" thermodynamic_boundary_fluxes : contains >
+
+' Domain mappings to SQL
+H3AdjacencyGraph ..> h3_resolution_metrics : loads nominal scales
+H3AdjacencyGraph ..> h3_cell_interfaces : generates & reads
+SpatialMonad ..> H3AdjacencyGraph : uses geodesic lengths
+SpatialMonad ..> ThermodynamicFluxTransaction : produces boundary fluxes
+ThermodynamicFluxTransaction ..> thermodynamic_boundary_fluxes : persists to ledger
+ThermodynamicFluxTransaction ..> IThermodynamicState : mutates conservatively
+
+@enduml
