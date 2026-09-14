@@ -1,0 +1,40 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life Spatial & Thermodynamic Architecture" {
+
+    class H3Grid {
+        + validateResolution(resolution: number): boolean
+        + assertValidResolution(resolution: number): void
+    }
+
+    class SpatialResolutionRecord {
+        + resolutionTier: int
+        + description: string
+        + averageHexagonAreaKm2: number
+        + createdAt: DateTime
+    }
+
+    class ThermodynamicStockTransaction {
+        + transactionId: string
+        + blockHeight: number
+        + h3Index: string
+        + resolutionTier: number
+        + energyDelta: number
+        + entropyDelta: number
+        + signature: string
+        + executedAt: DateTime
+    }
+
+    class ThermodynamicBlockchainLedger {
+        + recordTransaction(tx: ThermodynamicStockTransaction): void
+        + verifyBlockIntegrity(blockHeight: number): boolean
+    }
+
+    H3Grid --> SpatialResolutionRecord : enforces bounds [0, 15]
+    ThermodynamicStockTransaction --> SpatialResolutionRecord : references tier
+    ThermodynamicBlockchainLedger o-- ThermodynamicStockTransaction : contains
+}
+
+@enduml
