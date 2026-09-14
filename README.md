@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 21%
-SPRINT_GOAL: Implement string length boundary validation helper returning explicit boolean flags in `src/spatial/h3_grid.ts`.
+Roadmap Completion: 17%
+SPRINT_GOAL: Implement canonical 15-character hexadecimal regex constant H3_CANONICAL_INDEX_PATTERN in src/spatial/h3_grid.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -219,20 +219,27 @@ SPRINT_GOAL: Implement string length boundary validation helper returning explic
 - [x] Implement resolution tier (0-15) boundary check function (`src/spatial/h3_grid.ts`)
 - [x] Implement hexadecimal character set validation helper regex pattern check function (`src/spatial/h3_grid.ts`)
 - [x] Implement explicit null/undefined exception throwing for guard clause violations (`src/spatial/h3_grid.ts`)
-- [ ] Implement string length boundary validation helper returning explicit boolean flags (`src/spatial/h3_grid.ts`)
-- [ ] Implement dedicated regex matching utility using `/^[0-9a-fA-F]{15}$/` (`src/spatial/h3_grid.ts`)
+- [x] Implement string length boundary validation helper returning explicit boolean flags (`src/spatial/h3_grid.ts`)
+- [ ] Implement canonical 15-character hexadecimal regex constant `H3_CANONICAL_INDEX_PATTERN` (`src/spatial/h3_grid.ts`)
+- [ ] Implement dedicated regex boolean test function `matchesCanonicalH3Pattern(token: string): boolean` (`src/spatial/h3_grid.ts`)
+- [ ] Implement regex format validator `assertCanonicalH3Pattern(token: string): void` raising `H3ValidationError` (`src/spatial/h3_grid.ts`)
+- [ ] Implement global regex extraction utility `extractCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
 - [ ] Implement standalone unit test verifying hexadecimal string validation constraints (`tests/sprint_035.test.ts`)
 - [ ] Implement Uber H3 spatial ring generation utility functions (`src/spatial/h3_grid.ts`)
 - [ ] Implement Uber H3 edge-neighbor mapping functions (`src/spatial/h3_grid.ts`)
-- [ ] Spatial-Thermodynamic State Tensor Routing (`src/spatial/tensor_router.ts`)
+- [ ] Discrete Topographic Insolation and Solar Zenith Angle formulation (`src/thermodynamics/insolation.ts`)
+- [ ] Spatial-Thermodynamic State Tensor Routing and boundary heat flux operator (`src/spatial/tensor_router.ts`)
 - [ ] Exergy & Entropy Generation Accounting and Gouy-Stodola theorem validation (`src/thermodynamics/exergy.ts`)
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures (`src/thermodynamics/carnot.ts`)
+- [ ] Latent heat phase transitions and hydro-thermodynamic enthalpy feedback (`src/thermodynamics/phase_change.ts`)
 - [ ] Stefan-Boltzmann incoming/outgoing energy balance equations with dynamic cloud-cover and albedo multipliers (`src/thermodynamics/radiative_balance.ts`)
-- [ ] Dynamic Albedo & Radiation Balance Feedback (`src/thermodynamics/albedo.ts`)
+- [ ] Dynamic Albedo & Cryospheric Radiation Balance Feedback (`src/thermodynamics/albedo.ts`)
 - [ ] Biogeochemical Mass-Conservation Reservoirs for C, N, P, and Water (`src/monads/biogeochemical_cycles.ts`)
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
+- [ ] Plant Functional Types (PFT) and Consumer Guild trait interfaces (`src/biosphere/traits.ts`)
+- [ ] Allometric metabolic scaling and Kleiber's Law basal respiration calculator (`src/biosphere/allometry.ts`)
 - [ ] Implement `CSRMatrix` interface holding `values: number[]`, `columnIndices: number[]`, and `rowOffsets: number[]` (`src/biosphere/trophic_matrix.ts`)
 - [ ] Implement `csrMultiplyVector` energy flux propagator across trophic interaction networks (`src/biosphere/trophic_matrix.ts`)
 - [ ] Implement Gauss-Seidel steady-state biomass solver updating node biomass stocks (`src/biosphere/trophic_solver.ts`)
@@ -251,15 +258,18 @@ SPRINT_GOAL: Implement string length boundary validation helper returning explic
 - [ ] Implement microbial necromass and temperature-dependent decomposition kinetics (`src/geobiome/soil_matrix.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
+- [ ] Define `MaterialStream`, `EnergyCarrier`, and process thermodynamic condition interfaces (`src/technosphere/types.ts`)
+- [ ] Abstract class `IndustrialProcessMonad extends ThermodynamicStructure` with First/Second Law enthalpy balances (`src/technosphere/industrial_monad.ts`)
 - [ ] Implement minimum theoretical separation work calculation $\Delta G_{\text{sep}} = -RT \sum y_i \ln(y_i)$ (`src/technosphere/dac_thermodynamics.ts`)
-- [ ] Solid-sorbent thermal regeneration energy requirement function for TSA cycles (`src/technosphere/dac.ts`)
-- [ ] Liquid-solvent calcium carbonate calcination enthalpy balance for caustic recovery (`src/technosphere/dac.ts`)
+- [ ] Solid-sorbent thermal regeneration energy requirement function for TSA cycles (`src/technosphere/dac.ts`, `src/technosphere/dac_solid_sorbent.ts`)
+- [ ] Liquid-solvent calcium carbonate calcination enthalpy balance for caustic recovery (`src/technosphere/dac.ts`, `src/technosphere/dac_liquid_calciner.ts`)
 - [ ] Parasitic electrical and thermal load simulation routing for solid and liquid DAC monads (`src/technosphere/dac.ts`)
 - [ ] Implement stoichiometry solvers for olivine/basalt carbonation mass balances (`src/technosphere/basalt_carbonation.ts`)
 - [ ] Model dissolution kinetics, local pH buffering, and exothermic reaction heat routing across subsurface H3 geological monads (`src/technosphere/basalt_carbonation.ts`)
 - [ ] Implement carbothermal reduction stock-flow calculator for metallurgical silicon production (`src/technosphere/semiconductors_silicon.ts`)
 - [ ] Siemens reactor chemical vapor deposition (CVD) mass-yield equations for polysilicon (`src/technosphere/semiconductors_silicon.ts`)
 - [ ] Ultrapure water (UPW) and acid etching consumption balancer per semiconductor node (`src/technosphere/semiconductors_fab.ts`)
+- [ ] Data center compute monad calculating FLOPs per Joule and thermal dissipation (`src/technosphere/compute_monad.ts`)
 - [ ] Distance-dependent Joule heating loss calculation and thermal waste routing across H3 edges (`src/technosphere/energy_grid.ts`)
 - [ ] Regional electrical transmission network capacity constraints and brownout penalties (`src/technosphere/energy_grid.ts`)
 - [ ] Carnot efficiency bounding function and fuel-to-work conversion monads for thermal power plants (`src/technosphere/power_plants.ts`)
@@ -275,6 +285,8 @@ SPRINT_GOAL: Implement string length boundary validation helper returning explic
 - [ ] SQLite schema definitions for append-only temporal vortex blocks (`db/schema.sql`)
 - [ ] Multi-objective Pareto scoring function integrating human wellbeing, biospheric diversity, and planetary explorability (`src/optimization/pareto_objective.ts`)
 - [ ] Multi-Objective AI Optimization Objective function integrating wellbeing, diversity, and explorability (`src/optimization/ai_symbiosis.ts`)
+
+<!-- BACKLOG_END -->
 
 <!-- BACKLOG_END -->
 

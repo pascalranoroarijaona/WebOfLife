@@ -27,7 +27,7 @@ describe('Sprint 017 - H3 Spatial Index 15-Character Length Validation', () => {
   it('should return false for non-string primitives', () => {
     assert.strictEqual(validateH3IndexLength(null), false);
     assert.strictEqual(validateH3IndexLength(undefined), false);
-    assert.strictEqual(validateH3IndexLength('8928308280fffff'), false);
+    assert.strictEqual(validateH3IndexLength(123456789012345 as any), false);
     assert.strictEqual(validateH3IndexLength({}), false);
     assert.strictEqual(validateH3IndexLength([]), false);
   });

@@ -1,0 +1,207 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 6
+skinparam componentStyle uml2
+skinparam shadowing false
+skinparam class {
+    BackgroundColor #F8F9FA
+    ArrowColor #2C3E50
+    BorderColor #34495E
+}
+
+title Web of Life - Sprint 037 Architecture: Canonical H3 Grid & Thermodynamic State Alignment
+
+package "TypeScript Spatial & Monad Layer (src/)" {
+    class H3GridManager <<singleton>> {
+        + {static} H3_CANONICAL_INDEX_PATTERN: RegExp = /^[0-9a-fA-F]{15}$/
+        + {static} isValidH3CanonicalIndex(index: string): index is CanonicalH3Index
+        + {static} assertCanonicalH3Index(index: string): CanonicalH3Index
+        + {static} getResolution(index: CanonicalH3Index): number
+        + {static} getBaseCell(index: CanonicalH3Index): number
+        + {static} getNeighbors(index: CanonicalH3Index): CanonicalH3Index[]
+    }
+
+    interface H3IndexBrand <<nominal>> {
+        + __brand: "CanonicalH3Index"
+    }
+
+    type CanonicalH3Index = string & H3IndexBrand
+
+    class EarthPod {
+        - _h3Index: CanonicalH3Index
+        - _waterContinentalKg: number
+        - _waterOceanicKg: number
+        - _waterVaporKg: number
+        - _carbonBiomassKg: number
+        - _carbonSoilOrganicKg: number
+        - _carbonAtmosphericCo2Kg: number
+        - _internalEnergyJoules: number
+        - _temperatureKelvin: number
+        - _entropyProductionRateWK: number
+        + getIndex(): CanonicalH3Index
+        + totalWaterMass(): number
+        + totalCarbonMass(): number
+        + applyAdvectionFlux(flux: BoundaryFlux): EarthPod
+        + verifyThermodynamicInvariants(): boolean
+    }
+
+    class SpatialMonad<T> {
+        - _cellIndex: CanonicalH3Index
+        - _value: T
+        + {static} of<U>(cellIndex: CanonicalH3Index, value: U): SpatialMonad<U>
+        + bind<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U>
+        + map<U>(fn: (val: T) => U): SpatialMonad<U>
+        + getCellIndex(): CanonicalH3Index
+        + extract(): T
+    }
+
+    class BoundaryFlux {
+        - _sourceIndex: CanonicalH3Index
+        - _targetIndex: CanonicalH3Index
+        - _waterMassFluxKgPerSec: number
+        - _carbonMassFluxKgPerSec: number
+        - _thermalEnergyFluxWatts: number
+        - _entropyGenFluxWK: number
+        + getSource(): CanonicalH3Index
+        + getTarget(): CanonicalH3Index
+        + isConservative(): boolean
+    }
+}
+
+package "Relational & Time-Series DB Schema (db/schema.sql)" {
+    class spatial_cells <<(T,#7FB3D5) table>> {
+        + h3_index: canonical_h3_index [PK]
+        --
+        * resolution: SMALLINT (0..15)
+        * base_cell: SMALLINT (0..121)
+        * centroid_lat: DOUBLE PRECISION
+        * centroid_lon: DOUBLE PRECISION
+        * cell_area_m2: DOUBLE PRECISION
+        * boundary_perimeter_m: DOUBLE PRECISION
+        * is_active: BOOLEAN
+        * created_at: TIMESTAMPTZ
+        * updated_at: TIMESTAMPTZ
+    }
+
+    class spatial_adjacency_edges <<(T,#7FB3D5) table>> {
+        + source_h3: canonical_h3_index [PK, FK]
+        + target_h3: canonical_h3_index [PK, FK]
+        --
+        * shared_boundary_length_m: DOUBLE PRECISION
+        * advection_normal_azimuth: DOUBLE PRECISION
+        * is_bidirectional: BOOLEAN
+    }
+
+    class thermodynamic_cell_stocks <<(H,#A3E4D7) hypertable>> {
+        + h3_index: canonical_h3_index [PK, FK]
+        + timestamp: TIMESTAMPTZ [PK]
+        --
+        * epoch_height: BIGINT
+        * water_mass_continental_kg: DOUBLE PRECISION
+        * water_mass_oceanic_kg: DOUBLE PRECISION
+        * water_mass_vapor_kg: DOUBLE PRECISION
+        * carbon_mass_biomass_kg: DOUBLE PRECISION
+        * carbon_mass_detritus_kg: DOUBLE PRECISION
+        * carbon_mass_soil_organic_kg: DOUBLE PRECISION
+        * carbon_mass_atmospheric_co2_kg: DOUBLE PRECISION
+        * internal_energy_joules: DOUBLE PRECISION
+        * mean_temperature_kelvin: DOUBLE PRECISION
+        * entropy_production_rate_w_k: DOUBLE PRECISION
+        * solar_insolation_watts_m2: DOUBLE PRECISION
+        * state_vector_hash: BYTEA
+    }
+
+    class boundary_flux_transactions <<(H,#A3E4D7) hypertable>> {
+        + flux_id: UUID [PK]
+        --
+        * source_h3: canonical_h3_index [FK]
+        * target_h3: canonical_h3_index [FK]
+        * epoch_height: BIGINT
+        * timestamp: TIMESTAMPTZ
+        * water_mass_flux_kg_s: DOUBLE PRECISION
+        * carbon_mass_flux_kg_s: DOUBLE PRECISION
+        * thermal_energy_flux_watts: DOUBLE PRECISION
+        * entropy_generation_flux_w_k: DOUBLE PRECISION (>= 0)
+        * flux_signature: BYTEA
+    }
+
+    class ledger_blocks <<(T,#F9E79F) table>> {
+        + block_height: BIGINT [PK]
+        --
+        * block_hash: BYTEA [UNIQUE]
+        * parent_hash: BYTEA
+        * epoch_timestamp: TIMESTAMPTZ
+        * spatial_merkle_root: BYTEA
+        * state_entropy_merkle_root: BYTEA
+        * total_water_mass_kg: DOUBLE PRECISION
+        * total_carbon_mass_kg: DOUBLE PRECISION
+        * total_internal_energy_joules: DOUBLE PRECISION
+        * total_entropy_generated_j_k: DOUBLE PRECISION
+        * mass_conservation_residual: DOUBLE PRECISION (|r| < 1e-6)
+        * validator_node_address: VARCHAR(42)
+        * prover_signature: BYTEA
+        * created_at: TIMESTAMPTZ
+    }
+
+    class spatial_monad_mutations <<(T,#7FB3D5) table>> {
+        + mutation_id: UUID [PK]
+        --
+        * block_height: BIGINT [FK]
+        * h3_index: canonical_h3_index [FK]
+        * monad_bind_depth: INTEGER
+        * operator_name: VARCHAR(64)
+        * initial_state_hash: BYTEA
+        * resulting_state_hash: BYTEA
+        * delta_water_mass_kg: DOUBLE PRECISION
+        * delta_carbon_mass_kg: DOUBLE PRECISION
+        * delta_energy_joules: DOUBLE PRECISION
+        * delta_entropy_j_k: DOUBLE PRECISION (>= 0)
+        * execution_time_us: INTEGER
+        * created_at: TIMESTAMPTZ
+    }
+}
+
+' TypeScript Internal Relationships
+H3IndexBrand <|.. CanonicalH3Index
+H3GridManager ..> CanonicalH3Index : validates & asserts
+EarthPod o-- CanonicalH3Index : branded index
+SpatialMonad o-- CanonicalH3Index : anchored cell
+BoundaryFlux o-- CanonicalH3Index : source & target
+
+' Cross-Layer Mapping & Database Relationships
+EarthPod ..|> thermodynamic_cell_stocks : maps directly to
+SpatialMonad ..|> spatial_monad_mutations : journaled into
+BoundaryFlux ..|> boundary_flux_transactions : recorded as
+
+spatial_cells "1" -- "0..*" spatial_adjacency_edges : source
+spatial_cells "1" -- "0..*" spatial_adjacency_edges : target
+spatial_cells "1" -- "0..*" thermodynamic_cell_stocks : tracks
+spatial_cells "1" -- "0..*" spatial_monad_mutations : mutated_by
+
+spatial_adjacency_edges "1" -- "0..*" boundary_flux_transactions : channels
+
+ledger_blocks "1" -- "0..*" boundary_flux_transactions : aggregates
+ledger_blocks "1" -- "0..*" spatial_monad_mutations : commits
+
+note right of H3GridManager
+  <b>RFC-037 Constraint:</b>
+  Matches: <b>/^[0-9a-fA-F]{15}$/</b>
+  - 15 hexadecimal digits
+  - Mode = 1 (Cell)
+  - Prevents orphan buckets
+  - Guaranteed Mass Conservation:
+    Delta M_total = 0
+end note
+
+note bottom of ledger_blocks
+  <b>Thermodynamic Blockchain Guard:</b>
+  1. Mass Conservation Invariant:
+     |sum(dM_w) + sum(dM_c)| < 1e-6
+  2. Second Law of Thermodynamics:
+     dS_gen / dt >= 0
+  3. Solar Insolation Bound:
+     U_input <= S_0 * (1 - albedo) * A_cell
+end note
+
+@enduml

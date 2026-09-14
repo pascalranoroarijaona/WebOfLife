@@ -1,5 +1,5 @@
 {
-  "current_sprint": 37,
+  "current_sprint": 38,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -180,6 +180,11 @@
       "sprint": 36,
       "goal": "Implement string length boundary validation helper returning explicit boolean flags in `src/spatial/h3_grid.ts`.",
       "timestamp": "2026-09-14T10:03:35.906952+00:00"
+    },
+    {
+      "sprint": 37,
+      "goal": "Implement canonical 15-character hexadecimal regex constant H3_CANONICAL_INDEX_PATTERN in src/spatial/h3_grid.ts.",
+      "timestamp": "2026-09-14T11:24:47.688941+00:00"
     }
   ]
 }

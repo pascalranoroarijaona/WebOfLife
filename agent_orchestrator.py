@@ -81,7 +81,7 @@ MIN_CALL_DELAY_SEC = 3.0
 
 # Global Provider State
 SELECTED_PROVIDER = "gemini"
-SELECTED_MODEL = "gemini-flash-lite-latest"
+SELECTED_MODEL = "gemini-3.8-flash"
 
 gemini_client = None
 hf_client = None
@@ -93,7 +93,7 @@ def init_provider(provider: str, custom_model: Optional[str] = None):
     SELECTED_PROVIDER = provider.lower()
 
     if SELECTED_PROVIDER == "gemini":
-        SELECTED_MODEL = custom_model or "gemini-flash-lite-latest"
+        SELECTED_MODEL = custom_model or "gemini-3.8-flash"
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             print("❌ Error: Missing Gemini API key. Set GEMINI_API_KEY in your environment.")
