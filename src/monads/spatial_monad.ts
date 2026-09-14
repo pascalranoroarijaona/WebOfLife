@@ -1,4 +1,4 @@
-import { guardH3Payload, H3GridParser, H3Validator, H3Error, H3ErrorCode } from '../spatial/h3_grid';
+import { guardH3Payload, H3GridParser, H3Validator, H3Error, H3ErrorCode } from '../spatial/h3_grid.js';
 
 export { H3ErrorCode };
 
@@ -99,6 +99,11 @@ export class SpatialMonad<T> {
       return true;
     }
     return false;
+  }
+
+  public bind<U>(payload: unknown, fn: (val: any) => U): U {
+    guardH3Payload(payload);
+    return fn(payload);
   }
 }
 

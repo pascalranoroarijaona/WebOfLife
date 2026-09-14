@@ -1,61 +1,53 @@
 -- ============================================================================
--- Web of Life Database & Thermodynamic Blockchain Schema (Sprint 016)
+-- Web of Life: Database, UML & Thermodynamic Blockchain Architecture
+-- Sprint 017 Schema Update: H3 Spatial Indexing & Thermodynamic Ledger
 -- ============================================================================
 
--- Enable TimescaleDB extension for time-series thermodynamic stocks & flows
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ============================================================================
--- 1. SPATIAL & H3 GRID LEDGER
--- ============================================================================
-
-CREATE TABLE spatial_cells (
-    h3_index VARCHAR(15) PRIMARY KEY,
-    is_valid BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_h3_length CHECK (LENGTH(h3_index) = 15),
-    CONSTRAINT chk_h3_hex CHECK (h3_index ~ '^[0-9a-fA-F]{15}$')
+-- ----------------------------------------------------------------------------
+-- 1. Thermodynamic Blockchain Ledger (First & Second Law Conservation)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    previous_hash VARCHAR(64) NOT NULL,
+    merkle_root VARCHAR(64) NOT NULL,
+    entropy_delta NUMERIC(20, 10) NOT NULL CHECK (entropy_delta >= 0),
+    solar_input_joules NUMERIC(20, 10) NOT NULL CHECK (solar_input_joules >= 0),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================================
--- 2. THERMODYNAMIC STOCKS & MONADS
--- ============================================================================
-
-CREATE TABLE trophic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    h3_index VARCHAR(15) NOT NULL REFERENCES spatial_cells(h3_index),
-    energy_joules DOUBLE PRECISION NOT NULL CHECK (energy_joules >= 0.0),
-    entropy_j_k DOUBLE PRECISION NOT NULL CHECK (entropy_j_k >= 0.0),
-    biomass_grams DOUBLE PRECISION NOT NULL CHECK (biomass_grams >= 0.0),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Convert to hypertable for high-frequency thermodynamic telemetry
-SELECT create_hypertable('trophic_stocks', 'updated_at', if_not_exists => TRUE);
-
--- ============================================================================
--- 3. BLOCKCHAIN TRANSACTION LEDGER (FIRST & SECOND LAW CONSERVATION)
--- ============================================================================
-
-CREATE TABLE block_transactions (
-    tx_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL,
-    h3_index VARCHAR(15) NOT NULL REFERENCES spatial_cells(h3_index),
-    source_stock_id UUID REFERENCES trophic_stocks(stock_id),
-    target_stock_id UUID REFERENCES trophic_stocks(stock_id),
-    delta_energy_joules DOUBLE PRECISION NOT NULL,
-    delta_entropy_j_k DOUBLE PRECISION NOT NULL,
-    solar_flux_constant DOUBLE PRECISION NOT NULL,
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_id UUID REFERENCES thermodynamic_blocks(block_id) ON DELETE CASCADE,
+    source_monad_id UUID NOT NULL,
+    target_monad_id UUID NOT NULL,
+    energy_joules NUMERIC(20, 10) NOT NULL CHECK (energy_joules >= 0),
     signature VARCHAR(128) NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-SELECT create_hypertable('block_transactions', 'recorded_at', if_not_exists => TRUE);
+-- ----------------------------------------------------------------------------
+-- 2. Spatial Indexing & H3 Grids (Sprint 017)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spatial_h3_indices (
+    h3_index VARCHAR(15) PRIMARY KEY CHECK (length(h3_index) = 15 AND h3_index ~ '^[0-9a-f]{15}$'),
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    biome_type VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
--- ============================================================================
--- 4. INDEXING FOR PERFORMANCE & INTEGRITY
--- ============================================================================
+-- ----------------------------------------------------------------------------
+-- 3. Biosphere Monad Stocks & Trophic Flows
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS trophic_monads (
+    monad_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index VARCHAR(15) REFERENCES spatial_h3_indices(h3_index),
+    trophic_level VARCHAR(32) NOT NULL CHECK (trophic_level IN ('PRIMARY_PRODUCER', 'HERBIVORE', 'CARNIVORE', 'APEX_PREDATOR', 'DECOMPOSER')),
+    biomass_joules NUMERIC(20, 10) NOT NULL CHECK (biomass_joules >= 0),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
-CREATE INDEX idx_spatial_cells_h3 ON spatial_cells(h3_index);
-CREATE INDEX idx_trophic_stocks_spatial ON trophic_stocks(h3_index, updated_at DESC);
-CREATE INDEX idx_block_transactions_height ON block_transactions(block_height DESC);
+-- Indexes for performance & spatial queries
+CREATE INDEX IF NOT EXISTS idx_spatial_h3_index ON spatial_h3_indices(h3_index);
+CREATE INDEX IF NOT EXISTS idx_trophic_monads_h3 ON trophic_monads(h3_index);

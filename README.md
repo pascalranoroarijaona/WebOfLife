@@ -206,7 +206,7 @@ python agent_orchestrator.py --wipe
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 21%
-SPRINT_GOAL: Implement 15-character length validation helper function in src/spatial/h3_grid.ts.
+SPRINT_GOAL: Implement 15-character length validation helper function src/spatial/h3_grid.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)

@@ -1,0 +1,70 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 017 Architecture: H3 Spatial & Thermodynamic Ledger
+
+package "src.spatial" {
+    class H3Grid {
+        +validateH3IndexLength(index: string): boolean
+        +getNeighborIndices(index: string): string[]
+    }
+}
+
+package "src.monads" {
+    class SpatialMonad {
+        +monadId: UUID
+        +h3Index: string
+        +biomassJoules: number
+        +commitStock(): void
+    }
+}
+
+package "src.biosphere" {
+    class TrophicLevel {
+        +levelName: string
+        +calculateEnergyTransfer(input: number): number
+    }
+}
+
+package "db.schema" {
+    class ThermodynamicBlock {
+        +blockId: UUID
+        +previousHash: string
+        +merkleRoot: string
+        +entropyDelta: number
+        +solarInputJoules: number
+    }
+
+    class ThermodynamicTransaction {
+        +txId: UUID
+        +blockId: UUID
+        +sourceMonadId: UUID
+        +targetMonadId: UUID
+        +energyJoules: number
+        +signature: string
+    }
+
+    class SpatialH3IndexRecord {
+        +h3Index: string
+        +resolution: number
+        +biomeType: string
+    }
+
+    class TrophicMonadRecord {
+        +monadId: UUID
+        +h3Index: string
+        +trophicLevel: string
+        +biomassJoules: number
+    }
+}
+
+H3Grid --> SpatialH3IndexRecord : validates 15-char hex
+SpatialMonad --> H3Grid : uses validation
+SpatialMonad --> TrophicLevel : encapsulates
+ThermodynamicBlock "1" *-- "*" ThermodynamicTransaction : contains
+SpatialH3IndexRecord "1" -- "*" TrophicMonadRecord : spatially anchors
+TrophicMonadRecord --> ThermodynamicTransaction : participates in
+
+@enduml

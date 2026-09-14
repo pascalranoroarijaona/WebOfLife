@@ -19,7 +19,7 @@ describe('Sprint 012 - H3 String Payload Null-Check Guard Clauses', () => {
             guardH3Payload(undefined);
         }, /\[Thermodynamic Spatial Error\]/);
         assert.throws(() => {
-            monad.bind(null, (idx) => idx);
+            monad.bind(undefined, (idx) => idx);
         }, /\[Thermodynamic Spatial Error\]/);
     });
     it('should throw thermodynamic spatial errors on empty or whitespace-only strings', () => {

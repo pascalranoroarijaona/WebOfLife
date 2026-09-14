@@ -7,20 +7,25 @@ describe('Sprint 006: Uber H3 Index String Format Validation & Error Code Mappin
   const validator = new H3Validator();
 
   it('should validate correct 15-character hex H3 index strings', () => {
-    // A sample valid H3-like 15-char hex string with resolution 5 and base cell 10
     const validIndex = '85283473fffffff';
     assert.strictEqual(validator.validate(validIndex), true);
-    assert.doesNotThrow(() => validator.assertValid(validIndex));
+    assert.doesNotThrow(() => {
+      const valArg: string = validIndex;
+      const v: H3Validator = validator;
+      v.assertValid(valArg);
+    });
   });
 
   it('should reject non-hex characters with INVALID_CHARACTER', () => {
     const invalidCharIndex = '85283473fffffzZ';
     assert.strictEqual(validator.validate(invalidCharIndex), false);
     assert.throws(() => {
-      validator.assertValid(invalidCharIndex);
+      const valArg: string = invalidCharIndex;
+      const v: H3Validator = validator;
+      v.assertValid(valArg);
     }, (err: any) => {
       assert(err instanceof H3Error);
-      assert.strictEqual(err.code, H3ErrorCode.INVALID_CHARACTER);
+      assert.strictEqual((err as H3Error).code, H3ErrorCode.INVALID_CHARACTER);
       return true;
     });
   });
@@ -29,21 +34,36 @@ describe('Sprint 006: Uber H3 Index String Format Validation & Error Code Mappin
     const shortIndex = '85283473fff';
     const longIndex = '85283473ffffffffffff';
     
-    assert.throws(() => validator.assertValid(shortIndex), (err: H3Error) => {
-      assert.strictEqual(err.code, H3ErrorCode.INVALID_LENGTH);
+    assert.throws(() => {
+      const valArg: string = shortIndex;
+      const v: H3Validator = validator;
+      v.assertValid(valArg);
+    }, (err: any) => {
+      const h3Err = err as H3Error;
+      assert.strictEqual(h3Err.code, H3ErrorCode.INVALID_LENGTH);
       return true;
     });
 
-    assert.throws(() => validator.assertValid(longIndex), (err: H3Error) => {
-      assert.strictEqual(err.code, H3ErrorCode.INVALID_LENGTH);
+    assert.throws(() => {
+      const valArg: string = longIndex;
+      const v: H3Validator = validator;
+      v.assertValid(valArg);
+    }, (err: any) => {
+      const h3Err = err as H3Error;
+      assert.strictEqual(h3Err.code, H3ErrorCode.INVALID_LENGTH);
       return true;
     });
   });
 
   it('should reject null index (all zeros) with NULL_INDEX', () => {
     const nullIndex = '000000000000000';
-    assert.throws(() => validator.assertValid(nullIndex), (err: H3Error) => {
-      assert.strictEqual(err.code, H3ErrorCode.NULL_INDEX);
+    assert.throws(() => {
+      const valArg: string = nullIndex;
+      const v: H3Validator = validator;
+      v.assertValid(valArg);
+    }, (err: any) => {
+      const h3Err = err as H3Error;
+      assert.strictEqual(h3Err.code, H3ErrorCode.NULL_INDEX);
       return true;
     });
   });

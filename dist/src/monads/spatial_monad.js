@@ -1,4 +1,4 @@
-import { guardH3Payload, H3GridParser, H3Error, H3ErrorCode } from '../spatial/h3_grid';
+import { guardH3Payload, H3GridParser, H3Error, H3ErrorCode } from '../spatial/h3_grid.js';
 export { H3ErrorCode };
 export class SpatialMonad {
     stock;
@@ -79,6 +79,10 @@ export class SpatialMonad {
             return true;
         }
         return false;
+    }
+    bind(payload, fn) {
+        guardH3Payload(payload);
+        return fn(payload);
     }
 }
 export class H3ValidationMonad {

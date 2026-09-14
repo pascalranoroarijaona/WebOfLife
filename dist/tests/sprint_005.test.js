@@ -5,24 +5,23 @@ import { H3ErrorCode } from '../src/spatial/h3_types.js';
 describe('Sprint 005 - Uber H3 Index String Format Validation and Error Code Mapping', () => {
     const h3Grid = new H3Grid();
     it('should successfully validate valid 15-character hex strings across valid resolutions', () => {
-        // Constructing mock H3 strings where char at index 1 represents resolution (0-9, a-f)
         const validIndices = [
-            '8019fffffffffff', // resolution 0
-            '8119fffffffffff', // resolution 1
-            '8219fffffffffff', // resolution 2
-            '8319fffffffffff', // resolution 3
-            '8419fffffffffff', // resolution 4
-            '8519fffffffffff', // resolution 5
-            '8619fffffffffff', // resolution 6
-            '8719fffffffffff', // resolution 7
-            '8819fffffffffff', // resolution 8
-            '8919fffffffffff', // resolution 9
-            '8a19fffffffffff', // resolution 10 (10 in hex)
-            '8b19fffffffffff', // resolution 11 (11 in hex)
-            '8c19fffffffffff', // resolution 12 (12 in hex)
-            '8d19fffffffffff', // resolution 13 (13 in hex)
-            '8e19fffffffffff', // resolution 14 (14 in hex)
-            '8f19fffffffffff' // resolution 15 (15 in hex)
+            '8019fffffffffff',
+            '8119fffffffffff',
+            '8219fffffffffff',
+            '8319fffffffffff',
+            '8419fffffffffff',
+            '8519fffffffffff',
+            '8619fffffffffff',
+            '8719fffffffffff',
+            '8819fffffffffff',
+            '8919fffffffffff',
+            '8a19fffffffffff',
+            '8b19fffffffffff',
+            '8c19fffffffffff',
+            '8d19fffffffffff',
+            '8e19fffffffffff',
+            '8f19fffffffffff'
         ];
         validIndices.forEach((idx, expectedRes) => {
             const res = h3Grid.validateIndex(idx);
@@ -32,8 +31,8 @@ describe('Sprint 005 - Uber H3 Index String Format Validation and Error Code Map
         });
     });
     it('should reject invalid lengths (<15 and >15)', () => {
-        const tooShort = '8f19ffffffffff'; // 14 chars
-        const tooLong = '8f19ffffffffffff'; // 16 chars
+        const tooShort = '8f19ffffffffff';
+        const tooLong = '8f19ffffffffffff';
         const empty = '';
         const resShort = h3Grid.validateIndex(tooShort);
         assert.strictEqual(resShort.isValid, false);
@@ -61,10 +60,18 @@ describe('Sprint 005 - Uber H3 Index String Format Validation and Error Code Map
     });
     it('should assert valid indices successfully and throw on invalid ones', () => {
         assert.doesNotThrow(() => {
-            h3Grid.assertValidIndex('8f19fffffffffff');
+            const validIndexStr = '8f19fffffffffff';
+            const gridInst = h3Grid;
+            gridInst.assertValidIndex(validIndexStr);
         });
         assert.throws(() => {
-            h3Grid.assertValidIndex('invalid_index_string');
-        }, /Spatial Validation Error/);
+            const invalidIndexStr = 'invalid_index_string';
+            const gridInst = h3Grid;
+            gridInst.assertValidIndex(invalidIndexStr);
+        }, (err) => {
+            assert(err instanceof Error);
+            assert(err.message.includes('Spatial Validation Error'));
+            return true;
+        });
     });
 });
