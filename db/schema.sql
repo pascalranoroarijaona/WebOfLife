@@ -1,44 +1,48 @@
--- Updated Schema & Ledger Definitions for Sprint 031: H3 Hexadecimal Validation & Spatial Monad Stocks
+-- Sprint 032 Schema Update: H3 Spatial Monad Validation & Thermodynamic Accounting
+-- Ensure strict adherence to time-series ledger standards for spatial energy states.
 
--- Drop existing tables if re-initializing sprint
-DROP TABLE IF EXISTS spatial_quarantine_ledger CASCADE;
-DROP TABLE IF EXISTS h3_spatial_monad_stocks CASCADE;
-DROP TABLE IF EXISTS thermodynamic_entropy_logs CASCADE;
-
--- 1. H3 Spatial Monad Stocks & State Tracking
-CREATE TABLE h3_spatial_monad_stocks (
-    monad_id VARCHAR(64) PRIMARY KEY,
-    raw_identifier VARCHAR(128) NOT NULL,
-    is_valid_hex BOOLEAN NOT NULL DEFAULT FALSE,
-    entropy_state NUMERIC(18, 6) NOT NULL DEFAULT 0.000000,
-    trophic_tier INTEGER NOT NULL CHECK (trophic_tier >= 0 AND trophic_tier <= 5),
-    solar_energy_consumed NUMERIC(18, 6) NOT NULL CHECK (solar_energy_consumed >= 0.0),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE IF NOT EXISTS thermodynamic_constants (
+    constant_key VARCHAR(64) PRIMARY KEY,
+    numeric_value DECIMAL(20, 10) NOT NULL,
+    description TEXT,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Spatial Quarantine Ledger (Second Law Entropy Sinks)
-CREATE TABLE spatial_quarantine_ledger (
-    quarantine_id SERIAL PRIMARY KEY,
-    monad_id VARCHAR(64) REFERENCES h3_spatial_monad_stocks(monad_id) ON DELETE CASCADE,
-    invalid_token VARCHAR(128) NOT NULL,
-    rejection_reason VARCHAR(255) NOT NULL,
-    quarantine_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    entropy_delta NUMERIC(18, 6) NOT NULL
+INSERT INTO thermodynamic_constants (constant_key, numeric_value, description)
+VALUES ('SOLAR_INPUT_BASELINE', 1361.0000000000, 'Solar irradiance baseline for validation computational overhead')
+ON CONFLICT (constant_key) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS spatial_monad_states (
+    state_id VARCHAR(64) PRIMARY KEY,
+    state_name VARCHAR(32) NOT NULL CHECK (state_name IN ('UnvalidatedState', 'ActiveSpatialStock', 'SinkState')),
+    description TEXT
 );
 
--- 3. Thermodynamic Blockchain Block Transaction Signatures
-CREATE TABLE thermodynamic_entropy_logs (
-    block_id SERIAL PRIMARY KEY,
-    transaction_hash VARCHAR(64) UNIQUE NOT NULL,
-    monad_id VARCHAR(64) REFERENCES h3_spatial_monad_stocks(monad_id),
-    first_law_conservation_check BOOLEAN NOT NULL DEFAULT TRUE,
-    second_law_entropy_delta NUMERIC(18, 6) NOT NULL,
-    proof_of_solar_work NUMERIC(18, 6) NOT NULL,
-    signed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+INSERT INTO spatial_monad_states (state_id, state_name, description) VALUES
+('STATE_UNVAL', 'UnvalidatedState', 'Initial ingestion state prior to regex validation'),
+('STATE_ACTIVE', 'ActiveSpatialStock', 'Valid H3 15-char hex spatial token, maintaining free energy'),
+('STATE_SINK', 'SinkState', 'Invalid payload discarded to entropy sink')
+ON CONFLICT (state_id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS h3_spatial_tokens (
+    token_id VARCHAR(64) PRIMARY KEY,
+    h3_payload VARCHAR(15) NOT NULL CHECK (h3_payload ~ '^[0-9a-fA-F]{15}$'),
+    resolution INT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    state_id VARCHAR(64) NOT NULL REFERENCES spatial_monad_states(state_id),
+    validated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    entropy_delta DECIMAL(16, 8) DEFAULT 0.00000000
 );
 
--- Indexes for high-frequency spatial grid queries
-CREATE INDEX idx_h3_valid_hex ON h3_spatial_monad_stocks(is_valid_hex);
-CREATE INDEX idx_quarantine_timestamp ON spatial_quarantine_ledger(quarantine_timestamp);
-CREATE INDEX idx_thermodynamic_hash ON thermodynamic_entropy_logs(transaction_hash);
+CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
+    transaction_id UUID PRIMARY KEY,
+    token_id VARCHAR(64) REFERENCES h3_spatial_tokens(token_id),
+    source_state VARCHAR(64) NOT NULL REFERENCES spatial_monad_states(state_id),
+    target_state VARCHAR(64) NOT NULL REFERENCES spatial_monad_states(state_id),
+    energy_joules DECIMAL(20, 10) NOT NULL,
+    entropy_generated_joules_k DECIMAL(20, 10) NOT NULL,
+    transaction_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    block_signature VARCHAR(128) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_h3_spatial_tokens_payload ON h3_spatial_tokens(h3_payload);
+CREATE INDEX IF NOT EXISTS idx_thermodynamic_tx_timestamp ON thermodynamic_stock_transactions(transaction_timestamp);

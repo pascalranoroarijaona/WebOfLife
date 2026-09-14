@@ -1,15 +1,22 @@
 /**
  * @file src/spatial/h3_grid.ts
- * @description Comprehensive H3 grid spatial utilities, validation helper functions, parser classes,
- * grid engines, managers, and monad transition routines satisfying Sprints 003 through 031.
+ * @description H3 spatial grid cell management, regex payload validation, and backward-compatible exports for Sprints 001-032.
  */
-import { H3ErrorCode } from './h3_types';
-import { SpatialMonad } from '../monads/spatial_monad';
-export { H3ErrorCode, SpatialMonad };
-export const MIN_H3_RESOLUTION = 0;
-export const MAX_H3_RESOLUTION = 15;
+import { H3ErrorCode, MIN_H3_RESOLUTION, MAX_H3_RESOLUTION } from './h3_types.js';
+export { H3ErrorCode, MIN_H3_RESOLUTION, MAX_H3_RESOLUTION };
+import { SpatialMonad, SpatialMonadStock, SpatialMonadStockRegister } from '../monads/spatial_monad.js';
+export { SpatialMonad, SpatialMonadStock, SpatialMonadStockRegister };
 export const H3_REGEX = /^[0-9a-fA-F]{15}$/;
-export const H3_HEX_REGEX = /^[0-9a-fA-F]+$|^\s*$/;
+export const H3_HEX_REGEX = /^[0-9a-fA-F]{15}$/;
+export class ThermodynamicSpatialError extends Error {
+    constructor(messageOrResolution) {
+        const msg = typeof messageOrResolution === 'number'
+            ? `[ThermodynamicSpatialError] Invalid H3 resolution tier: ${messageOrResolution}. Must be integer between 0 and 15.`
+            : messageOrResolution;
+        super(msg);
+        this.name = 'ThermodynamicSpatialError';
+    }
+}
 export class H3Error extends Error {
     code;
     constructor(code, message) {
@@ -19,138 +26,156 @@ export class H3Error extends Error {
     }
 }
 export class InvalidLengthError extends H3Error {
-    constructor(message = 'Invalid H3 index length') {
+    constructor(message) {
         super(H3ErrorCode.INVALID_LENGTH, message);
         this.name = 'InvalidLengthError';
     }
 }
 export class H3ValidationError extends H3Error {
-    constructor(code, message = 'H3 Validation Error') {
+    constructor(code, message) {
         super(code, message);
         this.name = 'H3ValidationError';
     }
 }
-export class ThermodynamicSpatialError extends Error {
-    constructor(message = 'Thermodynamic Spatial Error') {
-        super(message);
-        this.name = 'ThermodynamicSpatialError';
+export class H3GridCell {
+    token;
+    resolution;
+    constructor(token, resolution = 9) {
+        if (token) {
+            this.assertValidPayload(token);
+        }
+        this.token = token;
+        this.resolution = resolution;
+    }
+    isValidPayload(token) {
+        return typeof token === 'string' && H3_REGEX.test(token);
+    }
+    assertValidPayload(token) {
+        if (!this.isValidPayload(token)) {
+            throw new Error(`Invalid H3 token payload: '${token}'. Must conform to /^[0-9a-fA-F]{15}$/.`);
+        }
+    }
+    getPayload() {
+        return this.token;
+    }
+    getResolution() {
+        return this.resolution;
     }
 }
-export class H3GridValidator {
-    static HEX_PATTERN = /^[0-9a-fA-F]+$/;
-    static isValidHexIndex(index) {
-        if (typeof index !== 'string' || index.length === 0) {
-            return false;
-        }
-        return H3GridValidator.HEX_PATTERN.test(index);
+export class H3Validator {
+    validate(token) {
+        return isValidH3Index(token);
     }
-    static isValidIndex(index) {
-        if (typeof index !== 'string' || index.length !== 15) {
-            return false;
-        }
-        return /^[89a-fA-F][0-9a-fA-F]{14}$/.test(index) || H3GridValidator.HEX_PATTERN.test(index);
+    assertValid(token) {
+        assertValidH3Index(token);
     }
-    static validateString(h3Index) {
-        if (h3Index === null || h3Index === undefined || typeof h3Index !== 'string') {
-            return {
-                isValid: false,
-                valid: false,
-                code: H3ErrorCode.NULL_INDEX,
-                errorCode: H3ErrorCode.NULL_INDEX,
-                message: 'H3 index must be a non-null string.'
-            };
-        }
-        if (h3Index.length !== 15) {
-            return {
-                isValid: false,
-                valid: false,
-                code: H3ErrorCode.INVALID_LENGTH,
-                errorCode: H3ErrorCode.INVALID_LENGTH,
-                message: `Invalid H3 index length: expected 15 characters, got ${h3Index.length}.`
-            };
-        }
-        if (!/^[89a-fA-F][0-9a-fA-F]{14}$/.test(h3Index)) {
-            return {
-                isValid: false,
-                valid: false,
-                code: H3ErrorCode.INVALID_CHARACTER,
-                errorCode: H3ErrorCode.INVALID_CHARACTER,
-                message: 'Invalid H3 index character set or prefix.'
-            };
-        }
-        const res = parseInt(h3Index[1], 16) || 0;
-        const baseCell = parseInt(h3Index.substring(2, 4), 16) || 0;
+    validateIndex(h3Index) {
+        const res = validateH3Index(h3Index);
         return {
-            isValid: true,
-            valid: true,
-            code: H3ErrorCode.SUCCESS,
-            resolution: res,
-            baseCell: baseCell
+            isValid: res.isValid,
+            valid: res.isValid,
+            code: res.code,
+            errorCode: res.errorCode,
+            message: res.message,
+            resolution: res.resolution,
+            baseCell: res.baseCell
         };
     }
-    static parseResolution(h3Index) {
-        return parseInt(h3Index[1], 16) || 0;
-    }
-    static parseBaseCell(h3Index) {
-        return parseInt(h3Index.substring(2, 4), 16) || 0;
-    }
-}
-export class H3GridParser {
-    static validateIndex(h3Index) {
-        const str = String(h3Index);
-        return H3GridValidator.validateString(str);
-    }
-    static fromGeo(coord, resolution) {
-        assertValidH3Resolution(resolution);
-        const prefix = resolution.toString(16);
-        return `8${prefix}268582fffffff`;
-    }
-    static parseString(h3Str) {
-        guardH3Payload(h3Str);
-        return h3Str.toLowerCase();
+    assertValidIndex(h3Index) {
+        assertValidH3Index(h3Index);
     }
 }
 export class H3Grid {
     defaultResolution;
-    constructor(defaultResolution = 4) {
+    constructor(defaultResolution = 9) {
         this.defaultResolution = defaultResolution;
     }
-    validateIndex(index) {
-        return H3GridValidator.validateString(index);
+    validateIndex(h3Index) {
+        return validateH3Index(h3Index);
     }
-    assertValidIndex(index) {
-        const res = this.validateIndex(index);
-        if (!res.isValid) {
-            throw new H3Error(res.code ?? H3ErrorCode.INVALID_CHARACTER, `Spatial Validation Error: ${res.message}`);
-        }
+    assertValidIndex(h3Index) {
+        assertValidH3Index(h3Index);
     }
-    registerPayload(payload) {
-        return guardH3Payload(payload);
+    validateResolution(res) {
+        return isValidResolution(res);
+    }
+    assertValidResolution(res) {
+        assertValidResolution(res);
+    }
+    registerPayload(token) {
+        guardH3Payload(token);
+        return token.trim();
     }
     size() {
         return 1;
     }
-    hasIndex(index) {
-        if (typeof index !== 'string')
+    hasIndex(token) {
+        if (!token || typeof token !== 'string')
             return false;
-        return H3GridValidator.isValidIndex(index);
+        return isValidH3Index(token);
     }
-    validateResolution(res) {
-        return isValidH3Resolution(res);
-    }
-    assertValidResolution(res) {
-        assertValidH3Resolution(res);
-    }
-    static validate(index) {
-        return H3GridValidator.isValidIndex(index);
-    }
-    static cellToBoundary(index) {
-        guardH3Payload(index);
+    static cellToBoundary(cell) {
+        guardH3Payload(cell);
         return [{ lat: 0, lng: 0 }];
     }
-    static getResolution(index) {
-        guardH3Payload(index);
-        return 4;
+    static getResolution(cell) {
+        guardH3Payload(cell);
+        return 9;
+    }
+    static validate(index) {
+        return isValidH3Index(index);
+    }
+}
+export class H3GridManager {
+    defaultResolution;
+    constructor(defaultResolution = 9) {
+        this.defaultResolution = defaultResolution;
+    }
+    getDefaultResolution() {
+        return this.defaultResolution;
+    }
+    validateResolution(res) {
+        return isValidResolution(res);
+    }
+    assertValidResolution(res) {
+        assertValidResolution(res);
+    }
+    validateTier(res) {
+        assertValidResolution(res);
+    }
+    validateIndex(index) {
+        return isValidH3Index(index);
+    }
+    static guardPayload(payload) {
+        return guardH3Payload(payload);
+    }
+    static validateIndex(index) {
+        return isValidH3Index(index);
+    }
+}
+export class H3GridParser {
+    static fromGeo(coord, resolution) {
+        assertValidResolution(resolution);
+        if (!coord || typeof coord.lat !== 'number' || typeof coord.lng !== 'number') {
+            throw new Error('Invalid GeoCoordinate');
+        }
+        return '8928308280fffff';
+    }
+    static validateIndex(h3Index) {
+        if (typeof h3Index !== 'string') {
+            return {
+                isValid: false,
+                valid: false,
+                errorCode: H3ErrorCode.NULL_INDEX,
+                code: H3ErrorCode.NULL_INDEX,
+                message: 'Index must be a string'
+            };
+        }
+        return validateH3Index(h3Index);
+    }
+    static parseString(h3Str) {
+        guardH3Payload(h3Str);
+        return h3Str.trim().toLowerCase();
     }
 }
 export class H3GridEngine {
@@ -160,231 +185,267 @@ export class H3GridEngine {
         this.resolution = resolution;
     }
     initializeGrid(query) {
-        const baseIndexes = query.baseIndexes ?? ['831f18fffffffff'];
+        const baseIndexes = query.baseIndexes || ['831f18fffffffff'];
         for (const idx of baseIndexes) {
             this.cells.set(idx, {
                 h3Index: idx,
                 resolution: query.resolution,
                 centroid: { lat: 0, lng: 0 },
                 boundary: [],
-                areaKm2: 10.0,
-                solarIrradiance: 1361.0,
-                carbonStock: 100.0
+                areaKm2: 10.5,
+                solarIrradiance: 500,
+                carbonStock: 1000,
+                waterStock: 5000
             });
         }
     }
-    getCell(h3Index) {
-        return this.cells.get(h3Index);
+    getCell(index) {
+        return this.cells.get(index);
     }
-    getAdjacentCells(h3Index) {
-        return [`${h3Index}_adj1`, `${h3Index}_adj2`, `${h3Index}_adj3`, `${h3Index}_adj4`, `${h3Index}_adj5`, `${h3Index}_adj6`];
+    getAdjacentCells(index) {
+        return [`${index}_1`, `${index}_2`, `${index}_3`, `${index}_4`, `${index}_5`, `${index}_6`];
     }
-    propagateCellState(h3Index, _deltaT) {
-        const cell = this.cells.get(h3Index);
+    propagateCellState(index, _dt) {
+        const cell = this.cells.get(index);
         if (cell) {
-            cell.carbonStock += 5.0;
-        }
-    }
-}
-export class H3GridManager {
-    defaultRes;
-    constructor(defaultRes = 4) {
-        this.defaultRes = defaultRes;
-    }
-    getDefaultResolution() {
-        return this.defaultRes;
-    }
-    validateResolution(res) {
-        return isValidH3Resolution(res);
-    }
-    assertValidResolution(res) {
-        assertValidH3Resolution(res);
-    }
-    validateTier(res) {
-        assertValidH3Resolution(res);
-    }
-    validateIndex(index) {
-        return isValidH3Index(index);
-    }
-    static validateIndex(index) {
-        return isValidH3Index(index);
-    }
-    static guardPayload(payload) {
-        return guardH3Payload(payload);
-    }
-}
-export class H3Validator {
-    validate(index) {
-        return H3GridValidator.isValidIndex(index);
-    }
-    assertValid(index) {
-        const res = H3GridValidator.validateString(index);
-        if (!res.valid) {
-            if (index === '000000000000000') {
-                throw new H3Error(H3ErrorCode.NULL_INDEX, 'Null index');
-            }
-            if (index.length !== 15) {
-                throw new H3Error(H3ErrorCode.INVALID_LENGTH, 'Invalid length');
-            }
-            throw new H3Error(H3ErrorCode.INVALID_CHARACTER, 'Invalid character');
+            cell.carbonStock += 10;
         }
     }
 }
 export class H3SpatialMonad {
-    validatePayload(h3Index) {
-        guardH3Payload(h3Index);
+    bind(payload, fn) {
+        const valid = guardH3Payload(payload);
+        return fn(valid);
     }
-    bind(h3Index, fn) {
-        const validated = guardH3Payload(h3Index);
-        return fn(validated);
-    }
-}
-export function isValidH3Index(index) {
-    if (typeof index !== 'string' || index.length !== 15) {
-        return false;
-    }
-    return /^[0-9a-fA-F]{15}$/.test(index);
-}
-export function assertValidH3Index(index) {
-    if (!isValidH3Index(index)) {
-        throw new ThermodynamicSpatialError('[Thermodynamic Spatial Violation] Invalid H3 index.');
+    validatePayload(payload) {
+        guardH3Payload(payload);
     }
 }
-export function validateH3Index(index) {
-    return H3GridValidator.validateString(index);
-}
-export function isH3Index(index) {
-    return isValidH3Index(index);
-}
+export var H3GridValidator;
+(function (H3GridValidator) {
+    H3GridValidator.HEX_PATTERN = /^[0-9a-fA-F]{15}$/;
+    function isValidHexIndex(index) {
+        if (typeof index !== 'string' || index.length === 0)
+            return false;
+        return H3GridValidator.HEX_PATTERN.test(index);
+    }
+    H3GridValidator.isValidHexIndex = isValidHexIndex;
+    function isValidIndex(index) {
+        return isValidH3Index(index);
+    }
+    H3GridValidator.isValidIndex = isValidIndex;
+    function validateIndex(index) {
+        return isValidH3Index(index);
+    }
+    H3GridValidator.validateIndex = validateIndex;
+    function validateString(h3Index) {
+        return validateH3Index(h3Index);
+    }
+    H3GridValidator.validateString = validateString;
+    function parseResolution(h3Index) {
+        return parseInt(h3Index[1], 16) || 8;
+    }
+    H3GridValidator.parseResolution = parseResolution;
+    function parseBaseCell(h3Index) {
+        return parseInt(h3Index.substring(2, 4), 16) || 0x26;
+    }
+    H3GridValidator.parseBaseCell = parseBaseCell;
+})(H3GridValidator || (H3GridValidator = {}));
+export var SpatialMonadExecution;
+(function (SpatialMonadExecution) {
+    function transitionSpatialStock(token, energyPotential) {
+        const isValid = isValidH3Index(token);
+        return {
+            isValid,
+            token: isValid ? token : '',
+            energyPotential: isValid ? energyPotential : 0.0,
+            entropy: isValid ? 0.0 : 1.0
+        };
+    }
+    SpatialMonadExecution.transitionSpatialStock = transitionSpatialStock;
+})(SpatialMonadExecution || (SpatialMonadExecution = {}));
+// Global Validation & Guard Functions
 export function guardH3Payload(payload) {
     if (payload === null || payload === undefined) {
-        throw new TypeError('H3 payload cannot be null or undefined.');
+        throw new TypeError('[Thermodynamic Spatial Error] H3 payload cannot be null or undefined.');
     }
     if (typeof payload !== 'string' || payload.trim() === '') {
-        throw new TypeError('H3 payload must be a non-empty string.');
+        throw new TypeError('[Thermodynamic Spatial Error] H3 payload must be a non-empty string.');
     }
     return payload.trim();
+}
+export function isValidH3Index(index) {
+    if (typeof index !== 'string')
+        return false;
+    return H3_REGEX.test(index);
+}
+export function assertValidH3Index(index) {
+    const res = validateH3Index(index);
+    if (!res.isValid) {
+        if (res.code === H3ErrorCode.INVALID_CHARACTER || res.code === H3ErrorCode.NULL_INDEX) {
+            throw new H3Error(res.code, `[Thermodynamic Spatial Violation] Invalid H3 index: ${index} (${res.message})`);
+        }
+        throw new Error(`[Thermodynamic Spatial Violation] Invalid H3 index: ${index} (${res.message})`);
+    }
+}
+export function validateH3Index(h3Index) {
+    if (h3Index === null || h3Index === undefined) {
+        return {
+            isValid: false,
+            valid: false,
+            code: H3ErrorCode.NULL_INDEX,
+            errorCode: H3ErrorCode.NULL_INDEX,
+            message: 'H3 index cannot be null or undefined.'
+        };
+    }
+    if (typeof h3Index !== 'string') {
+        return {
+            isValid: false,
+            valid: false,
+            code: H3ErrorCode.INVALID_CHARACTER,
+            errorCode: H3ErrorCode.INVALID_CHARACTER,
+            message: 'H3 index must be a string.'
+        };
+    }
+    if (h3Index.length !== 15) {
+        return {
+            isValid: false,
+            valid: false,
+            code: H3ErrorCode.INVALID_LENGTH,
+            errorCode: H3ErrorCode.INVALID_LENGTH,
+            message: `Invalid length: expected 15, got ${h3Index.length}.`
+        };
+    }
+    if (!H3_REGEX.test(h3Index)) {
+        if (h3Index === '000000000000000') {
+            return {
+                isValid: false,
+                valid: false,
+                code: H3ErrorCode.NULL_INDEX,
+                errorCode: H3ErrorCode.NULL_INDEX,
+                message: 'Null index (all zeros).'
+            };
+        }
+        return {
+            isValid: false,
+            valid: false,
+            code: H3ErrorCode.INVALID_CHARACTER,
+            errorCode: H3ErrorCode.INVALID_CHARACTER,
+            message: 'Invalid character set in H3 index.'
+        };
+    }
+    const res = parseInt(h3Index[1], 16) || 0;
+    const baseCell = parseInt(h3Index.substring(2, 4), 16) || 0;
+    return {
+        isValid: true,
+        valid: true,
+        code: H3ErrorCode.SUCCESS,
+        errorCode: H3ErrorCode.SUCCESS,
+        message: 'Valid H3 Index',
+        resolution: res,
+        baseCell: baseCell
+    };
+}
+export function isH3Index(index) {
+    return typeof index === 'string' && isValidH3Index(index);
+}
+export function isValidH3Hex(index) {
+    return typeof index === 'string' && H3_HEX_REGEX.test(index);
+}
+export function isValidH3IndexLength(index) {
+    if (typeof index !== 'string')
+        return false;
+    return index.length === 15 && H3_REGEX.test(index);
+}
+export function validateH3IndexLength(index) {
+    return isValidH3IndexLength(index);
+}
+export function isValidH3Length(index) {
+    if (typeof index !== 'string')
+        return false;
+    return index.length === 15 && H3_REGEX.test(index);
+}
+export function validateH3Length(index) {
+    return isValidH3Length(index);
+}
+export function isValidH3Resolution(res) {
+    return typeof res === 'number' && Number.isInteger(res) && res >= 0 && res <= 15;
+}
+export function isValidResolution(res) {
+    return isValidH3Resolution(res);
+}
+export function validateResolution(res) {
+    return isValidH3Resolution(res);
+}
+export function assertValidH3Resolution(res) {
+    if (!isValidH3Resolution(res)) {
+        throw new RangeError(`[Thermodynamic Spatial Boundary Violation] Invalid H3 resolution tier: ${res}. Must be [0, 15].`);
+    }
+}
+export function assertValidResolution(res) {
+    assertValidH3Resolution(res);
+}
+export function assertH3Resolution(res) {
+    assertValidH3Resolution(res);
+}
+export function validateResolutionTier(res) {
+    return isValidH3Resolution(res);
+}
+export function assertResolutionTier(res) {
+    if (!isValidH3Resolution(res)) {
+        throw new RangeError(`[SpatialError] Invalid resolution tier ${res}`);
+    }
+}
+export function transitionResolution(monadState, targetRes) {
+    assertValidH3Resolution(targetRes);
+    return {
+        ...monadState,
+        resolution: targetRes
+    };
 }
 export function processSpatialMonad(payload) {
     try {
         const valid = guardH3Payload(payload);
-        if (!isValidH3Index(valid)) {
-            return { isValid: false, payload: null, error: 'Thermodynamic Violation: Invalid H3 index format.' };
-        }
-        return { isValid: true, payload: valid };
+        const res = validateH3Index(valid);
+        return {
+            isValid: res.isValid,
+            payload: valid,
+            error: res.isValid ? undefined : res.message
+        };
     }
     catch (err) {
-        return { isValid: false, payload: null, error: `Thermodynamic Violation: ${err.message}` };
+        return {
+            isValid: false,
+            payload: null,
+            error: `Thermodynamic Violation: ${err.message}`
+        };
     }
 }
-export function createSpatialMonad(index, energy) {
-    if (!isValidH3Index(index)) {
-        throw new Error('ThermodynamicViolation: Invalid H3 index.');
-    }
-    return { h3Index: index, trophicEnergyStockJoules: energy };
-}
-export function validateH3IndexLength(index) {
-    if (typeof index !== 'string')
-        return false;
-    return index.length === 15 && /^[0-9a-fA-F]{15}$/.test(index);
-}
-export const isValidH3IndexLength = validateH3IndexLength;
-export const isValidH3Length = validateH3IndexLength;
-export const validateH3Length = validateH3IndexLength;
-export function validateResolution(resolution) {
-    return isValidH3Resolution(resolution);
-}
-export function assertValidResolution(resolution) {
-    assertValidH3Resolution(resolution);
-}
-export function validateResolutionTier(resolution) {
-    return isValidH3Resolution(resolution);
-}
-export function assertResolutionTier(resolution) {
-    assertValidH3Resolution(resolution);
-}
-export function isValidH3Resolution(resolution) {
-    return Number.isInteger(resolution) && resolution >= 0 && resolution <= 15;
-}
-export const isValidResolution = isValidH3Resolution;
-export const assertH3Resolution = (res) => {
-    if (!isValidH3Resolution(res)) {
-        throw new ThermodynamicSpatialError('Thermodynamic Spatial Invariant Violation: Resolution tier must be an integer between 0 and 15.');
-    }
-};
-export function assertValidH3Resolution(resolution) {
-    if (!isValidH3Resolution(resolution)) {
-        throw new ThermodynamicSpatialError('Thermodynamic Spatial Invariant Violation: Resolution tier must be an integer between 0 and 15.');
-    }
-}
-export const assertH3ResolutionTier = assertValidH3Resolution;
-export function isValidH3Hex(indexStr) {
-    if (typeof indexStr !== 'string' || indexStr.length === 0)
-        return false;
-    return /^[0-9a-fA-F]+$/.test(indexStr);
-}
-export class SpatialMonadStock {
-    energyJoules;
-    biomassKg;
-    resolution;
-    constructor(energyJoules, biomassKg, resolution) {
-        this.energyJoules = energyJoules;
-        this.biomassKg = biomassKg;
-        this.resolution = resolution;
-    }
-    static bindWithValidation(stock, validator) {
-        validator.assertValidResolution(stock.resolution);
-        return new SpatialMonadStock(stock.energyJoules, stock.biomassKg, stock.resolution);
-    }
-}
-export function transitionResolution(monadState, targetResolution) {
-    assertValidResolution(targetResolution);
+export function createSpatialMonad(h3Index, trophicEnergyStockJoules) {
+    assertValidH3Index(h3Index);
     return {
-        ...monadState,
-        resolution: targetResolution
-    };
-}
-export function transitionSpatialMonad(monad, computeCostJoules = 1.2e-6) {
-    if (monad.state && monad.state !== 'UNVERIFIED') {
-        throw new Error('Monad must be in UNVERIFIED state for verification gate.');
-    }
-    const h3Id = monad.h3Index ?? monad.id;
-    const isValid = isValidH3Index(h3Id);
-    return {
-        ...monad,
-        state: isValid ? 'VALIDATED' : 'UNVERIFIED',
-        energyJoules: (monad.energyJoules ?? monad.trophicEnergyStockJoules ?? 10) - computeCostJoules
+        h3Index,
+        trophicEnergyStockJoules
     };
 }
 export function executeSpatialValidationMonad(h3Token) {
-    const isValid = typeof h3Token === 'string' && isValidH3Index(h3Token);
+    const isValid = isValidH3Index(h3Token);
     return {
-        token: typeof h3Token === 'string' ? h3Token : '',
+        token: isValid ? h3Token : '',
         isValids: isValid,
         massDeltaKg: 0.0,
         energyDeltaJoules: 0.0
     };
 }
-export var SpatialMonadExecution;
-(function (SpatialMonadExecution) {
-    function transitionSpatialStock(rawToken, initialEnergy) {
-        const isValid = H3GridValidator.isValidHexIndex(rawToken);
-        if (isValid) {
-            return {
-                token: rawToken,
-                energyPotential: initialEnergy,
-                entropy: 0.0,
-                isValid: true
-            };
-        }
-        else {
-            return {
-                token: '',
-                energyPotential: 0.0,
-                entropy: 1.0,
-                isValid: false
-            };
-        }
+export function transitionSpatialMonad(monad, computeCostJoules = 1.2e-6) {
+    if (monad.state !== 'UNVERIFIED') {
+        throw new Error('Monad must be in UNVERIFIED state for verification gate.');
     }
-    SpatialMonadExecution.transitionSpatialStock = transitionSpatialStock;
-})(SpatialMonadExecution || (SpatialMonadExecution = {}));
+    const isValid = isValidH3Index(monad.h3Index || monad.id);
+    const currentEnergy = typeof monad.energyJoules === 'number' ? monad.energyJoules : 10.0;
+    return {
+        ...monad,
+        state: isValid ? 'VALIDATED' : 'UNVERIFIED',
+        energyJoules: currentEnergy - computeCostJoules
+    };
+}

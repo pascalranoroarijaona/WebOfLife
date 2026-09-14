@@ -1,0 +1,49 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Web of Life Spatial Subsystem" {
+    interface IH3PayloadValidator {
+        + isValidPayload(token: string): boolean
+        + assertValidPayload(token: string): void
+    }
+
+    class H3GridCell {
+        - token: string
+        - resolution: number
+        + validatePayload(): boolean
+        + getPayload(): string
+    }
+
+    class SpatialMonad {
+        - stock: EnergyStock
+        - validator: IH3PayloadValidator
+        + transit(payload: string): Monad
+    }
+
+    class EnergyStock {
+        - joules: number
+        - entropy: number
+        + dissipate(amount: number): void
+        + preserve(amount: number): void
+    }
+
+    enum MonadState {
+        UnvalidatedState
+        ActiveSpatialStock
+        SinkState
+    }
+
+    class ThermodynamicLedger {
+        - blockSignature: string
+        + recordTransaction(tx: StockTransaction): void
+    }
+}
+
+IH3PayloadValidator <|.. H3GridCell
+H3GridCell "1" o-- "1" SpatialMonad : composes
+SpatialMonad "1" *-- "1" EnergyStock : contains
+SpatialMonad --> MonadState : transitions
+ThermodynamicLedger --> SpatialMonad : logs state change
+
+@enduml

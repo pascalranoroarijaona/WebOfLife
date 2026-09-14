@@ -1,6 +1,7 @@
 /**
- * Sprint 026: H3 Spatial Types and Resolution Tier Definitions.
- * Includes complete backward compatibility for Sprints 001-025.
+ * @file src/spatial/h3_types.ts
+ * @description H3 Spatial Types and Resolution Tier Definitions.
+ * Includes complete backward compatibility for Sprints 001-032.
  */
 
 export type H3Resolution = 
@@ -8,6 +9,8 @@ export type H3Resolution =
   | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export type H3ResolutionTier = H3Resolution;
+export type Resolution = H3Resolution;
+export type H3Index = string;
 
 export const MIN_H3_RESOLUTION = 0;
 export const MAX_H3_RESOLUTION = 15;
@@ -38,7 +41,7 @@ export enum H3ErrorCode {
 }
 
 export interface H3ValidationResult {
-  isValid: boolean;
+  isValid?: boolean;
   code?: H3ErrorCode;
   errorCode?: H3ErrorCode | string;
   message?: string;
@@ -51,4 +54,14 @@ export interface IH3GridQuery {
   resolution: number;
   baseIndexes?: string[];
   bounds?: { north: number; south: number; east: number; west: number };
+}
+
+export interface IH3PayloadValidator {
+  isValidPayload(token: string): boolean;
+  assertValidPayload(token: string): void;
+}
+
+export interface IH3GridService {
+  validateIndex(h3Index: string): H3ValidationResult;
+  assertValidIndex(h3Index: string): void;
 }
