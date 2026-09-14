@@ -1,126 +1,150 @@
--- ============================================================================
--- Web of Life: Thermodynamic Ledger & Spatial State Schema
--- Sprint 043: Discrete H3 Hexagonal Cell Thermodynamic Invariant Verification
--- ============================================================================
+-- Web of Life Thermodynamic Engine & Spatial Ledger Schema
+-- Target: Sprint 044 - Discrete Global Grid System (H3 DGGS) Thermodynamic State Tensor
+-- Physical Invariants: 1st Law (Conservation of Mass/Energy) & 2nd Law (dS_gen >= 0)
 
--- Spatial grid topology reference table for Uber H3 cells
-CREATE TABLE IF NOT EXISTS h3_grid_cells (
-    cell_index VARCHAR(15) PRIMARY KEY,
-    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lon DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
-    surface_area_m2 DOUBLE PRECISION NOT NULL CHECK (surface_area_m2 > 0),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Extensions for spatial-temporal indexing and cryptographic verification
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Enum types for thermodynamic phases and transition types
+DO $$ BEGIN
+    CREATE TYPE thermodynamic_phase AS ENUM ('GAS', 'LIQUID', 'SOLID', 'PLASMA', 'SUPERCRITICAL');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE spatial_monad_op_type AS ENUM (
+        'STP_INITIALIZATION',
+        'ADIABATIC_TRANSITION',
+        'ISOTHERMAL_FLUX',
+        'TROPHIC_EXCHANGE',
+        'MASS_DIFFUSION',
+        'ENTROPY_PRODUCTION'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Table: h3_cell_registry
+-- Tracks registered H3 discrete global grid indices and geometric invariant properties
+CREATE TABLE IF NOT EXISTS h3_cell_registry (
+    h3_index VARCHAR(15) PRIMARY KEY,
+    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    area_m2 NUMERIC(24, 6) NOT NULL CHECK (area_m2 > 0),
+    centroid_lat NUMERIC(10, 7) NOT NULL CHECK (centroid_lat >= -90.0 AND centroid_lat <= 90.0),
+    centroid_lon NUMERIC(11, 7) NOT NULL CHECK (centroid_lon >= -180.0 AND centroid_lon <= 180.0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Core Blockchain Block Header with Thermodynamic Conservation Merkle Root
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
+-- Table: h3_cell_thermodynamic_state
+-- Represents IH3CellThermodynamicState baseline and temporal state transitions
+CREATE TABLE IF NOT EXISTS h3_cell_thermodynamic_state (
+    state_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    h3_index VARCHAR(15) NOT NULL REFERENCES h3_cell_registry(h3_index) ON DELETE RESTRICT,
+    epoch_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    area_m2 NUMERIC(24, 6) NOT NULL CHECK (area_m2 > 0),
+    
+    -- Bulk Intensive Thermodynamic Properties
+    temperature_kelvin NUMERIC(12, 5) NOT NULL CHECK (temperature_kelvin > 0.0), -- Absolute Zero invariant
+    surface_pressure_pa NUMERIC(14, 4) NOT NULL CHECK (surface_pressure_pa > 0.0),
+    internal_energy_joules NUMERIC(28, 6) NOT NULL,
+    entropy_joules_per_kelvin NUMERIC(28, 6) NOT NULL,
+
+    -- Atmosphere Stock (IThermodynamicAtmosphereStock)
+    atm_nitrogen_moles NUMERIC(24, 6) NOT NULL CHECK (atm_nitrogen_moles >= 0.0),
+    atm_oxygen_moles NUMERIC(24, 6) NOT NULL CHECK (atm_oxygen_moles >= 0.0),
+    atm_co2_moles NUMERIC(24, 6) NOT NULL CHECK (atm_co2_moles >= 0.0),
+    atm_water_vapor_moles NUMERIC(24, 6) NOT NULL CHECK (atm_water_vapor_moles >= 0.0),
+
+    -- Hydrosphere Stock (IThermodynamicHydrosphereStock)
+    hydro_liquid_water_kg NUMERIC(24, 6) NOT NULL CHECK (hydro_liquid_water_kg >= 0.0),
+    hydro_ice_kg NUMERIC(24, 6) NOT NULL CHECK (hydro_ice_kg >= 0.0),
+    hydro_salinity_psu NUMERIC(8, 4) NOT NULL CHECK (hydro_salinity_psu >= 0.0),
+
+    -- Lithosphere Stock (IThermodynamicLithosphereStock)
+    litho_soil_organic_carbon_kg NUMERIC(24, 6) NOT NULL CHECK (litho_soil_organic_carbon_kg >= 0.0),
+    litho_inorganic_mineral_kg NUMERIC(24, 6) NOT NULL CHECK (litho_inorganic_mineral_kg >= 0.0),
+    litho_soil_moisture_kg NUMERIC(24, 6) NOT NULL CHECK (litho_soil_moisture_kg >= 0.0),
+
+    -- Biosphere Stock (IThermodynamicBiosphereStock)
+    bio_autotroph_biomass_kg NUMERIC(24, 6) NOT NULL CHECK (bio_autotroph_biomass_kg >= 0.0),
+    bio_heterotroph_biomass_kg NUMERIC(24, 6) NOT NULL CHECK (bio_heterotroph_biomass_kg >= 0.0),
+    bio_detritus_kg NUMERIC(24, 6) NOT NULL CHECK (bio_detritus_kg >= 0.0),
+
+    -- Cryptographic Integrity & Merkle State Commit
+    state_tensor_hash BYTEA NOT NULL,
+    parent_state_id UUID REFERENCES h3_cell_thermodynamic_state(state_id),
+
+    CONSTRAINT uq_cell_timestamp UNIQUE (h3_index, epoch_timestamp)
+);
+
+CREATE INDEX IF NOT EXISTS idx_h3_cell_state_h3_time 
+    ON h3_cell_thermodynamic_state (h3_index, epoch_timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_h3_cell_state_hash 
+    ON h3_cell_thermodynamic_state USING HASH (state_tensor_hash);
+
+-- Table: thermodynamic_blocks
+-- Immutable blockchain ledger recording verifiable thermodynamic epoch state commitments
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
     block_height BIGINT PRIMARY KEY,
-    block_hash CHAR(64) NOT NULL UNIQUE,
-    parent_hash CHAR(64) NOT NULL,
-    state_root CHAR(64) NOT NULL,
-    thermodynamic_entropy_merkle_root CHAR(64) NOT NULL,
-    total_enthalpy_joules DOUBLE PRECISION NOT NULL,
-    total_carbon_mass_kg DOUBLE PRECISION NOT NULL CHECK (total_carbon_mass_kg >= 0),
-    total_water_mass_kg DOUBLE PRECISION NOT NULL CHECK (total_water_mass_kg >= 0),
-    timestamp BIGINT NOT NULL,
-    validator_signature VARCHAR(130) NOT NULL
+    block_hash BYTEA NOT NULL UNIQUE,
+    parent_block_hash BYTEA NOT NULL,
+    merkle_state_root BYTEA NOT NULL,
+    entropy_production_total NUMERIC(32, 8) NOT NULL CHECK (entropy_production_total >= 0.0), -- 2nd Law verification
+    energy_conservation_delta NUMERIC(24, 8) NOT NULL, -- Must be within epsilon of zero
+    mass_conservation_delta NUMERIC(24, 8) NOT NULL,   -- Must be within epsilon of zero
+    validator_signature BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Discrete H3 Cell Thermodynamic State Tensor Snapshots
-CREATE TABLE IF NOT EXISTS h3_cell_thermodynamic_states (
-    state_id BIGSERIAL PRIMARY KEY,
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    cell_index VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_index),
-    temperature_kelvin DOUBLE PRECISION NOT NULL,
-    atmospheric_carbon DOUBLE PRECISION NOT NULL,
-    organic_carbon DOUBLE PRECISION NOT NULL,
-    water_mass_kg DOUBLE PRECISION NOT NULL,
-    enthalpy_joules DOUBLE PRECISION NOT NULL,
-    is_thermodynamically_valid BOOLEAN NOT NULL DEFAULT TRUE,
-    snapshot_timestamp BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-
-    -- Physical invariant checks representing Omega_phys admissibility bounds
-    CONSTRAINT chk_positive_temperature CHECK (temperature_kelvin > 0.0),
-    CONSTRAINT chk_non_negative_atm_carbon CHECK (atmospheric_carbon >= -1e-9),
-    CONSTRAINT chk_non_negative_org_carbon CHECK (organic_carbon >= -1e-9),
-    CONSTRAINT chk_non_negative_water_mass CHECK (water_mass_kg >= -1e-9),
-    CONSTRAINT chk_finite_enthalpy CHECK (enthalpy_joules = enthalpy_joules)
+-- Table: thermodynamic_transactions
+-- Monadic state transitions across H3 cells within a block ledger
+CREATE TABLE IF NOT EXISTS thermodynamic_transactions (
+    tx_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height) ON DELETE CASCADE,
+    operation_type spatial_monad_op_type NOT NULL,
+    source_h3_index VARCHAR(15) REFERENCES h3_cell_registry(h3_index),
+    target_h3_index VARCHAR(15) REFERENCES h3_cell_registry(h3_index),
+    pre_state_hash BYTEA NOT NULL,
+    post_state_hash BYTEA NOT NULL,
+    enthalpy_flux_joules NUMERIC(28, 6) NOT NULL,
+    mass_flux_kg NUMERIC(24, 6) NOT NULL,
+    entropy_delta_joules_per_k NUMERIC(28, 6) NOT NULL,
+    transition_monad_signature BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_state_cell_block ON h3_cell_thermodynamic_states(cell_index, block_height);
-CREATE INDEX IF NOT EXISTS idx_h3_state_validity ON h3_cell_thermodynamic_states(is_thermodynamically_valid);
+CREATE INDEX IF NOT EXISTS idx_tx_block_height 
+    ON thermodynamic_transactions (block_height);
+CREATE INDEX IF NOT EXISTS idx_tx_h3_source 
+    ON thermodynamic_transactions (source_h3_index);
+CREATE INDEX IF NOT EXISTS idx_tx_h3_target 
+    ON thermodynamic_transactions (target_h3_index);
 
--- Multivariant Trophic Biomass Stocks associated with an H3 Cell State
-CREATE TABLE IF NOT EXISTS h3_cell_biomass_stocks (
-    stock_id BIGSERIAL PRIMARY KEY,
-    state_id BIGINT NOT NULL REFERENCES h3_cell_thermodynamic_states(state_id) ON DELETE CASCADE,
-    trophic_tier VARCHAR(64) NOT NULL, -- e.g., autotroph, primary_herbivore, apex_predator, decomposer
-    biomass_mass_kg DOUBLE PRECISION NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-
-    -- Mass non-negativity constraint
-    CONSTRAINT chk_non_negative_trophic_biomass CHECK (biomass_mass_kg >= -1e-9),
-    CONSTRAINT uq_state_trophic_tier UNIQUE (state_id, trophic_tier)
-);
-
-CREATE INDEX IF NOT EXISTS idx_biomass_stocks_state ON h3_cell_biomass_stocks(state_id);
-
--- Thermodynamic State Validation Audit Trail
-CREATE TABLE IF NOT EXISTS h3_thermodynamic_validation_events (
-    validation_id BIGSERIAL PRIMARY KEY,
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    cell_index VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_index),
-    is_valid BOOLEAN NOT NULL,
-    tolerance DOUBLE PRECISION NOT NULL DEFAULT 1e-9,
-    min_temperature_kelvin DOUBLE PRECISION NOT NULL DEFAULT 1e-3,
-    violation_count INTEGER NOT NULL DEFAULT 0,
-    evaluated_at BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_validation_events_cell ON h3_thermodynamic_validation_events(cell_index, evaluated_at);
-CREATE INDEX IF NOT EXISTS idx_validation_events_block ON h3_thermodynamic_validation_events(block_height);
-
--- Detailed Invariant Violations Emitted by validateH3CellThermodynamicState
-CREATE TABLE IF NOT EXISTS h3_thermodynamic_violations (
-    violation_id BIGSERIAL PRIMARY KEY,
-    validation_id BIGINT NOT NULL REFERENCES h3_thermodynamic_validation_events(validation_id) ON DELETE CASCADE,
-    violation_type VARCHAR(32) NOT NULL CHECK (
-        violation_type IN (
-            'NEGATIVE_STOCK',
-            'NON_POSITIVE_TEMPERATURE',
-            'NON_FINITE_VALUE',
-            'CORRUPT_METADATA'
-        )
-    ),
-    field_name VARCHAR(128) NOT NULL,
-    observed_value DOUBLE PRECISION,
-    threshold_value DOUBLE PRECISION,
-    diagnostic_message TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_violations_validation_id ON h3_thermodynamic_violations(validation_id);
-CREATE INDEX IF NOT EXISTS idx_violations_type ON h3_thermodynamic_violations(violation_type);
-
--- Thermodynamic Stock Ledger Transitions (Monadic bind ledger receipts)
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_transitions (
-    transition_id BIGSERIAL PRIMARY KEY,
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    cell_index VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_index),
-    monad_stage VARCHAR(64) NOT NULL, -- e.g., 'climate', 'trophic', 'lateral_flux'
-    delta_atmospheric_carbon DOUBLE PRECISION NOT NULL,
-    delta_organic_carbon DOUBLE PRECISION NOT NULL,
-    delta_water_mass_kg DOUBLE PRECISION NOT NULL,
-    delta_enthalpy_joules DOUBLE PRECISION NOT NULL,
-    entropy_generated_joules_per_kelvin DOUBLE PRECISION NOT NULL CHECK (entropy_generated_joules_per_kelvin >= 0),
-    post_state_hash CHAR(64) NOT NULL,
-    pre_validation_passed BOOLEAN NOT NULL,
-    post_validation_passed BOOLEAN NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_transitions_cell_stage ON thermodynamic_stock_transitions(cell_index, monad_stage);
+-- View: v_stp_thermodynamic_invariants
+-- Computes and audits STP baseline state adherence (T = 288.15 K, P = 101325.0 Pa)
+CREATE OR REPLACE VIEW v_stp_thermodynamic_invariants AS
+SELECT 
+    state_id,
+    h3_index,
+    resolution,
+    area_m2,
+    temperature_kelvin,
+    surface_pressure_pa,
+    (atm_nitrogen_moles + atm_oxygen_moles + atm_co2_moles + atm_water_vapor_moles) AS total_gas_moles,
+    (
+        atm_nitrogen_moles * 0.0280134 + 
+        atm_oxygen_moles * 0.0319988 + 
+        atm_co2_moles * 0.0440100 + 
+        atm_water_vapor_moles * 0.0180153
+    ) AS calculated_atm_mass_kg,
+    (hydro_liquid_water_kg + hydro_ice_kg) AS total_water_kg,
+    (litho_soil_organic_carbon_kg + litho_inorganic_mineral_kg + litho_soil_moisture_kg) AS total_litho_kg,
+    (bio_autotroph_biomass_kg + bio_heterotroph_biomass_kg + bio_detritus_kg) AS total_biomass_kg,
+    internal_energy_joules,
+    entropy_joules_per_kelvin,
+    state_tensor_hash
+FROM h3_cell_thermodynamic_state;

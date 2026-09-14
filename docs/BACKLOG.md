@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 22%
-SPRINT_GOAL: Implement validateH3CellThermodynamicState predicate enforcing non-negative stocks and positive temperature in src/spatial/h3_state_tensor.ts.
+Roadmap Completion: 23%
+SPRINT_GOAL: Implement createDefaultH3CellThermodynamicState factory returning baseline STP thermodynamic state in src/spatial/h3_state_tensor.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -21,10 +21,11 @@ SPRINT_GOAL: Implement validateH3CellThermodynamicState predicate enforcing non-
 - [x] Implement token extractor function `extractCanonicalH3Tokens(text: string): string[]` returning validated canonical H3 tokens (`src/spatial/h3_grid.ts`)
 - [x] Implement deduplicated canonical token extraction helper `extractUniqueCanonicalH3Tokens(text: string): string[]` (`src/spatial/h3_grid.ts`)
 - [x] Define `H3CellThermodynamicState` interface with scalar thermodynamic properties in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement `validateH3CellThermodynamicState` predicate enforcing non-negative stocks and positive temperature in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement `createDefaultH3CellThermodynamicState` factory with Earth surface defaults in `src/spatial/h3_state_tensor.ts`
-- [ ] Implement Haversine geodesic distance helper between cell centroids in `src/spatial/h3_adjacency.ts`
-- [ ] Implement boundary interface length and area calculation across shared H3 edges in `src/spatial/h3_adjacency.ts`
+- [x] Implement `validateH3CellThermodynamicState` predicate enforcing non-negative stocks and positive temperature in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement createDefaultH3CellThermodynamicState factory returning baseline STP thermodynamic state in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement applyThermodynamicOverrides helper for partial cell state mutations in `src/spatial/h3_state_tensor.ts`
+- [ ] Implement calculateHaversineDistance geodesic metric helper between cell centroids in `src/spatial/h3_adjacency.ts`
+- [ ] Implement calculateH3SharedBoundaryLength geometric interface contact calculator in `src/spatial/h3_adjacency.ts`
 - [ ] Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
 - [ ] Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation (`src/thermodynamics/radiative_balance.ts`)

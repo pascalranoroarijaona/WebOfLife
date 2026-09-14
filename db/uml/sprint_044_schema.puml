@@ -1,0 +1,196 @@
+@startuml sprint_044_schema
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing true
+skinparam defaultFontName "Courier New"
+skinparam defaultFontSize 11
+
+title Web of Life - Sprint 044: Baseline STP H3 Cell Thermodynamic State Tensor & Ledger Schema
+
+package "Domain Types & Physical Invariants (src/spatial/h3_types.ts)" {
+    interface IH3CellCoordinates {
+        +h3Index: string
+        +resolution: number
+        +areaM2: number
+    }
+
+    interface IThermodynamicAtmosphereStock {
+        +nitrogenMoles: number
+        +oxygenMoles: number
+        +co2Moles: number
+        +waterVaporMoles: number
+        +surfacePressurePa: number
+    }
+
+    interface IThermodynamicHydrosphereStock {
+        +liquidWaterKg: number
+        +iceKg: number
+        +salinityPsu: number
+    }
+
+    interface IThermodynamicLithosphereStock {
+        +soilOrganicCarbonKg: number
+        +inorganicMineralKg: number
+        +soilMoistureKg: number
+    }
+
+    interface IThermodynamicBiosphereStock {
+        +autotrophBiomassKg: number
+        +heterotrophBiomassKg: number
+        +detritusKg: number
+    }
+
+    interface IH3CellThermodynamicState {
+        +h3Index: string
+        +resolution: number
+        +areaM2: number
+        +temperatureKelvin: number
+        +atmosphere: IThermodynamicAtmosphereStock
+        +hydrosphere: IThermodynamicHydrosphereStock
+        +lithosphere: IThermodynamicLithosphereStock
+        +biosphere: IThermodynamicBiosphereStock
+        +internalEnergyJoules: number
+        +entropyJoulesPerKelvin: number
+    }
+
+    IH3CellCoordinates <|-- IH3CellThermodynamicState
+    IH3CellThermodynamicState *-- IThermodynamicAtmosphereStock
+    IH3CellThermodynamicState *-- IThermodynamicHydrosphereStock
+    IH3CellThermodynamicState *-- IThermodynamicLithosphereStock
+    IH3CellThermodynamicState *-- IThermodynamicBiosphereStock
+}
+
+package "Thermodynamic State Factory & Entity (src/spatial/h3_state_tensor.ts)" {
+    class H3CellThermodynamicState implements IH3CellThermodynamicState {
+        +readonly h3Index: string
+        +readonly resolution: number
+        +readonly areaM2: number
+        +readonly temperatureKelvin: number
+        +readonly atmosphere: IThermodynamicAtmosphereStock
+        +readonly hydrosphere: IThermodynamicHydrosphereStock
+        +readonly lithosphere: IThermodynamicLithosphereStock
+        +readonly biosphere: IThermodynamicBiosphereStock
+        +readonly internalEnergyJoules: number
+        +readonly entropyJoulesPerKelvin: number
+        +computeStateTensorHash(): string
+        +validateInvariants(): boolean
+    }
+
+    class H3StateTensorFactory <<utility>> {
+        +{static} createDefaultH3CellThermodynamicState(h3Index: string, overrides?: Partial<IH3CellThermodynamicState>): IH3CellThermodynamicState
+        -{static} calculateCellArea(resolution: number): number
+        -{static} calculateSTPAtmosphericMoles(areaM2: number): IThermodynamicAtmosphereStock
+        -{static} calculateBaselineInternalEnergy(state: Partial<IH3CellThermodynamicState>): number
+    }
+
+    H3StateTensorFactory ..> H3CellThermodynamicState : <<instantiates>>
+}
+
+package "Monadic Spatial State Machine (src/monads/spatial_monad.ts)" {
+    class SpatialMonad<T extends IH3CellThermodynamicState> {
+        -readonly state: T
+        +{static} of(state: T): SpatialMonad<T>
+        +map<U extends IH3CellThermodynamicState>(fn: (state: T) => U): SpatialMonad<U>
+        +flatMap<U extends IH3CellThermodynamicState>(fn: (state: T) => SpatialMonad<U>): SpatialMonad<U>
+        +diffuseTo(target: SpatialMonad<T>, fluxCoeff: number): [SpatialMonad<T>, SpatialMonad<T>]
+        +commitToBlock(blockHeight: number): ThermodynamicTransactionRecord
+        +getState(): T
+    }
+
+    SpatialMonad o-- IH3CellThermodynamicState
+    H3StateTensorFactory ..> SpatialMonad : "identity unit (η)"
+}
+
+package "Thermodynamic Blockchain Ledger (db/schema.sql)" {
+    class h3_cell_registry <<table>> {
+        +h3_index: VARCHAR(15) [PK]
+        +resolution: SMALLINT
+        +area_m2: NUMERIC(24, 6)
+        +centroid_lat: NUMERIC(10, 7)
+        +centroid_lon: NUMERIC(11, 7)
+        +created_at: TIMESTAMPTZ
+    }
+
+    class h3_cell_thermodynamic_state <<table/timeseries>> {
+        +state_id: UUID [PK]
+        +h3_index: VARCHAR(15) [FK]
+        +epoch_timestamp: TIMESTAMPTZ
+        +resolution: SMALLINT
+        +area_m2: NUMERIC(24, 6)
+        +temperature_kelvin: NUMERIC(12, 5)
+        +surface_pressure_pa: NUMERIC(14, 4)
+        +internal_energy_joules: NUMERIC(28, 6)
+        +entropy_joules_per_kelvin: NUMERIC(28, 6)
+        +atm_nitrogen_moles: NUMERIC(24, 6)
+        +atm_oxygen_moles: NUMERIC(24, 6)
+        +atm_co2_moles: NUMERIC(24, 6)
+        +atm_water_vapor_moles: NUMERIC(24, 6)
+        +hydro_liquid_water_kg: NUMERIC(24, 6)
+        +hydro_ice_kg: NUMERIC(24, 6)
+        +hydro_salinity_psu: NUMERIC(8, 4)
+        +litho_soil_organic_carbon_kg: NUMERIC(24, 6)
+        +litho_inorganic_mineral_kg: NUMERIC(24, 6)
+        +litho_soil_moisture_kg: NUMERIC(24, 6)
+        +bio_autotroph_biomass_kg: NUMERIC(24, 6)
+        +bio_heterotroph_biomass_kg: NUMERIC(24, 6)
+        +bio_detritus_kg: NUMERIC(24, 6)
+        +state_tensor_hash: BYTEA
+        +parent_state_id: UUID [FK]
+    }
+
+    class thermodynamic_blocks <<table/ledger>> {
+        +block_height: BIGINT [PK]
+        +block_hash: BYTEA [UQ]
+        +parent_block_hash: BYTEA
+        +merkle_state_root: BYTEA
+        +entropy_production_total: NUMERIC(32, 8)
+        +energy_conservation_delta: NUMERIC(24, 8)
+        +mass_conservation_delta: NUMERIC(24, 8)
+        +validator_signature: BYTEA
+        +created_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_transactions <<table/ledger>> {
+        +tx_id: UUID [PK]
+        +block_height: BIGINT [FK]
+        +operation_type: spatial_monad_op_type
+        +source_h3_index: VARCHAR(15) [FK]
+        +target_h3_index: VARCHAR(15) [FK]
+        +pre_state_hash: BYTEA
+        +post_state_hash: BYTEA
+        +enthalpy_flux_joules: NUMERIC(28, 6)
+        +mass_flux_kg: NUMERIC(24, 6)
+        +entropy_delta_joules_per_k: NUMERIC(28, 6)
+        +transition_monad_signature: BYTEA
+        +created_at: TIMESTAMPTZ
+    }
+
+    h3_cell_registry "1" <-- "0..*" h3_cell_thermodynamic_state : "historical states"
+    h3_cell_thermodynamic_state "1" <-- "0..1" h3_cell_thermodynamic_state : "parent_state"
+    thermodynamic_blocks "1" <-- "0..*" thermodynamic_transactions : "contains"
+    h3_cell_registry "1" <-- "0..*" thermodynamic_transactions : "source/target"
+}
+
+H3CellThermodynamicState ..> h3_cell_thermodynamic_state : "<<persisted as>>"
+SpatialMonad ..> thermodynamic_transactions : "<<emits verifiable proof>>"
+
+note right of H3StateTensorFactory
+  <b>STP Invariants:</b>
+  T0 = 288.15 K
+  P0 = 101,325 Pa
+  g0 = 9.80665 m/s²
+  Air molar mass = 0.0289647 kg/mol
+  Gas Ratios: N2 78.084%, O2 20.946%,
+  CO2 420 ppm, H2O RH 60%
+end note
+
+note bottom of thermodynamic_blocks
+  <b>Thermodynamic Blockchain Invariants:</b>
+  1. Mass Conservation: Sum(delta M) = 0
+  2. 1st Law: Delta U = Q - W + Sum(mu_k * Delta N_k)
+  3. 2nd Law: Delta S_universe >= 0
+end note
+
+@enduml
