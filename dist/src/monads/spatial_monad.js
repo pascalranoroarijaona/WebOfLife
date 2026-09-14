@@ -198,10 +198,3 @@ export class H3ValidationMonad {
         return onSuccess(this.state);
     }
 }
-export function createSpatialMonad(h3Index, energyJoules) {
-    const valid = guardH3Payload(h3Index);
-    if (!isValidH3Index(valid)) {
-        throw new Error("ThermodynamicViolation: Invalid H3 index.");
-    }
-    return { h3Index: valid, trophicEnergyStockJoules: energyJoules };
-}

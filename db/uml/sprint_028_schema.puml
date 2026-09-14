@@ -1,0 +1,50 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 028: Spatial Monad & H3 Tier Validation Architecture
+
+class H3GridManager {
+    + {static} MIN_RESOLUTION : number = 0
+    + {static} MAX_RESOLUTION : number = 15
+    + {static} isValidResolution(resolution: number) : boolean
+    + {static} assertValidResolution(resolution: number) : void
+    + getResolutionArea(resolution: number) : number
+}
+
+class SpatialMonad {
+    - monadId : string
+    - h3Index : string
+    - resolution : number
+    - enthalpyJoules : number
+    - biomassKg : number
+    - solarFluxInput : number
+    + constructor(h3Index: string, resolution: number)
+    + validateResolution() : void
+    + mutateResolution(newResolution: number) : void
+    + applySolarFlux(flux: number) : void
+}
+
+class ThermodynamicBlockchainLedger {
+    - blockIndex : number
+    - blockHash : string
+    - previousBlockHash : string
+    + recordTransaction(tx: ThermodynamicTransaction) : void
+    + verifyFirstLawOfThermodynamics() : boolean
+}
+
+class ThermodynamicTransaction {
+    - transactionId : string
+    - sourceMonadId : string
+    - targetMonadId : string
+    - energyTransferredJoules : number
+    - entropyGeneratedJoulesK : number
+    - transactionType : string
+}
+
+H3GridManager <-- SpatialMonad : enforces bounds [0-15]
+SpatialMonad "1" *-- "0..*" ThermodynamicTransaction : generates flows >
+ThermodynamicBlockchainLedger "1" o-- "0..*" ThermodynamicTransaction : audits
+
+@enduml
