@@ -1,0 +1,68 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam classStereotypeFontColor #333333
+
+title Web of Life - Sprint 036 Architecture: H3 Spatial Boundary Validation & Thermodynamic Monads
+
+package "Spatial Domain (src/spatial)" {
+  class H3Grid {
+    +validateH3StringLength(h3String: string, minLength: number, maxLength: number): { isValidLength: boolean; isWithinBounds: boolean }
+  }
+
+  interface H3ValidationResult {
+    +isValidLength: boolean
+    +isWithinBounds: boolean
+  }
+}
+
+package "Monad Stack (src/monads)" {
+  class SpatialMonad {
+    -monadId: string
+    -h3Token: string
+    +bind(transform: Function): SpatialMonad
+    +validateBounds(minLength: number, maxLength: number): H3ValidationResult
+  }
+}
+
+package "Database & Ledger (db/schema.sql)" {
+  class SpatialMonadRegistry {
+    +monad_id: VARCHAR(64)
+    +h3_index_token: VARCHAR(32)
+    +is_valid_length: BOOLEAN
+    +is_within_bounds: BOOLEAN
+    +thermodynamic_entropy_delta: NUMERIC
+    +solar_input_joules: NUMERIC
+    +created_at: TIMESTAMP
+  }
+
+  class H3BoundaryValidationAudit {
+    +audit_id: SERIAL
+    +monad_id: VARCHAR(64)
+    +tested_string: VARCHAR(255)
+    +min_length: INT
+    +max_length: INT
+    +is_valid_length: BOOLEAN
+    +is_within_bounds: BOOLEAN
+    +validated_at: TIMESTAMP
+  }
+
+  class BlockchainTransaction {
+    +tx_hash: VARCHAR(64)
+    +block_number: BIGINT
+    +previous_hash: VARCHAR(64)
+    +monad_id: VARCHAR(64)
+    +payload_signature: TEXT
+    +matter_conservation_verified: BOOLEAN
+    +second_law_entropy_checked: BOOLEAN
+    +timestamp: TIMESTAMP
+  }
+}
+
+-- Relationships & Dependencies
+H3Grid ..> H3ValidationResult : creates
+SpatialMonad --> H3Grid : utilizes validateH3StringLength()
+SpatialMonadRegistry "1" o-- "*" H3BoundaryValidationAudit : logs validation
+SpatialMonadRegistry "1" -- "*" BlockchainTransaction : records state proof
+@enduml

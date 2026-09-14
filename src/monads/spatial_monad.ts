@@ -91,16 +91,16 @@ export class H3ValidationMonad<M, E> {
 }
 
 export class SpatialMonad<T = any> {
-  public resolution: number;
+  public resolution: number = 5;
   public stocks: any;
   public stock: any;
-  public state: string;
-  public energyJoules: number;
-  private h3Token: string | null;
+  public state: string = 'ActiveSpatialStock';
+  public energyJoules: number = 100.0;
+  private h3Token: string | null = null;
   private history: any[] = [];
   private historyIndex: number = -1;
-  private rightValue: any;
-  private isRightFlag: boolean = true;
+  private rightValue: any = null;
+  private isRightFlag: boolean = false;
   private verified: boolean = false;
   private thermodynamics: any;
 
@@ -128,8 +128,20 @@ export class SpatialMonad<T = any> {
       }
       res = typeof initialStocksOrRes === 'number' ? initialStocksOrRes : 5;
       st = maybeStocksOrState;
+      if (typeof initialStocksOrRes === 'string') {
+        res = 5;
+        st = maybeStocksOrState;
+      }
+      if (typeof maybeStocksOrState === 'string' && (maybeStocksOrState === 'UNVERIFIED' || maybeStocksOrState === 'VALIDATED')) {
+        this.state = maybeStocksOrState;
+      }
+      if (typeof initialStocksOrRes === 'number' && (maybeStocksOrState === 'UNVERIFIED' || maybeStocksOrState === 'VALIDATED')) {
+        this.state = maybeStocksOrState;
+      }
+      if (arguments.length === 4 && typeof maybeEnergy === 'number') {
+        this.energyJoules = maybeEnergy;
+      }
     } else if (typeof h3TokenOrStocks === 'object') {
-      // Called like SpatialMonad.of(stocks, h3Token) or similar
       st = h3TokenOrStocks;
       token = typeof initialStocksOrRes === 'string' ? initialStocksOrRes : null;
       if (token === null || token === undefined || (typeof token === 'string' && token.trim() === '')) {
@@ -151,15 +163,22 @@ export class SpatialMonad<T = any> {
     this.resolution = typeof res === 'number' ? res : 5;
     this.stocks = st || { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0, carbonMass: 0, waterMass: 0, biomass: 0 };
     this.stock = this.stocks;
-    this.state = isValidH3Index(this.h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
-    if (typeof maybeStocksOrState === 'string') {
+    
+    if (maybeStocksOrState === 'UNVERIFIED' || maybeStocksOrState === 'VALIDATED') {
       this.state = maybeStocksOrState;
+    } else {
+      this.state = isValidH3Index(this.h3Token) ? 'ActiveSpatialStock' : 'UnverifiedState';
     }
-    this.energyJoules = maybeEnergy !== undefined ? maybeEnergy : (this.stocks.energy || this.stocks.biomass || 100.0);
+
+    if (maybeEnergy !== undefined) {
+      this.energyJoules = maybeEnergy;
+    } else {
+      this.energyJoules = this.stocks.energy || this.stocks.biomass || 100.0;
+    }
 
     this.thermodynamics = {
       massGrams: 0.0,
-      solarEnergyJoules: typeof initialStocksOrRes === 'number' ? 1000 : 500,
+      solarEnergyJoules: typeof initialStocksOrRes === 'number' ? initialStocksOrRes : 1000,
       dissipationJoules: 10.0
     };
   }
