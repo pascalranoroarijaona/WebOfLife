@@ -1,0 +1,41 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title Web of Life - Sprint 016 Architecture & Spatial Validation
+
+class SpatialMonad {
+  - stock: TrophicEnergy
+  - h3Index: string
+  + validateBoundary(): boolean
+}
+
+class H3GridValidator {
+  {static} + isValidH3Index(index: string): boolean
+}
+
+class TrophicStock {
+  + stockId: UUID
+  + h3Index: string
+  + energyJoules: float
+  + entropyJK: float
+  + biomassGrams: float
+  + updateMetrics(): void
+}
+
+class ThermodynamicBlockchainBlock {
+  + blockHeight: bigint
+  + h3Index: string
+  + deltaEnergy: float
+  + deltaEntropy: float
+  + signature: string
+  + verifyFirstLaw(): boolean
+  + verifySecondLaw(): boolean
+}
+
+SpatialMonad --> H3GridValidator : delegates validation >
+SpatialMonad *-- TrophicStock : contains stock
+ThermodynamicBlockchainBlock --> SpatialMonad : anchors to H3 cell
+
+@enduml
