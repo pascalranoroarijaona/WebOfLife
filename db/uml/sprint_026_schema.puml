@@ -1,0 +1,43 @@
+```Code snippet
+@startuml
+skinparam classAttributeIconSize 0
+title Web of Life - Sprint 026: Spatial H3 Resolution Tier Architecture
+
+class SpatialMonad {
+  +monadsId: UUID
+  +qSolarInflow: decimal
+  +entropyDissipation: decimal
+  +allocateEnergy(): void
+}
+
+class H3Grid {
+  +{static} isValidH3Resolution(resolution: number): boolean
+  +{static} assertH3Resolution(resolution: number): void
+  +validateCell(cell: H3SpatialConstraint): boolean
+}
+
+class H3SpatialConstraint {
+  +resolution: H3Resolution
+  +index: string
+}
+
+class ThermodynamicSpatialError {
+  +message: string
+  +constructor(resolution: number)
+}
+
+class SpatialTransactionBlock {
+  +blockId: UUID
+  +previousHash: string
+  +currentHash: string
+  +resolutionTier: number
+  +solarWorkDelta: decimal
+  +verifyIntegrity(): boolean
+}
+
+SpatialMonad "1" *-- "1..*" H3Grid : powers spatial indexing
+H3Grid ..> H3SpatialConstraint : validates
+H3Grid ..> ThermodynamicSpatialError : throws on out-of-bounds [0-15]
+H3SpatialConstraint --> SpatialTransactionBlock : anchors state transition
+
+@enduml
