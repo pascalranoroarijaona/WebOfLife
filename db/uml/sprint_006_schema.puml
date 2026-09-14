@@ -1,0 +1,64 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "Spatial Validation (src/spatial/h3_grid.ts)" {
+    enum H3ErrorCode {
+        INVALID_LENGTH : H3_ERR_INVALID_LENGTH
+        INVALID_CHARACTER : H3_ERR_INVALID_CHARACTER
+        INVALID_RESOLUTION : H3_ERR_INVALID_RESOLUTION
+        INVALID_BASE_CELL : H3_ERR_INVALID_BASE_CELL
+        NULL_INDEX : H3_ERR_NULL_INDEX
+    }
+
+    class H3Error {
+        + code: H3ErrorCode
+        + message: string
+        + constructor(code: H3ErrorCode, message: string)
+    }
+
+    class H3Validator {
+        {static} + isValidH3(indexStr: string): boolean
+        {static} + parseH3(indexStr: string): string
+        {static} + extractResolution(indexStr: string): number
+        {static} + extractBaseCell(indexStr: string): number
+    }
+
+    interface IH3GridValidator {
+        + validate(indexStr: string): boolean
+        + assertValid(indexStr: string): void
+    }
+
+    IH3GridValidator <|.. H3Validator
+    H3Validator --> H3Error : throws
+    H3Error --> H3ErrorCode : uses
+}
+
+package "Monads & Thermodynamic Ledger (db/schema.sql)" {
+    class SpatialMonad {
+        + h3Index: string
+        + validateState(): void
+    }
+
+    class ThermodynamicStock {
+        + stockId: UUID
+        + h3Index: string
+        + energyJoules: number
+        + matterGrams: number
+        + entropyJK: number
+    }
+
+    class BlockchainBlock {
+        + blockId: UUID
+        + blockIndex: number
+        + previousHash: string
+        + merkleRoot: string
+        + stateSignature: string
+        + h3ValidationStatus: H3ErrorCode
+    }
+
+    SpatialMonad --> H3Validator : invokes parseH3()
+    ThermodynamicStock "*" --> "1" SpatialMonad : mapped to
+    BlockchainBlock --> H3ErrorCode : records validation
+}
+
+@enduml

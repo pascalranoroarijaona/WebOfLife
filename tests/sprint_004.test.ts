@@ -43,7 +43,7 @@ describe('Sprint 004: Uber H3 Geospatial Partitioning Engine Base Initialization
   });
 
   it('should support SpatialMonad state transitions and rollback', () => {
-    const monad = new SpatialMonad<string>();
+    const monad = new SpatialMonad<Map<string, string>>();
     monad.run(() => {
       monad.setValue(new Map([['cellA', 'forest']]));
     });

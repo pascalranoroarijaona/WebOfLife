@@ -216,8 +216,8 @@ SPRINT_GOAL: Implement Uber H3 index string format validation and error code map
 - [ ] Uber H3 index string format validation and error code mapping (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 spatial ring generation utility functions (`src/spatial/h3_grid.ts`)
 - [ ] Uber H3 edge-neighbor mapping functions (`src/spatial/h3_grid.ts`)
-- [ ] Spatial-Thermodynamic State Tensor Routing (`src/spatial/tensor_router.ts`)
 - [ ] Centralized thermodynamic physical constants and temperature normalization engine (`src/thermodynamics/constants.ts`)
+- [ ] Spatial-Thermodynamic State Tensor Routing (`src/spatial/tensor_router.ts`)
 - [ ] Exergy & Entropy Generation Accounting and Gouy-Stodola theorem validation (`src/thermodynamics/exergy.ts`)
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures (`src/thermodynamics/carnot.ts`)
 - [ ] Stefan-Boltzmann incoming/outgoing energy balance equations with dynamic cloud-cover and albedo multipliers (`src/thermodynamics/radiative_balance.ts`)
@@ -226,35 +226,36 @@ SPRINT_GOAL: Implement Uber H3 index string format validation and error code map
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
-- [ ] Sparse matrix representations for Directed Acyclic Trophic Graphs to calculate multi-tier Lindeman's Efficiency energy transfers (`src/biosphere/trophic_matrix.ts`)
-- [ ] Functional Response Curves (Holling Type II/III) for consumer-prey dynamics (`src/biosphere/kinetics.ts`)
-- [ ] Holling Type II and Type III functional response equations for predator-prey consumption rates (`src/biosphere/holling_kinetics.ts`)
-- [ ] Stoichiometric Nutritional Constraint Engine (C:N:P elemental limits) (`src/biosphere/stoichiometry.ts`)
+- [ ] Compressed sparse row (CSR) matrix structures for multi-trophic energy routing (`src/biosphere/trophic_matrix.ts`)
+- [ ] Iterative linear solver for steady-state flux propagation across $N$-tier food webs (`src/biosphere/trophic_solver.ts`)
+- [ ] Holling Type II predator ingestion rate function with handling time parameters (`src/biosphere/holling_kinetics.ts`)
+- [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds (`src/biosphere/holling_kinetics.ts`)
 - [ ] Elemental stoichiometric constraint checks enforcing strict C:N:P mass conservation ratios during biomass synthesis (`src/biosphere/redfield_ratio.ts`)
-- [ ] Common Mycorrhizal Network (CMN) Interface and subterranean hyphae graphs (`src/biosphere/mycorrhizal.ts`)
-- [ ] Carbon-for-Mineral Exchange Kinetics in plant-fungal symbioses (`src/biosphere/mycorrhizal_flows.ts`)
-- [ ] Shannon-Wiener and Simpson Biodiversity Index calculators (`src/biosphere/diversity_metrics.ts`)
+- [ ] Adjacency-weighted hyphal transport arrays for carbon-for-mineral exchange (`src/biosphere/mycorrhizal_flows.ts`)
+- [ ] Shannon-Wiener entropy metric calculation across spatial H3 node communities (`src/biosphere/diversity_metrics.ts`)
+- [ ] Simpson's dominance and evenness index calculator (`src/biosphere/diversity_metrics.ts`)
 - [ ] Stochastic Extinction, Bottleneck, and Minimum Viable Population engine (`src/biosphere/population_genetics.ts`)
-- [ ] Soil Microbiome, Detritus, and Necromass decomposition pools (`src/geobiome/soil_matrix.ts`)
+- [ ] Soil Organic Matter (SOM) and microbial necromass decomposition pools (`src/geobiome/soil_matrix.ts`)
 
 ### Phase 3: Technosphere & Industrial Metabolism
-- [ ] Direct Air Capture (DAC) thermodynamic solvent regeneration and energy penalties (`src/technosphere/dac.ts`)
-- [ ] Amine/solid-sorbent regeneration enthalpy of solution and minimum work equations for Direct Air Capture (`src/technosphere/dac_thermodynamics.ts`)
-- [ ] Mineral Sequestration Kinetics (basalt/peridotite carbonation) (`src/technosphere/dac.ts`)
-- [ ] Mineral sequestration reaction kinetics modeling olivine/basalt carbonation as a function of surface area and temperature (`src/technosphere/basalt_carbonation.ts`)
-- [ ] Semiconductor Manufacturing & Critical Mineral supply chain tracking (`src/technosphere/semiconductors.ts`)
-- [ ] Industrial Energy Grids balancing variable renewable generation and thermal loss (`src/technosphere/energy_grid.ts`)
-- [ ] Electrical and thermal grid balance algorithms enforcing node-level power supply-demand equilibrium (`src/technosphere/exergy_grid.ts`)
-- [ ] Heavy Metal, Xenobiotic, and Thermal Waste Pollution stock tracking (`src/technosphere/industrial_metabolism.ts`)
+- [ ] Minimum theoretical separation work using Gibbs free energy of mixing for DAC (`src/technosphere/dac_thermodynamics.ts`)
+- [ ] Parasitic electrical and thermal load simulation for Direct Air Capture (`src/technosphere/dac.ts`)
+- [ ] Olivine/basalt carbonation mineral sequestration reaction kinetics (`src/technosphere/basalt_carbonation.ts`)
+- [ ] Material stock-flow monads for semiconductor manufacturing and electronic-grade silicon (`src/technosphere/semiconductors.ts`)
+- [ ] Regional electrical and thermal transmission networks with capacity limits and Joule heating losses (`src/technosphere/energy_grid.ts`)
+- [ ] Gouy-Stodola theorem validation for Second Law exergy efficiency across industrial power plants (`src/technosphere/exergy_grid.ts`)
+- [ ] Heavy metal, xenobiotic, and thermal waste pollution stock tracking (`src/technosphere/industrial_metabolism.ts`)
 
 ### Phase 4: Blockchain Ledger & AI Symbiosis
 - [ ] Thermodynamic Vortex Block Chaining (`src/ledger/vortex_ledger.ts`)
-- [ ] Deterministic JSON canonicalization for state monad payloads to generate SHA-256 Merkle root hashes (`src/ledger/vortex_serialization.ts`)
-- [ ] Proof of Ecological Work (PoEW) validation middleware (`src/ledger/poew.ts`)
+- [ ] Deterministic JSON canonicalization (RFC 8785) for state monad payloads to generate SHA-256 Merkle root hashes (`src/ledger/vortex_serialization.ts`)
 - [ ] Verification middleware independently re-executing First and Second Law checks across block transactions (`src/ledger/poew_validator.ts`)
+- [ ] Proof of Ecological Work (PoEW) validation middleware (`src/ledger/poew.ts`)
 - [ ] SQLite schema definitions for append-only temporal vortex blocks (`db/schema.sql`)
-- [ ] Multi-Objective AI Optimization Objective function integrating wellbeing, diversity, and explorability (`src/optimization/ai_symbiosis.ts`)
 - [ ] Multi-objective Pareto scoring function integrating human wellbeing, biospheric diversity, and planetary explorability (`src/optimization/pareto_objective.ts`)
+- [ ] Multi-Objective AI Optimization Objective function integrating wellbeing, diversity, and explorability (`src/optimization/ai_symbiosis.ts`)
+
+<!-- BACKLOG_END -->
 
 <!-- BACKLOG_END -->
 

@@ -1,4 +1,10 @@
-import { H3GridParser, GeoCoordinate } from '../spatial/h3_grid.js';
+import { H3Error, H3ErrorCode, IH3GridValidator, H3Validator, GeoCoordinate, H3GridParser, H3ValidationResult } from '../spatial/h3_grid';
+
+export interface SpatialState<M, E> {
+  h3Index: string;
+  matter: M;
+  energy: E;
+}
 
 export interface ThermodynamicStock {
   carbonKg: number;
@@ -6,86 +12,148 @@ export interface ThermodynamicStock {
   biomassJoules: number;
 }
 
-export class SpatialMonad<T> {
-  private value: Map<string, T> | T;
-  private history: (Map<string, T> | T)[] = [];
-  private h3Index?: string;
-  private stock?: ThermodynamicStock;
+export class H3ValidationMonad<M, E> {
+  private constructor(
+    private readonly state: SpatialState<M, E> | null,
+    private readonly error: H3Error | null,
+    private readonly validator: IH3GridValidator
+  ) {}
 
-  constructor(initialValue?: Map<string, T> | T, h3Index?: string, stock?: ThermodynamicStock) {
-    if (initialValue instanceof Map) {
-      this.value = new Map(initialValue);
-    } else {
-      this.value = initialValue as T;
+  public static unit<M, E>(
+    state: SpatialState<M, E>, 
+    validator: IH3GridValidator = new H3Validator()
+  ): H3ValidationMonad<M, E> {
+    try {
+      validator.assertValid(state.h3Index);
+      return new H3ValidationMonad(state, null, validator);
+    } catch (err) {
+      if (err instanceof H3Error) {
+        return new H3ValidationMonad(null, err, validator);
+      }
+      throw err;
     }
-    this.h3Index = h3Index;
-    this.stock = stock;
+  }
+
+  public bind<M2, E2>(
+    transitionFn: (state: SpatialState<M, E>) => SpatialState<M2, E2>
+  ): H3ValidationMonad<M2, E2> {
+    if (this.error !== null || this.state === null) {
+      return new H3ValidationMonad<M2, E2>(null, this.error, this.validator);
+    }
+
+    try {
+      const nextState = transitionFn(this.state);
+      this.validator.assertValid(nextState.h3Index);
+      return new H3ValidationMonad(nextState, null, this.validator);
+    } catch (err) {
+      if (err instanceof H3Error) {
+        return new H3ValidationMonad<M2, E2>(null, err, this.validator);
+      }
+      return new H3ValidationMonad<M2, E2>(
+        null, 
+        new H3Error(H3ErrorCode.INVALID_CHARACTER, (err as Error).message), 
+        this.validator
+      );
+    }
+  }
+
+  public match<T>(
+    onSuccess: (state: SpatialState<M, E>) => T,
+    onError: (error: H3Error) => T
+  ): T {
+    if (this.error !== null || this.state === null) {
+      return onError(this.error!);
+    }
+    return onSuccess(this.state);
+  }
+}
+
+export class SpatialMonad<T = any> {
+  private historyStack: T[] = [];
+  private currentValue: T | null = null;
+  private h3Index: string = '';
+  private stock: ThermodynamicStock = { carbonKg: 0, waterKg: 0, biomassJoules: 0 };
+
+  constructor(initialValue?: T) {
+    if (initialValue !== undefined) {
+      this.currentValue = initialValue;
+      this.historyStack.push(initialValue);
+    }
   }
 
   public static unit<T>(value: T): SpatialMonad<T> {
-    return new SpatialMonad<T>(value);
+    return new SpatialMonad(value);
   }
 
   public static fromGeo(
-    coord: GeoCoordinate,
-    resolution: number,
-    initialStock?: ThermodynamicStock
-  ): SpatialMonad<any> {
-    const indexStr = H3GridParser.fromGeo(coord, resolution);
-    const stock = initialStock ?? { carbonKg: 1000, waterKg: 50000, biomassJoules: 250000 };
-    return new SpatialMonad<any>(stock, indexStr, stock);
-  }
+    coord: GeoCoordinate, 
+    resolution: number, 
+    initialStock: ThermodynamicStock
+  ): SpatialMonad {
+    const normalizedIndex = H3GridParser.fromGeo(coord, resolution);
+    const validation: H3ValidationResult = H3GridParser.validateIndex(normalizedIndex);
 
-  public getIndex(): string {
-    return this.h3Index ?? '831f18fffffffff';
-  }
-
-  public unwrapStock(): ThermodynamicStock {
-    return this.stock ?? { carbonKg: 0, waterKg: 0, biomassJoules: 0 };
-  }
-
-  public run(computation: () => void): SpatialMonad<T> {
-    if (this.value instanceof Map) {
-      this.history.push(new Map(this.value as Map<any, any>));
-    } else {
-      this.history.push(this.value);
+    if (!validation.isValid) {
+      throw new Error(`SpatialMonad Binding Failed: Invalid H3 index generated [${validation.errorCode}]`);
     }
-    computation();
-    return this;
+
+    const monad = new SpatialMonad(normalizedIndex);
+    monad.h3Index = normalizedIndex;
+    monad.stock = { ...initialStock };
+    return monad;
   }
 
-  public map<U>(mapper: (cellMap: any) => any): SpatialMonad<U> {
-    const newValue = mapper(this.value);
-    return new SpatialMonad<U>(newValue, this.h3Index, this.stock);
-  }
-
-  public flatMap<U>(mapper: (cellMap: any) => SpatialMonad<U>): SpatialMonad<U> {
-    return mapper(this.value);
-  }
-
-  public getValue(): Map<string, T> | T {
-    return this.value;
-  }
-
-  public setValue(newValue: Map<string, T> | T): void {
-    if (this.value instanceof Map) {
-      this.history.push(new Map(this.value as Map<any, any>));
-    } else {
-      this.history.push(this.value);
+  public bind<U>(fn: (val: T) => SpatialMonad<U>): SpatialMonad<U> {
+    if (this.currentValue === null) {
+      throw new Error('Cannot bind null spatial monad state.');
     }
-    this.value = newValue;
+    return fn(this.currentValue);
+  }
+
+  public map<U>(fn: (val: T) => U): SpatialMonad<U> {
+    const nextVal = fn(this.currentValue as T);
+    const res = new SpatialMonad<U>(nextVal);
+    res.h3Index = this.h3Index;
+    res.stock = { ...this.stock };
+    return res;
   }
 
   public extract(): T {
-    return this.value as T;
+    if (this.currentValue === null) {
+      throw new Error('No state to extract from SpatialMonad.');
+    }
+    return this.currentValue;
+  }
+
+  public run(action: () => void): void {
+    action();
+    if (this.currentValue !== null) {
+      this.historyStack.push(this.currentValue);
+    }
+  }
+
+  public setValue(val: T): void {
+    this.currentValue = val;
+  }
+
+  public getValue(): T | null {
+    return this.currentValue;
   }
 
   public rollback(): boolean {
-    const prev = this.history.pop();
-    if (prev !== undefined) {
-      this.value = prev;
+    if (this.historyStack.length > 1) {
+      this.historyStack.pop();
+      this.currentValue = this.historyStack[this.historyStack.length - 1];
       return true;
     }
     return false;
+  }
+
+  public getIndex(): string {
+    return this.h3Index || '831f18fffffffff';
+  }
+
+  public unwrapStock(): ThermodynamicStock {
+    return { ...this.stock };
   }
 }

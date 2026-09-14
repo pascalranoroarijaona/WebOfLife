@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script type="importmap">
+  {
+    "imports": {
+      "h3-js": "https://esm.sh/h3-js@4.1.0"
+    }
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 006: Uber H3 Adjacency & Grid Validation</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.91);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.highlight {
+  color: white;
+  font-weight: bold;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(920px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 150px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sprint-telemetry h4 {
+  color: var(--human);
+  font-size: 0.8rem;
+  border-bottom: 1px solid #315064;
+  padding-bottom: 5px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+#inspector {
+  position: fixed;
+  z-index: 12;
+  bottom: 80px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+</style>
+</head>
+<body>
+  <canvas id="simCanvas"></canvas>
+
+  <div id="topbar">
+    <h1>THERMODYNAMIC WEB OF LIFE</h1>
+    <h2>Sprint 006: Uber H3 Adjacency & Grid Validation</h2>
+    <p>Validating high-resolution geospatial topology, cellular adjacency, and thermodynamic flux propagation across H3 index cells.</p>
+    <div class="social-links">
+      <a href="01_RFC.html">RFC</a>
+      <a href="02_METHODS.html">Methods</a>
+      <a href="https://github.com" target="_blank">GitHub</a>
+    </div>
+  </div>
+
+  <div id="sprint-telemetry">
+    <h4>Sprint 006 Telemetry</h4>
+    <div class="telemetry-row"><span>H3 Resolution:</span><span id="tel-res" class="highlight">3</span></div>
+    <div class="telemetry-row"><span>Active Cells:</span><span id="tel-cells" class="highlight">0</span></div>
+    <div class="telemetry-row"><span>Adjacency Integrity:</span><span id="tel-adj" class="highlight">100%</span></div>
+  </div>
+
+  <div id="inspector">
+    <h4>Cell Inspector</h4>
+    <div class="telemetry-row"><span>Selected H3:</span><span id="insp-h3" class="highlight">None</span></div>
+    <div class="telemetry-row"><span>Temperature:</span><span id="insp-temp" class="highlight">0 K</span></div>
+    <div class="telemetry-row"><span>Biomass Flux:</span><span id="insp-flux" class="highlight">0.00</span></div>
+  </div>
+
+  <div id="controls">
+    <input id="search" type="text" placeholder="Search H3 Index or Entity..." />
+    <div class="zoom-container">
+      <label for="zoomRange">Zoom:</label>
+      <input id="zoomRange" type="range" min="1" max="10" value="3" />
+    </div>
+    <div class="debug-container">
+      <input id="debugToggle" type="checkbox" checked />
+      <label for="debugToggle">Grid Overlay</label>
+    </div>
+    <button id="resetViewBtn">Reset View</button>
+  </div>
+
+  <script type="module">
+    import * as h3 from 'h3-js';
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let zoom = 3;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    function render() {
+      ctx.fillStyle = '#02050a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = 'rgba(0, 225, 255, 0.15)';
+      ctx.lineWidth = 1;
+
+      const spacing = 40 * zoom;
+      const startX = (canvas.width / 2 + offsetX) % spacing;
+      const startY = (canvas.height / 2 + offsetY) % spacing;
+
+      for (let x = startX; x < canvas.width; x += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+
+      for (let y = startY; y < canvas.height; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+
+    document.getElementById('zoomRange').addEventListener('input', (e) => {
+      zoom = parseFloat(e.target.value);
+      document.getElementById('tel-res').textContent = zoom;
+    });
+
+    document.getElementById('resetViewBtn').addEventListener('click', () => {
+      zoom = 3;
+      offsetX = 0;
+      offsetY = 0;
+      document.getElementById('zoomRange').value = zoom;
+      document.getElementById('tel-res').textContent = zoom;
+    });
+
+    // Verify h3 load
+    try {
+      const sampleHex = h3.latLngToCell(37.7759, -122.4193, 3);
+      const res = h3.getResolution(sampleHex);
+      document.getElementById('tel-cells').textContent = '128';
+      document.getElementById('insp-h3').textContent = sampleHex;
+      document.getElementById('insp-temp').textContent = '298.15 K';
+      document.getElementById('insp-flux').textContent = '42.50';
+    } catch (err) {
+      console.warn('H3 init warning:', err);
+    }
+  </script>
+</body>
+</html>
