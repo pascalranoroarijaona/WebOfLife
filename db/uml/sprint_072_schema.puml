@@ -1,0 +1,256 @@
+@startuml sprint_072_schema
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageFontSize 13
+skinparam roundcorner 6
+skinparam linetype ortho
+
+package "Spatial Geometry & Adjacency (src/spatial)" {
+    interface Point2D <<Type>> {
+        +[0]: number (x / lon)
+        +[1]: number (y / lat)
+    }
+
+    interface Vector3D <<Type>> {
+        +[0]: number (x)
+        +[1]: number (y)
+        +[2]: number (z)
+    }
+
+    interface ISharedBoundarySegment<TCoord> {
+        +start: TCoord
+        +end: TCoord
+        +outwardNormal: TCoord
+        +length: number
+    }
+
+    interface OrderedBoundaryResult<TCoord> {
+        +orderedEndpoints: [TCoord, TCoord]
+        +outwardNormal: TCoord
+        +length: number
+        +isFlipped: boolean
+    }
+
+    class H3AdjacencyGraph {
+        -adjacencyCache: Map<string, Set<string>>
+        -orientedBoundaryCache: Map<string, ISharedBoundarySegment<Point2D>>
+        +getNeighbors(cellId: string): string[]
+        +getSharedEdge(cellA: string, cellB: string): RawEdge
+        +getCellCentroid(cellId: string): Point2D
+        +getCellCentroid3D(cellId: string): Vector3D
+        +getOrientedBoundary(cellA: string, cellB: string): ISharedBoundarySegment<Point2D>
+        +getOrientedBoundary3D(cellA: string, cellB: string): ISharedBoundarySegment<Vector3D>
+    }
+
+    class BoundaryOrientationAlgorithms <<Utility>> {
+        {static} +orderSharedBoundaryEndpointsByCentroid(p1: Point2D, p2: Point2D, centroidA: Point2D, centroidB: Point2D): OrderedBoundaryResult<Point2D>
+        {static} +orderSharedBoundaryEndpointsByCentroid3D(p1: Vector3D, p2: Vector3D, centroidA: Vector3D, centroidB: Vector3D): OrderedBoundaryResult<Vector3D>
+        {static} -computeNormal2D(start: Point2D, end: Point2D): Point2D
+        {static} -computeNormal3D(start: Vector3D, end: Vector3D, midpoint: Vector3D): Vector3D
+    }
+}
+
+package "Thermodynamic Monad & Conservation (src/spatial/flux)" {
+    enum FluxCarrierType {
+        SENSIBLE_HEAT
+        WATER_MASS
+        CARBON_ADVECTIVE
+        CARBON_DIFFUSIVE
+        NITROGEN_TROPHIC
+        PHOSPHORUS_TROPHIC
+        BIOMASS_MIGRATION
+    }
+
+    class ThermodynamicStockVector {
+        +internalEnergyJoules: number
+        +waterMassKg: number
+        +carbonMoles: number
+        +nitrogenMoles: number
+        +phosphorusMoles: number
+        +biomassDryKg: number
+        +entropyJPerK: number
+        +temperatureKelvin: number
+        +chemicalPotentialJPerMol: number
+    }
+
+    class BoundaryFluxTransaction {
+        +interfaceId: string
+        +sourceCell: string
+        +neighborCell: string
+        +carrier: FluxCarrierType
+        +fluxDensity: number
+        +totalQuantity: number
+        +entropyGenerated: number
+        +dtSeconds: number
+    }
+
+    class SpatialFluxMonad {
+        -stateMap: Map<string, ThermodynamicStockVector>
+        -adjacency: H3AdjacencyGraph
+        +bind(f: (s: ThermodynamicStockVector) => SpatialFluxMonad): SpatialFluxMonad
+        +integrateEdgeFluxes(dt: number): SpatialFluxMonad
+        +evaluateInterfaceFlux(src: string, tgt: string, carrier: FluxCarrierType): BoundaryFluxTransaction
+        +verifySkewSymmetry(tol: number): boolean
+        +getState(cellId: string): ThermodynamicStockVector
+    }
+}
+
+package "Relational Persistence & Blockchain Consensus (db/schema.sql)" {
+    entity "h3_cells" as H3CellEntity {
+        *cell_id : VARCHAR(15) [PK]
+        --
+        resolution : SMALLINT
+        centroid_lat : DOUBLE PRECISION
+        centroid_lon : DOUBLE PRECISION
+        centroid_x : DOUBLE PRECISION
+        centroid_y : DOUBLE PRECISION
+        centroid_z : DOUBLE PRECISION
+        surface_area_m2 : DOUBLE PRECISION
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "h3_shared_boundaries" as SharedBoundaryEntity {
+        *boundary_id : UUID [PK]
+        --
+        *cell_low_id : VARCHAR(15) [FK]
+        *cell_high_id : VARCHAR(15) [FK]
+        raw_p1_x : DOUBLE PRECISION
+        raw_p1_y : DOUBLE PRECISION
+        raw_p1_z : DOUBLE PRECISION
+        raw_p2_x : DOUBLE PRECISION
+        raw_p2_y : DOUBLE PRECISION
+        raw_p2_z : DOUBLE PRECISION
+        geodesic_length_m : DOUBLE PRECISION
+    }
+
+    entity "h3_directed_interfaces" as DirectedInterfaceEntity {
+        *interface_id : UUID [PK]
+        --
+        *boundary_id : UUID [FK]
+        *source_cell_id : VARCHAR(15) [FK]
+        *neighbor_cell_id : VARCHAR(15) [FK]
+        v_start_x : DOUBLE PRECISION
+        v_start_y : DOUBLE PRECISION
+        v_start_z : DOUBLE PRECISION
+        v_end_x : DOUBLE PRECISION
+        v_end_y : DOUBLE PRECISION
+        v_end_z : DOUBLE PRECISION
+        outward_normal_x : DOUBLE PRECISION
+        outward_normal_y : DOUBLE PRECISION
+        outward_normal_z : DOUBLE PRECISION
+        interface_length_m : DOUBLE PRECISION
+        alignment_dot_product : DOUBLE PRECISION
+        is_inverted : BOOLEAN
+    }
+
+    entity "cell_thermodynamic_stocks" as CellStocksEntity {
+        *stock_id : UUID [PK]
+        --
+        *cell_id : VARCHAR(15) [FK]
+        *epoch_height : BIGINT
+        timestamp : TIMESTAMPTZ
+        internal_energy_joules : DOUBLE PRECISION
+        water_mass_kg : DOUBLE PRECISION
+        carbon_moles : DOUBLE PRECISION
+        nitrogen_moles : DOUBLE PRECISION
+        phosphorus_moles : DOUBLE PRECISION
+        biomass_dry_kg : DOUBLE PRECISION
+        temperature_kelvin : DOUBLE PRECISION
+        chemical_potential_j_per_mol : DOUBLE PRECISION
+        accumulated_entropy_j_per_k : DOUBLE PRECISION
+    }
+
+    entity "spatial_boundary_flux_ledger" as FluxLedgerEntity {
+        *flux_id : UUID [PK]
+        --
+        *epoch_height : BIGINT
+        *interface_id : UUID [FK]
+        *source_cell_id : VARCHAR(15) [FK]
+        *neighbor_cell_id : VARCHAR(15) [FK]
+        carrier : flux_carrier_type
+        flux_density_per_meter : DOUBLE PRECISION
+        total_flux_quantity : DOUBLE PRECISION
+        entropy_production_j_per_k : DOUBLE PRECISION
+        delta_t_seconds : DOUBLE PRECISION
+        execution_merkle_leaf : BYTEA
+    }
+
+    entity "boundary_skew_symmetry_audit" as SkewAuditEntity {
+        *audit_id : UUID [PK]
+        --
+        *epoch_height : BIGINT
+        *boundary_id : UUID [FK]
+        carrier : flux_carrier_type
+        flux_ab : DOUBLE PRECISION
+        flux_ba : DOUBLE PRECISION
+        imbalance_residual : DOUBLE PRECISION [VIRTUAL]
+        is_conservative : BOOLEAN [VIRTUAL]
+    }
+
+    entity "thermodynamic_blockchain_blocks" as BlockchainBlockEntity {
+        *epoch_height : BIGINT [PK]
+        --
+        block_hash : BYTEA
+        parent_block_hash : BYTEA
+        timestamp : TIMESTAMPTZ
+        state_root_merkle : BYTEA
+        flux_receipts_root : BYTEA
+        total_entropy_production_rate : DOUBLE PRECISION
+        first_law_residual_l2_norm : DOUBLE PRECISION
+        proposer_public_key : BYTEA
+        consensus_signature : BYTEA
+    }
+}
+
+' Relations: Geometry & Adjacency
+H3AdjacencyGraph ..> ISharedBoundarySegment : generates
+H3AdjacencyGraph ..> OrderedBoundaryResult : consumes
+BoundaryOrientationAlgorithms ..> OrderedBoundaryResult : produces
+ISharedBoundarySegment ..> Point2D
+ISharedBoundarySegment ..> Vector3D
+
+' Relations: Monad & Physical Fluxes
+SpatialFluxMonad *-- H3AdjacencyGraph
+SpatialFluxMonad *-- ThermodynamicStockVector
+SpatialFluxMonad ..> BoundaryFluxTransaction : records
+BoundaryFluxTransaction --> FluxCarrierType
+
+' Relations: Object-Relational Mappings
+H3AdjacencyGraph ..> H3CellEntity : mirrors
+BoundaryOrientationAlgorithms ..> DirectedInterfaceEntity : populates
+SpatialFluxMonad ..> CellStocksEntity : reads/writes
+SpatialFluxMonad ..> FluxLedgerEntity : emits
+BoundaryFluxTransaction ..> FluxLedgerEntity : maps to
+
+' Relations: Relational Foreign Keys
+H3CellEntity "1" <-- "0..*" SharedBoundaryEntity : cell_low_id
+H3CellEntity "1" <-- "0..*" SharedBoundaryEntity : cell_high_id
+SharedBoundaryEntity "1" <-- "2" DirectedInterfaceEntity : boundary_id
+H3CellEntity "1" <-- "0..*" DirectedInterfaceEntity : source_cell_id
+H3CellEntity "1" <-- "0..*" DirectedInterfaceEntity : neighbor_cell_id
+
+H3CellEntity "1" <-- "0..*" CellStocksEntity : cell_id
+DirectedInterfaceEntity "1" <-- "0..*" FluxLedgerEntity : interface_id
+SharedBoundaryEntity "1" <-- "0..*" SkewAuditEntity : boundary_id
+BlockchainBlockEntity "1" <-- "0..*" CellStocksEntity : epoch_height
+BlockchainBlockEntity "1" <-- "0..*" FluxLedgerEntity : epoch_height
+BlockchainBlockEntity "1" <-- "0..*" SkewAuditEntity : epoch_height
+
+' Invariant notes
+note bottom of DirectedInterfaceEntity
+  <b>INV-072-1:</b> outward_normal · (C_B - C_A) > 0
+  <b>INV-072-2:</b> n_{B->A} = - n_{A->B}
+  <b>INV-072-3:</b> ||outward_normal|| = 1.0 ± 1e-9
+  <b>INV-072-4:</b> {V_start, V_end} = {P1, P2}
+  <b>INV-072-5:</b> Deterministic lexicographic fallback
+end note
+
+note bottom of SkewAuditEntity
+  <b>First Law:</b> Phi_{A->B} + Phi_{B->A} == 0
+  <b>Second Law:</b> entropy_production_j_per_k >= 0
+  Imbalance residual <= 1e-12 required for block seal.
+end note
+
+@enduml

@@ -1,5 +1,5 @@
 {
-  "current_sprint": 72,
+  "current_sprint": 73,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -355,6 +355,11 @@
       "sprint": 71,
       "goal": "Implement findSharedBoundaryVertexPairs3D matching coincident boundary vertices between adjacent H3 cells in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-15T01:36:27.182369+00:00"
+    },
+    {
+      "sprint": 72,
+      "goal": "Implement orderSharedBoundaryEndpointsByCentroid orienting shared endpoints with outward normal in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-15T01:53:43.152925+00:00"
     }
   ]
 }

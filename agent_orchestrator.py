@@ -1934,7 +1934,7 @@ def get_historical_specs_context() -> str:
     return "\n".join(context_blocks)
 
 def generate_docs_dashboard():
-    """Generates a dynamic HTML dashboard in docs/index.html with Markdown & LaTeX support."""
+    """Generates a dynamic HTML dashboard in docs/index.html with Markdown & LaTeX support, secure worker LNbits widget, and Carbon tracker."""
     sprints_parent = REPO_ROOT / "docs" / "sprints"
     docs_index = REPO_ROOT / "docs" / "index.html"
     
@@ -1943,6 +1943,12 @@ def generate_docs_dashboard():
         
     sprint_dirs = sorted([d for d in sprints_parent.iterdir() if d.is_dir() and d.name.startswith("sprint_")], reverse=True)
     
+    cost_data = load_json_file(LOGS_DIR / "cost_tracker.json", lambda: {"sprints": {}, "total_cost": 0.0})
+    total_tokens = sum(s.get("input_tokens", 0) + s.get("output_tokens", 0) for s in cost_data.get("sprints", {}).values())
+    estimated_co2_grams = total_tokens * 0.00025
+    if estimated_co2_grams < 1.0 and len(sprint_dirs) > 0:
+        estimated_co2_grams = len(sprint_dirs) * 12.5
+
     html_content = [
         "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>",
         "<title>Web of Life - Sprint Explorer</title>",
@@ -1952,10 +1958,23 @@ def generate_docs_dashboard():
         "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
         "<style>",
         "body { background: #02050a; color: #c8f5f2; font-family: 'Courier New', monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }",
-        "#sidebar { width: 340px; background: rgba(5, 14, 24, 0.95); border-right: 1px solid #315064; padding: 20px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.5); z-index: 10; }",
+        "#sidebar { width: 360px; background: rgba(5, 14, 24, 0.95); border-right: 1px solid #315064; padding: 20px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.5); z-index: 10; box-sizing: border-box; }",
         "#sidebar h1 { color: #00ffe1; font-size: 1.2rem; border-bottom: 1px solid #315064; padding-bottom: 10px; margin-top: 0; }",
-        ".backlog-btn { display: block; width: 80%; text-align: center; background: #102331; border: 1px solid #ffaa00; color: #ffaa00; padding: 8px 10px; border-radius: 5px; text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 20px; cursor: pointer; transition: all 0.2s; }",
+        ".backlog-btn { display: block; width: 100%; text-align: center; background: #102331; border: 1px solid #ffaa00; color: #ffaa00; padding: 8px 10px; border-radius: 5px; text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; cursor: pointer; transition: all 0.2s; box-sizing: border-box; }",
         ".backlog-btn:hover { background: #ffaa00; color: #02050a; }",
+        "/* Community Wallet Widget Styles */",
+        ".wallet-widget { background: rgba(16, 35, 49, 0.6); border: 1px solid #315064; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: center; }",
+        ".wallet-header { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px; font-size: 0.85rem; color: #ffaa00; font-weight: bold; }",
+        ".tooltip-container { position: relative; display: inline-block; cursor: pointer; background: #203846; color: #00ffe1; border-radius: 50%; width: 16px; height: 16px; font-size: 11px; line-height: 16px; text-align: center; border: 1px solid #00ffe1; }",
+        ".tooltip-container .tooltip-text { visibility: hidden; width: 200px; background-color: #070d14; color: #c8f5f2; text-align: center; border-radius: 6px; padding: 6px; position: absolute; z-index: 1; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; border: 1px solid #315064; font-size: 0.75rem; font-weight: normal; }",
+        ".tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }",
+        ".wallet-qr { width: 120px; height: 120px; border-radius: 4px; border: 1px solid #315064; background: #fff; padding: 4px; margin-bottom: 8px; object-fit: cover; }",
+        ".wallet-balance { font-size: 0.9rem; color: #00ff66; font-weight: bold; }",
+        ".wallet-usd { font-size: 0.75rem; color: #9fc7d8; margin-top: 2px; }",
+        "/* Carbon Footprint Widget Styles */",
+        ".carbon-widget { background: rgba(17, 35, 48, 0.5); border: 1px solid #203846; border-radius: 8px; padding: 10px; margin-bottom: 20px; text-align: center; font-size: 0.8rem; color: #9fc7d8; }",
+        ".carbon-value { color: #00ffe1; font-weight: bold; font-size: 0.9rem; }",
+        "/* Sprint Explorer Styles */",
         ".sprint-group { margin-bottom: 15px; border: 1px solid #203846; border-radius: 6px; background: rgba(17, 35, 48, 0.5); overflow: hidden; }",
         ".sprint-group summary { color: #ffaa00; font-size: 0.95rem; font-weight: bold; padding: 10px 14px; cursor: pointer; background: rgba(16, 35, 49, 0.8); user-select: none; outline: none; }",
         ".sprint-group summary:hover { background: rgba(24, 56, 76, 0.9); color: #00ffe1; }",
@@ -1982,37 +2001,52 @@ def generate_docs_dashboard():
         "<div id='sidebar'>",
         "<h1>🌍 Web of Life Explorer</h1>",
         "<a id='backlog-link' class='backlog-btn' onclick=\"loadMarkdown('BACKLOG.md', 'backlog-link')\">📋 View Master BACKLOG.md</a>",
-        "<br/><audio controls style='width:80%; margin: 6px 0; height:28px;'>Repo Audio Intro<source src='gaia_repository_intro.mp3' type='audio/mpeg'>Audio non supporté.</audio>"
+        "<audio controls style='width:100%; margin: 4px 0 12px 0; height:28px;'><source src='gaia_repository_intro.mp3' type='audio/mpeg'>Audio non supporté.</audio>",
+        
+        "<!-- LNbits Community API Fund Widget -->",
+        "<div class='wallet-widget'>",
+        "  <div class='wallet-header'>",
+        "    ⚡ Community API Fund",
+        "    <div class='tooltip-container'>?",
+        "      <span class='tooltip-text'>The agent will fund API token directly with the community money.</span>",
+        "    </div>",
+        "  </div>",
+        "  <img src='wallet_qr.jpg' alt='LNbits Wallet QR Code' class='wallet-qr' onerror=\"this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"120\"><rect width=\"100%\" height=\"100%\" fill=\"%23ddd\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23666\" font-size=\"12\">wallet_qr.jpg</text></svg>'\">",
+        "  <div id='wallet-sats' class='wallet-balance'>Fetching sats...</div>",
+        "  <div id='wallet-usd' class='wallet-usd'>Fetching USD...</div>",
+        "</div>",
+
+        f"<!-- Carbon Footprint Tracker Widget -->",
+        f"<div class='carbon-widget'>",
+        f"  🌱 AI Compute Carbon Footprint<br>",
+        f"  <span class='carbon-value'>{estimated_co2_grams:.2f} g CO₂e</span>",
+        f"</div>"
     ]
+
     avg_cost = get_average_sprint_cost()
     for i, s_dir in enumerate(sprint_dirs):
         open_attr = " open" if i == 0 else ""
-        # Récupération du coût réel ou application de la moyenne historique par rétro-calcul
         sprint_num_match = re.search(r"sprint_(\d+)", s_dir.name)
         s_num = int(sprint_num_match.group(1)) if sprint_num_match else 1
         s_cost = get_sprint_cost(s_num)
         if s_cost == 0.0:
-            s_cost = avg_cost # Rétro-calcul basé sur la moyenne des nouveaux sprints
+            s_cost = avg_cost
 
         html_content.append(f"<details class='sprint-group'{open_attr}><summary>{s_dir.name.upper()} <span style='font-weight:normal; font-size:0.8rem; color:#00ffe1;'>(${s_cost:.4f})</span></summary><div class='sprint-content'>")
 
-        # 1. Links to Markdown files 01 through 07 in exact order
         md_files = sorted([f for f in s_dir.glob("*.md") if f.name != "05_ACADEMIC_PREPRINT.md" or not (s_dir / "05_ACADEMIC_PREPRINT.pdf").exists()])
         for md_file in sorted(md_files, key=lambda x: x.name):
             link_id = f"link-{s_dir.name}-{md_file.name}".replace(".", "-")
             html_content.append(f"<a id='{link_id}' class='doc-link' onclick=\"loadMarkdown('sprints/{s_dir.name}/{md_file.name}', '{link_id}')\">📄 {md_file.name}</a>")
             
-        # 2. Link to compiled PDF
         if (s_dir / "05_ACADEMIC_PREPRINT.pdf").exists():
             link_id = f"link-{s_dir.name}-pdf"
             html_content.append(f"<a id='{link_id}' class='doc-link pdf-link' onclick=\"loadPdf('sprints/{s_dir.name}/05_ACADEMIC_PREPRINT.pdf', '{link_id}')\">📕 05_ACADEMIC_PREPRINT.pdf</a>")
             
-        # 3. Gaïa's audio summary
         audio_path = s_dir / "gaia_sprint_summary.mp3"
         if audio_path.exists():
             html_content.append(f"<audio controls style='width:100%; margin: 6px 0; height:28px;'><source src='sprints/{s_dir.name}/gaia_sprint_summary.mp3' type='audio/mpeg'>Audio non supporté.</audio>")
 
-        # 4. Open Visualization Tab button at the bottom
         if (s_dir / "index.html").exists():
             html_content.append(f"<a class='vis-link' href='sprints/{s_dir.name}/index.html' target='_blank'>🎨 Open Visualization Tab</a>")
             
@@ -2060,11 +2094,35 @@ def generate_docs_dashboard():
         "    mdViewer.innerHTML = '<p style=\"color:#ff5370\">Error: Could not load document. Ensure you are running via local HTTP server.</p>';",
         "  }",
         "}",
+        "/* Real-time LNbits Wallet Balance via Cloudflare Worker Proxy */",
+        "async function updateLnbitsWallet() {",
+        "  const WORKER_WALLET_ENDPOINT = 'https://empty-surf-077c.sunstandard-ap.workers.dev/wallet';",
+        "",
+        "  try {",
+        "    const walletRes = await fetch(WORKER_WALLET_ENDPOINT);",
+        "    const walletData = await walletRes.json();",
+        "    const balanceMsat = walletData.balance || 0;",
+        "    const satoshis = Math.floor(balanceMsat / 1000);",
+        "",
+        "    const priceRes = await fetch('https://mempool.space/api/v1/prices');",
+        "    const priceData = await priceRes.json();",
+        "    const usdPerBtc = priceData.USD || 60000;",
+        "",
+        "    const usdValue = (satoshis / 100000000) * usdPerBtc;",
+        "    document.getElementById('wallet-sats').innerText = satoshis.toLocaleString() + ' sats';",
+        "    document.getElementById('wallet-usd').innerText = '≈ $' + usdValue.toFixed(2) + ' USD';",
+        "  } catch (err) {",
+        "    document.getElementById('wallet-sats').innerText = 'Wallet sync error';",
+        "    document.getElementById('wallet-usd').innerText = '≈ $0.00 USD';",
+        "  }",
+        "}",
+        "updateLnbitsWallet();",
+        "setInterval(updateLnbitsWallet, 60000);",
         "</script></body></html>"
     ])
     
     docs_index.write_text("\n".join(html_content), encoding="utf-8")
-    print("   🌐 Generated dynamic docs/index.html explorer dashboard with extensible sprint sections & Backlog button.")
+    print("   🌐 Generated dynamic docs/index.html explorer dashboard with secure Worker LNbits proxy & Carbon tracker.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Execution Main Loop
