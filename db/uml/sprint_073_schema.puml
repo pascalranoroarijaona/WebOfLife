@@ -1,0 +1,160 @@
+```Code snippet
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classFontName "Courier"
+skinparam defaultFontName "Helvetica"
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 073 Schema: Spherical Angular Tolerance Validation
+
+package "Domain Exceptions & Error Handling" {
+    class BoundaryEndpointToleranceExceededError {
+        +endpointA: Tuple<number, number>
+        +endpointB: Tuple<number, number>
+        +angularDistanceRad: number
+        +toleranceRad: number
+        +context: string
+        --
+        +constructor(endpointA, endpointB, angularDistanceRad, toleranceRad, context)
+    }
+    BoundaryEndpointToleranceExceededError --|> "Error"
+}
+
+package "Spatial Geometry & DGGS Monads" {
+    class SphericalCoordinate {
+        +latRad: number
+        +lngRad: number
+        --
+        +fromDegrees(latDeg: number, lngDeg: number): SphericalCoordinate
+        +toUnitVector(): Vector3D
+    }
+
+    class Vector3D {
+        +x: number
+        +y: number
+        +z: number
+        --
+        +dot(other: Vector3D): number
+        +cross(other: Vector3D): Vector3D
+        +magnitude(): number
+    }
+
+    class H3AdjacencyGraph {
+        -cells: Map<string, H3CellNode>
+        -edges: Map<string, SharedBoundaryArc>
+        --
+        +extractSharedEndpoints(u: string, v: string): Pair<SphericalCoordinate, SphericalCoordinate>
+        +validateSharedBoundaries(epsilonRad?: number): void
+        +computeEdgeNormal(p1: SphericalCoordinate, p2: SphericalCoordinate): Vector3D
+    }
+
+    class SharedBoundaryArc {
+        +originCellId: string
+        +destCellId: string
+        +startEndpoint: SphericalCoordinate
+        +endEndpoint: SphericalCoordinate
+        +centralAngleRad: number
+        +arcLengthMeters: number
+        +normalVector: Vector3D
+        --
+        +isConjugate(other: SharedBoundaryArc, toleranceRad: number): boolean
+    }
+
+    class SpatialBoundaryValidator <<utility>> {
+        +{static} computeSphericalAngularDistance(p1: SphericalCoordinate, p2: SphericalCoordinate): number
+        +{static} assertBoundaryEndpointTolerance(endpointA, endpointB, maxAngularToleranceRad?, options?): void
+    }
+}
+
+package "Thermodynamic State & Flux Ledgers" {
+    class SpatialFluxMonad {
+        -stateEnthalpy: number
+        -stateEntropy: number
+        --
+        +applyDiffusionFlux(conduit: EdgeFluxConduit, dt: number): SpatialFluxMonad
+        +assertFirstLawEquivalence(leakageThreshold: number): void
+    }
+
+    class EdgeFluxConduit {
+        +conduitId: UUID
+        +edge: SharedBoundaryArc
+        +diffusivePermeability: number
+        +effectiveLengthRad: number
+        +diffusionCoefficient: number
+        +isManifoldSealed: boolean
+        --
+        +computeConductance(): number
+    }
+
+    class ThermodynamicStockLedger {
+        +transactionId: UUID
+        +conduitId: UUID
+        +sourceCellId: string
+        +targetCellId: string
+        +enthalpyDeltaJoules: number
+        +entropyDeltaJoulesPerKelvin: number
+        +massDeltaKg: number
+        +firstLawResidual: number
+        +recordedAt: DateTime
+        --
+        +verifyConservation(): boolean
+    }
+}
+
+package "Blockchain Invariants & Signatures" {
+    class BlockchainBlock {
+        +blockHeight: bigint
+        +blockHash: byte[]
+        +parentBlockHash: byte[]
+        +stateMerkleRoot: byte[]
+        +spatialTopologyMerkleRoot: byte[]
+        +boundaryVerificationDigest: byte[]
+        +totalEntropyAccumulated: number
+        +mintedAt: DateTime
+        --
+        +verifyTopologyMerkleProof(): boolean
+    }
+
+    class StockTransactionSignature {
+        +signatureId: UUID
+        +blockHeight: bigint
+        +transactionId: UUID
+        +secp256k1Signature: byte[]
+        +signerPublicKey: byte[]
+        +merkleLeafHash: byte[]
+        --
+        +verifySignature(stateHash: byte[]): boolean
+    }
+}
+
+' Relationships & Invariant Links
+H3AdjacencyGraph "1" *-- "*" SharedBoundaryArc : indexes
+H3AdjacencyGraph ..> SpatialBoundaryValidator : invokes
+SpatialBoundaryValidator ..> BoundaryEndpointToleranceExceededError : throws on breach
+SharedBoundaryArc "1" *-- "2" SphericalCoordinate : defined by
+SphericalCoordinate ..> Vector3D : converts to
+EdgeFluxConduit "1" o-- "1" SharedBoundaryArc : wraps geometric arc
+SpatialFluxMonad ..> EdgeFluxConduit : conducts flow across
+ThermodynamicStockLedger "1" --> "1" EdgeFluxConduit : audited by
+BlockchainBlock "1" *-- "*" StockTransactionSignature : commits
+StockTransactionSignature "1" --> "1" ThermodynamicStockLedger : signs transfer
+
+note right of SpatialBoundaryValidator
+    Vincenty/Haversine Formulation:
+    a = sin²(Δφ/2) + cos(φ₁)cos(φ₂)sin²(Δλ/2)
+    Δσ = 2 * arcsin(min(1.0, √a))
+    Asserts: Δσ ≤ ε_angular (default 1e-6 rad)
+    Guarantees ∂Ω_gap = ∅ (Thermodynamic Closure)
+end note
+
+note bottom of SpatialFluxMonad
+    First Law of Thermodynamics:
+    d/dt ∑ S_k(t) = S_solar - S_radiant
+    No flux divergence via unclosed boundary cracks.
+end note
+
+@enduml

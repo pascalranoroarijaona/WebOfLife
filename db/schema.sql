@@ -1,223 +1,166 @@
--- ============================================================================
--- Web of Life: Thermodynamic Blockchain & Spatial DGGS Ledger Schema
--- Sprint 072: Centroid-Relative Boundary Ordering & Outward-Normal Orientation
--- ============================================================================
+-- Web of Life Thermodynamic Blockchain Schema
+-- Sprint 073: Spherical Angular Tolerance Validation & Shared Boundary Closure
+-- Enforces topological manifold continuity and First Law of Thermodynamics across DGGS cell interfaces.
 
--- Enable PostGIS and cryptographic extensions if available
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ----------------------------------------------------------------------------
--- 1. H3 DGGS SPATIAL CELL REGISTRY
--- ----------------------------------------------------------------------------
+-- Enum types for coordinate systems and validation statuses
+DO $$ BEGIN
+    CREATE TYPE coordinate_system_unit AS ENUM ('RADIANS', 'DEGREES');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE boundary_validation_status AS ENUM ('CONVERGED', 'BREACHED', 'BYPASS_CHECKED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE flux_direction AS ENUM ('FORWARD', 'REVERSE', 'NET_ZERO');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- DGGS H3 Cells Registry
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS h3_cells (
-    cell_id VARCHAR(15) PRIMARY KEY, -- Canonical 64-bit H3 index in hex string format
-    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    cell_id VARCHAR(15) PRIMARY KEY, -- 15-character H3 canonical index
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
     centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lon DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
-    centroid_x DOUBLE PRECISION NOT NULL, -- Cartesian unit sphere X (||C|| = 1)
-    centroid_y DOUBLE PRECISION NOT NULL, -- Cartesian unit sphere Y
-    centroid_z DOUBLE PRECISION NOT NULL, -- Cartesian unit sphere Z
-    surface_area_m2 DOUBLE PRECISION NOT NULL CHECK (surface_area_m2 > 0),
+    centroid_lng DOUBLE PRECISION NOT NULL CHECK (centroid_lng BETWEEN -180.0 AND 180.0),
+    centroid_lat_rad DOUBLE PRECISION GENERATED ALWAYS AS (radians(centroid_lat)) STORED,
+    centroid_lng_rad DOUBLE PRECISION GENERATED ALWAYS AS (radians(centroid_lng)) STORED,
+    geom GEOMETRY(Polygon, 4326) NOT NULL,
+    thermodynamic_stock_entropy DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (thermodynamic_stock_entropy >= 0.0),
+    thermodynamic_stock_enthalpy DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT h3_cell_unit_sphere_norm CHECK (
-        ABS(SQRT(centroid_x * centroid_x + centroid_y * centroid_y + centroid_z * centroid_z) - 1.0) < 1e-7
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_h3_cells_geom ON h3_cells USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_res ON h3_cells (resolution);
+
+-- ---------------------------------------------------------------------
+-- H3 Directed Boundary Adjacency Edges
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS h3_boundary_edges (
+    edge_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    origin_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE CASCADE,
+    destination_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE CASCADE,
+    edge_index INTEGER NOT NULL CHECK (edge_index BETWEEN 0 AND 5),
+    start_lat_rad DOUBLE PRECISION NOT NULL CHECK (start_lat_rad BETWEEN -pi()/2 AND pi()/2),
+    start_lng_rad DOUBLE PRECISION NOT NULL CHECK (start_lng_rad BETWEEN -pi() AND pi()),
+    end_lat_rad DOUBLE PRECISION NOT NULL CHECK (end_lat_rad BETWEEN -pi()/2 AND pi()/2),
+    end_lng_rad DOUBLE PRECISION NOT NULL CHECK (end_lng_rad BETWEEN -pi() AND pi()),
+    boundary_length_meters DOUBLE PRECISION NOT NULL CHECK (boundary_length_meters >= 0.0),
+    normal_vector_x DOUBLE PRECISION NOT NULL,
+    normal_vector_y DOUBLE PRECISION NOT NULL,
+    normal_vector_z DOUBLE PRECISION NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_origin_destination_edge UNIQUE (origin_cell_id, destination_cell_id),
+    CONSTRAINT chk_different_cells CHECK (origin_cell_id <> destination_cell_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_h3_edges_origin ON h3_boundary_edges (origin_cell_id);
+CREATE INDEX IF NOT EXISTS idx_h3_edges_dest ON h3_boundary_edges (destination_cell_id);
+
+-- ---------------------------------------------------------------------
+-- Spherical Angular Tolerance Verifications (RFC-073 Invariant Audit)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS boundary_endpoint_validations (
+    validation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    edge_id UUID NOT NULL REFERENCES h3_boundary_edges(edge_id) ON DELETE CASCADE,
+    reverse_edge_id UUID REFERENCES h3_boundary_edges(edge_id) ON DELETE SET NULL,
+    endpoint_a_lat_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_a_lat_rad BETWEEN -pi()/2 AND pi()/2),
+    endpoint_a_lng_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_a_lng_rad BETWEEN -pi() AND pi()),
+    endpoint_b_lat_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_b_lat_rad BETWEEN -pi()/2 AND pi()/2),
+    endpoint_b_lng_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_b_lng_rad BETWEEN -pi() AND pi()),
+    calculated_angular_distance_rad DOUBLE PRECISION NOT NULL CHECK (calculated_angular_distance_rad >= 0.0),
+    tolerance_threshold_rad DOUBLE PRECISION NOT NULL DEFAULT 1.0e-6 CHECK (tolerance_threshold_rad > 0.0),
+    validation_status boundary_validation_status NOT NULL,
+    error_message TEXT,
+    execution_context VARCHAR(255) NOT NULL DEFAULT 'H3AdjacencyGraph.validateSharedBoundaries',
+    verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_valid_tolerance CHECK (
+        (validation_status = 'CONVERGED' AND calculated_angular_distance_rad <= tolerance_threshold_rad) OR
+        (validation_status = 'BREACHED' AND calculated_angular_distance_rad > tolerance_threshold_rad) OR
+        (validation_status = 'BYPASS_CHECKED')
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_cells_resolution ON h3_cells(resolution);
-CREATE INDEX IF NOT EXISTS idx_h3_cells_lat_lon ON h3_cells(centroid_lat, centroid_lon);
+CREATE INDEX IF NOT EXISTS idx_boundary_validations_edge ON boundary_endpoint_validations (edge_id);
+CREATE INDEX IF NOT EXISTS idx_boundary_validations_status ON boundary_endpoint_validations (validation_status);
 
--- ----------------------------------------------------------------------------
--- 2. UNDIRECTED TOPOLOGICAL BOUNDARIES
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_shared_boundaries (
-    boundary_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    cell_low_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    cell_high_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    raw_p1_x DOUBLE PRECISION NOT NULL,
-    raw_p1_y DOUBLE PRECISION NOT NULL,
-    raw_p1_z DOUBLE PRECISION NOT NULL,
-    raw_p2_x DOUBLE PRECISION NOT NULL,
-    raw_p2_y DOUBLE PRECISION NOT NULL,
-    raw_p2_z DOUBLE PRECISION NOT NULL,
-    geodesic_length_m DOUBLE PRECISION NOT NULL CHECK (geodesic_length_m > 0),
+-- ---------------------------------------------------------------------
+-- Edge Flux Metrics & Spatial Conduit Cache
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS edge_flux_conduits (
+    conduit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    edge_id UUID NOT NULL REFERENCES h3_boundary_edges(edge_id) ON DELETE RESTRICT,
+    validation_id UUID NOT NULL REFERENCES boundary_endpoint_validations(validation_id) ON DELETE RESTRICT,
+    diffusive_permeability DOUBLE PRECISION NOT NULL DEFAULT 1.0 CHECK (diffusive_permeability >= 0.0),
+    effective_length_rad DOUBLE PRECISION NOT NULL CHECK (effective_length_rad >= 0.0),
+    diffusion_coefficient DOUBLE PRECISION NOT NULL CHECK (diffusion_coefficient >= 0.0),
+    is_manifold_sealed BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_flux_conduits_edge ON edge_flux_conduits (edge_id);
+
+-- ---------------------------------------------------------------------
+-- Thermodynamic Stock Ledger & Conserved Flux Transactions
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_stock_ledger (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conduit_id UUID NOT NULL REFERENCES edge_flux_conduits(conduit_id) ON DELETE RESTRICT,
+    source_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE RESTRICT,
+    target_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE RESTRICT,
+    enthalpy_delta_joules DOUBLE PRECISION NOT NULL,
+    entropy_delta_joules_per_kelvin DOUBLE PRECISION NOT NULL CHECK (entropy_delta_joules_per_kelvin >= 0.0),
+    mass_delta_kg DOUBLE PRECISION NOT NULL,
+    flux_vector_direction flux_direction NOT NULL,
+    first_law_residual_joules DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (abs(first_law_residual_joules) <= 1.0e-12),
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_different_flux_cells CHECK (source_cell_id <> target_cell_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_cells ON thermodynamic_stock_ledger (source_cell_id, target_cell_id);
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_conduit ON thermodynamic_stock_ledger (conduit_id);
+
+-- ---------------------------------------------------------------------
+-- Blockchain Block Headers & State Invariant Signatures
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    block_height BIGSERIAL PRIMARY KEY,
+    block_hash BYTEA NOT NULL UNIQUE CHECK (length(block_hash) = 32),
+    parent_block_hash BYTEA NOT NULL CHECK (length(parent_block_hash) = 32),
+    state_merkle_root BYTEA NOT NULL CHECK (length(state_merkle_root) = 32),
+    spatial_topology_merkle_root BYTEA NOT NULL CHECK (length(spatial_topology_merkle_root) = 32),
+    boundary_verification_digest BYTEA NOT NULL CHECK (length(boundary_verification_digest) = 32),
+    total_entropy_accumulated DOUBLE PRECISION NOT NULL CHECK (total_entropy_accumulated >= 0.0),
+    total_enthalpy_accumulated DOUBLE PRECISION NOT NULL,
+    minted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blockchain_blocks (block_hash);
+
+-- ---------------------------------------------------------------------
+-- Blockchain Stock Transaction Signatures & Inclusion Proofs
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stock_transaction_signatures (
+    signature_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    transaction_id UUID NOT NULL REFERENCES thermodynamic_stock_ledger(transaction_id) ON DELETE RESTRICT,
+    secp256k1_signature BYTEA NOT NULL CHECK (length(secp256k1_signature) = 64),
+    signer_public_key BYTEA NOT NULL CHECK (length(signer_public_key) = 33),
+    merkle_leaf_hash BYTEA NOT NULL CHECK (length(merkle_leaf_hash) = 32),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT h3_canonical_cell_pair CHECK (cell_low_id < cell_high_id),
-    CONSTRAINT h3_unique_boundary_pair UNIQUE (cell_low_id, cell_high_id)
+    CONSTRAINT uq_block_transaction UNIQUE (block_height, transaction_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_shared_boundaries_cells ON h3_shared_boundaries(cell_low_id, cell_high_id);
-
--- ----------------------------------------------------------------------------
--- 3. ORIENTED SHARED BOUNDARY INTERFACES (Sprint 072 RFC Addition)
--- Implements outward-normal orientation and strict skew-symmetry
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_directed_interfaces (
-    interface_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    boundary_id UUID NOT NULL REFERENCES h3_shared_boundaries(boundary_id) ON DELETE CASCADE,
-    source_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    neighbor_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    -- Ordered endpoints (V_start -> V_end) such that normal points source -> neighbor
-    v_start_x DOUBLE PRECISION NOT NULL,
-    v_start_y DOUBLE PRECISION NOT NULL,
-    v_start_z DOUBLE PRECISION NOT NULL,
-    v_end_x DOUBLE PRECISION NOT NULL,
-    v_end_y DOUBLE PRECISION NOT NULL,
-    v_end_z DOUBLE PRECISION NOT NULL,
-    -- Normalized outward unit normal vector n_{A -> B}
-    outward_normal_x DOUBLE PRECISION NOT NULL,
-    outward_normal_y DOUBLE PRECISION NOT NULL,
-    outward_normal_z DOUBLE PRECISION NOT NULL,
-    interface_length_m DOUBLE PRECISION NOT NULL CHECK (interface_length_m > 0),
-    alignment_dot_product DOUBLE PRECISION NOT NULL, -- n_{A->B} . (C_B - C_A) > 0 (INV-072-1)
-    is_inverted BOOLEAN NOT NULL DEFAULT FALSE,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_outward_orientation_positive CHECK (alignment_dot_product > 0),
-    CONSTRAINT chk_unit_normal_magnitude CHECK (
-        ABS(SQRT(outward_normal_x * outward_normal_x + outward_normal_y * outward_normal_y + outward_normal_z * outward_normal_z) - 1.0) < 1e-9
-    ),
-    CONSTRAINT chk_distinct_adjacent_cells CHECK (source_cell_id <> neighbor_cell_id),
-    CONSTRAINT uq_directed_interface UNIQUE (source_cell_id, neighbor_cell_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_directed_interfaces_source ON h3_directed_interfaces(source_cell_id);
-CREATE INDEX IF NOT EXISTS idx_directed_interfaces_neighbor ON h3_directed_interfaces(neighbor_cell_id);
-
--- ----------------------------------------------------------------------------
--- 4. THERMODYNAMIC STATE STOCKS (Finite Volume Cell Stocks)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS cell_thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    epoch_height BIGINT NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    -- First Law Conserved Physical Stocks (Extensive Quantities)
-    internal_energy_joules DOUBLE PRECISION NOT NULL CHECK (internal_energy_joules >= 0),
-    water_mass_kg DOUBLE PRECISION NOT NULL CHECK (water_mass_kg >= 0),
-    carbon_moles DOUBLE PRECISION NOT NULL CHECK (carbon_moles >= 0),
-    nitrogen_moles DOUBLE PRECISION NOT NULL CHECK (nitrogen_moles >= 0),
-    phosphorus_moles DOUBLE PRECISION NOT NULL CHECK (phosphorus_moles >= 0),
-    biomass_dry_kg DOUBLE PRECISION NOT NULL CHECK (biomass_dry_kg >= 0),
-    -- Intensive State Variables
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0),
-    chemical_potential_j_per_mol DOUBLE PRECISION NOT NULL,
-    -- Second Law Entropy Diagnostic
-    accumulated_entropy_j_per_k DOUBLE PRECISION NOT NULL CHECK (accumulated_entropy_j_per_k >= 0),
-    CONSTRAINT uq_cell_epoch UNIQUE (cell_id, epoch_height)
-);
-
-CREATE INDEX IF NOT EXISTS idx_cell_stocks_epoch ON cell_thermodynamic_stocks(epoch_height, cell_id);
-CREATE INDEX IF NOT EXISTS idx_cell_stocks_time ON cell_thermodynamic_stocks(timestamp);
-
--- ----------------------------------------------------------------------------
--- 5. FINITE-VOLUME BOUNDARY FLUX LEDGER (SpatialFluxMonad Transitions)
--- ----------------------------------------------------------------------------
-CREATE TYPE flux_carrier_type AS ENUM (
-    'SENSIBLE_HEAT',
-    'WATER_MASS',
-    'CARBON_ADVECTIVE',
-    'CARBON_DIFFUSIVE',
-    'NITROGEN_TROPHIC',
-    'PHOSPHORUS_TROPHIC',
-    'BIOMASS_MIGRATION'
-);
-
-CREATE TABLE IF NOT EXISTS spatial_boundary_flux_ledger (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    epoch_height BIGINT NOT NULL,
-    interface_id UUID NOT NULL REFERENCES h3_directed_interfaces(interface_id),
-    source_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    neighbor_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id),
-    carrier flux_carrier_type NOT NULL,
-    -- Directed flux value Phi_{A -> B} evaluated via dot(F, n_{A->B}) * dl
-    flux_density_per_meter DOUBLE PRECISION NOT NULL,
-    total_flux_quantity DOUBLE PRECISION NOT NULL, -- integrated over interface_length_m * dt
-    entropy_production_j_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_j_per_k >= 0), -- Second Law: dot(sigma) >= 0
-    delta_t_seconds DOUBLE PRECISION NOT NULL CHECK (delta_t_seconds > 0),
-    execution_merkle_leaf BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_epoch ON spatial_boundary_flux_ledger(epoch_height, source_cell_id, neighbor_cell_id);
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_interface ON spatial_boundary_flux_ledger(interface_id);
-
--- ----------------------------------------------------------------------------
--- 6. FIRST LAW INTERFACE SKEW-SYMMETRY VERIFICATION AUDIT
--- Guarantees Phi(A -> B) + Phi(B -> A) = 0 identical across boundaries
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS boundary_skew_symmetry_audit (
-    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    epoch_height BIGINT NOT NULL,
-    boundary_id UUID NOT NULL REFERENCES h3_shared_boundaries(boundary_id),
-    carrier flux_carrier_type NOT NULL,
-    flux_ab DOUBLE PRECISION NOT NULL,
-    flux_ba DOUBLE PRECISION NOT NULL,
-    imbalance_residual DOUBLE PRECISION GENERATED ALWAYS AS (flux_ab + flux_ba) STORED,
-    tolerance_threshold DOUBLE PRECISION NOT NULL DEFAULT 1e-12,
-    is_conservative BOOLEAN GENERATED ALWAYS AS (ABS(flux_ab + flux_ba) <= 1e-12) STORED,
-    verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_interface_conservative CHECK (is_conservative = TRUE)
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_epoch_boundary ON boundary_skew_symmetry_audit(epoch_height, boundary_id);
-
--- ----------------------------------------------------------------------------
--- 7. THERMODYNAMIC BLOCKCHAIN CONSENSUS LAYER
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_blockchain_blocks (
-    epoch_height BIGINT PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_block_hash BYTEA NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    state_root_merkle BYTEA NOT NULL,
-    flux_receipts_root BYTEA NOT NULL,
-    total_entropy_production_rate DOUBLE PRECISION NOT NULL CHECK (total_entropy_production_rate >= 0),
-    first_law_residual_l2_norm DOUBLE PRECISION NOT NULL CHECK (first_law_residual_l2_norm <= 1e-9),
-    proposer_public_key BYTEA NOT NULL,
-    consensus_signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_timestamp ON thermodynamic_blockchain_blocks(timestamp);
-
--- ----------------------------------------------------------------------------
--- 8. TRIGGERS: AUTOMATIC DERIVATION & VALIDATION OF DIRECTED INTERFACES
--- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION trg_enforce_outward_normal_direction()
-RETURNS TRIGGER AS $$
-DECLARE
-    src_x DOUBLE PRECISION;
-    src_y DOUBLE PRECISION;
-    src_z DOUBLE PRECISION;
-    nbr_x DOUBLE PRECISION;
-    nbr_y DOUBLE PRECISION;
-    nbr_z DOUBLE PRECISION;
-    dx DOUBLE PRECISION;
-    dy DOUBLE PRECISION;
-    dz DOUBLE PRECISION;
-    dot_prod DOUBLE PRECISION;
-BEGIN
-    SELECT centroid_x, centroid_y, centroid_z INTO src_x, src_y, src_z FROM h3_cells WHERE cell_id = NEW.source_cell_id;
-    SELECT centroid_x, centroid_y, centroid_z INTO nbr_x, nbr_y, nbr_z FROM h3_cells WHERE cell_id = NEW.neighbor_cell_id;
-
-    dx := nbr_x - src_x;
-    dy := nbr_y - src_y;
-    dz := nbr_z - src_z;
-
-    dot_prod := (NEW.outward_normal_x * dx) + (NEW.outward_normal_y * dy) + (NEW.outward_normal_z * dz);
-
-    IF dot_prod <= 0.0 THEN
-        RAISE EXCEPTION 'INV-072-1 Violation: Interface outward normal must point from centroid A to centroid B. Dot product: %', dot_prod;
-    END IF;
-
-    NEW.alignment_dot_product := dot_prod;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS check_directed_interface_orientation ON h3_directed_interfaces;
-CREATE TRIGGER check_directed_interface_orientation
-    BEFORE INSERT OR UPDATE ON h3_directed_interfaces
-    FOR EACH ROW
-    EXECUTE FUNCTION trg_enforce_outward_normal_direction();
+CREATE INDEX IF NOT EXISTS idx_tx_signatures_block ON stock_transaction_signatures (block_height);
+CREATE INDEX IF NOT EXISTS idx_tx_signatures_tx ON stock_transaction_signatures (transaction_id);

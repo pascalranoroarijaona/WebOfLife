@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 37%
-SPRINT_GOAL: Implement orderSharedBoundaryEndpointsByCentroid orienting shared endpoints with outward normal in src/spatial/h3_adjacency.ts.
+SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angular tolerance between shared endpoints in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -52,7 +52,9 @@ SPRINT_GOAL: Implement orderSharedBoundaryEndpointsByCentroid orienting shared e
 - [x] Implement `extractSharedBoundaryVertices3D` composite edge endpoint extractor in `src/spatial/h3_adjacency.ts`
 - [x] Implement `areCartesianUnitVectorsEqual3D` testing angular tolerance epsilon between two Cartesian vectors in `src/spatial/h3_adjacency.ts`
 - [x] Implement `findSharedBoundaryVertexPairs3D` matching coincident boundary vertices between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
+- [x] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
