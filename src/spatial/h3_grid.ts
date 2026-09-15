@@ -10,6 +10,7 @@ import {
   CellThermodynamicStocks,
   ThermodynamicStocks,
 } from './h3_types.js';
+import { createVec3D } from './h3_adjacency.js';
 
 export { H3ErrorCode, SpatialGuardClauseException, CellThermodynamicStocks, ThermodynamicStocks };
 
@@ -817,8 +818,9 @@ export function computeInterfaceAdvectiveTransfer(
   edgeLength: number,
   dt: number
 ) {
-  const vA = Array.isArray(cellA.velocity) ? cellA.velocity : [cellA.velocity.x, cellA.velocity.y, cellA.velocity.z];
-  const normalVelocity = Math.hypot(vA[1], vA[2]);
+  const vy = (cellA.velocity as any)[1] ?? (cellA.velocity as any).y ?? 0;
+  const vz = (cellA.velocity as any)[2] ?? (cellA.velocity as any).z ?? 0;
+  const normalVelocity = Math.hypot(vy, vz);
   const fluxFraction = Math.min(1.0, (normalVelocity * edgeLength * dt) / cellA.area);
   const fluxAtoB: CellStocks = {
     carbon: cellA.stocks.carbon * fluxFraction,
@@ -835,7 +837,7 @@ export function latLonToVector3D(lonDeg: number, latDeg: number): Vector3D {
   const lonRad = (lonDeg * Math.PI) / 180.0;
   const latRad = (latDeg * Math.PI) / 180.0;
   const cosLat = Math.cos(latRad);
-  return [cosLat * Math.cos(lonRad), cosLat * Math.sin(lonRad), Math.sin(latRad)];
+  return createVec3D(cosLat * Math.cos(lonRad), cosLat * Math.sin(lonRad), Math.sin(latRad));
 }
 
 export function vector3DToLatLon(v: any): Point2D {

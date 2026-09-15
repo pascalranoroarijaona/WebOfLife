@@ -1,5 +1,5 @@
 {
-  "current_sprint": 75,
+  "current_sprint": 76,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -370,6 +370,11 @@
       "sprint": 74,
       "goal": "Define PentagonalCoordinationViolationError class with cellIndex, expectedCount, and actualCount in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-15T03:58:59.241804+00:00"
+    },
+    {
+      "sprint": 75,
+      "goal": "Implement isExpectedNeighborCount comparing a numeric candidate count against getCoordinationNumber in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-15T04:34:56.149993+00:00"
     }
   ]
 }

@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 38%
-SPRINT_GOAL: Define PentagonalCoordinationViolationError class with cellIndex, expectedCount, and actualCount in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 39%
+SPRINT_GOAL: Implement isExpectedNeighborCount comparing a numeric candidate count against getCoordinationNumber in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -260,23 +260,26 @@ SPRINT_GOAL: Define PentagonalCoordinationViolationError class with cellIndex, e
 - [x] Implement `findSharedBoundaryVertexPairs3D` matching coincident boundary vertices between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [x] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
 - [x] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
-- [ ] Define `PentagonalCoordinationViolationError` class with cellIndex, expectedCount, and actualCount in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `isExpectedNeighborCountForCell` checking neighbor array length against getCoordinationNumber in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertValidNeighborCountForCell` throwing PentagonalCoordinationViolationError on count mismatch in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `validatePentagonalNeighborCount` verifying neighbor collection length matches coordination number (5 for pentagons, 6 for hexagons) in `src/spatial/h3_adjacency.ts`
+- [x] Define `PentagonalCoordinationViolationError` class with cellIndex, expectedCount, and actualCount in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `isExpectedNeighborCount` comparing a numeric candidate count against getCoordinationNumber in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `isExpectedNeighborCountForCell` validating neighbor string array length using isExpectedNeighborCount in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `assertValidNeighborCountForCell` throwing PentagonalCoordinationViolationError on coordination mismatch in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `validatePentagonalNeighborCount` verifying neighbor collection length matches coordination number in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
+- [ ] Define `H3DirectedEdgeKey` type and implement `formatDirectedEdgeKey` canonical key generator in `src/spatial/h3_types.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
+- [ ] Implement `calculatePhysicalExergy` computing non-flow thermo-mechanical exergy relative to environmental dead state in `src/thermodynamics/exergy.ts`
+- [ ] Implement `calculateGouyStodolaExergyDestruction` instantaneous rate computation in `src/thermodynamics/exergy.ts`
+- [ ] Implement Petela-Landsberg-Jeter solar radiation exergy conversion efficiency in `src/thermodynamics/insolation.ts`
 - [ ] Implement Spencer solar declination and orbital eccentricity formulations in `src/thermodynamics/insolation.ts`
 - [ ] Implement Solar Zenith Angle and Top-of-Atmosphere insolation engine in `src/thermodynamics/insolation.ts`
-- [ ] Implement Petela-Landsberg-Jeter solar radiation exergy conversion efficiency in `src/thermodynamics/insolation.ts`
 - [ ] Single-layer Stefan-Boltzmann outgoing longwave radiation and GHG optical depth formulation in `src/thermodynamics/radiative_balance.ts`
 - [ ] Logarithmic CO2 radiative forcing function with band overlap in `src/thermodynamics/radiative_balance.ts`
 - [ ] Tetens saturation vapor pressure and Clausius-Clapeyron phase transitions in `src/thermodynamics/phase_change.ts`
 - [ ] Implement calculateEvaporationExergyLoss mass-enthalpy dissipation calculator in `src/thermodynamics/phase_change.ts`
-- [ ] Define ExergyDestructionReport interface and Gouy-Stodola rate computation in `src/thermodynamics/exergy.ts`
 - [ ] Reference functions for thermal exergy streams using ambient temperature and source temperatures in `src/thermodynamics/carnot.ts`
 - [ ] Surface albedo endmember profiles for snow, ice, ocean, and canopy in `src/thermodynamics/albedo.ts`
 - [ ] Temperature-dependent sigmoidal ice-fraction melting function in `src/thermodynamics/albedo.ts`
@@ -314,6 +317,8 @@ SPRINT_GOAL: Define PentagonalCoordinationViolationError class with cellIndex, e
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication in `src/biosphere/trophic_matrix.ts`
 - [ ] Gauss-Seidel steady-state biomass solver updating node biomass stocks in `src/biosphere/trophic_solver.ts`
 - [ ] Spectral radius and relative residual convergence checks in `src/biosphere/trophic_solver.ts`
+- [ ] Construct community Jacobian matrix from trophic interaction edges in `src/biosphere/trophic_stability.ts`
+- [ ] Compute dominant eigenvalue spectral radius to detect ecological tipping points in `src/biosphere/trophic_stability.ts`
 - [ ] Define `MycorrhizalType` enum, `HyphalNode`, and directed `HyphalEdge` graph structure in `src/biosphere/mycorrhizal_types.ts`
 - [ ] Mutualistic carbon-for-nutrient exchange and fungal sink strength calculation in `src/biosphere/mycorrhizal_trading.ts`
 - [ ] Spatial hyphal network conductivity matrix mapping carbon translocation efficiency in `src/biosphere/hyphal_transport.ts`
@@ -327,6 +332,7 @@ SPRINT_GOAL: Define PentagonalCoordinationViolationError class with cellIndex, e
 
 ### Phase 3: Technosphere & Industrial Metabolism
 - [ ] Define `StandardChemicalSpecies` enum and NASA 7-coefficient polynomials for thermodynamic species enthalpy and entropy in `src/technosphere/thermochemistry.ts`
+- [ ] Evaluate standard species enthalpy and entropy across low and high temperature regimes in `src/technosphere/thermochemistry.ts`
 - [ ] Define chemical specie vector and concentration map with unit-sum invariants in `src/technosphere/species.ts`
 - [ ] Define `MaterialStream` interface tracking mass flow, enthalpy, and species vectors in `src/technosphere/material_stream.ts`
 - [ ] Implement adiabatic material stream mixing function conserving mass and enthalpy in `src/technosphere/material_stream.ts`

@@ -1,0 +1,187 @@
+@startuml sprint_075_schema
+!theme plain
+skinparam roundcorner 8
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam defaultFontName "Courier New"
+skinparam monochrome false
+skinparam packageStyle rectangle
+
+package "Spatial Topology Subsystem (src/spatial)" {
+    
+    enum CellPolygonType {
+        HEXAGON
+        PENTAGON
+    }
+
+    class H3Index <<(T,#B4A7D6) ValueObject>> {
+        - value: string
+        + constructor(rawIndex: string | bigint)
+        + toString(): string
+        + toBigInt(): bigint
+        + isValid(): boolean
+    }
+
+    interface H3AdjacencyContract {
+        + isPentagon(cellIndex: H3Index): boolean
+        + getCoordinationNumber(cellIndex: H3Index): 5 | 6
+        + isExpectedNeighborCount(cellIndex: H3Index, candidateCount: number): boolean
+        + isExpectedNeighborCount(candidateCount: number, cellIndex: H3Index): boolean
+    }
+
+    class H3AdjacencyManager implements H3AdjacencyContract {
+        + {static} isPentagon(cellIndex: H3Index): boolean
+        + {static} getCoordinationNumber(cellIndex: H3Index): 5 | 6
+        + {static} isExpectedNeighborCount(cellIndex: H3Index, candidateCount: number): boolean
+        + {static} isExpectedNeighborCount(candidateCount: number, cellIndex: H3Index): boolean
+        - {static} sanitizeCount(candidateCount: number): boolean
+    }
+
+    class TopologicalAdjacencyDefectError extends Error {
+        + cellIndex: H3Index
+        + candidateCount: number
+        + expectedCount: number
+        + constructor(message: string, cell: H3Index, candidate: number, expected: number)
+    }
+
+    class SpatialCell {
+        + index: H3Index
+        + resolution: number
+        + polygonType: CellPolygonType
+        + coordinationNumber: 5 | 6
+        + latitude: number
+        + longitude: number
+    }
+}
+
+package "Thermodynamic Monad Subsystem" {
+
+    interface ThermodynamicStockState {
+        + cellIndex: H3Index
+        + massKg: number
+        + enthalpyJoules: number
+        + entropyJPerK: number
+        + temperatureKelvin: number
+        + laplacianDegree: number
+    }
+
+    class SpatialFluxMonad<T extends ThermodynamicStockState> {
+        - currentState: T
+        - adjacencyManager: H3AdjacencyManager
+        + constructor(initialState: T)
+        + verifyNeighborhoodTopology(cell: H3Index, neighbors: H3Index[]): boolean
+        + computeDivergence(incomingFlux: number[], outgoingFlux: number[]): number
+        + applyFluxTransition(dt: number, neighborStates: T[]): SpatialFluxMonad<T>
+        + run(): T
+    }
+}
+
+package "Persistence & Blockchain Ledger Schema" {
+
+    entity "spatial_h3_cells" as SpatialH3CellsTable {
+        * cell_index : VARCHAR(16) <<PK>>
+        --
+        * resolution : SMALLINT
+        * polygon_type : cell_polygon_type
+        * is_pentagon : BOOLEAN <<GENERATED>>
+        * coordination_number : SMALLINT [5, 6]
+        * latitude : DOUBLE PRECISION
+        * longitude : DOUBLE PRECISION
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity "spatial_h3_adjacencies" as SpatialH3AdjacenciesTable {
+        * source_cell : VARCHAR(16) <<FK>>
+        * neighbor_cell : VARCHAR(16) <<FK>>
+        --
+        * directional_index : SMALLINT [0..5]
+        * contact_edge_length_m : DOUBLE PRECISION
+        * boundary_normal_vector : DOUBLE PRECISION[3]
+    }
+
+    entity "topological_neighborhood_verifications" as TopoVerificationsTable {
+        * verification_id : UUID <<PK>>
+        --
+        * block_height : BIGINT <<FK>>
+        * cell_index : VARCHAR(16) <<FK>>
+        * candidate_neighbor_count : SMALLINT
+        * expected_coordination_number : SMALLINT [5, 6]
+        * is_valid : BOOLEAN
+        * evaluated_at : TIMESTAMPTZ
+        * verification_digest : BYTEA
+    }
+
+    entity "spatial_thermodynamic_stocks" as SpatialStocksTable {
+        * stock_snapshot_id : UUID <<PK>>
+        --
+        * block_height : BIGINT <<FK>>
+        * cell_index : VARCHAR(16) <<FK>>
+        * mass_kg : NUMERIC(28, 10)
+        * enthalpy_joules : NUMERIC(38, 10)
+        * entropy_j_per_k : NUMERIC(28, 10)
+        * temperature_kelvin : NUMERIC(10, 4)
+        * laplacian_degree : SMALLINT [5, 6]
+        * is_neighborhood_verified : BOOLEAN
+        * recorded_at : TIMESTAMPTZ
+    }
+
+    entity "spatial_flux_transactions" as SpatialFluxTxTable {
+        * tx_id : UUID <<PK>>
+        --
+        * block_height : BIGINT <<FK>>
+        * source_cell : VARCHAR(16) <<FK>>
+        * target_cell : VARCHAR(16) <<FK>>
+        * mass_flux_kg_per_sec : NUMERIC(24, 10)
+        * heat_flux_watts : NUMERIC(30, 10)
+        * interface_area_m2 : NUMERIC(18, 6)
+        * verification_id : UUID <<FK>>
+        * flux_state : flux_vector_state
+        * tx_signature : BYTEA
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_blockchain_blocks" as BlockchainBlocksTable {
+        * block_height : BIGINT <<PK>>
+        --
+        * block_hash : BYTEA
+        * prev_block_hash : BYTEA
+        * merkle_flux_root : BYTEA
+        * merkle_topology_root : BYTEA
+        * total_pentagons : SMALLINT (= 12)
+        * net_mass_divergence_residual : NUMERIC(28, 18)
+        * net_heat_divergence_residual : NUMERIC(32, 18)
+        * validator_node_id : VARCHAR(64)
+        * validator_signature : BYTEA
+        * timestamp : TIMESTAMPTZ
+    }
+}
+
+' Relations within Spatial Model
+SpatialCell *-- H3Index
+SpatialCell o-- CellPolygonType
+H3AdjacencyManager ..> H3Index : evaluates
+H3AdjacencyManager ..> TopologicalAdjacencyDefectError : throws
+
+' Relations with Monad
+SpatialFluxMonad o-- ThermodynamicStockState
+SpatialFluxMonad ..> H3AdjacencyManager : verifies via isExpectedNeighborCount
+SpatialFluxMonad ..> TopologicalAdjacencyDefectError : raises
+
+' Schema Foreign Keys & Mappings
+SpatialH3CellsTable ||--o{ SpatialH3AdjacenciesTable : "source_cell"
+SpatialH3CellsTable ||--o{ SpatialH3AdjacenciesTable : "neighbor_cell"
+SpatialH3CellsTable ||--o{ TopoVerificationsTable : "verifies cell"
+SpatialH3CellsTable ||--o{ SpatialStocksTable : "holds state"
+SpatialH3CellsTable ||--o{ SpatialFluxTxTable : "source"
+SpatialH3CellsTable ||--o{ SpatialFluxTxTable : "target"
+
+TopoVerificationsTable ||--o{ SpatialFluxTxTable : "authorizes flux"
+BlockchainBlocksTable ||--o{ TopoVerificationsTable : "commits"
+BlockchainBlocksTable ||--o{ SpatialStocksTable : "contains snapshots"
+BlockchainBlocksTable ||--o{ SpatialFluxTxTable : "orders transactions"
+
+' Monad to SQL Ledger alignment
+SpatialFluxMonad ..> SpatialFluxTxTable : logs divergence transitions
+ThermodynamicStockState ..> SpatialStocksTable : persists discrete state
+
+@enduml

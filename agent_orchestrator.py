@@ -1960,17 +1960,23 @@ def generate_docs_dashboard():
 
     cost_data = load_json_file(LOGS_DIR / "cost_tracker.json", lambda: {"sprints": {}, "total_cost": 0.0})
     total_tokens = sum(s.get("input_tokens", 0) + s.get("output_tokens", 0) for s in cost_data.get("sprints", {}).values())
+
     estimated_co2_grams = total_tokens * 0.00025
     if estimated_co2_grams < 1.0 and len(sprint_dirs) > 0:
         estimated_co2_grams = len(sprint_dirs) * 12.5
+
+    # Alerte conditionnelle préparée hors de la f-string
+    warning_banner = ""
+    if remaining_credits <= 0:
+        warning_banner = "<div style='color: #ff5370; font-size: 0.72rem; margin-top: 6px; line-height: 1.2; font-weight: bold;'>Please top up the Google Studio Project with Crowd Funded Money!</div>"
 
     html_content = [
         "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>",
         "<title>Web of Life - Sprint Explorer</title>",
         "<!-- Markdown & LaTeX rendering libraries -->",
-        "<script src='[https://cdn.jsdelivr.net/npm/marked/marked.min.js](https://cdn.jsdelivr.net/npm/marked/marked.min.js)'></script>",
+        "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>",
         "<script>window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] } };</script>",
-        "<script id='MathJax-script' async src='[https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js](https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js)'></script>",
+        "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
         "<style>",
         "body { background: #02050a; color: #c8f5f2; font-family: 'Courier New', monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }",
         "#sidebar { width: 360px; background: rgba(5, 14, 24, 0.95); border-right: 1px solid #315064; padding: 20px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.5); z-index: 10; box-sizing: border-box; }",
@@ -2040,11 +2046,11 @@ def generate_docs_dashboard():
         "  <div id='wallet-usd' class='wallet-usd'>Fetching USD...</div>",
         "</div>",
 
-        "<!-- Google AI Studio Project Quota Widget (Interactive Decrementing Balance) -->",
+        "<!-- Google AI Studio Project Quota Widget -->",
         "<div class='ai-quota-widget'>",
         "  <div class='ai-quota-header'>🧠 AI Studio Project</div>",
         f"  <div style='margin-bottom: 4px;'>Available Credits: <span class='ai-quota-value'>${remaining_credits:.2f} USD</span></div>",
-        "  <a href='[https://aistudio.google.com/billing?billing=019923-A320B9-18E474](https://aistudio.google.com/billing?billing=019923-A320B9-18E474)' target='_blank' class='ai-quota-link'>💳 Manage Billing ↗</a>",
+        f"  {warning_banner}",
         "</div>",
 
         f"<!-- Carbon Footprint Tracker Widget -->",
@@ -2128,7 +2134,7 @@ def generate_docs_dashboard():
         "}",
         "/* Real-time LNbits Wallet Balance via Cloudflare Worker Proxy (Refreshed every 10s) */",
         "async function updateLnbitsWallet() {",
-        "  const WORKER_WALLET_ENDPOINT = '[https://empty-surf-077c.sunstandard-ap.workers.dev/wallet](https://empty-surf-077c.sunstandard-ap.workers.dev/wallet)';",
+        "  const WORKER_WALLET_ENDPOINT = 'https://empty-surf-077c.sunstandard-ap.workers.dev/wallet';",
         "",
         "  try {",
         "    const walletRes = await fetch(WORKER_WALLET_ENDPOINT);",
@@ -2136,7 +2142,7 @@ def generate_docs_dashboard():
         "    const balanceMsat = walletData.balance || 0;",
         "    const satoshis = Math.floor(balanceMsat / 1000);",
         "",
-        "    const priceRes = await fetch('[https://mempool.space/api/v1/prices](https://mempool.space/api/v1/prices)');",
+        "    const priceRes = await fetch('https://mempool.space/api/v1/prices');",
         "    const priceData = await priceRes.json();",
         "    const usdPerBtc = priceData.USD || 60000;",
         "",

@@ -2,6 +2,7 @@
 // WEB OF LIFE - H3 GRID GEOMETRY, VALIDATION & PROJECTION UTILITIES
 // =============================================================================
 import { H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
+import { createVec3D } from './h3_adjacency.js';
 export { H3ErrorCode, SpatialGuardClauseException };
 export const MIN_H3_RESOLUTION = 0;
 export const MAX_H3_RESOLUTION = 15;
@@ -717,8 +718,9 @@ export function createCellStocks(stocks) {
     };
 }
 export function computeInterfaceAdvectiveTransfer(cellA, _cellB, edgeLength, dt) {
-    const vA = Array.isArray(cellA.velocity) ? cellA.velocity : [cellA.velocity.x, cellA.velocity.y, cellA.velocity.z];
-    const normalVelocity = Math.hypot(vA[1], vA[2]);
+    const vy = cellA.velocity[1] ?? cellA.velocity.y ?? 0;
+    const vz = cellA.velocity[2] ?? cellA.velocity.z ?? 0;
+    const normalVelocity = Math.hypot(vy, vz);
     const fluxFraction = Math.min(1.0, (normalVelocity * edgeLength * dt) / cellA.area);
     const fluxAtoB = {
         carbon: cellA.stocks.carbon * fluxFraction,
@@ -734,7 +736,7 @@ export function latLonToVector3D(lonDeg, latDeg) {
     const lonRad = (lonDeg * Math.PI) / 180.0;
     const latRad = (latDeg * Math.PI) / 180.0;
     const cosLat = Math.cos(latRad);
-    return [cosLat * Math.cos(lonRad), cosLat * Math.sin(lonRad), Math.sin(latRad)];
+    return createVec3D(cosLat * Math.cos(lonRad), cosLat * Math.sin(lonRad), Math.sin(latRad));
 }
 export function vector3DToLatLon(v) {
     const x = v[0] ?? v.x;
