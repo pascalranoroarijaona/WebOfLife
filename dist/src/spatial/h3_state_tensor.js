@@ -6,7 +6,7 @@ import { ThermodynamicChannel, THERMODYNAMIC_CONSTANTS, } from './h3_types.js';
 import { STEFAN_BOLTZMANN_CONSTANT, STP_CONSTANTS, DRY_MOLE_FRACTION_N2, DRY_MOLE_FRACTION_O2, DRY_MOLE_FRACTION_CO2, computeAugustRocheMagnusSatVaporPressure, } from '../thermodynamics/constants.js';
 export { SOLAR_CONSTANT_W_M2 } from '../thermodynamics/constants.js';
 export { ThermodynamicChannel, THERMODYNAMIC_CONSTANTS, } from './h3_types.js';
-export { computeAdvectiveEdgeTransfer, } from './h3_adjacency.js';
+export { AdvectiveEdgeContext, computeAdvectiveEdgeTransfer, } from './h3_adjacency.js';
 export { SpatialMonad } from '../monads/spatial_monad.js';
 // =============================================================================
 // ERROR HIERARCHY

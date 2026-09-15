@@ -158,7 +158,7 @@ current_iteration_backups: Dict[str, Optional[str]] = {}
 # ─────────────────────────────────────────────────────────────────────────────
 
 COST_TRACKER_FILE = LOGS_DIR / "cost_tracker.json"
-INITIAL_AI_STUDIO_CREDITS = 35.00  # Valeur de référence initiale en USD
+INITIAL_AI_STUDIO_CREDITS = 0.00  # Valeur de référence initiale en USD
 # Tarifs approximatifs par million de tokens (USD) - Ajustables selon les grilles tarifaires officielles Gemini
 GEMINI_PRICING = {
     "gemini-3.8-flash": {"input": 0.075, "output": 0.30},
@@ -2155,7 +2155,7 @@ def generate_docs_dashboard():
         "  }",
         "}",
         "updateLnbitsWallet();",
-        "setInterval(updateLnbitsWallet, 10000); /* Refresh balance every 10 seconds */",
+        "setInterval(updateLnbitsWallet, 60000); /* Refresh balance every 60 seconds */",
         "</script></body></html>"
     ])
     
