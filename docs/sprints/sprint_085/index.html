@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 085: H3 Aperture Digit Extraction</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --accent-s69: #00ffcc;
+
+  /* Sprint 078-084 Invariants */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --coordination-accent: #a855f7;
+
+  /* Sprint 083-084 Directional Topology */
+  --omitted-dir: #ff3366;
+  --present-dir: #00ffcc;
+  --facet-outline: #f59e0b;
+  --flux-active: #38bdf8;
+  --flux-forbidden: #ef4444;
+  --topology-gold: #fbbf24;
+  --bitmask-cyan: #38bdf8;
+  --bitmask-active: #10b981;
+  --bitmask-inactive: #334155;
+  --bitmask-border: #0ea5e9;
+  --reciprocal-pink: #ec4899;
+
+  /* Sprint 085: H3 Aperture Digit Invariants */
+  --aperture-active: #38bdf8;
+  --aperture-unused: #475569;
+  --aperture-gold: #f59e0b;
+  --aperture-purple: #c084fc;
+  --bit-header: #38bdf8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(840px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.73rem;
+  margin-bottom: 10px;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 20, 35, 0.6);
+  border-radius: 6px;
+  border: 1px solid #14354b;
+}
+
+.metric-item {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  font-weight: bold;
+  color: var(--accent-s69);
+}
+
+.badge-pass {
+  color: var(--type-pass);
+  border: 1px solid var(--type-pass);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 255, 162, 0.1);
+  font-size: 0.68rem;
+}
+
+.badge-fail {
+  color: var(--type-fail);
+  border: 1px solid var(--type-fail);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 42, 95, 0.1);
+  font-size: 0.68rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(8, 22, 36, 0.8);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #1f3d52;
+  font-size: 0.72rem;
+}
+
+.ctrl-group label {
+  color: var(--muted);
+}
+
+.ctrl-group select,
+.ctrl-group input {
+  background: #091724;
+  color: #c8f5f2;
+  border: 1px solid #284c66;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+}
+
+#sidebar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-section {
+  background: rgba(0, 15, 28, 0.65);
+  border: 1px solid #13344b;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.panel-title {
+  color: var(--bit-header);
+  font-size: 0.78rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bit-strip {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.bit-cell {
+  background: #0b1a26;
+  border: 1px solid #1a3347;
+  border-radius: 2px;
+  font-size: 0.58rem;
+  text-align: center;
+  padding: 2px 0;
+  color: #5d7d91;
+}
+
+.bit-cell.active-mode {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #00e1ff;
+}
+
+.bit-cell.active-res {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.bit-cell.active-base {
+  background: rgba(192, 132, 252, 0.25);
+  border-color: #c084fc;
+  color: #c084fc;
+}
+
+.bit-cell.active-digit {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.bit-cell.unused-digit {
+  background: rgba(71, 85, 105, 0.3);
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+.digit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(0, 10, 20, 0.4);
+  font-size: 0.7rem;
+  margin-bottom: 3px;
+  border: 1px solid #112739;
+}
+
+.digit-row.highlight {
+  border-color: var(--accent-s69);
+  background: rgba(0, 255, 204, 0.08);
+}
+
+.digit-btns {
+  display: flex;
+  gap: 3px;
+}
+
+.digit-btn {
+  padding: 1px 5px;
+  font-size: 0.65rem;
+  background: #091a27;
+  border: 1px solid #1c3c54;
+  border-radius: 3px;
+}
+
+.digit-btn.active {
+  background: var(--present-dir);
+  color: #02050a;
+  font-weight: bold;
+}
+
+.digit-btn.forbidden {
+  background: rgba(255, 51, 102, 0.25);
+  color: #ff7799;
+  border-color: var(--omitted-dir);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+#hud-overlay {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid #00e1ff2b;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life</h1>
+  <h2>Sprint 085: H3 Aperture 7 Hierarchical Digit Extraction &amp; Discrete Monad Tensor</h2>
+
+  <div class="metric-strip">
+    <div class="metric-item">
+      <span class="metric-label">H3 Index:</span>
+      <span id="metric-h3" class="metric-val">0x832830fffffffff</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Resolution:</span>
+      <span id="metric-res" class="metric-val">3</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Base Cell:</span>
+      <span id="metric-base" class="metric-val">14 (Pentagon)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Digit Path:</span>
+      <span id="metric-digits" class="metric-val">[0, 2, 4]</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Status:</span>
+      <span id="metric-status" class="badge-pass">INVARIANTS VALID</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <label for="resSelect">Res:</label>
+      <select id="resSelect">
+        <option value="0">0 (Base)</option>
+        <option value="1">1 (x7)</option>
+        <option value="2">2 (x49)</option>
+        <option value="3" selected>3 (x343)</option>
+        <option value="4">4 (x2401)</option>
+        <option value="5">5 (x16807)</option>
+      </select>
+    </div>
+
+    <div class="ctrl-group">
+      <label for="baseSelect">Base Cell:</label>
+      <select id="baseSelect">
+        <option value="14" selected>14 (Pentagon - K=1 Omitted)</option>
+        <option value="4">4 (Pentagon)</option>
+        <option value="12">12 (Hexagon - Standard)</option>
+        <option value="20">20 (Hexagon - Equator)</option>
+        <option value="58">58 (Pentagon)</option>
+        <option value="65">65 (Hexagon)</option>
+      </select>
+    </div>
+
+    <button id="btnPentagonToggle">Toggle Pentagon/Hex</button>
+    <button id="btnRandomizeDigits">Random Path</button>
+    <button id="btnPulseFlux" class="active">Flux Wave: ON</button>
+    <button id="btnResetCamera">Reset View</button>
+  </div>
+</div>
+
+<div id="sidebar">
+  <div class="panel-section">
+    <div class="panel-title">
+      <span>64-BIT H3 BITFIELD INSPECTOR</span>
+      <span style="color:var(--muted); font-size:0.62rem">IEEE 754 BigInt</span>
+    </div>
+    <div style="font-size:0.65rem; color:var(--muted); line-height:1.4">
+      [Mode:4b][Res:4b][BaseCell:7b][R1:3b][R2:3b]...[R15:3b]
+    </div>
+    <div class="bit-strip" id="bitfieldStrip"></div>
+    <div style="margin-top:6px; font-size:0.63rem; display:flex; justify-content:space-between;">
+      <span style="color:#00e1ff">■ Mode</span>
+      <span style="color:#f59e0b">■ Res</span>
+      <span style="color:#c084fc">■ BaseCell</span>
+      <span style="color:#10b981">■ Active Digits</span>
+      <span style="color:#94a3b8">■ Unused (7)</span>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-title">
+      <span>APERTURE 7 RESOLUTION DIGITS</span>
+      <span id="apertureRatioBadge" style="color:var(--accent-s69); font-size:0.65rem">1:343 Scale</span>
+    </div>
+    <div id="digitRowsContainer"></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-title">
+      <span>SPRINT 085 INVARIANTS</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:4px; font-size:0.68rem">
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--muted)">Digit Bound [0..6]:</span>
+        <span id="inv-bound" class="badge-pass">PASS</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--muted)">Unused Res Padding (7):</span>
+        <span id="inv-pad" class="badge-pass">PASS</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--muted)">Pentagon K=1 Direction:</span>
+        <span id="inv-penta" class="badge-pass">PASS</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--muted)">Monadic Entropy Flux:</span>
+        <span id="inv-flux" class="badge-pass">&Delta;S &ge; 0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="hud-overlay">
+  Pan: Drag canvas | Zoom: Mouse wheel | Click hex: Set child digit
+</div>
+
+<script>
+/**
+ * Thermodynamic Web of Life - Sprint 085
+ * Client-Side H3 Aperture 7 Digit Extraction and Visual Decomposition Monad
+ */
+
+// 12 Pentagonal Base Cells in standard H3 grid specification
+const PENTAGON_BASE_CELLS = new Set([4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117]);
+
+// H3 Aperture angle: asin(sqrt(3) / (2 * sqrt(7)))
+const APERTURE_ANGLE = Math.asin(Math.sqrt(3) / (2 * Math.sqrt(7))); // ~19.1066 degrees
+const APERTURE_SCALE = 1 / Math.sqrt(7); // ~0.37796447
+
+class H3IndexMonad {
+  constructor(baseCell = 14, resolution = 3, digits = [0, 2, 4]) {
+    this.mode = 1; // Hexagon / Pentagon
+    this.baseCell = baseCell;
+    this.resolution = Math.max(0, Math.min(15, resolution));
+    this.digits = new Array(15).fill(7);
+    for (let r = 0; r < this.resolution; r++) {
+      this.digits[r] = digits[r] !== undefined ? digits[r] : 0;
+    }
+  }
+
+  isPentagon() {
+    return PENTAGON_BASE_CELLS.has(this.baseCell);
+  }
+
+  toBigInt() {
+    let val = 0n;
+    val |= (BigInt(this.mode & 0xF) << 59n);
+    val |= (BigInt(this.resolution & 0xF) << 52n);
+    val |= (BigInt(this.baseCell & 0x7F) << 45n);
+    for (let r = 1; r <= 15; r++) {
+      const d = r <= this.resolution ? (this.digits[r - 1] & 7) : 7;
+      const shift = BigInt(45 - 3 * r);
+      val |= (BigInt(d) << shift);
+    }
+    return val;
+  }
+
+  toHexString() {
+    return '0x' + this.toBigInt().toString(16);
+  }
+
+  setResolution(newRes) {
+    this.resolution = Math.max(0, Math.min(15, newRes));
+    for (let r = 0; r < 15; r++) {
+      if (r >= this.resolution) {
+        this.digits[r] = 7;
+      } else if (this.digits[r] === 7) {
+        this.digits[r] = 0;
+      }
+    }
+  }
+
+  setDigit(resLevel, digit) {
+    if (resLevel < 1 || resLevel > this.resolution) return false;
+    // In pentagon cells, digit 1 (K=1 omitted directional facet) is forbidden
+    if (this.isPentagon() && digit === 1) {
+      return false;
+    }
+    this.digits[resLevel - 1] = digit & 7;
+    return true;
+  }
+
+  getDigit(resLevel) {
+    if (resLevel < 1 || resLevel > 15) return 7;
+    return this.digits[resLevel - 1];
+  }
+}
+
+// Global Application State
+const state = {
+  h3: new H3IndexMonad(14, 3, [0, 2, 4]),
+  camera: { x: 0, y: 0, zoom: 1.0 },
+  dragging: false,
+  dragStart: { x: 0, y: 0 },
+  pulseFlux: true,
+  time: 0,
+  hoverCell: null
+};
+
+// Canvas and DOM element cache
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const metricH3 = document.getElementById('metric-h3');
+const metricRes = document.getElementById('metric-res');
+const metricBase = document.getElementById('metric-base');
+const metricDigits = document.getElementById('metric-digits');
+const metricStatus = document.getElementById('metric-status');
+const resSelect = document.getElementById('resSelect');
+const baseSelect = document.getElementById('baseSelect');
+const bitfieldStrip = document.getElementById('bitfieldStrip');
+const digitRowsContainer = document.getElementById('digitRowsContainer');
+const apertureRatioBadge = document.getElementById('apertureRatioBadge');
+
+const invBound = document.getElementById('inv-bound');
+const invPad = document.getElementById('inv-pad');
+const invPenta = document.getElementById('inv-penta');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// H3 Geometry Calculations
+function getHexVertices(cx, cy, radius, rotation = 0) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = rotation + (i * Math.PI) / 3;
+    pts.push({
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle)
+    });
+  }
+  return pts;
+}
+
+function getPentagonVertices(cx, cy, radius, rotation = 0) {
+  const pts = [];
+  for (let i = 0; i < 5; i++) {
+    const angle = rotation + (i * 2 * Math.PI) / 5 - Math.PI / 2;
+    pts.push({
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle)
+    });
+  }
+  return pts;
+}
+
+// Aperture 7 child position offsets
+function getApertureChildOffset(digit, radius, levelRotation) {
+  if (digit === 0) return { x: 0, y: 0 };
+  const dAngle = (digit - 1) * (Math.PI / 3) + levelRotation + APERTURE_ANGLE;
+  const dist = radius * Math.sqrt(3) * APERTURE_SCALE;
+  return {
+    x: Math.cos(dAngle) * dist,
+    y: Math.sin(dAngle) * dist
+  };
+}
+
+// Invariant audit routine
+function updateInvariants() {
+  let boundPass = true;
+  let padPass = true;
+  let pentaPass = true;
+
+  for (let r = 0; r < 15; r++) {
+    const d = state.h3.digits[r];
+    if (r < state.h3.resolution) {
+      if (d < 0 || d > 6) boundPass = false;
+      if (state.h3.isPentagon() && d === 1) pentaPass = false;
+    } else {
+      if (d !== 7) padPass = false;
+    }
+  }
+
+  invBound.className = boundPass ? 'badge-pass' : 'badge-fail';
+  invBound.textContent = boundPass ? 'PASS' : 'FAIL';
+
+  invPad.className = padPass ? 'badge-pass' : 'badge-fail';
+  invPad.textContent = padPass ? 'PASS' : 'FAIL';
+
+  invPenta.className = pentaPass ? 'badge-pass' : 'badge-fail';
+  invPenta.textContent = pentaPass ? (state.h3.isPentagon() ? 'OMITTED (PASS)' : 'N/A (PASS)') : 'VIOLATION';
+
+  const allPass = boundPass && padPass && pentaPass;
+  metricStatus.className = allPass ? 'badge-pass' : 'badge-fail';
+  metricStatus.textContent = allPass ? 'INVARIANTS VALID' : 'VIOLATION DETECTED';
+}
+
+// Render DOM Bitfield Inspector
+function updateBitfieldUI() {
+  bitfieldStrip.innerHTML = '';
+  const big = state.h3.toBigInt();
+
+  for (let b = 63; b >= 0; b--) {
+    const bitVal = Number((big >> BigInt(b)) & 1n);
+    const cell = document.createElement('div');
+    cell.className = 'bit-cell';
+    cell.textContent = bitVal;
+
+    if (b >= 59) cell.classList.add('active-mode');
+    else if (b >= 52) cell.classList.add('active-res');
+    else if (b >= 45) cell.classList.add('active-base');
+    else {
+      const resIdx = Math.floor((44 - b) / 3) + 1;
+      if (resIdx <= state.h3.resolution) cell.classList.add('active-digit');
+      else cell.classList.add('unused-digit');
+    }
+    bitfieldStrip.appendChild(cell);
+  }
+}
+
+// Render Digit Control Buttons
+function updateDigitRowsUI() {
+  digitRowsContainer.innerHTML = '';
+  const isPenta = state.h3.isPentagon();
+
+  for (let r = 1; r <= Math.min(7, state.h3.resolution); r++) {
+    const currentDigit = state.h3.getDigit(r);
+    const row = document.createElement('div');
+    row.className = 'digit-row highlight';
+
+    const lbl = document.createElement('span');
+    lbl.style.fontWeight = 'bold';
+    lbl.style.color = '#38bdf8';
+    lbl.textContent = `Res ${r}: [d=${currentDigit}]`;
+    row.appendChild(lbl);
+
+    const btns = document.createElement('div');
+    btns.className = 'digit-btns';
+
+    for (let d = 0; d <= 6; d++) {
+      const btn = document.createElement('button');
+      btn.className = 'digit-btn';
+      btn.textContent = d;
+
+      if (isPenta && d === 1) {
+        btn.classList.add('forbidden');
+        btn.title = 'K=1 Direction is topologically omitted in pentagons!';
+      } else {
+        if (d === currentDigit) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          state.h3.setDigit(r, d);
+          syncAllUI();
+        });
+      }
+      btns.appendChild(btn);
+    }
+
+    row.appendChild(btns);
+    digitRowsContainer.appendChild(row);
+  }
+
+  if (state.h3.resolution === 0) {
+    const emptyMsg = document.createElement('div');
+    emptyMsg.style.fontSize = '0.68rem';
+    emptyMsg.style.color = 'var(--muted)';
+    emptyMsg.style.padding = '8px';
+    emptyMsg.textContent = 'Resolution 0: Base Cell only (no aperture child digits).';
+    digitRowsContainer.appendChild(emptyMsg);
+  }
+}
+
+function syncAllUI() {
+  metricH3.textContent = state.h3.toHexString();
+  metricRes.textContent = state.h3.resolution;
+  metricBase.textContent = `${state.h3.baseCell} (${state.h3.isPentagon() ? 'Pentagon' : 'Hexagon'})`;
+
+  const activeDigits = state.h3.digits.slice(0, state.h3.resolution);
+  metricDigits.textContent = `[${activeDigits.join(', ')}]`;
+
+  resSelect.value = String(state.h3.resolution);
+  baseSelect.value = String(state.h3.baseCell);
+
+  const ratio = Math.pow(7, state.h3.resolution);
+  apertureRatioBadge.textContent = `1:${ratio} Scale`;
+
+  updateBitfieldUI();
+  updateDigitRowsUI();
+  updateInvariants();
+}
+
+// Canvas Rendering Loop
+function render() {
+  state.time += 0.02;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background subtle grid
+  ctx.save();
+  ctx.strokeStyle = '#081420';
+  ctx.lineWidth = 1;
+  const gridSize = 40 * state.camera.zoom;
+  const offX = (canvas.width / 2 + state.camera.x) % gridSize;
+  const offY = (canvas.height / 2 + state.camera.y) % gridSize;
+  for (let x = offX; x < canvas.width; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = offY; y < canvas.height; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // World transform
+  ctx.save();
+  ctx.translate(canvas.width / 2 + state.camera.x, canvas.height / 2 + state.camera.y);
+  ctx.scale(state.camera.zoom, state.camera.zoom);
+
+  const baseRadius = 220;
+  const isPenta = state.h3.isPentagon();
+
+  // 1. Draw Root Base Cell
+  const rootPts = isPenta
+    ? getPentagonVertices(0, 0, baseRadius, 0)
+    : getHexVertices(0, 0, baseRadius, 0);
+
+  ctx.beginPath();
+  rootPts.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(pt.x, pt.y);
+    else ctx.lineTo(pt.x, pt.y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = isPenta ? 'rgba(255, 0, 85, 0.08)' : 'rgba(0, 225, 255, 0.05)';
+  ctx.fill();
+  ctx.strokeStyle = isPenta ? '#ff0055' : '#00e1ff';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Base Cell Label
+  ctx.fillStyle = isPenta ? '#ff7799' : '#88e7ff';
+  ctx.font = 'bold 12px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Base Cell ${state.h3.baseCell} [${isPenta ? 'Pentagon' : 'Hexagon'}]`, 0, -baseRadius - 14);
+
+  // 2. Draw Hierarchical Aperture Decomposition
+  let currentCenter = { x: 0, y: 0 };
+  let currentRadius = baseRadius;
+  let currentRotation = 0;
+
+  for (let lvl = 1; lvl <= state.h3.resolution; lvl++) {
+    const parentCenter = { ...currentCenter };
+    const parentRadius = currentRadius;
+    const parentRot = currentRotation;
+
+    currentRadius = parentRadius * APERTURE_SCALE;
+    currentRotation = parentRot + APERTURE_ANGLE;
+
+    const chosenDigit = state.h3.getDigit(lvl);
+
+    // Draw all 7 children of current active level
+    for (let d = 0; d <= 6; d++) {
+      if (isPenta && d === 1) {
+        // Draw omitted direction marker
+        const dAngle = parentRot + APERTURE_ANGLE;
+        const dist = parentRadius * Math.sqrt(3) * APERTURE_SCALE;
+        const ox = parentCenter.x + Math.cos(dAngle) * dist;
+        const oy = parentCenter.y + Math.sin(dAngle) * dist;
+
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = 1.5;
+        const omitPts = getHexVertices(ox, oy, currentRadius * 0.9, currentRotation);
+        ctx.beginPath();
+        omitPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ff3366';
+        ctx.font = '9px Courier New';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('d=1 ✕', ox, oy);
+        ctx.restore();
+        continue;
+      }
+
+      const offset = getApertureChildOffset(d, parentRadius, parentRot);
+      const cx = parentCenter.x + offset.x;
+      const cy = parentCenter.y + offset.y;
+
+      const isChosen = d === chosenDigit;
+      const hexPts = getHexVertices(cx, cy, currentRadius, currentRotation);
+
+      ctx.beginPath();
+      hexPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+      ctx.closePath();
+
+      if (isChosen) {
+        ctx.fillStyle = lvl === state.h3.resolution ? 'rgba(0, 255, 204, 0.28)' : 'rgba(56, 189, 248, 0.16)';
+        ctx.strokeStyle = lvl === state.h3.resolution ? '#00ffcc' : '#38bdf8';
+        ctx.lineWidth = lvl === state.h3.resolution ? 2.5 : 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(10, 30, 48, 0.45)';
+        ctx.strokeStyle = '#1e405a';
+        ctx.lineWidth = 1;
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // Child Digit Number
+      ctx.fillStyle = isChosen ? '#ffffff' : '#5c839f';
+      ctx.font = isChosen ? 'bold 11px Courier New' : '10px Courier New';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`d=${d}`, cx, cy);
+
+      if (isChosen) {
+        currentCenter = { x: cx, y: cy };
+      }
+    }
+
+    // Path connector ray
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(parentCenter.x, parentCenter.y);
+    ctx.lineTo(currentCenter.x, currentCenter.y);
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2, 2]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 3. Thermodynamic Monad Wave Pulse
+  if (state.pulseFlux) {
+    const pulseRad = currentRadius * (1 + 0.18 * Math.sin(state.time * 4));
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(currentCenter.x, currentCenter.y, pulseRad, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+  requestAnimationFrame(render);
+}
+
+// Event Listeners for Interaction
+window.addEventListener('mousedown', (e) => {
+  if (e.target.id === 'simCanvas') {
+    state.dragging = true;
+    state.dragStart = { x: e.clientX - state.camera.x, y: e.clientY - state.camera.y };
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (state.dragging) {
+    state.camera.x = e.clientX - state.dragStart.x;
+    state.camera.y = e.clientY - state.dragStart.y;
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  state.dragging = false;
+});
+
+window.addEventListener('wheel', (e) => {
+  if (e.target.id === 'simCanvas') {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    state.camera.zoom = Math.max(0.2, Math.min(10.0, state.camera.zoom * zoomFactor));
+  }
+}, { passive: false });
+
+resSelect.addEventListener('change', (e) => {
+  state.h3.setResolution(parseInt(e.target.value, 10));
+  syncAllUI();
+});
+
+baseSelect.addEventListener('change', (e) => {
+  state.h3.baseCell = parseInt(e.target.value, 10);
+  // Revalidate pentagon omitted direction
+  if (state.h3.isPentagon()) {
+    for (let r = 0; r < state.h3.resolution; r++) {
+      if (state.h3.digits[r] === 1) state.h3.digits[r] = 0;
+    }
+  }
+  syncAllUI();
+});
+
+document.getElementById('btnPentagonToggle').addEventListener('click', () => {
+  if (state.h3.isPentagon()) {
+    state.h3.baseCell = 12; // Hexagon
+  } else {
+    state.h3.baseCell = 14; // Pentagon
+    for (let r = 0; r < state.h3.resolution; r++) {
+      if (state.h3.digits[r] === 1) state.h3.digits[r] = 0;
+    }
+  }
+  syncAllUI();
+});
+
+document.getElementById('btnRandomizeDigits').addEventListener('click', () => {
+  const isPenta = state.h3.isPentagon();
+  for (let r = 0; r < state.h3.resolution; r++) {
+    let d = Math.floor(Math.random() * 7);
+    if (isPenta && d === 1) d = Math.random() > 0.5 ? 0 : 2;
+    state.h3.digits[r] = d;
+  }
+  syncAllUI();
+});
+
+const btnPulseFlux = document.getElementById('btnPulseFlux');
+btnPulseFlux.addEventListener('click', () => {
+  state.pulseFlux = !state.pulseFlux;
+  btnPulseFlux.className = state.pulseFlux ? 'active' : '';
+  btnPulseFlux.textContent = `Flux Wave: ${state.pulseFlux ? 'ON' : 'OFF'}`;
+});
+
+document.getElementById('btnResetCamera').addEventListener('click', () => {
+  state.camera.x = 0;
+  state.camera.y = 0;
+  state.camera.zoom = 1.0;
+});
+
+// Initialize UI and start animation loop
+syncAllUI();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

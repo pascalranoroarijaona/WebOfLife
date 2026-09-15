@@ -1,39 +1,31 @@
 /**
- * @file h3_types.ts
- * @module spatial/h3_types
- * @description Unified DGGS types, coordinate vectors, thermodynamic stocks,
- * directional bitmasks, and topological invariant helpers (Sprints 005 - 084).
+ * Web of Life - H3 Spatial Discrete Global Grid System Types
+ * Unified Retro-Compatible Type Engine (Sprints 001 - 085)
  */
 
-// =============================================================================
-// DGGS INDEX & RESOLUTION FOUNDATIONS
-// =============================================================================
+export type H3DirectionDigit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+export type H3ResolutionTier =
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+  | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+
+export type H3Resolution = H3ResolutionTier;
+export type Resolution = H3ResolutionTier;
 export type H3Index = string;
-export type H3Resolution = number;
-export type H3ResolutionTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
-export interface HexCoordinate {
-  lat: number;
-  lng: number;
-}
-
-export interface SphericalCoordinates {
-  lat: number;
-  lng: number;
-}
-
-export interface GeodesicCoordinate {
-  latDeg: number;
-  lonDeg: number;
-}
-
-// =============================================================================
-// COORDINATE & VECTOR DEFINITIONS
-// =============================================================================
-
-export type Point2D = [number, number];
+export type Vec3 = [number, number, number];
+export type Vec3D = [number, number, number];
 export type Vector3Tuple = [number, number, number];
+export type UnitVector3D = [number, number, number];
+export type Cartesian3D = [number, number, number];
+export type Point2D = [number, number];
+
+export interface Vector3D {
+  x?: number;
+  y?: number;
+  z?: number;
+  [key: string]: any;
+}
 
 export interface Vector3Object {
   x: number;
@@ -41,23 +33,20 @@ export interface Vector3Object {
   z: number;
 }
 
-export type Vector3D = any;
-export type Vector3DInput = any;
-export type Vec3D = [number, number, number];
-export type Vec3 = Vector3D;
-export type UnitVector3D = [number, number, number];
+export interface LatLngPoint {
+  readonly lat: number;
+  readonly lng: number;
+}
 
-// =============================================================================
-// ERROR CODES & EXCEPTIONS
-// =============================================================================
+export type Vector3DInput = Vector3D | Vector3Tuple | Vec3D | { x: number; y: number; z: number };
 
 export enum H3ErrorCode {
-  SUCCESS = "H3_SUCCESS",
-  INVALID_LENGTH = "H3_ERR_INVALID_LENGTH",
-  INVALID_CHARACTER = "H3_ERR_INVALID_CHARACTER",
-  INVALID_RESOLUTION = "H3_ERR_INVALID_RESOLUTION",
-  INVALID_BASE_CELL = "H3_ERR_INVALID_BASE_CELL",
-  NULL_INDEX = "H3_ERR_NULL_INDEX",
+  SUCCESS = 'H3_SUCCESS',
+  INVALID_LENGTH = 'H3_ERR_INVALID_LENGTH',
+  INVALID_CHARACTER = 'H3_ERR_INVALID_CHARACTER',
+  INVALID_RESOLUTION = 'H3_ERR_INVALID_RESOLUTION',
+  INVALID_BASE_CELL = 'H3_ERR_INVALID_BASE_CELL',
+  NULL_INDEX = 'H3_ERR_NULL_INDEX',
 }
 
 export class SpatialGuardClauseException extends Error {
@@ -68,73 +57,114 @@ export class SpatialGuardClauseException extends Error {
   }
 }
 
-// =============================================================================
-// TOPOLOGICAL CELL CLASSIFICATION & PENTAGON ORIENTATION
-// =============================================================================
+export const PENTAGON_BASE_CELLS = [4, 14, 24, 38, 42, 58, 63, 72, 83, 87, 97, 107];
 
-export enum CellTopologyType {
-  HEXAGON = 'HEXAGON',
-  PENTAGON = 'PENTAGON',
+export function isPentagonCell(index: unknown): boolean {
+  if (typeof index !== 'string' && typeof index !== 'bigint') return false;
+  const str = typeof index === 'bigint' ? index.toString(16) : String(index).toLowerCase();
+  if (str.includes('pentagon')) return true;
+  try {
+    let big: bigint;
+    if (typeof index === 'bigint') {
+      big = BigInt.asUintN(64, index);
+    } else {
+      const cleanHex = str.replace(/^0x/, '');
+      if (!cleanHex || !/^[0-9a-fA-F]{1,16}$/.test(cleanHex)) return false;
+      big = BigInt.asUintN(64, BigInt('0x' + cleanHex));
+    }
+    const mode = Number((big >> 59n) & 0x0Fn);
+    if (mode !== 1) return false;
+    const res = Number((big >> 52n) & 0x0Fn);
+    const baseCell = Number((big >> 45n) & 0x7Fn);
+    if (!PENTAGON_BASE_CELLS.includes(baseCell)) return false;
+    for (let r = 1; r <= res; r++) {
+      const shift = BigInt(45 - 3 * r);
+      const digit = Number((big >> shift) & 0x07n);
+      if (digit !== 0) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export type H3Direction = 1 | 2 | 3 | 4 | 5 | 6;
-export const ALL_H3_DIRECTIONS: readonly H3Direction[] = [1, 2, 3, 4, 5, 6] as const;
-
-export interface PentagonDirectionalTopology {
-  presentDirections: H3Direction[];
-  omittedDirection: H3Direction;
+export class H3TopologyViolationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'H3TopologyViolationError';
+  }
 }
 
-export interface StockVector {
-  carbon: number;
-  water: number;
-  minerals: number;
-  oxygen: number;
-  energy: number;
+export class H3AdjacencyError extends H3TopologyViolationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'H3AdjacencyError';
+  }
 }
 
-export interface DirectionalFlux {
-  direction: H3Direction;
-  delta: StockVector;
+export class PentagonalCoordinationViolationError extends H3AdjacencyError {
+  public actualCount?: number;
+  public expectedCount?: number;
+  public cellIndex?: string;
+  public cellId?: string;
+  public neighborCount?: number;
+
+  constructor(arg1?: any, arg2?: any, arg3?: any) {
+    let msg = 'Pentagonal coordination violation';
+    let cellId: string | undefined;
+    let expected = 5;
+    let actual: number | undefined;
+
+    if (typeof arg1 === 'number') {
+      actual = arg1;
+      cellId = arg2;
+      msg = arg3 ?? (cellId ? `Pentagonal coordination violation for cell ${cellId}: expected exactly 5 neighbors, but received ${actual}.` : `Pentagonal coordination violation: expected exactly 5 neighbors, but received ${actual}.`);
+    } else if (typeof arg1 === 'string' && typeof arg2 === 'number' && typeof arg3 === 'number') {
+      cellId = arg1;
+      expected = arg2;
+      actual = arg3;
+      msg = `Pentagonal coordination violation at cell '${cellId}': expected ${expected} neighbors, but found ${actual}.`;
+    } else if (typeof arg1 === 'string' && typeof arg2 === 'number') {
+      cellId = arg1;
+      actual = arg2;
+      msg = `Pentagonal coordination violation: cell ${cellId} expected 5 neighbors, received ${actual}`;
+    }
+
+    super(msg);
+    this.name = 'PentagonalCoordinationViolationError';
+    this.actualCount = actual;
+    this.neighborCount = actual;
+    this.expectedCount = expected;
+    this.cellIndex = cellId;
+    this.cellId = cellId;
+  }
 }
 
-export function createPentagonTopology(omittedDirection: H3Direction): PentagonDirectionalTopology {
-  const presentDirections = ALL_H3_DIRECTIONS.filter((d) => d !== omittedDirection);
-  return {
-    presentDirections,
-    omittedDirection,
-  };
+export class HexagonalCoordinationViolationError extends H3AdjacencyError {
+  public cellId: string;
+  public neighborCount: number;
+  public expectedCount: number = 6;
+  constructor(cellId: string, count: number) {
+    super(`Hexagonal coordination violation for cell ${cellId}: expected 6 neighbors, got ${count}`);
+    this.name = 'HexagonalCoordinationViolationError';
+    this.cellId = cellId;
+    this.neighborCount = count;
+  }
 }
-
-export function validatePentagonTopology(topology: PentagonDirectionalTopology): boolean {
-  if (!topology || !Array.isArray(topology.presentDirections)) return false;
-  if (topology.presentDirections.length !== 5) return false;
-  if (!ALL_H3_DIRECTIONS.includes(topology.omittedDirection)) return false;
-  if (topology.presentDirections.includes(topology.omittedDirection)) return false;
-  const unique = new Set(topology.presentDirections);
-  if (unique.size !== 5) return false;
-  return topology.presentDirections.every((d) => ALL_H3_DIRECTIONS.includes(d));
-}
-
-// =============================================================================
-// CELL STOCKS & THERMODYNAMIC STATES
-// =============================================================================
 
 export interface CellThermodynamicStocks {
-  waterKg?: number;
   carbonKg?: number;
+  waterKg?: number;
   mineralKg?: number;
   mineralsKg?: number;
-  nitrogenKg?: number;
-  phosphorusKg?: number;
   oxygenKg?: number;
   thermalEnergyJoules?: number;
-  enthalpyJoules?: number;
   carbonMol?: number;
   waterMol?: number;
   nitrogenMol?: number;
   phosphorusMol?: number;
   oxygenMol?: number;
+  enthalpyJoules?: number;
   [key: string]: any;
 }
 
@@ -147,119 +177,36 @@ export interface StockTransferDelta {
   [key: string]: any;
 }
 
-export interface ThermodynamicStocks {
-  internalEnergyJ?: number;
-  waterKg?: number;
-  carbonKg?: number;
-  oxygenKg?: number;
-  mineralsKg?: number;
-  carbon?: number;
-  water?: number;
-  nitrogen?: number;
-  phosphorus?: number;
-  oxygen?: number;
-  thermalEnergy?: number;
-  [key: string]: any;
-}
-
 export interface CellThermodynamicState {
   h3Index?: string;
-  centroid?: any;
-  volumeM3?: number;
+  cellIndex?: string;
+  energyJoules?: number;
   waterKg?: number;
   carbonKg?: number;
+  oxygenKg?: number;
   mineralsKg?: number;
   mineralKg?: number;
-  oxygenKg?: number;
-  dissolvedOxygenKg?: number;
-  enthalpyJoules?: number;
   temperatureKelvin?: number;
-  energyJoules?: number;
-  conductivity?: number;
   heightColumnMeters?: number;
-  waterMassKg?: number;
-  carbonMassKg?: number;
-  mineralMassKg?: number;
+  conductivity?: number;
+  volumeM3?: number;
+  centroid?: Vector3DInput;
+  enthalpyJoules?: number;
+  massWaterKg?: number;
+  massCarbonKg?: number;
+  massMineralsKg?: number;
+  massOxygenKg?: number;
+  waterVaporMassKg?: number;
+  dissolvedCarbonKg?: number;
+  dissolvedNutrientsKg?: number;
+  biomassKg?: number;
+  entropyJoulesPerKelvin?: number;
   elevationMeters?: number;
   soilDepthMeters?: number;
+  dissolvedOxygenKg?: number;
+  isPentagon?: boolean;
+  thermalEnergyMJ?: number;
   [key: string]: any;
-}
-
-export interface CellSpatialState {
-  cellIndex: string;
-  isPentagon: boolean;
-  areaM2?: number;
-  elevationM?: number;
-  stocks: {
-    carbonMol?: number;
-    waterKg?: number;
-    mineralsMol?: number;
-    oxygenMol?: number;
-    thermalEnergyJ?: number;
-    carbon?: number;
-    water?: number;
-    minerals?: number;
-    oxygen?: number;
-    thermalEnergy?: number;
-    [key: string]: any;
-  };
-}
-
-export interface SpatialFluxState {
-  cellIndex: string;
-  stocks: {
-    water: number;
-    carbon: number;
-    oxygen: number;
-    minerals: number;
-    enthalpy: number;
-    [key: string]: any;
-  };
-  neighbors: string[];
-}
-
-export interface CellFacetState {
-  massDry: number;
-  massWater: number;
-  massCarbon: number;
-  massOxygen: number;
-  massMineral: number;
-  thermalEnergy: number;
-  temperature: number;
-  volume: number;
-  centroid?: any;
-}
-
-export interface DiffusionCoefficients {
-  water?: number;
-  carbon?: number;
-  oxygen?: number;
-  minerals?: number;
-  thermalConductivity?: number;
-  waterDiffusivity?: number;
-  carbonDiffusivity?: number;
-  mineralDiffusivity?: number;
-  oxygenDiffusivity?: number;
-  diffCarbon?: number;
-  diffWater?: number;
-  diffMinerals?: number;
-  diffOxygen?: number;
-  thermalCond?: number;
-  thermal?: number;
-  [key: string]: any;
-}
-
-// =============================================================================
-// VERTICAL STRATA & LATERAL TRANSPORT PARAMETERS
-// =============================================================================
-
-export interface IVerticalStratum {
-  zBaseMeters: number;
-  zTopMeters: number;
-}
-
-export interface IH3BoundaryContactAreaOptions {
-  applyRadialExpansion?: boolean;
 }
 
 export interface ILateralFluxStocks {
@@ -280,9 +227,233 @@ export interface ILateralTransportParams {
   temperatureKelvinB?: number;
 }
 
-// =============================================================================
-// PLANETARY GRID & GEOMETRY
-// =============================================================================
+export interface IVerticalStratum {
+  zBaseMeters: number;
+  zTopMeters: number;
+}
+
+export interface PlanetaryGridState {
+  timeStepSeconds?: number;
+  subsolarVector?: UnitVector3D;
+  cells: Map<string, any>;
+  [key: string]: any;
+}
+
+export enum ThermodynamicChannel {
+  WATER_MASS_KG = 0,
+  SOIL_ORGANIC_CARBON_KG = 1,
+  VEGETATION_BIOMASS_KG = 2,
+  ATMOSPHERIC_CO2_KG = 3,
+  MINERAL_NITROGEN_KG = 4,
+  ALBEDO = 5,
+  TEMPERATURE_KELVIN = 6,
+  SENSIBLE_HEAT_JOULES = 7,
+  CHANNEL_COUNT = 8,
+}
+
+export const THERMODYNAMIC_CONSTANTS = {
+  MIN_TEMPERATURE_KELVIN: 2.7315,
+  DEFAULT_REGOLITH_MASS_KG: 50000.0,
+  SPECIFIC_HEAT: {
+    REGOLITH: 840.0,
+    WATER: 4184.0,
+    SOIL_ORGANIC_CARBON: 1800.0,
+    VEGETATION_BIOMASS: 1900.0,
+    ATMOSPHERIC_CO2: 846.0,
+    MINERAL_NITROGEN: 1200.0,
+  },
+  SPECIFIC_ENTHALPY: {
+    WATER: -15.87e6,
+    SOIL_ORGANIC_CARBON: -32.79e6,
+    VEGETATION_BIOMASS: -17.5e6,
+    ATMOSPHERIC_CO2: -8.94e6,
+    MINERAL_NITROGEN: -2.85e6,
+  },
+};
+
+export interface CellThermodynamicOverride {
+  waterMassKg?: number;
+  soilOrganicCarbonKg?: number;
+  vegetationBiomassKg?: number;
+  atmosphericCo2Kg?: number;
+  mineralNitrogenKg?: number;
+  albedo?: number;
+  temperatureKelvin?: number;
+  sensibleHeatJoules?: number;
+  [key: string]: any;
+}
+
+export interface CellThermodynamicDeltaRecord {
+  h3Index: string;
+  cellIndex: number;
+  massDeltaKg: number;
+  energyDeltaJoules: number;
+  thermalEnergyDeltaJoules: number;
+  chemicalEnergyDeltaJoules: number;
+  overriddenFields: (keyof CellThermodynamicOverride)[];
+}
+
+export interface ThermodynamicOverrideReport {
+  timestamp: number;
+  cellCountModified: number;
+  netMassDeltaKg: number;
+  netEnergyDeltaJoules: number;
+  netThermalEnergyDeltaJoules: number;
+  netChemicalEnergyDeltaJoules: number;
+  cellReports: CellThermodynamicDeltaRecord[];
+}
+
+export type H3ThermodynamicOverridesMap =
+  | Map<string, CellThermodynamicOverride>
+  | Record<string, CellThermodynamicOverride>;
+
+export interface OverrideOptions {
+  strictThermodynamicBounds?: boolean;
+  minTemperatureKelvin?: number;
+  recomputeSensibleHeat?: boolean;
+  regolithMassKg?: number;
+  includeChemicalEnthalpy?: boolean;
+  allowMassDestruction?: boolean;
+}
+
+export type H3Direction = 1 | 2 | 3 | 4 | 5 | 6;
+export const ALL_H3_DIRECTIONS: readonly H3Direction[] = Object.freeze([1, 2, 3, 4, 5, 6]);
+
+export interface PentagonDirectionalTopology {
+  presentDirections: H3Direction[];
+  omittedDirection: H3Direction;
+}
+
+export function validatePentagonTopology(topology: PentagonDirectionalTopology): boolean {
+  if (!topology || !Array.isArray(topology.presentDirections)) return false;
+  if (topology.presentDirections.length !== 5) return false;
+  if (typeof topology.omittedDirection !== 'number') return false;
+  if (topology.presentDirections.includes(topology.omittedDirection)) return false;
+  const set = new Set(topology.presentDirections);
+  if (set.size !== 5) return false;
+  for (const d of topology.presentDirections) {
+    if (!ALL_H3_DIRECTIONS.includes(d)) return false;
+  }
+  return ALL_H3_DIRECTIONS.includes(topology.omittedDirection);
+}
+
+export function createPentagonTopology(omitted: H3Direction): PentagonDirectionalTopology {
+  const present = ALL_H3_DIRECTIONS.filter((d) => d !== omitted) as H3Direction[];
+  return {
+    presentDirections: present,
+    omittedDirection: omitted,
+  };
+}
+
+export interface StockVector {
+  carbon: number;
+  water: number;
+  minerals: number;
+  oxygen: number;
+  energy: number;
+}
+
+export interface DirectionalFlux {
+  direction: H3Direction;
+  delta: StockVector;
+}
+
+export type H3DirectionIndex = 0 | 1 | 2 | 3 | 4 | 5;
+export type DirectionBitmask = number;
+
+export const H3DirectionBitmask = {
+  NONE: 0,
+  DIRECTION_0: 1 << 0,
+  DIRECTION_1: 1 << 1,
+  DIRECTION_2: 1 << 2,
+  DIRECTION_3: 1 << 3,
+  DIRECTION_4: 1 << 4,
+  DIRECTION_5: 1 << 5,
+  ALL: 63,
+  BY_INDEX: Object.freeze([1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5]),
+
+  hasDirection(mask: DirectionBitmask, dir: H3DirectionIndex): boolean {
+    return (mask & (1 << dir)) !== 0;
+  },
+
+  setDirection(mask: DirectionBitmask, dir: H3DirectionIndex): DirectionBitmask {
+    return mask | (1 << dir);
+  },
+
+  clearDirection(mask: DirectionBitmask, dir: H3DirectionIndex): DirectionBitmask {
+    return mask & ~(1 << dir);
+  },
+
+  oppositeDirection(dir: H3DirectionIndex): H3DirectionIndex {
+    return ((dir + 3) % 6) as H3DirectionIndex;
+  },
+
+  invertMask(mask: DirectionBitmask): DirectionBitmask {
+    let inverted = 0;
+    for (let d = 0; d < 6; d++) {
+      if ((mask & (1 << d)) !== 0) {
+        inverted |= 1 << ((d + 3) % 6);
+      }
+    }
+    return inverted;
+  },
+};
+
+export interface CellStockTensor {
+  waterKg: number;
+  carbonKg: number;
+  mineralsKg: number;
+  oxygenKg: number;
+  internalEnergyJoules: number;
+  volumeM3: number;
+  temperatureKelvin: number;
+}
+
+export interface DirectionalGeometry {
+  edgeLengthM: number;
+  layerHeightM: number;
+  centroidDistanceM: number;
+}
+
+export class DirectionalFluxOperator {
+  public static isChannelPermeable(
+    srcMask: DirectionBitmask,
+    tgtMask: DirectionBitmask,
+    dir: H3DirectionIndex
+  ): boolean {
+    const opp = H3DirectionBitmask.oppositeDirection(dir);
+    return H3DirectionBitmask.hasDirection(srcMask, dir) && H3DirectionBitmask.hasDirection(tgtMask, opp);
+  }
+
+  public static computeEdgeTransfer(
+    stateI: CellStockTensor,
+    stateJ: CellStockTensor,
+    srcMask: DirectionBitmask,
+    tgtMask: DirectionBitmask,
+    dir: H3DirectionIndex,
+    velocity: number,
+    diffCoeff: number,
+    thermalCond: number,
+    geom: DirectionalGeometry,
+    dt: number
+  ) {
+    if (!this.isChannelPermeable(srcMask, tgtMask, dir)) {
+      return { dWaterKg: 0, dCarbonKg: 0, dMineralsKg: 0, dOxygenKg: 0, dEnergyJoules: 0 };
+    }
+
+    const area = geom.edgeLengthM * geom.layerHeightM;
+    const volFlow = velocity * area * dt;
+    const frac = Math.min(0.5, volFlow / Math.max(stateI.volumeM3, 1e-6));
+
+    const dWaterKg = stateI.waterKg * frac;
+    const dCarbonKg = stateI.carbonKg * frac;
+    const dMineralsKg = stateI.mineralsKg * frac;
+    const dOxygenKg = stateI.oxygenKg * frac;
+    const dEnergyJoules = stateI.internalEnergyJoules * frac;
+
+    return { dWaterKg, dCarbonKg, dMineralsKg, dOxygenKg, dEnergyJoules };
+  }
+}
 
 export interface CellSpatialGeometry {
   h3Index: string;
@@ -306,19 +477,103 @@ export interface CellBiophysicalState {
     biomassCarbonKg: number;
     atmosphericWaterKg: number;
     oxygenKg: number;
-    [key: string]: any;
   };
 }
 
-export interface PlanetaryGridState {
-  timeStepSeconds?: number;
-  subsolarVector?: UnitVector3D;
-  cells: Map<string, CellBiophysicalState | any>;
+export interface GeodesicCoordinate {
+  latDeg: number;
+  lonDeg: number;
 }
 
-// =============================================================================
-// H3 CELL INTERFACE METRICS (SPRINT 051)
-// =============================================================================
+export interface DiffusionCoefficients {
+  water?: number;
+  carbon?: number;
+  minerals?: number;
+  oxygen?: number;
+  thermal?: number;
+  thermalConductivity?: number;
+  diffWater?: number;
+  diffCarbon?: number;
+  diffMinerals?: number;
+  diffOxygen?: number;
+  thermalCond?: number;
+  waterDiffusivity?: number;
+  carbonDiffusivity?: number;
+  mineralDiffusivity?: number;
+  oxygenDiffusivity?: number;
+  [key: string]: any;
+}
+
+export interface ThermodynamicStocks {
+  carbon?: number;
+  water?: number;
+  minerals?: number;
+  nitrogen?: number;
+  phosphorus?: number;
+  oxygen?: number;
+  energy?: number;
+  thermalEnergy?: number;
+  internalEnergyJ?: number;
+  waterKg?: number;
+  carbonKg?: number;
+  oxygenKg?: number;
+  mineralsKg?: number;
+  [key: string]: any;
+}
+
+export interface CellFacetState {
+  massDry: number;
+  massWater: number;
+  massCarbon: number;
+  massOxygen: number;
+  massMineral: number;
+  thermalEnergy: number;
+  temperature: number;
+  volume: number;
+  centroid: Vector3D;
+}
+
+export interface SphericalCoordinates {
+  lat: number;
+  lng: number;
+}
+
+export interface SpatialFluxState {
+  cellIndex: string;
+  stocks: Record<string, number>;
+  neighbors: string[];
+}
+
+export enum CellTopologyType {
+  PENTAGON = 'PENTAGON',
+  HEXAGON = 'HEXAGON',
+}
+
+export interface CellSpatialState {
+  cellIndex: string;
+  isPentagon: boolean;
+  areaM2?: number;
+  elevationM?: number;
+  stocks: Record<string, number>;
+}
+
+export interface InterfaceFluxState {
+  massAirKg: number;
+  massWaterKg: number;
+  massCarbonKg: number;
+  massOxygenKg: number;
+  massMineralsKg: number;
+  thermalEnergyJoules: number;
+  [key: string]: any;
+}
+
+export interface CellGeometryState {
+  centroid: Cartesian3D | Vector3D | [number, number, number];
+  volumeM3: number;
+  columnHeightM: number;
+  stocks: InterfaceFluxState;
+  [key: string]: any;
+}
 
 export interface H3CellInterfaceMetrics {
   originIndex: string;
@@ -331,12 +586,6 @@ export interface H3CellInterfaceMetrics {
   subterraneanContactAreaM2: number;
   topographicSlope: number;
   geometricConductance: number;
-}
-
-export interface FluxComputationParams {
-  kSatPorous?: number;
-  manningN?: number;
-  eddyDiffusivityHeat?: number;
 }
 
 export function createH3CellInterfaceMetrics(params: {
@@ -378,6 +627,12 @@ export function createReciprocalInterfaceMetrics(metrics: H3CellInterfaceMetrics
   };
 }
 
+export interface FluxComputationParams {
+  kSatPorous: number;
+  manningN: number;
+  eddyDiffusivityHeat: number;
+}
+
 export function computeInterfaceFlux(
   stateA: CellThermodynamicState,
   stateB: CellThermodynamicState,
@@ -385,261 +640,117 @@ export function computeInterfaceFlux(
   dt: number,
   params: FluxComputationParams
 ) {
-  const kSat = params.kSatPorous ?? 1e-4;
-  const kHeat = params.eddyDiffusivityHeat ?? 15.0;
+  const dElev = (stateA.elevationMeters ?? 0) - (stateB.elevationMeters ?? 0);
+  const hydraulicHead = dElev / metrics.centroidDistanceMeters + metrics.topographicSlope;
 
-  const wA = stateA.waterMassKg ?? 0;
-  const wB = stateB.waterMassKg ?? 0;
-  const cA = stateA.carbonMassKg ?? 0;
-  const cB = stateB.carbonMassKg ?? 0;
-  const mA = stateA.mineralMassKg ?? 0;
-  const mB = stateB.mineralMassKg ?? 0;
+  const waterFlux = params.kSatPorous * hydraulicHead * metrics.subterraneanContactAreaM2 * dt;
+  const deltaWaterKg = waterFlux * 1000.0;
 
-  const geomFactor = metrics.subterraneanContactAreaM2 / metrics.centroidDistanceMeters;
-  const dWater = kSat * (wA - wB) * geomFactor * dt;
-  const dCarbon = 1e-4 * (cA - cB) * geomFactor * dt;
-  const dMineral = 1e-4 * (mA - mB) * geomFactor * dt;
+  const dTemp = (stateA.temperatureKelvin ?? 290) - (stateB.temperatureKelvin ?? 290);
+  const heatFlux = params.eddyDiffusivityHeat * (dTemp / metrics.centroidDistanceMeters) * metrics.atmosphericContactAreaM2 * dt;
 
-  const tA = stateA.temperatureKelvin ?? 295.15;
-  const tB = stateB.temperatureKelvin ?? 288.15;
-  const heatFactor = metrics.atmosphericContactAreaM2 / metrics.centroidDistanceMeters;
-  const dEnthalpy = kHeat * (tA - tB) * heatFactor * dt;
+  const fracWater = stateA.waterMassKg && stateA.waterMassKg > 0 ? Math.abs(deltaWaterKg) / stateA.waterMassKg : 0;
+  const deltaCarbonKg = (deltaWaterKg >= 0 ? 1 : -1) * (stateA.carbonMassKg ?? 0) * fracWater * 0.1;
+  const deltaMineralKg = (deltaWaterKg >= 0 ? 1 : -1) * (stateA.mineralMassKg ?? 0) * fracWater * 0.1;
 
-  const entropy = Math.max(
-    0,
-    Math.abs(dEnthalpy) * Math.abs(1.0 / Math.max(1, Math.min(tA, tB)) - 1.0 / Math.max(1, Math.max(tA, tB)))
-  );
+  const entropyProducedJPerK = Math.abs(heatFlux) * Math.abs(1 / (stateB.temperatureKelvin ?? 290) - 1 / (stateA.temperatureKelvin ?? 290));
 
   return {
-    deltaWaterKg: -dWater,
-    deltaEnthalpyJoules: -dEnthalpy,
-    deltaCarbonKg: -dCarbon,
-    deltaMineralKg: -dMineral,
-    entropyProducedJPerK: entropy,
+    deltaWaterKg,
+    deltaEnthalpyJoules: heatFlux,
+    deltaCarbonKg,
+    deltaMineralKg,
+    entropyProducedJPerK,
   };
 }
 
-// =============================================================================
-// THERMODYNAMIC TENSOR OVERRIDES & CHANNELS (SPRINT 045)
-// =============================================================================
-
-export enum ThermodynamicChannel {
-  WATER_MASS_KG = 0,
-  SOIL_ORGANIC_CARBON_KG = 1,
-  VEGETATION_BIOMASS_KG = 2,
-  ATMOSPHERIC_CO2_KG = 3,
-  MINERAL_NITROGEN_KG = 4,
-  ALBEDO = 5,
-  TEMPERATURE_KELVIN = 6,
-  SENSIBLE_HEAT_JOULES = 7,
-  CHANNEL_COUNT = 8,
+export interface IH3BoundaryContactAreaOptions {
+  applyRadialExpansion?: boolean;
 }
 
-export const THERMODYNAMIC_CONSTANTS = {
-  MIN_TEMPERATURE_KELVIN: 2.7315,
-  DEFAULT_REGOLITH_MASS_KG: 50.0,
-  SPECIFIC_HEAT: {
-    REGOLITH: 840.0,
-    WATER: 4184.0,
-    SOIL_ORGANIC_CARBON: 1800.0,
-    VEGETATION_BIOMASS: 1900.0,
-    ATMOSPHERIC_CO2: 846.0,
-    MINERAL_NITROGEN: 1200.0,
-  },
-  SPECIFIC_ENTHALPY: {
-    WATER: -15.87e6,
-    SOIL_ORGANIC_CARBON: -32.79e6,
-    VEGETATION_BIOMASS: -17.50e6,
-    ATMOSPHERIC_CO2: -8.94e6,
-    MINERAL_NITROGEN: -2.85e6,
-  },
-} as const;
-
-export interface CellThermodynamicOverride {
-  waterMassKg?: number;
-  soilOrganicCarbonKg?: number;
-  vegetationBiomassKg?: number;
-  atmosphericCo2Kg?: number;
-  mineralNitrogenKg?: number;
-  albedo?: number;
-  temperatureKelvin?: number;
-  sensibleHeatJoules?: number;
+export interface H3ApertureDecomposition {
+  readonly index: bigint;
+  readonly indexHex: string;
+  readonly resolution: number;
+  readonly baseCell: number;
+  readonly mode: number;
+  readonly activeDigits: readonly H3DirectionDigit[];
+  readonly allDigits: readonly H3DirectionDigit[];
+  readonly isValid: boolean;
 }
 
-export interface CellThermodynamicDeltaRecord {
-  h3Index: string;
-  cellIndex: number;
-  massDeltaKg: number;
-  energyDeltaJoules: number;
-  thermalEnergyDeltaJoules: number;
-  chemicalEnergyDeltaJoules: number;
-  overriddenFields: (keyof CellThermodynamicOverride)[];
+export interface H3ApertureParseOptions {
+  readonly validateMode?: boolean;
+  readonly validateBaseCell?: boolean;
+  readonly validatePaddingDigits?: boolean;
+  readonly validateActiveDigits?: boolean;
 }
 
-export interface ThermodynamicOverrideReport {
-  timestamp: number;
-  cellCountModified: number;
-  netMassDeltaKg: number;
-  netEnergyDeltaJoules: number;
-  netThermalEnergyDeltaJoules: number;
-  netChemicalEnergyDeltaJoules: number;
-  cellReports: CellThermodynamicDeltaRecord[];
-}
-
-export type H3ThermodynamicOverridesMap =
-  | Map<string, CellThermodynamicOverride>
-  | Record<string, CellThermodynamicOverride>;
-
-export interface OverrideOptions {
-  strictThermodynamicBounds?: boolean;
-  minTemperatureKelvin?: number;
-  recomputeSensibleHeat?: boolean;
-  regolithMassKg?: number;
-  includeChemicalEnthalpy?: boolean;
-  allowMassDestruction?: boolean;
-}
-
-// =============================================================================
-// DIRECTION BITMASK & CONSERVATIVE FLUX OPERATOR (SPRINT 084)
-// =============================================================================
-
-export type DirectionBitmask = number;
-export type H3DirectionIndex = 0 | 1 | 2 | 3 | 4 | 5;
-
-export const H3DirectionBitmask = {
-  DIRECTION_0: 1 << 0, // 1
-  DIRECTION_1: 1 << 1, // 2
-  DIRECTION_2: 1 << 2, // 4
-  DIRECTION_3: 1 << 3, // 8
-  DIRECTION_4: 1 << 4, // 16
-  DIRECTION_5: 1 << 5, // 32
-
-  NONE: 0,
-  ALL: (1 << 6) - 1, // 63
-
-  BY_INDEX: [
-    1 << 0,
-    1 << 1,
-    1 << 2,
-    1 << 3,
-    1 << 4,
-    1 << 5,
-  ] as const,
-
-  hasDirection(mask: DirectionBitmask, direction: H3DirectionIndex): boolean {
-    return (mask & (1 << direction)) !== 0;
-  },
-
-  setDirection(mask: DirectionBitmask, direction: H3DirectionIndex): DirectionBitmask {
-    return mask | (1 << direction);
-  },
-
-  clearDirection(mask: DirectionBitmask, direction: H3DirectionIndex): DirectionBitmask {
-    return mask & ~(1 << direction);
-  },
-
-  oppositeDirection(direction: H3DirectionIndex): H3DirectionIndex {
-    return ((direction + 3) % 6) as H3DirectionIndex;
-  },
-
-  invertMask(mask: DirectionBitmask): DirectionBitmask {
-    let inverted = 0;
-    for (let d = 0; d < 6; d++) {
-      if ((mask & (1 << d)) !== 0) {
-        inverted |= (1 << ((d + 3) % 6));
-      }
-    }
-    return inverted;
-  },
-} as const;
-
-export interface CellStockTensor {
-  readonly waterKg: number;
+export interface BiophysicalStockVector {
   readonly carbonKg: number;
-  readonly mineralsKg: number;
+  readonly nitrogenKg: number;
+  readonly phosphorusKg: number;
+  readonly waterKg: number;
   readonly oxygenKg: number;
-  readonly internalEnergyJoules: number;
-  readonly volumeM3: number;
-  readonly temperatureKelvin: number;
+  readonly mineralKg: number;
+  readonly thermalJoules: number;
 }
 
-export interface DirectionalGeometry {
-  readonly edgeLengthM: number;
-  readonly layerHeightM: number;
-  readonly centroidDistanceM: number;
+export interface FluxTransferRecord {
+  readonly sourceIndex: bigint;
+  readonly targetIndex: bigint;
+  readonly transferredStocks: BiophysicalStockVector;
+  readonly apertureDigitUsed: number;
+  readonly entropyProducedJoulesPerKelvin: number;
 }
 
-export interface FacetDeltas {
-  dWaterKg: number;
-  dCarbonKg: number;
-  dMineralsKg: number;
-  dOxygenKg: number;
-  dEnergyJoules: number;
+export interface ChildPartitionStock {
+  readonly childDigit: H3DirectionDigit;
+  readonly childStocks: BiophysicalStockVector;
 }
 
-export class DirectionalFluxOperator {
-  public static isChannelPermeable(
-    sourceMask: number,
-    targetMask: number,
-    direction: H3DirectionIndex
-  ): boolean {
-    const forwardOpen = (sourceMask & (1 << direction)) !== 0;
-    const oppositeDir = H3DirectionBitmask.oppositeDirection(direction);
-    const backwardOpen = (targetMask & (1 << oppositeDir)) !== 0;
-    return forwardOpen && backwardOpen;
+export class InvalidH3IndexError extends Error {
+  constructor(message: string) {
+    super(`[H3IndexError] ${message}`);
+    this.name = 'InvalidH3IndexError';
   }
+}
 
-  public static computeEdgeTransfer(
-    stateI: CellStockTensor,
-    stateJ: CellStockTensor,
-    sourceMask: number,
-    targetMask: number,
-    direction: H3DirectionIndex,
-    normalVelocityMps: number,
-    diffusionCoeffM2ps: number,
-    thermalConductivityWpmK: number,
-    geometry: DirectionalGeometry,
-    dtSeconds: number
-  ): FacetDeltas {
-    if (!this.isChannelPermeable(sourceMask, targetMask, direction)) {
-      return {
-        dWaterKg: 0,
-        dCarbonKg: 0,
-        dMineralsKg: 0,
-        dOxygenKg: 0,
-        dEnergyJoules: 0,
-      };
-    }
+export class InvalidH3ModeError extends InvalidH3IndexError {
+  constructor(mode: number) {
+    super(`Invalid H3 cell mode: expected mode 1 (H3_CELL_MODE), encountered ${mode}`);
+    this.name = 'InvalidH3ModeError';
+  }
+}
 
-    const facetArea = geometry.edgeLengthM * geometry.layerHeightM;
-    const invDx = 1.0 / geometry.centroidDistanceM;
+export class InvalidH3BaseCellError extends InvalidH3IndexError {
+  constructor(baseCell: number) {
+    super(`Invalid H3 base cell: expected 0 <= baseCell <= 121, encountered ${baseCell}`);
+    this.name = 'InvalidH3BaseCellError';
+  }
+}
 
-    const isForward = normalVelocityMps >= 0;
-    const cW = isForward ? stateI.waterKg / stateI.volumeM3 : stateJ.waterKg / stateJ.volumeM3;
-    const cC = isForward ? stateI.carbonKg / stateI.volumeM3 : stateJ.carbonKg / stateJ.volumeM3;
-    const cM = isForward ? stateI.mineralsKg / stateI.volumeM3 : stateJ.mineralsKg / stateJ.volumeM3;
-    const cO = isForward ? stateI.oxygenKg / stateI.volumeM3 : stateJ.oxygenKg / stateJ.volumeM3;
-    const cU = isForward ? stateI.internalEnergyJoules / stateI.volumeM3 : stateJ.internalEnergyJoules / stateJ.volumeM3;
+export class InvalidH3ResolutionError extends InvalidH3IndexError {
+  constructor(res: number) {
+    super(`Invalid H3 resolution: expected 0 <= resolution <= 15, encountered ${res}`);
+    this.name = 'InvalidH3ResolutionError';
+  }
+}
 
-    const advVolRate = normalVelocityMps * facetArea;
-    const advW = advVolRate * cW;
-    const advC = advVolRate * cC;
-    const advM = advVolRate * cM;
-    const advO = advVolRate * cO;
-    const advU = advVolRate * cU;
+export class InvalidH3PaddingError extends InvalidH3IndexError {
+  constructor(resolution: number, digitPosition: number, digitValue: number) {
+    super(
+      `Corrupt H3 padding digit at resolution position ${digitPosition} for cell of resolution ${resolution}: expected 7 (0b111), encountered ${digitValue}`
+    );
+    this.name = 'InvalidH3PaddingError';
+  }
+}
 
-    const diffW = -diffusionCoeffM2ps * facetArea * ((stateJ.waterKg / stateJ.volumeM3) - (stateI.waterKg / stateI.volumeM3)) * invDx;
-    const diffC = -diffusionCoeffM2ps * facetArea * ((stateJ.carbonKg / stateJ.volumeM3) - (stateI.carbonKg / stateI.volumeM3)) * invDx;
-    const diffM = -diffusionCoeffM2ps * facetArea * ((stateJ.mineralsKg / stateJ.volumeM3) - (stateI.mineralsKg / stateI.volumeM3)) * invDx;
-    const diffO = -diffusionCoeffM2ps * facetArea * ((stateJ.oxygenKg / stateJ.volumeM3) - (stateI.oxygenKg / stateI.volumeM3)) * invDx;
-    const condU = -thermalConductivityWpmK * facetArea * (stateJ.temperatureKelvin - stateI.temperatureKelvin) * invDx;
-
-    return {
-      dWaterKg: (advW + diffW) * dtSeconds,
-      dCarbonKg: (advC + diffC) * dtSeconds,
-      dMineralsKg: (advM + diffM) * dtSeconds,
-      dOxygenKg: (advO + diffO) * dtSeconds,
-      dEnergyJoules: (advU + condU) * dtSeconds,
-    };
+export class InvalidH3ActiveDigitError extends InvalidH3IndexError {
+  constructor(digitPosition: number, digitValue: number) {
+    super(
+      `Corrupt active H3 aperture digit at resolution position ${digitPosition}: expected in range [0, 6], encountered ${digitValue}`
+    );
+    this.name = 'InvalidH3ActiveDigitError';
   }
 }

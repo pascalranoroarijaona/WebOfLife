@@ -1,0 +1,214 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam roundcorner 4
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Web of Life - Spatial Aperture Digit Extraction & Thermodynamic Flux Architecture (Sprint 085)
+
+package "Spatial DGGS Hierarchy (src/spatial)" {
+
+    enum H3DirectionDigit <<enumeration>> {
+        CENTER : 0
+        AXIS_K : 1
+        AXIS_J : 2
+        AXIS_JK : 3
+        AXIS_I : 4
+        AXIS_IK : 5
+        AXIS_IJ : 6
+        INVALID_TERMINAL : 7
+    }
+
+    interface H3ApertureDecomposition {
+        +index: bigint
+        +indexHex: string
+        +resolution: number
+        +baseCell: number
+        +activeDigits: readonly H3DirectionDigit[]
+        +allDigits: readonly H3DirectionDigit[]
+        +isValid: boolean
+    }
+
+    interface H3ApertureParseOptions {
+        +validateMode: boolean
+        +validateBaseCell: boolean
+        +validatePaddingDigits: boolean
+    }
+
+    class H3SpatialIndexCodec {
+        +H3_MODE_MASK: bigint
+        +H3_RES_MASK: bigint
+        +H3_BASE_CELL_MASK: bigint
+        +H3_DIGIT_MASK: bigint
+        +parseBigInt(input: bigint | string): bigint
+        +extractResolution(index: bigint): number
+        +extractBaseCell(index: bigint): number
+        +extractMode(index: bigint): number
+    }
+
+    class H3AdjacencyCoordinator {
+        +extractH3IndexApertureDigits(index: bigint | string, options?: H3ApertureParseOptions): H3ApertureDecomposition
+        +getAdjacentNeighbors(index: bigint): bigint[]
+        +computeDirectionalVector(digits: H3DirectionDigit[]): Vector3D
+        +validateHierarchyContinuity(parent: bigint, child: bigint): boolean
+    }
+
+    class SpatialFluxMonad<TStock> {
+        -cellIndex: bigint
+        -decomposition: H3ApertureDecomposition
+        -currentStock: TStock
+        -temperatureK: number
+        +routeAdvectiveFlux(targetDigit: H3DirectionDigit, deltaM: TStock): SpatialFluxMonad<TStock>
+        +conserveMassAcrossApertures(children: SpatialFluxMonad<TStock>[]): boolean
+        +calculateEntropyGeneration(destTempK: number, heatTransferJ: number): number
+    }
+
+    H3SpatialIndexCodec <|-- H3AdjacencyCoordinator
+    H3AdjacencyCoordinator ..> H3ApertureDecomposition : creates
+    H3AdjacencyCoordinator ..> H3ApertureParseOptions : uses
+    H3ApertureDecomposition o-- H3DirectionDigit
+    SpatialFluxMonad *-- H3ApertureDecomposition
+    SpatialFluxMonad --> H3AdjacencyCoordinator : relies on
+}
+
+package "Thermodynamic State & Stocks (Domain Models)" {
+
+    class BiophysicalStockVector {
+        +carbonKg: number
+        +nitrogenKg: number
+        +phosphorusKg: number
+        +waterKg: number
+        +internalEnergyJ: number
+        +entropyJPerK: number
+        +add(other: BiophysicalStockVector): BiophysicalStockVector
+        +subtract(other: BiophysicalStockVector): BiophysicalStockVector
+        +assertNonNegative(): void
+    }
+
+    class FirstLawConservationAudit {
+        +parentIndex: bigint
+        +childIndices: bigint[7]
+        +parentStock: BiophysicalStockVector
+        +childStocks: BiophysicalStockVector[7]
+        +verifyContinuity(): boolean
+    }
+
+    class SecondLawEntropyVerification {
+        +sourceTempK: number
+        +targetTempK: number
+        +heatTransferJ: number
+        +entropyProductionSigma: number
+        +verifyNonNegativeEntropy(): boolean
+    }
+
+    SpatialFluxMonad o-- BiophysicalStockVector
+    FirstLawConservationAudit o-- BiophysicalStockVector
+    SecondLawEntropyVerification <.. SpatialFluxMonad : validates
+}
+
+package "Database Relational Persistence (db/schema.sql)" {
+
+    entity h3_cell_registry <<table (PostgreSQL)>> {
+        * h3_index : BIGINT <<PK>>
+        --
+        * index_hex : VARCHAR(16) <<UNIQUE>>
+        * mode : SMALLINT (1)
+        * resolution : SMALLINT (0..15)
+        * base_cell : SMALLINT (0..121)
+        * active_digits : SMALLINT[]
+        * all_digits : SMALLINT[15]
+        parent_index : BIGINT <<FK>>
+        * is_valid : BOOLEAN
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity spatial_control_volume <<table (PostgreSQL)>> {
+        * volume_id : UUID <<PK>>
+        --
+        * h3_index : BIGINT <<FK>>
+        * resolution : SMALLINT
+        * carbon_stock_kg : NUMERIC(28,10)
+        * nitrogen_stock_kg : NUMERIC(28,10)
+        * phosphorus_stock_kg : NUMERIC(28,10)
+        * water_stock_kg : NUMERIC(28,10)
+        * temperature_k : NUMERIC(10,4)
+        * internal_energy_j : NUMERIC(32,6)
+        * entropy_j_per_k : NUMERIC(32,6)
+        * thermal_exergy_j : NUMERIC(32,6)
+        * state_merkle_root : BYTEA
+        * valid_from : TIMESTAMPTZ
+        valid_to : TIMESTAMPTZ
+    }
+
+    entity spatial_hierarchical_partition <<table (PostgreSQL)>> {
+        * partition_id : UUID <<PK>>
+        --
+        * parent_h3_index : BIGINT <<FK>>
+        * parent_resolution : SMALLINT
+        * child_resolution : SMALLINT
+        * total_child_carbon_kg : NUMERIC(28,10)
+        * parent_carbon_kg : NUMERIC(28,10)
+        * mass_conservation_delta_kg : NUMERIC(28,10)
+        * is_conserved : BOOLEAN
+        * verified_at : TIMESTAMPTZ
+    }
+
+    entity spatial_convective_flux_ledger <<table (PostgreSQL)>> {
+        * flux_id : UUID <<PK>>
+        --
+        * source_h3_index : BIGINT <<FK>>
+        * target_h3_index : BIGINT <<FK>>
+        * aperture_digit : SMALLINT (0..6)
+        * flux_epoch_nanos : BIGINT
+        * delta_carbon_kg : NUMERIC(24,8)
+        * delta_nitrogen_kg : NUMERIC(24,8)
+        * delta_phosphorus_kg : NUMERIC(24,8)
+        * delta_water_kg : NUMERIC(24,8)
+        * heat_transfer_j : NUMERIC(28,6)
+        * source_temp_k : NUMERIC(10,4)
+        * target_temp_k : NUMERIC(10,4)
+        * entropy_generation_sigma : NUMERIC(28,8)
+        * signature : BYTEA
+        * recorded_at : TIMESTAMPTZ
+    }
+
+    entity spatial_flux_block <<table (PostgreSQL)>> {
+        * block_height : BIGINT <<PK>>
+        --
+        * block_hash : BYTEA <<UNIQUE>>
+        * parent_block_hash : BYTEA
+        * merkle_state_root : BYTEA
+        * merkle_flux_root : BYTEA
+        * total_carbon_flux_kg : NUMERIC(32,10)
+        * total_entropy_generated_j_per_k : NUMERIC(32,10)
+        * block_timestamp : TIMESTAMPTZ
+        * proposer_public_key : BYTEA
+        * aggregate_signature : BYTEA
+    }
+
+    entity block_flux_transactions <<table (PostgreSQL)>> {
+        * block_height : BIGINT <<PK, FK>>
+        * tx_index : INTEGER <<PK>>
+        --
+        * flux_id : UUID <<FK>>
+    }
+
+    h3_cell_registry ||--o{ h3_cell_registry : "parent_index"
+    h3_cell_registry ||--o{ spatial_control_volume : "h3_index"
+    h3_cell_registry ||--o{ spatial_hierarchical_partition : "parent_h3_index"
+    h3_cell_registry ||--o{ spatial_convective_flux_ledger : "source_h3_index"
+    h3_cell_registry ||--o{ spatial_convective_flux_ledger : "target_h3_index"
+    spatial_flux_block ||--o{ block_flux_transactions : "block_height"
+    spatial_convective_flux_ledger ||--o{ block_flux_transactions : "flux_id"
+}
+
+' Mapping relations between domain monads and DB tables
+H3ApertureDecomposition ..> h3_cell_registry : maps to
+SpatialFluxMonad ..> spatial_control_volume : persists in
+FirstLawConservationAudit ..> spatial_hierarchical_partition : validates into
+SecondLawEntropyVerification ..> spatial_convective_flux_ledger : records into
+
+@enduml

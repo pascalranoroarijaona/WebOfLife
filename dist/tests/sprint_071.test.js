@@ -20,15 +20,16 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
         const hexA = createHexagon2D(0, 0, 1.0);
         // Perturb order or match identical vertices
         const hexB = [
-            { ...hexA[3] },
-            { ...hexA[4] },
-            { ...hexA[5] },
-            { ...hexA[0] },
-            { ...hexA[1] },
-            { ...hexA[2] },
+            { ...(hexA[3] ?? {}) },
+            { ...(hexA[4] ?? {}) },
+            { ...(hexA[5] ?? {}) },
+            { ...(hexA[0] ?? {}) },
+            { ...(hexA[1] ?? {}) },
+            { ...(hexA[2] ?? {}) },
         ];
         const pairs = findSharedBoundaryVertexPairs3D(hexA, hexB, 1e-6);
         assert.strictEqual(pairs.length, 2, 'Should clamp to at most 2 coincident pairs for a shared edge');
+        assert.ok(pairs[0] && pairs[1]);
         assert.strictEqual(pairs[0].distance, 0.0);
         assert.strictEqual(pairs[1].distance, 0.0);
         assert.strictEqual(pairs[0].vertexA.x, pairs[0].vertexB.x);
@@ -49,10 +50,12 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
             { x: -0.05, y: 0.15, z: Math.sqrt(1 - 0.05 * 0.05 - 0.15 * 0.15) },
             { x: -0.08, y: 0.05, z: Math.sqrt(1 - 0.08 * 0.08 - 0.05 * 0.05) },
         ];
+        const s1 = sphereHexA[1];
+        const s2 = sphereHexA[2];
         // Spherical Hex B shares vertices 1 and 2 of Hex A
         const sphereHexB = [
-            { x: sphereHexA[1].x + 1e-8, y: sphereHexA[1].y, z: sphereHexA[1].z },
-            { x: sphereHexA[2].x, y: sphereHexA[2].y - 1e-8, z: sphereHexA[2].z },
+            { x: (s1.x ?? 0) + 1e-8, y: s1.y, z: s1.z },
+            { x: s2.x, y: (s2.y ?? 0) - 1e-8, z: s2.z },
             { x: 0.25, y: 0.15, z: Math.sqrt(1 - 0.25 * 0.25 - 0.15 * 0.15) },
             { x: 0.3, y: 0.05, z: Math.sqrt(1 - 0.3 * 0.3 - 0.05 * 0.05) },
             { x: 0.25, y: -0.05, z: Math.sqrt(1 - 0.25 * 0.25 - 0.05 * 0.05) },
@@ -60,6 +63,7 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
         ];
         const pairsSphere = findSharedBoundaryVertexPairs3D(sphereHexA, sphereHexB, 1e-4);
         assert.strictEqual(pairsSphere.length, 2, 'Spherical adjacent cells must share exactly 2 coincident vertices');
+        assert.ok(pairsSphere[0] && pairsSphere[1]);
         assert.ok(pairsSphere[0].distance < 1e-6);
         assert.ok(pairsSphere[1].distance < 1e-6);
     });

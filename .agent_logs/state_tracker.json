@@ -1,5 +1,5 @@
 {
-  "current_sprint": 85,
+  "current_sprint": 86,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -420,6 +420,11 @@
       "sprint": 84,
       "goal": "Define H3DirectionBitmask constant map and DirectionBitmask type in src/spatial/h3_types.ts.",
       "timestamp": "2026-09-15T08:49:55.047777+00:00"
+    },
+    {
+      "sprint": 85,
+      "goal": "Implement extractH3IndexApertureDigits parsing resolution directional digits from 64-bit H3 index in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-15T09:17:25.966538+00:00"
     }
   ]
 }

@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 42%
-SPRINT_GOAL: Define H3DirectionBitmask constant map and DirectionBitmask type in src/spatial/h3_types.ts.
+Roadmap Completion: 43%
+SPRINT_GOAL: Implement extractH3IndexApertureDigits parsing resolution directional digits from 64-bit H3 index in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -64,8 +64,9 @@ SPRINT_GOAL: Define H3DirectionBitmask constant map and DirectionBitmask type in
 - [x] Implement `assertPentagonalNeighborStringElements` validating every element of pentagonal neighbor array is a non-empty string in `src/spatial/h3_adjacency.ts`
 - [x] Implement `validatePentagonalNeighborCount` checking neighbor array length equals 5 and throwing `PentagonalCoordinationViolationError` in `src/spatial/h3_adjacency.ts`
 - [x] Define `PentagonDirectionalTopology` interface with `presentDirections` and `omittedDirection` in `src/spatial/h3_types.ts`
-- [ ] Define H3DirectionBitmask constant map and DirectionBitmask type in `src/spatial/h3_types.ts`
-- [ ] Implement `extractPentagonApertureDigits` parsing non-zero directional digits from 64-bit H3 index in `src/spatial/h3_adjacency.ts`
+- [x] Define H3DirectionBitmask constant map and DirectionBitmask type in `src/spatial/h3_types.ts`
+- [ ] Implement `extractH3IndexApertureDigits` parsing resolution directional digits from 64-bit H3 index in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `extractPentagonApertureDigits` parsing non-zero directional digits for pentagonal cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
