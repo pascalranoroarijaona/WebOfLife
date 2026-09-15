@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 40%
-SPRINT_GOAL: Implement isExpectedNeighborCountForCell validating neighbor string array length using isExpectedNeighborCount in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 41%
+SPRINT_GOAL: Implement assertValidNeighborCountForCell taking cellId and neighbors array, asserting array type and calling isExpectedNeighborCountForCell in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -262,8 +262,9 @@ SPRINT_GOAL: Implement isExpectedNeighborCountForCell validating neighbor string
 - [x] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
 - [x] Define `PentagonalCoordinationViolationError` class with cellIndex, expectedCount, and actualCount in `src/spatial/h3_adjacency.ts`
 - [x] Implement `isExpectedNeighborCount` comparing a numeric candidate count against getCoordinationNumber in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `isExpectedNeighborCountForCell` validating neighbor string array length using isExpectedNeighborCount in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertValidNeighborCountForCell` throwing PentagonalCoordinationViolationError on coordination mismatch in `src/spatial/h3_adjacency.ts`
+- [x] Implement `isExpectedNeighborCountForCell` validating neighbor string array length using isExpectedNeighborCount in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `assertValidNeighborCountForCell` taking cellId and neighbors array, asserting array type and calling isExpectedNeighborCountForCell in `src/spatial/h3_adjacency.ts`
+- [ ] Implement coordination error dispatch in `assertValidNeighborCountForCell` throwing `PentagonalCoordinationViolationError` when neighbor check fails in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalNeighborCount` verifying neighbor collection length matches coordination number in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`

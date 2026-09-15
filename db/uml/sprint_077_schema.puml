@@ -1,0 +1,152 @@
+```Code snippet
+@startuml sprint_077_schema
+!theme vibrant
+title Web of Life - Spatial Adjacency Assertion & Thermodynamic Flux Schema (Sprint 077)
+
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam shadowing true
+
+package "Spatial DGGS Adjacency Domain (src/spatial)" {
+
+    class H3Adjacency <<module>> {
+        +isPentagonCell(cellId: string): boolean
+        +isExpectedNeighborCountForCell(cellId: string, count: number): boolean
+        +assertValidNeighborCountForCell(cellId: string, neighbors: unknown): void
+    }
+
+    note right of H3Adjacency::assertValidNeighborCountForCell
+      <b>Runtime Assertion Contract:</b>
+      1. Assert Array.isArray(neighbors) -> throws TypeError
+      2. count = neighbors.length
+      3. Assert isExpectedNeighborCountForCell(cellId, count)
+         -> 5 for 12 spherical pentagons
+         -> 6 for regular hexagons
+         -> throws RangeError on invariant breach
+      4. Narrows neighbors to readonly unknown[]
+    end note
+
+    class H3Grid <<entity>> {
+        -resolution: number
+        +getCell(cellId: string): DggsCell
+        +getDirectNeighbors(cellId: string): string[]
+        +validateTopology(cellId: string): boolean
+    }
+
+    class SpatialFluxMonad<T> <<monad>> {
+        -cellId: string
+        -stocks: ThermodynamicStock
+        -neighbors: readonly string[]
+        -fluxVector: Map<string, number>
+        +bind<R>(fn: (state: ThermodynamicStock) => SpatialFluxMonad<R>): SpatialFluxMonad<R>
+        +assertNeighborhoodIntegrity(): void
+        +computeBoundaryDivergence(): number
+        +runFluxStep(deltaT: number): SpatialFluxMonad<T>
+    }
+}
+
+package "Relational & Time-Series Database (db/schema.sql)" {
+
+    class dggs_cells <<TABLE>> {
+        +cell_id: VARCHAR(15) [PK]
+        --
+        +resolution: SMALLINT
+        +is_pentagon: BOOLEAN
+        +expected_neighbor_count: SMALLINT [STORED]
+        +centroid_lat: DOUBLE PRECISION
+        +centroid_lng: DOUBLE PRECISION
+        +created_at: TIMESTAMPTZ
+        +updated_at: TIMESTAMPTZ
+    }
+
+    class cell_neighborhoods <<TABLE>> {
+        +cell_id: VARCHAR(15) [PK, FK]
+        +neighbor_cell_id: VARCHAR(15) [PK, FK]
+        --
+        +edge_index: SMALLINT
+        +boundary_length_meters: DOUBLE PRECISION
+        +is_active: BOOLEAN
+        +created_at: TIMESTAMPTZ
+    }
+
+    class cell_neighborhood_validations <<TABLE>> {
+        +validation_id: UUID [PK]
+        --
+        +cell_id: VARCHAR(15) [FK]
+        +raw_payload_type: VARCHAR(64)
+        +is_array: BOOLEAN
+        +observed_count: INTEGER
+        +expected_count: SMALLINT
+        +is_valid: BOOLEAN
+        +error_message: TEXT
+        +caller_monad: VARCHAR(128)
+        +block_hash: BYTEA
+        +validated_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_cell_stocks <<TABLE>> {
+        +stock_id: UUID [PK]
+        --
+        +cell_id: VARCHAR(15) [FK]
+        +epoch_timestamp: TIMESTAMPTZ
+        +internal_energy_joules: NUMERIC(38,10)
+        +biomass_carbon_kg: NUMERIC(38,10)
+        +trophic_matter_kg: NUMERIC(38,10)
+        +entropy_joules_per_kelvin: NUMERIC(38,10)
+        +state_merkle_root: BYTEA
+        +block_height: BIGINT
+    }
+
+    class spatial_flux_transactions <<TABLE>> {
+        +transaction_id: UUID [PK]
+        --
+        +source_cell_id: VARCHAR(15) [FK]
+        +target_cell_id: VARCHAR(15) [FK]
+        +validation_id: UUID [FK]
+        +energy_flux_joules: NUMERIC(38,10)
+        +matter_flux_kg: NUMERIC(38,10)
+        +entropy_generation_jk: NUMERIC(38,10)
+        +boundary_divergence: NUMERIC(38,10)
+        +tx_signature: BYTEA
+        +block_height: BIGINT
+        +timestamp: TIMESTAMPTZ
+    }
+
+    class spatial_flux_blocks <<TABLE>> {
+        +block_height: BIGINT [PK]
+        --
+        +previous_block_hash: BYTEA
+        +merkle_root: BYTEA
+        +flux_count: INTEGER
+        +net_boundary_divergence: NUMERIC(38,10)
+        +is_conservation_preserved: BOOLEAN [STORED]
+        +validator_node_id: VARCHAR(64)
+        +validator_signature: BYTEA
+        +minted_at: TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invariant Dependencies
+H3Grid ..> H3Adjacency : delegates neighborhood cardinality check
+SpatialFluxMonad ..> H3Adjacency : calls assertValidNeighborCountForCell before flux assembly
+SpatialFluxMonad ..> spatial_flux_transactions : records audited fluxes
+H3Adjacency ..> cell_neighborhood_validations : records assertion audit
+
+dggs_cells "1" *-- "5..6" cell_neighborhoods : "contains direct neighbors"
+dggs_cells "1" *-- "0..*" cell_neighborhood_validations : "validated by"
+dggs_cells "1" *-- "0..*" thermodynamic_cell_stocks : "tracks state"
+
+cell_neighborhoods "1" *-- "0..*" spatial_flux_transactions : "conducts flux across"
+cell_neighborhood_validations "1" *-- "0..*" spatial_flux_transactions : "attests topological validity"
+
+spatial_flux_blocks "1" *-- "0..*" spatial_flux_transactions : "aggregates & closes boundary integral"
+
+note bottom of spatial_flux_blocks
+  <b>Thermodynamic Invariant:</b>
+  Net Boundary Divergence:
+  $$\oint_{\partial \Omega} \vec{J} \cdot d\vec{A} = 0$$
+  Enforces First Law of Thermodynamics across cell surfaces.
+end note
+
+@enduml

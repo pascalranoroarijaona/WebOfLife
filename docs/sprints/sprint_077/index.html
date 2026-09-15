@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 072: Centroid-Relative Ordering and Outward-Normal Orientation (orderSharedBoundaryEndpointsByCentroid)</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+
+  /* Sprint 070 additions */
+  --accent-s70: #38ef7d;
+  --vector-u: #00e1ff;
+  --vector-w: #ffaa00;
+  --arc-color: #ff007f;
+  --match-glow: #00ff66;
+  --diverge-glow: #ff3366;
+
+  /* Sprint 071 additions */
+  --accent-s71: #00f3ff;
+  --pair-match: #ffe600;
+  --edge-highlight: #ff007f;
+  --flux-particle: #00ffcc;
+  --cell-a: #00e1ff;
+  --cell-b: #ffaa00;
+
+  /* Sprint 072 additions */
+  --accent-s72: #ff0055;
+  --v-start: #00ff66;
+  --v-end: #bf5af2;
+  --normal-out: #ff9f0a;
+  --centroid-a: #00f0ff;
+  --centroid-b: #ffaa00;
+  --tangent: #30d158;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.accent-active {
+  background: #0d4526;
+  border-color: var(--accent-s70);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 239, 125, 0.4);
+}
+
+button.s71-active {
+  background: #004d5a;
+  border-color: var(--accent-s71);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 243, 255, 0.45);
+}
+
+button.s72-active {
+  background: #4a1525;
+  border-color: var(--accent-s72);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 0, 85, 0.5);
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(660px, calc(100vw - 36px));
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.02rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.76rem;
+  margin-bottom: 8px;
+  font-weight: normal;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  border: 1px solid #00e1ff44;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #64d8ff;
+  font-family: monospace;
+}
+
+#controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#telemetry,
+#sprint-telemetry {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  right: 18px;
+  width: min(390px, calc(100vw - 36px));
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+}
+
+#sprint-telemetry h3 {
+  color: var(--accent-s72);
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid rgba(255, 0, 85, 0.3);
+  padding-bottom: 4px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  color: #ffffff;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.val-green { color: var(--v-start); }
+.val-purple { color: var(--v-end); }
+.val-orange { color: var(--normal-out); }
+.val-blue { color: var(--centroid-a); }
+.val-yellow { color: var(--centroid-b); }
+.val-accent { color: var(--accent-s72); }
+
+#legend {
+  position: fixed;
+  z-index: 10;
+  bottom: 18px;
+  left: 18px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 8px;
+  box-shadow: 0 0 25px #000;
+  font-size: 0.70rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  display: inline-block;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 072</h1>
+  <h2>Centroid-Relative Ordering &amp; Outward-Normal Orientation</h2>
+  <p>
+    Formulates <span class="code-badge">orderSharedBoundaryEndpointsByCentroid(v0, v1, cA, cB)</span>.
+    Standardizes endpoint ordering so the directed tangent vector <span class="highlight">&vec;T = v_end - v_start</span>
+    yields an outward-pointing normal <span class="highlight">&ntilde;<sub>out</sub></span> pointing from Cell A into Cell B
+    such that <span class="code-badge">&ntilde; &middot; (cB - cA) &gt; 0</span> strictly holds.
+  </p>
+  <div id="controls-bar">
+    <button id="btnCyclePair" class="s72-active">Cycle Cell Pair (A &harr; B)</button>
+    <button id="btnFlipOrientation">Swap Perspective (A &harr; B)</button>
+    <button id="btnToggleNormal" class="s72-active">Toggle Normal (&ntilde;)</button>
+    <button id="btnToggleTangent" class="active">Toggle Tangent (&vec;T)</button>
+    <button id="btnToggleCentroidVec" class="active">Toggle &vec;D<sub>AB</sub></button>
+    <button id="btnResetView">Reset View</button>
+  </div>
+</div>
+
+<div id="sprint-telemetry">
+  <h3>SPRINT 072 &bull; ORIENTATION MONAD</h3>
+  <div class="metric-row">
+    <span class="metric-label">Active Cell A (Source):</span>
+    <span class="metric-val val-blue" id="valCellA">Hex 0</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Active Cell B (Target):</span>
+    <span class="metric-val val-yellow" id="valCellB">Hex 1</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">v_start [Green]:</span>
+    <span class="metric-val val-green" id="valVStart">(0.00, 0.00)</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">v_end [Purple]:</span>
+    <span class="metric-val val-purple" id="valVEnd">(0.00, 0.00)</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Tangent &vec;T (dx, dy):</span>
+    <span class="metric-val" id="valTangent">(0.00, 0.00)</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Outward Normal &ntilde;<sub>out</sub>:</span>
+    <span class="metric-val val-orange" id="valNormal">(0.00, 0.00)</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Centroid Vec &vec;D<sub>AB</sub>:</span>
+    <span class="metric-val" id="valCentroidVec">(0.00, 0.00)</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Dot Product &ntilde; &middot; &vec;D<sub>AB</sub>:</span>
+    <span class="metric-val val-green" id="valDotProduct">+1.0000</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Ordering Invariant:</span>
+    <span class="metric-val val-accent" id="valInvariant">SATISFIED (&gt; 0)</span>
+  </div>
+  <div class="metric-row">
+    <span class="metric-label">Endpoint Flip Count:</span>
+    <span class="metric-val" id="valFlipped">False</span>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="legend-item">
+    <span class="legend-swatch" style="background: var(--centroid-a);"></span>
+    <span>Cell A Centroid (Origin)</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-swatch" style="background: var(--centroid-b);"></span>
+    <span>Cell B Centroid (Target)</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-swatch" style="background: var(--v-start);"></span>
+    <span>v_start (Ordered Origin)</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-swatch" style="background: var(--v-end);"></span>
+    <span>v_end (Ordered Destination)</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-swatch" style="background: var(--normal-out);"></span>
+    <span>Outward Normal &ntilde; (A &rarr; B)</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-swatch" style="background: var(--tangent);"></span>
+    <span>Tangent &vec;T (v_start &rarr; v_end)</span>
+  </div>
+</div>
+
+<script>
+// Pure Vanilla JavaScript implementation - ZERO external network calls.
+(function () {
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  // Pan and zoom state
+  let panX = width / 2;
+  let panY = height / 2;
+  let zoom = 1.0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) {
+      isDragging = true;
+      dragStartX = e.clientX - panX;
+      dragStartY = e.clientY - panY;
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      panX = e.clientX - dragStartX;
+      panY = e.clientY - dragStartY;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    panX = mouseX - (mouseX - panX) * zoomFactor;
+    panY = mouseY - (mouseY - panY) * zoomFactor;
+    zoom *= zoomFactor;
+    zoom = Math.max(0.3, Math.min(zoom, 4.0));
+  }, { passive: false });
+
+  // Toggle settings
+  let showNormal = true;
+  let showTangent = true;
+  let showCentroidVec = true;
+
+  // Hexagon cluster generation (7 cells: 1 center + 6 surrounding rings)
+  const HEX_RADIUS = 95;
+  const cells = [];
+  const cellPositions = [
+    { q: 0, r: 0 },
+    { q: 1, r: -1 },
+    { q: 1, r: 0 },
+    { q: 0, r: 1 },
+    { q: -1, r: 1 },
+    { q: -1, r: -0 },
+    { q: 0, r: -1 }
+  ];
+
+  function hexToPixel(q, r, rad) {
+    const x = rad * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r);
+    const y = rad * ((3 / 2) * r);
+    return { x, y };
+  }
+
+  function getHexVertices(cx, cy, rad) {
+    const verts = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 180) * (60 * i - 30);
+      verts.push({
+        x: cx + rad * Math.cos(angle),
+        y: cy + rad * Math.sin(angle)
+      });
+    }
+    return verts;
+  }
+
+  cellPositions.forEach((pos, idx) => {
+    const p = hexToPixel(pos.q, pos.r, HEX_RADIUS);
+    cells.push({
+      id: idx,
+      q: pos.q,
+      r: pos.r,
+      centroid: p,
+      vertices: getHexVertices(p.x, p.y, HEX_RADIUS)
+    });
+  });
+
+  // Identify adjacent cell pairs sharing an edge
+  const adjacentPairs = [];
+  function distSq(p1, p2) {
+    return (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
+  }
+
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      const sharedVerts = [];
+      for (const v1 of cells[i].vertices) {
+        for (const v2 of cells[j].vertices) {
+          if (distSq(v1, v2) < 4.0) {
+            sharedVerts.push({ x: (v1.x + v2.x) / 2, y: (v1.y + v2.y) / 2 });
+          }
+        }
+      }
+      if (sharedVerts.length >= 2) {
+        adjacentPairs.push({
+          cellA: cells[i],
+          cellB: cells[j],
+          rawP1: sharedVerts[0],
+          rawP2: sharedVerts[1]
+        });
+      }
+    }
+  }
+
+  let activePairIndex = 0;
+  let perspectiveSwapped = false;
+
+  // The core Sprint 072 function: orderSharedBoundaryEndpointsByCentroid
+  function orderSharedBoundaryEndpointsByCentroid(p1, p2, centroidA, centroidB) {
+    const tx = p2.x - p1.x;
+    const ty = p2.y - p1.y;
+    // Right-hand 2D outward normal to tangent (tx, ty) is (ty, -tx)
+    const nx = ty;
+    const ny = -tx;
+
+    // Centroid vector from A to B
+    const dx = centroidB.x - centroidA.x;
+    const dy = centroidB.y - centroidA.y;
+
+    const dot = nx * dx + ny * dy;
+
+    if (dot >= 0) {
+      const len = Math.hypot(nx, ny) || 1;
+      return {
+        vStart: p1,
+        vEnd: p2,
+        tangent: { x: tx, y: ty },
+        normal: { x: nx / len, y: ny / len },
+        centroidVec: { x: dx, y: dy },
+        dotProduct: dot,
+        reversed: false
+      };
+    } else {
+      const len = Math.hypot(-nx, -ny) || 1;
+      return {
+        vStart: p2,
+        vEnd: p1,
+        tangent: { x: -tx, y: -ty },
+        normal: { x: -nx / len, y: -ny / len },
+        centroidVec: { x: dx, y: dy },
+        dotProduct: -dot,
+        reversed: true
+      };
+    }
+  }
+
+  // Flux particle system
+  const particles = [];
+  const PARTICLE_COUNT = 32;
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      progress: Math.random(),
+      lateralOffset: (Math.random() - 0.5) * 0.8,
+      speed: 0.008 + Math.random() * 0.012
+    });
+  }
+
+  // UI Event Handlers
+  const btnCyclePair = document.getElementById('btnCyclePair');
+  const btnFlipOrientation = document.getElementById('btnFlipOrientation');
+  const btnToggleNormal = document.getElementById('btnToggleNormal');
+  const btnToggleTangent = document.getElementById('btnToggleTangent');
+  const btnToggleCentroidVec = document.getElementById('btnToggleCentroidVec');
+  const btnResetView = document.getElementById('btnResetView');
+
+  btnCyclePair.addEventListener('click', () => {
+    activePairIndex = (activePairIndex + 1) % adjacentPairs.length;
+    perspectiveSwapped = false;
+  });
+
+  btnFlipOrientation.addEventListener('click', () => {
+    perspectiveSwapped = !perspectiveSwapped;
+  });
+
+  btnToggleNormal.addEventListener('click', () => {
+    showNormal = !showNormal;
+    btnToggleNormal.classList.toggle('s72-active', showNormal);
+  });
+
+  btnToggleTangent.addEventListener('click', () => {
+    showTangent = !showTangent;
+    btnToggleTangent.classList.toggle('active', showTangent);
+  });
+
+  btnToggleCentroidVec.addEventListener('click', () => {
+    showCentroidVec = !showCentroidVec;
+    btnToggleCentroidVec.classList.toggle('active', showCentroidVec);
+  });
+
+  btnResetView.addEventListener('click', () => {
+    panX = width / 2;
+    panY = height / 2;
+    zoom = 1.0;
+  });
+
+  // Telemetry DOM
+  const valCellA = document.getElementById('valCellA');
+  const valCellB = document.getElementById('valCellB');
+  const valVStart = document.getElementById('valVStart');
+  const valVEnd = document.getElementById('valVEnd');
+  const valTangent = document.getElementById('valTangent');
+  const valNormal = document.getElementById('valNormal');
+  const valCentroidVec = document.getElementById('valCentroidVec');
+  const valDotProduct = document.getElementById('valDotProduct');
+  const valInvariant = document.getElementById('valInvariant');
+  const valFlipped = document.getElementById('valFlipped');
+
+  // Animation Loop
+  function render() {
+    ctx.save();
+    ctx.fillStyle = '#02050a';
+    ctx.fillRect(0, 0, width, height);
+
+    // Apply view transform
+    ctx.translate(panX, panY);
+    ctx.scale(zoom, zoom);
+
+    // Grid backdrop
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.04)';
+    ctx.lineWidth = 1;
+    const gridSpacing = 40;
+    const minX = -panX / zoom - 200;
+    const maxX = (width - panX) / zoom + 200;
+    const minY = -panY / zoom - 200;
+    const maxY = (height - panY) / zoom + 200;
+
+    for (let x = Math.floor(minX / gridSpacing) * gridSpacing; x <= maxX; x += gridSpacing) {
+      ctx.beginPath();
+      ctx.moveTo(x, minY);
+      ctx.lineTo(x, maxY);
+      ctx.stroke();
+    }
+    for (let y = Math.floor(minY / gridSpacing) * gridSpacing; y <= maxY; y += gridSpacing) {
+      ctx.beginPath();
+      ctx.moveTo(minX, y);
+      ctx.lineTo(maxX, y);
+      ctx.stroke();
+    }
+
+    const pair = adjacentPairs[activePairIndex];
+    const sourceCell = perspectiveSwapped ? pair.cellB : pair.cellA;
+    const targetCell = perspectiveSwapped ? pair.cellA : pair.cellB;
+
+    // Compute centroid-relative ordered boundary
+    const ordered = orderSharedBoundaryEndpointsByCentroid(
+      pair.rawP1,
+      pair.rawP2,
+      sourceCell.centroid,
+      targetCell.centroid
+    );
+
+    // Draw non-selected hexagons
+    cells.forEach((c) => {
+      const isA = c.id === sourceCell.id;
+      const isB = c.id === targetCell.id;
+
+      ctx.beginPath();
+      c.vertices.forEach((v, idx) => {
+        if (idx === 0) ctx.moveTo(v.x, v.y);
+        else ctx.lineTo(v.x, v.y);
+      });
+      ctx.closePath();
+
+      if (isA) {
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.16)';
+        ctx.strokeStyle = '#00e1ff';
+        ctx.lineWidth = 2.5;
+      } else if (isB) {
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.16)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 2.5;
+      } else {
+        ctx.fillStyle = 'rgba(10, 25, 40, 0.55)';
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.28)';
+        ctx.lineWidth = 1.2;
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // Centroid markers
+      ctx.beginPath();
+      ctx.arc(c.centroid.x, c.centroid.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = isA ? '#00f0ff' : isB ? '#ffaa00' : 'rgba(200, 245, 242, 0.4)';
+      ctx.fill();
+
+      // Cell label
+      ctx.font = '11px monospace';
+      ctx.fillStyle = isA ? '#00f0ff' : isB ? '#ffaa00' : 'rgba(117, 151, 168, 0.7)';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Hex ${c.id}`, c.centroid.x, c.centroid.y - 10);
+    });
+
+    // Draw Centroid Separation Vector (A -> B)
+    if (showCentroidVec) {
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.moveTo(sourceCell.centroid.x, sourceCell.centroid.y);
+      ctx.lineTo(targetCell.centroid.x, targetCell.centroid.y);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label
+      const midX = (sourceCell.centroid.x + targetCell.centroid.x) / 2;
+      const midY = (sourceCell.centroid.y + targetCell.centroid.y) / 2;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px monospace';
+      ctx.fillText('D_AB', midX + 8, midY - 6);
+    }
+
+    // Draw Shared Boundary Segment
+    ctx.beginPath();
+    ctx.moveTo(ordered.vStart.x, ordered.vStart.y);
+    ctx.lineTo(ordered.vEnd.x, ordered.vEnd.y);
+    ctx.strokeStyle = '#ffe600';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    const edgeMidX = (ordered.vStart.x + ordered.vEnd.x) / 2;
+    const edgeMidY = (ordered.vStart.y + ordered.vEnd.y) / 2;
+
+    // Draw Tangent Vector T along the edge
+    if (showTangent) {
+      const tangentLen = 45;
+      const tNormX = ordered.tangent.x / Math.hypot(ordered.tangent.x, ordered.tangent.y);
+      const tNormY = ordered.tangent.y / Math.hypot(ordered.tangent.x, ordered.tangent.y);
+      const tEndX = edgeMidX + tNormX * tangentLen;
+      const tEndY = edgeMidY + tNormY * tangentLen;
+
+      ctx.beginPath();
+      ctx.moveTo(edgeMidX, edgeMidY);
+      ctx.lineTo(tEndX, tEndY);
+      ctx.strokeStyle = '#30d158';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Arrowhead
+      drawArrowHead(edgeMidX, edgeMidY, tEndX, tEndY, '#30d158', 8);
+
+      ctx.fillStyle = '#30d158';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('T (tangent)', tEndX + tNormX * 12, tEndY + tNormY * 12);
+    }
+
+    // Draw Outward Normal Vector n
+    if (showNormal) {
+      const normalLen = 50;
+      const nEndX = edgeMidX + ordered.normal.x * normalLen;
+      const nEndY = edgeMidY + ordered.normal.y * normalLen;
+
+      ctx.beginPath();
+      ctx.moveTo(edgeMidX, edgeMidY);
+      ctx.lineTo(nEndX, nEndY);
+      ctx.strokeStyle = '#ff9f0a';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Arrowhead
+      drawArrowHead(edgeMidX, edgeMidY, nEndX, nEndY, '#ff9f0a', 10);
+
+      ctx.fillStyle = '#ff9f0a';
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText('n_out (normal)', nEndX + ordered.normal.x * 12, nEndY + ordered.normal.y * 12);
+
+      // Outward flux particles along normal
+      particles.forEach((p) => {
+        p.progress += p.speed;
+        if (p.progress > 1.0) p.progress = 0;
+
+        const pX = edgeMidX + ordered.normal.x * (p.progress * 65) + ordered.tangent.x * (p.lateralOffset * 0.4);
+        const pY = edgeMidY + ordered.normal.y * (p.progress * 65) + ordered.tangent.y * (p.lateralOffset * 0.4);
+
+        ctx.beginPath();
+        ctx.arc(pX, pY, 2.5 * (1.0 - p.progress * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 159, 10, ${1.0 - p.progress})`;
+        ctx.fill();
+      });
+    }
+
+    // Draw Ordered Vertices: v_start (Green), v_end (Purple)
+    drawEndpointMarker(ordered.vStart.x, ordered.vStart.y, '#00ff66', 'v_start');
+    drawEndpointMarker(ordered.vEnd.x, ordered.vEnd.y, '#bf5af2', 'v_end');
+
+    ctx.restore();
+
+    // Update Telemetry Panel
+    valCellA.textContent = `Hex ${sourceCell.id} (q:${sourceCell.q}, r:${sourceCell.r})`;
+    valCellB.textContent = `Hex ${targetCell.id} (q:${targetCell.q}, r:${targetCell.r})`;
+    valVStart.textContent = `(${ordered.vStart.x.toFixed(1)}, ${ordered.vStart.y.toFixed(1)})`;
+    valVEnd.textContent = `(${ordered.vEnd.x.toFixed(1)}, ${ordered.vEnd.y.toFixed(1)})`;
+    valTangent.textContent = `(${ordered.tangent.x.toFixed(1)}, ${ordered.tangent.y.toFixed(1)})`;
+    valNormal.textContent = `(${ordered.normal.x.toFixed(3)}, ${ordered.normal.y.toFixed(3)})`;
+    valCentroidVec.textContent = `(${ordered.centroidVec.x.toFixed(1)}, ${ordered.centroidVec.y.toFixed(1)})`;
+    valDotProduct.textContent = `+${ordered.dotProduct.toFixed(2)}`;
+    valInvariant.textContent = ordered.dotProduct > 0 ? 'CONSERVED (n · D > 0)' : 'VIOLATED';
+    valFlipped.textContent = ordered.reversed ? 'YES (Swap Applied)' : 'NO (Original Order)';
+
+    requestAnimationFrame(render);
+  }
+
+  function drawEndpointMarker(x, y, color, label) {
+    ctx.save();
+    // Halo
+    ctx.beginPath();
+    ctx.arc(x, y, 9, 0, Math.PI * 2);
+    ctx.fillStyle = color.replace(')', ', 0.25)').replace('rgb', 'rgba').replace('#00ff66', 'rgba(0, 255, 102, 0.25)').replace('#bf5af2', 'rgba(191, 90, 242, 0.25)');
+    ctx.fill();
+
+    // Core
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Label badge
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, y - 12);
+    ctx.restore();
+  }
+
+  function drawArrowHead(fromX, fromY, toX, toY, color, size) {
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(
+      toX - size * Math.cos(angle - Math.PI / 6),
+      toY - size * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      toX - size * Math.cos(angle + Math.PI / 6),
+      toY - size * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
