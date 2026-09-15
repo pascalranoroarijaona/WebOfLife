@@ -1,11 +1,8 @@
 // =============================================================================
-// WEB OF LIFE - SPATIAL GEOMETRY & DGGS TOPOLOGY TYPES (SPRINTS 001 - 075)
+// WEB OF LIFE - SPATIAL DGGS & ADJACENCY TYPE DEFINITIONS
+// Retro-Compatible Unified Specifications (Sprints 002 - 079)
 // =============================================================================
 import { THERMODYNAMIC_CONSTANTS as TC } from '../thermodynamics/constants.js';
-export { TC as THERMODYNAMIC_CONSTANTS };
-/**
- * Error hierarchy and codes for spatial validation.
- */
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -22,58 +19,6 @@ export class SpatialGuardClauseException extends Error {
         Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
-export function createH3CellInterfaceMetrics(params) {
-    if (params.originIndex === params.neighborIndex) {
-        throw new Error('Self-interface is invalid');
-    }
-    if (params.sharedEdgeLengthMeters <= 0) {
-        throw new Error('sharedEdgeLengthMeters must be strictly positive');
-    }
-    if (params.centroidDistanceMeters <= 0) {
-        throw new Error('centroidDistanceMeters must be strictly positive');
-    }
-    return {
-        ...params,
-        geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
-    };
-}
-export function createReciprocalInterfaceMetrics(metrics) {
-    return {
-        originIndex: metrics.neighborIndex,
-        neighborIndex: metrics.originIndex,
-        sharedEdgeLengthMeters: metrics.sharedEdgeLengthMeters,
-        centroidDistanceMeters: metrics.centroidDistanceMeters,
-        bearingRadians: (metrics.bearingRadians + Math.PI) % (2 * Math.PI),
-        normalVector: [-metrics.normalVector[0], -metrics.normalVector[1], -metrics.normalVector[2]],
-        atmosphericContactAreaM2: metrics.atmosphericContactAreaM2,
-        subterraneanContactAreaM2: metrics.subterraneanContactAreaM2,
-        topographicSlope: -metrics.topographicSlope,
-        geometricConductance: metrics.geometricConductance,
-    };
-}
-export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
-    const cond = metrics.geometricConductance;
-    const tempDiff = (stateA.temperatureKelvin ?? 293.15) - (stateB.temperatureKelvin ?? 293.15);
-    const eddy = params.eddyDiffusivityHeat ?? 15.0;
-    const deltaEnthalpy = eddy * tempDiff * metrics.atmosphericContactAreaM2 * dt * 0.001;
-    const waterDiff = (stateA.massWaterKg ?? stateA.waterMassKg ?? stateA.waterKg ?? 0) - (stateB.massWaterKg ?? stateB.waterMassKg ?? stateB.waterKg ?? 0);
-    const kPorous = params.kSatPorous ?? 1e-4;
-    const deltaWater = kPorous * waterDiff * metrics.subterraneanContactAreaM2 * dt * 0.001;
-    const carbonDiff = (stateA.massCarbonKg ?? stateA.carbonMassKg ?? stateA.carbonKg ?? 0) - (stateB.massCarbonKg ?? stateB.carbonMassKg ?? stateB.carbonKg ?? 0);
-    const deltaCarbon = 1e-5 * carbonDiff * cond * dt;
-    const mineralDiff = (stateA.massMineralsKg ?? stateA.mineralMassKg ?? stateA.mineralsKg ?? stateA.mineralKg ?? 0) - (stateB.massMineralsKg ?? stateB.mineralMassKg ?? stateB.mineralsKg ?? stateB.mineralKg ?? 0);
-    const deltaMineral = 1e-6 * mineralDiff * cond * dt;
-    const tA = Math.max(1e-3, stateA.temperatureKelvin ?? 293.15);
-    const tB = Math.max(1e-3, stateB.temperatureKelvin ?? 293.15);
-    const entropyProduced = Math.max(0, Math.abs(deltaEnthalpy) * Math.abs(1 / tB - 1 / tA));
-    return {
-        deltaWaterKg: deltaWater,
-        deltaEnthalpyJoules: deltaEnthalpy,
-        deltaCarbonKg: deltaCarbon,
-        deltaMineralKg: deltaMineral,
-        entropyProducedJPerK: entropyProduced,
-    };
-}
 export var ThermodynamicChannel;
 (function (ThermodynamicChannel) {
     ThermodynamicChannel[ThermodynamicChannel["WATER_MASS_KG"] = 0] = "WATER_MASS_KG";
@@ -81,21 +26,78 @@ export var ThermodynamicChannel;
     ThermodynamicChannel[ThermodynamicChannel["VEGETATION_BIOMASS_KG"] = 2] = "VEGETATION_BIOMASS_KG";
     ThermodynamicChannel[ThermodynamicChannel["ATMOSPHERIC_CO2_KG"] = 3] = "ATMOSPHERIC_CO2_KG";
     ThermodynamicChannel[ThermodynamicChannel["MINERAL_NITROGEN_KG"] = 4] = "MINERAL_NITROGEN_KG";
-    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 5] = "ALBEDO";
-    ThermodynamicChannel[ThermodynamicChannel["TEMPERATURE_KELVIN"] = 6] = "TEMPERATURE_KELVIN";
-    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 7] = "SENSIBLE_HEAT_JOULES";
+    ThermodynamicChannel[ThermodynamicChannel["TEMPERATURE_KELVIN"] = 5] = "TEMPERATURE_KELVIN";
+    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 6] = "SENSIBLE_HEAT_JOULES";
+    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 7] = "ALBEDO";
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
+export const THERMODYNAMIC_CONSTANTS = TC;
+export function createH3CellInterfaceMetrics(params) {
+    if (params.originIndex === params.neighborIndex) {
+        throw new Error('Self-interface is invalid');
+    }
+    if (params.sharedEdgeLengthMeters <= 0) {
+        throw new Error('sharedEdgeLengthMeters must be strictly positive');
+    }
+    return {
+        ...params,
+        geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
+    };
+}
+export function createReciprocalInterfaceMetrics(m) {
+    return {
+        originIndex: m.neighborIndex,
+        neighborIndex: m.originIndex,
+        sharedEdgeLengthMeters: m.sharedEdgeLengthMeters,
+        centroidDistanceMeters: m.centroidDistanceMeters,
+        bearingRadians: (m.bearingRadians + Math.PI) % (2 * Math.PI),
+        normalVector: [-m.normalVector[0], -m.normalVector[1], -m.normalVector[2]],
+        atmosphericContactAreaM2: m.atmosphericContactAreaM2,
+        subterraneanContactAreaM2: m.subterraneanContactAreaM2,
+        topographicSlope: -m.topographicSlope,
+        geometricConductance: m.geometricConductance,
+    };
+}
+export function computeInterfaceFlux(stateA, stateB, metrics, dtSeconds, params) {
+    const kHeat = params.eddyDiffusivityHeat ?? 15.0;
+    const tempA = stateA.temperatureKelvin ?? 290;
+    const tempB = stateB.temperatureKelvin ?? 290;
+    const tempGrad = (tempA - tempB) / metrics.centroidDistanceMeters;
+    const heatFluxWatts = kHeat * tempGrad * metrics.atmosphericContactAreaM2;
+    const deltaEnthalpyJoules = heatFluxWatts * dtSeconds;
+    const waterA = stateA.waterMassKg ?? 0;
+    const waterB = stateB.waterMassKg ?? 0;
+    const waterDiff = waterA - waterB;
+    const deltaWaterKg = (waterDiff / metrics.centroidDistanceMeters) * (params.kSatPorous ?? 1e-4) * metrics.subterraneanContactAreaM2 * dtSeconds;
+    const carbonA = stateA.carbonMassKg ?? 0;
+    const carbonB = stateB.carbonMassKg ?? 0;
+    const deltaCarbonKg = ((carbonA - carbonB) / metrics.centroidDistanceMeters) * 1e-5 * metrics.atmosphericContactAreaM2 * dtSeconds;
+    const mineralA = stateA.mineralMassKg ?? 0;
+    const mineralB = stateB.mineralMassKg ?? 0;
+    const deltaMineralKg = ((mineralA - mineralB) / metrics.centroidDistanceMeters) * 1e-5 * metrics.subterraneanContactAreaM2 * dtSeconds;
+    const entropyProduced = Math.max(0, deltaEnthalpyJoules * (1 / Math.min(tempA, tempB) - 1 / Math.max(tempA, tempB)));
+    return {
+        deltaWaterKg: -deltaWaterKg,
+        deltaEnthalpyJoules: -deltaEnthalpyJoules,
+        deltaCarbonKg: -deltaCarbonKg,
+        deltaMineralKg: -deltaMineralKg,
+        entropyProducedJPerK: entropyProduced,
+    };
+}
 export const SPATIAL_CONSTANTS = {
-    HEX_COORDINATION_NUMBER: 6,
-    PENTAGON_COORDINATION_NUMBER: 5,
-    HEX_FACE_LENGTH_FACTOR: 1.000000,
-    PENTAGON_FACE_LENGTH_FACTOR: 1.051462,
-    CELL_AREA_FACTOR_HEX: 1.000000,
-    CELL_AREA_FACTOR_PENTAGON: 0.852398,
-    WATER_DIFFUSIVITY: 1.25e-3,
-    CARBON_DIFFUSION: 2.10e-5,
-    OXYGEN_DIFFUSION: 2.01e-5,
-    MINERAL_DIFFUSION: 1.00e-5,
-    THERMAL_CONDUCTIVITY: 0.58,
+    DEFAULT_ANGULAR_EPSILON: 1e-9,
 };
+export class AdjacencyTopologicalError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'AdjacencyTopologicalError';
+        Object.setPrototypeOf(this, AdjacencyTopologicalError.prototype);
+    }
+}
+export class TopologicalPreconditionError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'TopologicalPreconditionError';
+        Object.setPrototypeOf(this, TopologicalPreconditionError.prototype);
+    }
+}

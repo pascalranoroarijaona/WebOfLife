@@ -1,5 +1,5 @@
 // =============================================================================
-// WEB OF LIFE - SPRINT 075 SPECIFICATION TEST SUITE
+// WEB OF Life - SPRINT 075 SPECIFICATION TEST SUITE
 // Topological Adjacency Verification & Conservative Spatial Flux
 // =============================================================================
 import { describe, it } from 'node:test';
@@ -174,7 +174,7 @@ describe('Sprint 075: Topological Adjacency & isExpectedNeighborCount', () => {
             const reverseMap = new Map();
             reverseMap.set(cellA, stateA);
             for (const other of neighborState.neighbors.slice(1)) {
-                reverseMap.set(other, {
+                reverseMap.set(String(other), {
                     cellIndex: other,
                     stocks: { water: 100, carbon: 50, oxygen: 20, minerals: 10, enthalpy: 200 },
                     neighbors: [
@@ -183,36 +183,44 @@ describe('Sprint 075: Topological Adjacency & isExpectedNeighborCount', () => {
                     ]
                 });
             }
-            const reverseFlux = computeHarmonizedFluxDeltas(neighborState, reverseMap, 1.0).unwrap();
-            const transferBackToA = reverseFlux.find(t => t.targetCell === cellA);
-            assert.ok(transferBackToA !== undefined);
-            // Exact pairwise antisymmetry check: Delta S_{A -> B} + Delta S_{B -> A} === 0
-            const sumWater = firstTarget.deltaWater + transferBackToA.deltaWater;
-            const sumEnthalpy = firstTarget.deltaEnthalpy + transferBackToA.deltaEnthalpy;
-            assert.ok(Math.abs(sumWater) < 1e-12, 'Water flux sum must conserve to 0');
-            assert.ok(Math.abs(sumEnthalpy) < 1e-12, 'Enthalpy flux sum must conserve to 0');
+            const monadNeighbor = SpatialFluxMonad.of(neighborState);
+            const reverseFluxResult = monadNeighbor.computeHarmonizedFluxDeltas(reverseMap, 1.0);
+            assert.strictEqual(reverseFluxResult.isOk(), true);
+            const reverseTransfers = reverseFluxResult.unwrap();
+            const transferToA = reverseTransfers.find((t) => t.targetCell === cellA);
+            assert.ok(transferToA);
+            assert.strictEqual(transferToA.deltaWater, -firstTarget.deltaWater);
+            assert.strictEqual(transferToA.deltaCarbon, -firstTarget.deltaCarbon);
+            assert.strictEqual(transferToA.deltaOxygen, -firstTarget.deltaOxygen);
+            assert.strictEqual(transferToA.deltaMinerals, -firstTarget.deltaMinerals);
+            assert.strictEqual(transferToA.deltaEnthalpy, -firstTarget.deltaEnthalpy);
         });
-        it('aborts flux computation with FluxConservationError if a neighbor has topological defect', () => {
+        it('returns FluxConservationError when neighbor cell topology is defective', () => {
+            const cellA = knownHexagon;
+            const neighborsA = [
+                '8003fffffffffff', '8005fffffffffff', '8007fffffffffff',
+                '8013fffffffffff', '8015fffffffffff', '8017fffffffffff'
+            ];
             const stateA = {
-                cellIndex: knownHexagon,
+                cellIndex: cellA,
                 stocks: { water: 500, carbon: 200, oxygen: 100, minerals: 50, enthalpy: 1000 },
-                neighbors: [
-                    '8003fffffffffff', '8005fffffffffff', '8007fffffffffff',
-                    '8013fffffffffff', '8015fffffffffff', '8017fffffffffff'
-                ]
+                neighbors: neighborsA
             };
             const defectiveMap = new Map();
-            // Provide neighbor with defective neighbor count (only 4 neighbors)
-            for (const n of stateA.neighbors) {
-                defectiveMap.set(n, {
-                    cellIndex: n,
-                    stocks: { water: 100, carbon: 50, oxygen: 20, minerals: 10, enthalpy: 200 },
-                    neighbors: ['8001fffffffffff', '8021fffffffffff', '8023fffffffffff', '8025fffffffffff'] // 4 neighbors, defect!
-                });
-            }
-            const fluxResult = computeHarmonizedFluxDeltas(stateA, defectiveMap, 1.0);
-            assert.strictEqual(fluxResult.isErr(), true);
-            assert.ok(fluxResult.unwrapErr() instanceof FluxConservationError);
+            // Hexagon with only 5 neighbors is defective
+            defectiveMap.set(neighborsA[0], {
+                cellIndex: neighborsA[0],
+                stocks: { water: 100, carbon: 50, oxygen: 20, minerals: 10, enthalpy: 200 },
+                neighbors: [
+                    cellA, '8021fffffffffff', '8023fffffffffff',
+                    '8025fffffffffff', '8027fffffffffff'
+                ]
+            });
+            const res = computeHarmonizedFluxDeltas(stateA, defectiveMap, 1.0);
+            assert.strictEqual(res.isErr(), true);
+            const err = res.unwrapErr();
+            assert.ok(err instanceof FluxConservationError);
+            assert.match(err.message, /topological defect/i);
         });
     });
 });
