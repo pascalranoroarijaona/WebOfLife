@@ -9,6 +9,7 @@ import {
   findSharedBoundaryVertexPairs3D,
   extractSharedBoundaryEdge3D,
   H3AdjacencyService,
+  createVec3D,
 } from '../src/spatial/h3_adjacency.js';
 import {
   computeBoundaryFlux,
@@ -21,11 +22,11 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
     const vertices: Vector3D[] = [];
     for (let k = 0; k < 6; k++) {
       const angle = (k * Math.PI) / 3;
-      vertices.push({
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
-        z: 0.0,
-      });
+      vertices.push(createVec3D(
+        centerX + radius * Math.cos(angle),
+        centerY + radius * Math.sin(angle),
+        0.0
+      ));
     }
     return vertices;
   }
@@ -34,12 +35,12 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
     const hexA = createHexagon2D(0, 0, 1.0);
     // Perturb order or match identical vertices
     const hexB: Vector3D[] = [
-      { ...(hexA[3] ?? {}) },
-      { ...(hexA[4] ?? {}) },
-      { ...(hexA[5] ?? {}) },
-      { ...(hexA[0] ?? {}) },
-      { ...(hexA[1] ?? {}) },
-      { ...(hexA[2] ?? {}) },
+      createVec3D(hexA[3].x, hexA[3].y, hexA[3].z),
+      createVec3D(hexA[4].x, hexA[4].y, hexA[4].z),
+      createVec3D(hexA[5].x, hexA[5].y, hexA[5].z),
+      createVec3D(hexA[0].x, hexA[0].y, hexA[0].z),
+      createVec3D(hexA[1].x, hexA[1].y, hexA[1].z),
+      createVec3D(hexA[2].x, hexA[2].y, hexA[2].z),
     ];
 
     const pairs = findSharedBoundaryVertexPairs3D(hexA, hexB, 1e-6);
@@ -61,12 +62,12 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
 
     // Spherical hexagons on unit sphere
     const sphereHexA: Vector3D[] = [
-      { x: 0.0, y: 0.0, z: 1.0 },
-      { x: 0.1, y: 0.0, z: Math.sqrt(1 - 0.01) },
-      { x: 0.15, y: 0.1, z: Math.sqrt(1 - 0.15 * 0.15 - 0.01) },
-      { x: 0.05, y: 0.18, z: Math.sqrt(1 - 0.05 * 0.05 - 0.18 * 0.18) },
-      { x: -0.05, y: 0.15, z: Math.sqrt(1 - 0.05 * 0.05 - 0.15 * 0.15) },
-      { x: -0.08, y: 0.05, z: Math.sqrt(1 - 0.08 * 0.08 - 0.05 * 0.05) },
+      createVec3D(0.0, 0.0, 1.0),
+      createVec3D(0.1, 0.0, Math.sqrt(1 - 0.01)),
+      createVec3D(0.15, 0.1, Math.sqrt(1 - 0.15 * 0.15 - 0.01)),
+      createVec3D(0.05, 0.18, Math.sqrt(1 - 0.05 * 0.05 - 0.18 * 0.18)),
+      createVec3D(-0.05, 0.15, Math.sqrt(1 - 0.05 * 0.05 - 0.15 * 0.15)),
+      createVec3D(-0.08, 0.05, Math.sqrt(1 - 0.08 * 0.08 - 0.05 * 0.05)),
     ];
 
     const s1 = sphereHexA[1]!;
@@ -74,12 +75,12 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
 
     // Spherical Hex B shares vertices 1 and 2 of Hex A
     const sphereHexB: Vector3D[] = [
-      { x: (s1.x ?? 0) + 1e-8, y: s1.y, z: s1.z },
-      { x: s2.x, y: (s2.y ?? 0) - 1e-8, z: s2.z },
-      { x: 0.25, y: 0.15, z: Math.sqrt(1 - 0.25 * 0.25 - 0.15 * 0.15) },
-      { x: 0.3, y: 0.05, z: Math.sqrt(1 - 0.3 * 0.3 - 0.05 * 0.05) },
-      { x: 0.25, y: -0.05, z: Math.sqrt(1 - 0.25 * 0.25 - 0.05 * 0.05) },
-      { x: 0.18, y: -0.08, z: Math.sqrt(1 - 0.18 * 0.18 - 0.08 * 0.08) },
+      createVec3D((s1.x ?? 0) + 1e-8, s1.y, s1.z),
+      createVec3D(s2.x, (s2.y ?? 0) - 1e-8, s2.z),
+      createVec3D(0.25, 0.15, Math.sqrt(1 - 0.25 * 0.25 - 0.15 * 0.15)),
+      createVec3D(0.3, 0.05, Math.sqrt(1 - 0.3 * 0.3 - 0.05 * 0.05)),
+      createVec3D(0.25, -0.05, Math.sqrt(1 - 0.25 * 0.25 - 0.05 * 0.05)),
+      createVec3D(0.18, -0.08, Math.sqrt(1 - 0.18 * 0.18 - 0.08 * 0.08)),
     ];
 
     const pairsSphere = findSharedBoundaryVertexPairs3D(sphereHexA, sphereHexB, 1e-4);

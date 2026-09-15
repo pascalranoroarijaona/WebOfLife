@@ -1,6 +1,6 @@
 /**
  * Web of Life - H3 Grid Facade & Comprehensive Validation Subsystem
- * Unified Multi-Sprint Implementation (Sprints 003 - 085)
+ * Unified Multi-Sprint Implementation (Sprints 003 - 087)
  */
 
 import {
@@ -929,9 +929,13 @@ export function computeInterfaceAdvectiveTransfer(
   edgeLength: number,
   dt: number
 ) {
-  const vTanA = projectVectorOntoSphereTangentSpace(toVec3D(cellA.velocity), toVec3D(cellA.centroid));
-  const vTanB = projectVectorOntoSphereTangentSpace(toVec3D(cellB.velocity), toVec3D(cellB.centroid));
-  const basis = computeFacetNormalTangentBasis(cellA.centroid, cellB.centroid);
+  const vA = toVec3D(cellA.velocity);
+  const vB = toVec3D(cellB.velocity);
+  const cA = toVec3D(cellA.centroid);
+  const cB = toVec3D(cellB.centroid);
+  const vTanA = toVec3D(projectVectorOntoSphereTangentSpace(vA, cA));
+  const vTanB = toVec3D(projectVectorOntoSphereTangentSpace(vB, cB));
+  const basis = computeFacetNormalTangentBasis(cA, cB);
   const midVel: [number, number, number] = [
     (vTanA[0] + vTanB[0]) * 0.5,
     (vTanA[1] + vTanB[1]) * 0.5,

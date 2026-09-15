@@ -1,6 +1,6 @@
 /**
  * Web of Life - H3 Grid Facade & Comprehensive Validation Subsystem
- * Unified Multi-Sprint Implementation (Sprints 003 - 085)
+ * Unified Multi-Sprint Implementation (Sprints 003 - 087)
  */
 import { H3SpatialIndexCodec, extractH3IndexApertureDigits, assertValidLatitudeDegrees, latLngToCartesian3D, cartesian3DToLatLng, computeFacetNormalTangentBasis, dotProduct, toVec3D, projectVectorOntoSphereTangentSpace, } from './h3_adjacency.js';
 import { H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
@@ -737,9 +737,13 @@ export function createCellStocks(partial) {
     };
 }
 export function computeInterfaceAdvectiveTransfer(cellA, cellB, edgeLength, dt) {
-    const vTanA = projectVectorOntoSphereTangentSpace(toVec3D(cellA.velocity), toVec3D(cellA.centroid));
-    const vTanB = projectVectorOntoSphereTangentSpace(toVec3D(cellB.velocity), toVec3D(cellB.centroid));
-    const basis = computeFacetNormalTangentBasis(cellA.centroid, cellB.centroid);
+    const vA = toVec3D(cellA.velocity);
+    const vB = toVec3D(cellB.velocity);
+    const cA = toVec3D(cellA.centroid);
+    const cB = toVec3D(cellB.centroid);
+    const vTanA = toVec3D(projectVectorOntoSphereTangentSpace(vA, cA));
+    const vTanB = toVec3D(projectVectorOntoSphereTangentSpace(vB, cB));
+    const basis = computeFacetNormalTangentBasis(cA, cB);
     const midVel = [
         (vTanA[0] + vTanB[0]) * 0.5,
         (vTanA[1] + vTanB[1]) * 0.5,

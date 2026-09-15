@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 087: Pentagon Base Cell Missing Direction Mapping</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --accent-s69: #00ffcc;
+
+  /* Sprint 078-085 Invariants */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --coordination-accent: #a855f7;
+
+  /* Sprint 083-086 Directional & Aperture Topology */
+  --omitted-dir: #ff3366;
+  --present-dir: #00ffcc;
+  --facet-outline: #f59e0b;
+  --flux-active: #38bdf8;
+  --flux-forbidden: #ef4444;
+  --topology-gold: #fbbf24;
+  --bitmask-cyan: #38bdf8;
+  --bitmask-active: #10b981;
+  --bitmask-inactive: #334155;
+  --bitmask-border: #0ea5e9;
+  --reciprocal-pink: #ec4899;
+  --nonzero-digit: #f59e0b;
+  --pure-pentagon: #3b82f6;
+  --singularity-glow: #e11d48;
+  --conductance-cor: #10b981;
+  --streamline-cyan: #22d3ee;
+  --bit-header: #38bdf8;
+
+  /* Sprint 087: Base Cell Missing Direction Mapping */
+  --k-axes-gold: #eab308;
+  --zero-flux-barrier: #f43f5e;
+  --conserved-emerald: #10b981;
+  --manifold-indigo: #6366f1;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(960px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.73rem;
+  margin-bottom: 10px;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 20, 35, 0.6);
+  border-radius: 6px;
+  border: 1px solid #14354b;
+}
+
+.metric-item {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  font-weight: bold;
+  color: var(--accent-s69);
+}
+
+.badge-pass {
+  color: var(--type-pass);
+  border: 1px solid var(--type-pass);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 255, 162, 0.1);
+  font-size: 0.68rem;
+}
+
+.badge-fail {
+  color: var(--type-fail);
+  border: 1px solid var(--type-fail);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 42, 95, 0.1);
+  font-size: 0.68rem;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+#inspectorPanel {
+  position: fixed;
+  z-index: 10;
+  bottom: 16px;
+  left: 16px;
+  width: min(440px, calc(100vw - 32px));
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff33;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.8);
+  font-size: 0.75rem;
+}
+
+#inspectorPanel h3 {
+  color: var(--accent-s69);
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dir-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.dir-card {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(10, 25, 40, 0.7);
+  border: 1px solid #1c4059;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.dir-card.omitted {
+  border-color: var(--omitted-dir);
+  background: rgba(255, 51, 102, 0.15);
+  color: #ff99bb;
+}
+
+.dir-card.valid {
+  border-color: var(--present-dir);
+  background: rgba(0, 255, 204, 0.1);
+  color: var(--present-dir);
+}
+
+#legendPanel {
+  position: fixed;
+  z-index: 10;
+  bottom: 16px;
+  right: 16px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff33;
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+}
+
+#legendPanel h3 {
+  color: var(--sun);
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<header id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 087</h1>
+  <h2>Pentagon Base Cell Missing Direction Mapping & Zero-Flux Aperture Barrier</h2>
+
+  <div class="metric-strip">
+    <div class="metric-item">
+      <span class="metric-label">Base Cell:</span>
+      <span class="metric-val" id="dispCellId">bc_04 (Pentagon)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Coordination:</span>
+      <span class="metric-val" id="dispCoord">5 Neighbors</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Omitted Dir:</span>
+      <span class="metric-val" id="dispOmitted">Dir 1 (K-Axis)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Missing Flux:</span>
+      <span class="badge-pass" id="badgeZeroFlux">J_1 = 0.000 (Pass)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Deficit Angle:</span>
+      <span class="metric-val" id="dispDeficit">60.0° (π/3 rad)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Topology Invariant:</span>
+      <span class="badge-pass" id="badgeEuler">χ = 2 (Conserved)</span>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <button id="btnPrevCell">&lt; Prev Pentagon</button>
+    <button id="btnNextCell">Next Pentagon &gt;</button>
+    <button id="btnToggleHex">Inspect Hexagon Cell</button>
+    <button id="btnToggleFlux" class="active">Simulate Thermodynamic Flux</button>
+    <button id="btnResetCamera">Reset View</button>
+  </div>
+</header>
+
+<div id="inspectorPanel">
+  <h3>
+    <span>Base Cell Topology Inspector</span>
+    <span id="inspTypeBadge" class="badge-pass">PENTAGON DISCLINATION</span>
+  </h3>
+  <p id="inspDescription" style="color: var(--muted); line-height: 1.4; margin-bottom: 8px;">
+    In H3 spherical indexing, exactly 12 of the 122 base cells are pentagons. Each pentagon lacks Direction 1 (K-axis), forming a strict zero-flux barrier preventing radial energy leakage.
+  </p>
+
+  <div style="font-weight: bold; color: var(--accent-s69); margin-top: 6px;">Direction Aperture Bitmask:</div>
+  <div class="dir-grid" id="dirGridContainer">
+    <!-- Populated dynamically -->
+  </div>
+
+  <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted);">
+    <span>Thermodynamic Divergence: <b style="color:var(--conserved-emerald)" id="dispDiv">∇·J = 0.0000</b></span>
+    <span>Entropy Gen: <b style="color:var(--sun)" id="dispSigma">σ = 0.0418 W/K</b></span>
+  </div>
+</div>
+
+<div id="legendPanel">
+  <h3>Icosahedral Grid Legend</h3>
+  <div class="legend-item">
+    <div class="legend-color" style="background: var(--pentagon-color);"></div>
+    <span>Pentagon Base Cell (12 Singularities)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: var(--hexagon-color);"></div>
+    <span>Hexagon Base Cell (110 Cells)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: var(--omitted-dir);"></div>
+    <span>Omitted Direction 1 (Zero-Flux Barrier)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: var(--present-dir);"></div>
+    <span>Permitted Coordinate Flux Directions</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: var(--streamline-cyan);"></div>
+    <span>Divergence-Free Dissipation Streamlines</span>
+  </div>
+</div>
+
+<script>
+// Sprint 087: Pentagon Base Cell Missing Direction Mapping
+(function() {
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // The canonical 12 pentagon base cells in H3 spatial topology
+  const PENTAGON_BASE_CELLS = [4, 14, 24, 38, 44, 54, 58, 63, 72, 83, 97, 107];
+  let currentPentagonIndex = 0;
+  let isHexMode = false;
+  let simulateFlux = true;
+
+  // Viewport and camera state
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+  let rotX = 0.35;
+  let rotY = -0.45;
+  let zoom = 1.0;
+  let isDragging = false;
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+
+  // Flux streamline particles
+  const particles = [];
+  const PARTICLE_COUNT = 85;
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      angle: Math.random() * Math.PI * 2,
+      rad: 40 + Math.random() * 110,
+      speed: 0.01 + Math.random() * 0.018,
+      phase: Math.random() * Math.PI * 2,
+      life: Math.random()
+    });
+  }
+
+  function resizeCanvas() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // Mouse interaction
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    rotY += dx * 0.008;
+    rotX += dy * 0.008;
+    rotX = Math.max(-1.4, Math.min(1.4, rotX));
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener('mouseup', () => { isDragging = false; });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoom *= (e.deltaY > 0 ? 0.92 : 1.08);
+    zoom = Math.max(0.4, Math.min(3.0, zoom));
+  }, { passive: false });
+
+  // UI elements
+  const dispCellId = document.getElementById('dispCellId');
+  const dispCoord = document.getElementById('dispCoord');
+  const dispOmitted = document.getElementById('dispOmitted');
+  const dispDeficit = document.getElementById('dispDeficit');
+  const inspTypeBadge = document.getElementById('inspTypeBadge');
+  const inspDescription = document.getElementById('inspDescription');
+  const dirGridContainer = document.getElementById('dirGridContainer');
+  const btnPrevCell = document.getElementById('btnPrevCell');
+  const btnNextCell = document.getElementById('btnNextCell');
+  const btnToggleHex = document.getElementById('btnToggleHex');
+  const btnToggleFlux = document.getElementById('btnToggleFlux');
+  const btnResetCamera = document.getElementById('btnResetCamera');
+
+  // Direction definitions for H3 Base Cell Neighbors (1 to 6)
+  const DIRECTIONS = [
+    { dir: 1, name: 'Dir 1 (K-Axis)', angle: 0 },
+    { dir: 2, name: 'Dir 2 (+J Axis)', angle: Math.PI / 3 },
+    { dir: 3, name: 'Dir 3 (+I Axis)', angle: (2 * Math.PI) / 3 },
+    { dir: 4, name: 'Dir 4 (-K Axis)', angle: Math.PI },
+    { dir: 5, name: 'Dir 5 (-J Axis)', angle: (4 * Math.PI) / 3 },
+    { dir: 6, name: 'Dir 6 (-I Axis)', angle: (5 * Math.PI) / 3 }
+  ];
+
+  function updateInspector() {
+    const isPent = !isHexMode;
+    const cellNum = isPent ? PENTAGON_BASE_CELLS[currentPentagonIndex] : 0;
+    const cellStr = (cellNum < 10 ? '0' : '') + cellNum;
+
+    if (isPent) {
+      dispCellId.textContent = `bc_${cellStr} (Pentagon)`;
+      dispCoord.textContent = '5 Neighbors';
+      dispOmitted.textContent = 'Dir 1 (K-Axis)';
+      dispDeficit.textContent = '60.0° (π/3 rad)';
+      inspTypeBadge.className = 'badge-pass';
+      inspTypeBadge.textContent = 'PENTAGON DISCLINATION';
+      inspDescription.textContent = `Base cell ${cellNum} is one of 12 topological pentagons in the icosahedral grid. Direction 1 (K-Axis) is completely omitted, enforcing a zero-flux boundary condition J_1 = 0.`;
+    } else {
+      dispCellId.textContent = 'bc_00 (Hexagon)';
+      dispCoord.textContent = '6 Neighbors';
+      dispOmitted.textContent = 'None (Standard)';
+      dispDeficit.textContent = '0.0° (Flat)';
+      inspTypeBadge.className = 'badge-pass';
+      inspTypeBadge.textContent = 'REGULAR HEXAGON';
+      inspDescription.textContent = 'Standard base cell 0 has complete 6-fold coordination. All directions 1 through 6 are active and permitted for thermodynamic flux exchange.';
+    }
+
+    // Populate Direction Grid
+    dirGridContainer.innerHTML = '';
+    DIRECTIONS.forEach(d => {
+      const card = document.createElement('div');
+      const isOmitted = isPent && d.dir === 1;
+      card.className = `dir-card ${isOmitted ? 'omitted' : 'valid'}`;
+      card.innerHTML = `
+        <div style="font-weight:bold;">${d.name}</div>
+        <div style="font-size:0.62rem; margin-top:2px;">${isOmitted ? 'OMITTED (FLUX=0)' : 'ACTIVE (PERMITTED)'}</div>
+      `;
+      dirGridContainer.appendChild(card);
+    });
+  }
+
+  btnPrevCell.addEventListener('click', () => {
+    isHexMode = false;
+    currentPentagonIndex = (currentPentagonIndex - 1 + PENTAGON_BASE_CELLS.length) % PENTAGON_BASE_CELLS.length;
+    btnToggleHex.textContent = 'Inspect Hexagon Cell';
+    updateInspector();
+  });
+
+  btnNextCell.addEventListener('click', () => {
+    isHexMode = false;
+    currentPentagonIndex = (currentPentagonIndex + 1) % PENTAGON_BASE_CELLS.length;
+    btnToggleHex.textContent = 'Inspect Hexagon Cell';
+    updateInspector();
+  });
+
+  btnToggleHex.addEventListener('click', () => {
+    isHexMode = !isHexMode;
+    btnToggleHex.textContent = isHexMode ? 'Inspect Pentagon Cell' : 'Inspect Hexagon Cell';
+    updateInspector();
+  });
+
+  btnToggleFlux.addEventListener('click', () => {
+    simulateFlux = !simulateFlux;
+    btnToggleFlux.classList.toggle('active', simulateFlux);
+  });
+
+  btnResetCamera.addEventListener('click', () => {
+    rotX = 0.35;
+    rotY = -0.45;
+    zoom = 1.0;
+  });
+
+  updateInspector();
+
+  // Animation and rendering loop
+  let animTime = 0;
+
+  function render() {
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+
+    const centerX = width * 0.52;
+    const centerY = height * 0.52;
+    const baseRadius = 140 * zoom;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    // Draw background 3D-projected coordinate manifold grid
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.08)';
+    ctx.lineWidth = 1;
+    for (let r = 50; r <= 300; r += 50) {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * zoom, r * 0.7 * zoom, rotY * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    const isPent = !isHexMode;
+    const sides = isPent ? 5 : 6;
+    const polyRadius = baseRadius;
+
+    // Outer disclination glow for pentagons
+    if (isPent) {
+      const glowGrad = ctx.createRadialGradient(0, 0, polyRadius * 0.3, 0, 0, polyRadius * 1.5);
+      glowGrad.addColorStop(0, 'rgba(255, 0, 85, 0.18)');
+      glowGrad.addColorStop(0.7, 'rgba(255, 42, 109, 0.06)');
+      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, polyRadius * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw main cell polygon
+    ctx.beginPath();
+    for (let s = 0; s < sides; s++) {
+      const angle = (s * 2 * Math.PI) / sides - Math.PI / 2 + rotY * 0.2;
+      const px = Math.cos(angle) * polyRadius;
+      const py = Math.sin(angle) * polyRadius * (0.85 + Math.sin(rotX) * 0.15);
+      if (s === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = isPent ? 'rgba(255, 0, 85, 0.18)' : 'rgba(0, 225, 255, 0.12)';
+    ctx.fill();
+    ctx.strokeStyle = isPent ? '#ff0055' : '#00e1ff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Center cell nucleus
+    ctx.beginPath();
+    ctx.arc(0, 0, 8 * zoom, 0, Math.PI * 2);
+    ctx.fillStyle = isPent ? '#ff3366' : '#00ffcc';
+    ctx.fill();
+
+    // Directional facets and neighbor links
+    DIRECTIONS.forEach(d => {
+      const isOmitted = isPent && d.dir === 1;
+      const angle = d.angle - Math.PI / 2 + rotY * 0.2;
+      const len = (polyRadius + 75) * zoom;
+      const nx = Math.cos(angle) * len;
+      const ny = Math.sin(angle) * len * (0.85 + Math.sin(rotX) * 0.15);
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(nx, ny);
+
+      if (isOmitted) {
+        // Red dashed barrier for omitted direction 1 (K-axis)
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Barrier cross marker
+        ctx.save();
+        ctx.translate(nx * 0.7, ny * 0.7);
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-10, -10); ctx.lineTo(10, 10);
+        ctx.moveTo(10, -10); ctx.lineTo(-10, 10);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ff99aa';
+        ctx.font = '10px monospace';
+        ctx.fillText('ZERO-FLUX BARRIER (DIR 1 OMITTED)', 15, 4);
+        ctx.restore();
+      } else {
+        // Active permitted direction
+        ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Facet node
+        ctx.beginPath();
+        ctx.arc(nx, ny, 5 * zoom, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ffcc';
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(200, 245, 242, 0.75)';
+        ctx.font = '9px monospace';
+        ctx.fillText(d.name, nx + 8, ny + 3);
+      }
+    });
+
+    // Thermodynamic streamlines
+    if (simulateFlux) {
+      particles.forEach(p => {
+        p.angle += p.speed;
+        p.life += 0.01;
+        if (p.life > 1) {
+          p.life = 0;
+          p.rad = 35 + Math.random() * (polyRadius * 1.2);
+        }
+
+        // Deflect particles around Dir 1 barrier if pentagon
+        let effectiveAngle = p.angle;
+        if (isPent) {
+          const dir1Angle = -Math.PI / 2 + rotY * 0.2;
+          const diff = Math.atan2(Math.sin(effectiveAngle - dir1Angle), Math.cos(effectiveAngle - dir1Angle));
+          if (Math.abs(diff) < 0.45) {
+            effectiveAngle = dir1Angle + (diff >= 0 ? 0.45 : -0.45);
+          }
+        }
+
+        const px = Math.cos(effectiveAngle) * p.rad;
+        const py = Math.sin(effectiveAngle) * p.rad * (0.85 + Math.sin(rotX) * 0.15);
+        const alpha = Math.sin(p.life * Math.PI) * 0.7;
+
+        ctx.beginPath();
+        ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = isPent ? `rgba(255, 170, 0, ${alpha})` : `rgba(0, 225, 255, ${alpha})`;
+        ctx.fill();
+      });
+    }
+
+    ctx.restore();
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

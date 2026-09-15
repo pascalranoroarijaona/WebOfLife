@@ -1,0 +1,175 @@
+@startuml sprint_087_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam packageFontStyle bold
+skinparam defaultFontSize 11
+
+title Web of Life / Gaia Platform - Sprint 087\nTopological Discrete Global Grid System & Thermodynamic Invariants
+
+package "DGGS Spatial Topology (src/spatial)" {
+
+    enum Direction {
+        + CENTER : 0
+        + K_AXES : 1
+        + J_AXES : 2
+        + JK_AXES : 3
+        + I_AXES : 4
+        + IK_AXES : 5
+        + IJ_AXES : 6
+        + INVALID : 7
+    }
+
+    enum CellTopologyClass {
+        + HEXAGON
+        + PENTAGON
+    }
+
+    interface IPentagonDefectMetadata {
+        + baseCell: number
+        + isPentagon: boolean
+        + missingDirection: Direction
+        + validNeighborCount: 5 | 6
+    }
+
+    class H3AdjacencyService <<Singleton>> {
+        - PENTAGON_BASE_CELLS: ReadonlyArray<number>
+        - PENTAGON_BASE_CELL_SET: ReadonlySet<number>
+        - PENTAGON_MISSING_DIRECTION_MAP: ReadonlyMap<number, Direction>
+        - BASE_CELL_MISSING_DIR_LUT: Uint8Array
+        + isBaseCellPentagon(baseCell: number): boolean
+        + determinePentagonBaseCellMissingDirection(baseCell: number): Direction
+        + getBaseCellNeighbor(baseCell: number, dir: Direction): number
+        + verifyPentagonMissingDirectionConsistency(baseCell: number): boolean
+        + getActiveBoundaryDirections(baseCell: number): Direction[]
+    }
+
+    class SpatialFluxMonad<TStock> <<Monad>> {
+        - sourceBaseCell: number
+        - stockPayload: TStock
+        - adjacencyService: H3AdjacencyService
+        + bind<U>(fn: (s: TStock) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        + routeConservedFlux(totalFlux: number, diffusivities: Record<Direction, number>): Map<number, number>
+        + enforceZeroFluxBoundary(direction: Direction): boolean
+        + computeDiscreteLaplacian(scalarField: Float64Array): number
+    }
+
+    class EarthPod {
+        + baseCellId: number
+        + topologyClass: CellTopologyClass
+        + carbonStockKg: number
+        + waterStockKg: number
+        + sensibleHeatJoules: number
+        + latentHeatJoules: number
+        + applyFluxDeltas(inflows: Map<number, number>): void
+        + evaluateLocalEntropyGeneration(): number
+    }
+}
+
+package "Relational & Time-Series Ledger (db/schema.sql)" {
+
+    entity "dggs_base_cells" as DggsBaseCells {
+        * base_cell_id : SMALLINT [PK] (0..121)
+        --
+        * topology_class : cell_topology_class
+        * is_pentagon : BOOLEAN (Generated)
+        * omitted_direction : h3_direction
+        * valid_neighbor_count : SMALLINT (5 or 6)
+        * icosahedral_faces : SMALLINT[]
+        * polar_equator_zone : VARCHAR(32)
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity "dggs_base_cell_adjacencies" as DggsAdjacencies {
+        * source_base_cell : SMALLINT [PK, FK]
+        * direction : h3_direction [PK]
+        --
+        target_base_cell : SMALLINT [FK] (Nullable)
+        * is_omitted_defect : BOOLEAN
+    }
+
+    entity "earthpod_stock_states" as EarthpodStockStates {
+        * state_id : UUID [PK]
+        --
+        * base_cell_id : SMALLINT [FK]
+        * stock_type : thermodynamic_stock_type
+        * quantity : NUMERIC(38, 18)
+        * chemical_potential : NUMERIC(38, 18)
+        * entropy_j_per_k : NUMERIC(38, 18)
+        * epoch_timestamp : TIMESTAMPTZ
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity "spatial_flux_transactions" as SpatialFluxTx {
+        * transaction_id : UUID [PK]
+        --
+        * source_base_cell : SMALLINT [FK]
+        * direction : h3_direction
+        target_base_cell : SMALLINT [FK] (Nullable)
+        * stock_type : thermodynamic_stock_type
+        * flux_quantity : NUMERIC(38, 18)
+        * onsager_conductance : NUMERIC(38, 18)
+        * potential_gradient : NUMERIC(38, 18)
+        * entropy_production : NUMERIC(38, 18)
+        * is_zero_flux_boundary : BOOLEAN
+        * block_height : BIGINT [FK]
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_blocks" as ThermodynamicBlocks {
+        * block_height : BIGINT [PK]
+        --
+        * prev_block_hash : CHAR(64)
+        * merkle_root : CHAR(64)
+        * state_delta_hash : CHAR(64)
+        * total_mass_invariant_kg : NUMERIC(38, 18)
+        * total_energy_invariant_j : NUMERIC(38, 18)
+        * total_entropy_production_j_per_k : NUMERIC(38, 18)
+        * mass_conservation_delta_kg : NUMERIC(38, 18)
+        * energy_conservation_delta_j : NUMERIC(38, 18)
+        * is_conservation_proven : BOOLEAN (Generated)
+        * validator_node_id : VARCHAR(128)
+        * block_signature : TEXT
+        * timestamp : TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invariants
+H3AdjacencyService ..|> IPentagonDefectMetadata : implements query contracts
+H3AdjacencyService --> Direction : resolves omitted direction
+SpatialFluxMonad --> H3AdjacencyService : queries missing direction & neighbors
+EarthPod *-- SpatialFluxMonad : executes boundary transport
+
+DggsBaseCells ||--o{ DggsAdjacencies : "defines 6 topological directions"
+DggsBaseCells ||--o{ EarthpodStockStates : "tracks mass & energy pools"
+DggsBaseCells ||--o{ SpatialFluxTx : "acts as flux source"
+ThermodynamicBlocks ||--o{ SpatialFluxTx : "cryptographically seals transactions"
+
+note right of H3AdjacencyService
+  **Topological Invariant (Euler S^2)**:
+  Exactly 12 base cells are pentagons:
+  {4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117}.
+  Missing direction:
+    determinePentagonBaseCellMissingDirection(bc)
+    == Direction.K_AXES (1)
+  All 110 hexagons return Direction.INVALID (7).
+end note
+
+note bottom of SpatialFluxTx
+  **First Law Compliance**:
+  Flux along missing direction:
+    J_{bc, d_missing} == 0
+  is_zero_flux_boundary = TRUE
+  Zero mass/energy destruction.
+end note
+
+note bottom of ThermodynamicBlocks
+  **Consensus Invariant**:
+  |mass_conservation_delta_kg| < 1e-12
+  |energy_conservation_delta_j| < 1e-9
+  total_entropy_production >= 0 (Second Law)
+end note
+
+@enduml
