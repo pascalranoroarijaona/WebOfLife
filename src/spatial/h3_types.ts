@@ -16,17 +16,18 @@ export interface Vector3Object {
   y: number;
   z: number;
   [index: number]: any;
+  [key: string]: any;
 }
 
 export type Vector3Tuple = [number, number, number] & {
-  x?: number;
-  y?: number;
-  z?: number;
+  x?: any;
+  y?: any;
+  z?: any;
+  [key: string]: any;
 };
 
 export type Vector3D = any;
-
-export type Vector3DInput = Vector3Object | Vector3Tuple | [number, number, number] | any;
+export type Vector3DInput = any;
 
 export type H3ResolutionTier =
   | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7

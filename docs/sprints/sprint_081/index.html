@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 081: Pentagonal Neighbor String Element Assertion</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+
+  /* Sprint 078, 080 & 081 Pentagonal Invariant & Defensive Type Guard Variables */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --steady-accent: #05ffa1;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --type-cyan: #38bdf8;
+  --type-amber: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.73rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+button.s81-stringguard {
+  background: #0f3938;
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+button.s81-stringguard:hover {
+  background: #115e59;
+  border-color: #2dd4bf;
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.4);
+}
+
+button.s81-ambertest {
+  background: #3d2b09;
+  border-color: var(--type-amber);
+  color: #fde68a;
+}
+
+button.s81-ambertest:hover {
+  background: #5e410b;
+  border-color: #fbbf24;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(740px, calc(100vw - 32px));
+  padding: 15px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.02rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.75rem;
+  margin-bottom: 7px;
+  font-weight: normal;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.71rem;
+  line-height: 1.45;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #00f0ff;
+}
+
+.code-typeguard {
+  background: rgba(0, 255, 162, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #00ffa2;
+}
+
+#controls {
+  position: fixed;
+  z-index: 10;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: min(780px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 1px solid #00e1ff2b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  backdrop-filter: blur(10px);
+}
+
+#telemetry {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: min(340px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  padding: 14px 16px;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  box-shadow: 0 0 30px #000000;
+}
+
+#telemetry h3 {
+  color: var(--type-cyan);
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #00e1ff26;
+  padding-bottom: 4px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.telemetry-label {
+  color: var(--muted);
+}
+
+.telemetry-val {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.val-pass {
+  color: var(--type-pass);
+}
+
+.val-fail {
+  color: var(--type-fail);
+}
+
+.val-amber {
+  color: var(--type-amber);
+}
+
+#logTerminal {
+  position: fixed;
+  z-index: 10;
+  bottom: 74px;
+  right: 16px;
+  width: min(420px, calc(100vw - 32px));
+  height: 180px;
+  background: rgba(2, 8, 16, 0.95);
+  border: 1px solid #1e3a50;
+  border-radius: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: #8ed0ee;
+  box-shadow: 0 0 25px #000000;
+}
+
+#logTerminal .log-pass {
+  color: var(--type-pass);
+}
+
+#logTerminal .log-warn {
+  color: var(--type-amber);
+}
+
+#logTerminal .log-err {
+  color: var(--type-fail);
+}
+</style>
+</head>
+<body>
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life // Sprint 081</h1>
+  <h2>Pentagonal Neighbor String Element Assertion & Topology Invariant Guard</h2>
+  <p>
+    Euler characteristic theorem (<span class="highlight">&chi; = V - E + F = 2</span>) enforces exactly 12 pentagonal disclinations on the icosahedral H3 manifold.
+    Sprint 081 introduces <span class="code-typeguard">assertPentagonalNeighborStrings</span>: strict runtime assertions ensuring every pentagonal neighbor edge strictly validates as an immutable, non-empty <span class="code-badge">string</span> element index with degree 5.
+  </p>
+</div>
+
+<div id="telemetry">
+  <h3>Invariant Telemetry HUD</h3>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Pentagonal Disclinations:</span>
+    <span class="telemetry-val" id="pentCount">12 / 12</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Target Degree Invariant:</span>
+    <span class="telemetry-val">5 Neighbors</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">String Edge Assertions:</span>
+    <span class="telemetry-val val-pass" id="stringAssertionStatus">VALID (60/60 Strings)</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Element Type Check:</span>
+    <span class="telemetry-val val-pass" id="elementGuardStatus">PASS: Strict String</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Euler Disclination State:</span>
+    <span class="telemetry-val val-pass" id="eulerStatus">STABLE (&chi; = 2)</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Typecheck Overhead:</span>
+    <span class="telemetry-val" id="checkOverhead">0.012 ms</span>
+  </div>
+</div>
+
+<div id="logTerminal"></div>
+
+<div id="controls">
+  <button id="btnAssertAll" class="s81-stringguard active">Assert All 12 Pentagons</button>
+  <button id="btnCorruptString" class="s81-ambertest">Inject Non-String Element</button>
+  <button id="btnCorruptDegree" class="s78-violate">Inject Degree Invariant Fault</button>
+  <button id="btnResetTopology">Reset Topology</button>
+  <button id="btnToggleSpin" class="active">Auto Rotation</button>
+  <button id="btnSound">Synth Audio: Off</button>
+</div>
+
+<script>
+(function() {
+  // --- 1. Simulation Constants and Geodesic 12 Pentagons ---
+  const PENTAGON_COUNT = 12;
+  const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
+
+  // Exact 12 vertices of regular icosahedron normalized to unit sphere
+  const ICO_VERTICES = [
+    [-1,  GOLDEN_RATIO, 0],
+    [ 1,  GOLDEN_RATIO, 0],
+    [-1, -GOLDEN_RATIO, 0],
+    [ 1, -GOLDEN_RATIO, 0],
+    [0, -1,  GOLDEN_RATIO],
+    [0,  1,  GOLDEN_RATIO],
+    [0, -1, -GOLDEN_RATIO],
+    [0,  1, -GOLDEN_RATIO],
+    [ GOLDEN_RATIO, 0, -1],
+    [ GOLDEN_RATIO, 0,  1],
+    [-GOLDEN_RATIO, 0, -1],
+    [-GOLDEN_RATIO, 0,  1]
+  ].map(v => {
+    const len = Math.hypot(v[0], v[1], v[2]);
+    return [v[0] / len, v[1] / len, v[2] / len];
+  });
+
+  // H3-like cell mock database
+  const pentagonalCells = [];
+  for (let i = 0; i < PENTAGON_COUNT; i++) {
+    const hexId = '8528347' + (i.toString(16).padStart(2, '0')) + 'ffffff';
+    pentagonalCells.push({
+      id: hexId,
+      index: i,
+      pos: ICO_VERTICES[i],
+      neighbors: []
+    });
+  }
+
+  // Populate canonical 5 string neighbors for each pentagon
+  function initializeTopology() {
+    pentagonalCells.forEach((cell, idx) => {
+      // Find 5 closest geodesic neighbors
+      const dists = pentagonalCells
+        .map((other, oIdx) => {
+          if (idx === oIdx) return { idx: oIdx, id: other.id, dist: Infinity };
+          const dx = cell.pos[0] - other.pos[0];
+          const dy = cell.pos[1] - other.pos[1];
+          const dz = cell.pos[2] - other.pos[2];
+          return { idx: oIdx, id: other.id, dist: Math.hypot(dx, dy, dz) };
+        })
+        .sort((a, b) => a.dist - b.dist);
+
+      cell.neighbors = dists.slice(0, 5).map(d => d.id);
+    });
+  }
+  initializeTopology();
+
+  // --- 2. Sprint 081 Defensive Runtime Type Guard ---
+  // assertPentagonalNeighborStrings(cellId, neighbors)
+  function assertPentagonalNeighborStrings(cellId, neighbors) {
+    if (!Array.isArray(neighbors)) {
+      throw new TypeError(`[Invariant Violation] Cell ${cellId} neighbors must be an Array. Received: ${typeof neighbors}`);
+    }
+
+    if (neighbors.length !== 5) {
+      throw new RangeError(`[Invariant Violation] Pentagonal cell ${cellId} must have exactly 5 neighbors. Received: ${neighbors.length}`);
+    }
+
+    for (let i = 0; i < neighbors.length; i++) {
+      const elem = neighbors[i];
+      if (typeof elem !== 'string') {
+        throw new TypeError(`[Invariant Violation] Neighbor element at index [${i}] of cell ${cellId} must be a string. Received ${typeof elem} (${JSON.stringify(elem)})`);
+      }
+      if (elem.trim().length === 0) {
+        throw new TypeError(`[Invariant Violation] Neighbor element string at index [${i}] of cell ${cellId} cannot be empty`);
+      }
+    }
+    return true;
+  }
+
+  // Terminal logging
+  const terminal = document.getElementById('logTerminal');
+  function log(msg, cls = '') {
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = `[${new Date().toISOString().substring(14, 23)}] ${msg}`;
+    terminal.appendChild(div);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  // Web Audio Synthesizer (Zero external assets)
+  let audioCtx = null;
+  let soundEnabled = false;
+  function playTone(freq, duration = 0.12, type = 'sine') {
+    if (!soundEnabled) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+      // AudioContext policy handled gracefully
+    }
+  }
+
+  // Run full topology validation
+  function validateAllPentagons() {
+    const t0 = performance.now();
+    let passCount = 0;
+    let failed = false;
+
+    for (const cell of pentagonalCells) {
+      try {
+        assertPentagonalNeighborStrings(cell.id, cell.neighbors);
+        passCount++;
+      } catch (err) {
+        failed = true;
+        log(err.message, 'log-err');
+      }
+    }
+    const t1 = performance.now();
+    const overhead = (t1 - t0).toFixed(4);
+
+    document.getElementById('checkOverhead').textContent = `${overhead} ms`;
+
+    if (!failed) {
+      document.getElementById('stringAssertionStatus').textContent = `VALID (${passCount * 5}/60 Strings)`;
+      document.getElementById('stringAssertionStatus').className = 'telemetry-val val-pass';
+      document.getElementById('elementGuardStatus').textContent = 'PASS: Strict String';
+      document.getElementById('elementGuardStatus').className = 'telemetry-val val-pass';
+      document.getElementById('eulerStatus').textContent = 'STABLE (χ = 2)';
+      document.getElementById('eulerStatus').className = 'telemetry-val val-pass';
+      log(`All 12 pentagons validated: 60/60 neighbor string elements match strict string type safety.`, 'log-pass');
+      playTone(523.25, 0.1, 'triangle');
+    } else {
+      document.getElementById('stringAssertionStatus').textContent = 'CORRUPTED';
+      document.getElementById('stringAssertionStatus').className = 'telemetry-val val-fail';
+      document.getElementById('elementGuardStatus').textContent = 'DEFENSIVE TRAP TRIGGERED';
+      document.getElementById('elementGuardStatus').className = 'telemetry-val val-fail';
+      document.getElementById('eulerStatus').textContent = 'ANOMALY DETECTED';
+      document.getElementById('eulerStatus').className = 'telemetry-val val-fail';
+      playTone(180, 0.25, 'sawtooth');
+    }
+  }
+
+  // --- 3. Interactive Controls ---
+  document.getElementById('btnAssertAll').addEventListener('click', () => {
+    validateAllPentagons();
+  });
+
+  document.getElementById('btnCorruptString').addEventListener('click', () => {
+    // Inject non-string element into pentagon 0
+    pentagonalCells[0].neighbors[2] = 404040; // Number injected
+    log(`[FAULT INJECTION] Injecting non-string element (Number 404040) into Cell ${pentagonalCells[0].id} neighbor [2]`, 'log-warn');
+    validateAllPentagons();
+  });
+
+  document.getElementById('btnCorruptDegree').addEventListener('click', () => {
+    // Inject 6th neighbor into pentagon 1 (Hexagonal defect)
+    pentagonalCells[1].neighbors.push('8528347ff0ffffff');
+    log(`[FAULT INJECTION] Injected 6th neighbor into pentagonal cell ${pentagonalCells[1].id} (violating degree 5 invariant)`, 'log-warn');
+    validateAllPentagons();
+  });
+
+  document.getElementById('btnResetTopology').addEventListener('click', () => {
+    initializeTopology();
+    log(`Topology reset to pure 12 pentagonal disclinations with canonical string element arrays.`, 'log-pass');
+    validateAllPentagons();
+  });
+
+  let autoSpin = true;
+  const btnSpin = document.getElementById('btnToggleSpin');
+  btnSpin.addEventListener('click', () => {
+    autoSpin = !autoSpin;
+    btnSpin.textContent = autoSpin ? 'Auto Rotation: On' : 'Auto Rotation: Off';
+    btnSpin.classList.toggle('active', autoSpin);
+  });
+
+  const btnSound = document.getElementById('btnSound');
+  btnSound.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    btnSound.textContent = soundEnabled ? 'Synth Audio: On' : 'Synth Audio: Off';
+    btnSound.classList.toggle('active', soundEnabled);
+    if (soundEnabled) playTone(440, 0.1, 'sine');
+  });
+
+  // --- 4. 3D Geodesic Canvas Visualizer ---
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  let rotX = 0.35;
+  let rotY = 0.5;
+  let isDragging = false;
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+
+  canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    rotY += dx * 0.006;
+    rotX += dy * 0.006;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  function project3Dto2D(x, y, z, radius, cx, cy) {
+    // Rotation Y
+    const cosY = Math.cos(rotY);
+    const sinY = Math.sin(rotY);
+    const x1 = x * cosY + z * sinY;
+    const z1 = -x * sinY + z * cosY;
+
+    // Rotation X
+    const cosX = Math.cos(rotX);
+    const sinX = Math.sin(rotX);
+    const y2 = y * cosX - z1 * sinX;
+    const z2 = y * sinX + z1 * cosX;
+
+    const scale = 360 / (360 + z2 * radius * 0.7);
+    return {
+      px: cx + x1 * radius * scale,
+      py: cy + y2 * radius * scale,
+      pz: z2,
+      scale: scale
+    };
+  }
+
+  function render(time) {
+    if (autoSpin && !isDragging) {
+      rotY += 0.003;
+    }
+
+    ctx.fillStyle = '#02050a';
+    ctx.fillRect(0, 0, width, height);
+
+    const cx = width * 0.45;
+    const cy = height * 0.52;
+    const globeRadius = Math.min(width, height) * 0.32;
+
+    // Background sphere glow
+    const grad = ctx.createRadialGradient(cx, cy, globeRadius * 0.1, cx, cy, globeRadius * 1.15);
+    grad.addColorStop(0, 'rgba(0, 160, 255, 0.06)');
+    grad.addColorStop(0.8, 'rgba(255, 0, 85, 0.03)');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, globeRadius * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Projected nodes
+    const projected = pentagonalCells.map(c => {
+      const p = project3Dto2D(c.pos[0], c.pos[1], c.pos[2], globeRadius, cx, cy);
+      return { cell: c, ...p };
+    });
+
+    // Draw geodesic adjacency arcs
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < projected.length; i++) {
+      const p1 = projected[i];
+      for (const nId of p1.cell.neighbors) {
+        const target = projected.find(p => p.cell.id === nId);
+        if (target) {
+          const depthAlpha = Math.max(0.1, (p1.pz + target.pz + 2) / 4);
+          const isCorrupt = typeof nId !== 'string' || p1.cell.neighbors.length !== 5;
+          ctx.strokeStyle = isCorrupt ? `rgba(255, 42, 95, ${depthAlpha * 0.85})` : `rgba(0, 225, 255, ${depthAlpha * 0.35})`;
+          ctx.beginPath();
+          ctx.moveTo(p1.px, p1.py);
+          ctx.lineTo(target.px, target.py);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw pentagonal disclination nodes
+    projected.sort((a, b) => a.pz - b.pz); // Painter's algorithm
+    for (const p of projected) {
+      const alpha = Math.max(0.25, (p.pz + 1.2) / 2.2);
+      const isCorrupted = p.cell.neighbors.some(n => typeof n !== 'string') || p.cell.neighbors.length !== 5;
+
+      // Pulse glow
+      const pulse = Math.sin(time * 0.004 + p.cell.index) * 2;
+      const radius = (isCorrupted ? 11 : 8.5) + pulse;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, radius * p.scale, 0, Math.PI * 2);
+      ctx.fillStyle = isCorrupted ? `rgba(255, 42, 95, ${alpha})` : `rgba(255, 0, 85, ${alpha})`;
+      ctx.shadowColor = isCorrupted ? '#ff0033' : '#ff2a6d';
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.restore();
+
+      // Node border
+      ctx.strokeStyle = isCorrupted ? '#ffffff' : '#ffd0e0';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // String ID label if facing camera
+      if (p.pz > -0.2) {
+        ctx.fillStyle = isCorrupted ? '#fecdd3' : '#a7f3d0';
+        ctx.font = `${Math.floor(9 * p.scale)}px Courier New`;
+        ctx.fillText(`P${p.cell.index}: [${p.cell.neighbors.length} strings]`, p.px + 12, p.py + 3);
+      }
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  // Initial validation & boot
+  validateAllPentagons();
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

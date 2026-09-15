@@ -1,7 +1,7 @@
 // =============================================================================
 // WEB OF LIFE - CONSERVATIVE SPATIAL FLUX MONAD & TOPOLOGY ENGINES (FULL)
 // =============================================================================
-import { H3_PENTAGON_NEIGHBOR_COUNT, isPentagonNeighborArrayLengthValid, isPentagonCell, PentagonalCoordinationViolationError, HexagonalCoordinationViolationError, orderSharedBoundaryEndpointsByCentroid, areCartesianUnitVectorsEqual3D, toVec3D, dotProduct, vec3Norm, vec3Normalize, createVec3D, calculateH3SharedBoundaryLength, } from './h3_adjacency.js';
+import { H3_PENTAGON_NEIGHBOR_COUNT, isPentagonNeighborArrayLengthValid, isPentagonCell, PentagonalCoordinationViolationError, HexagonalCoordinationViolationError, orderSharedBoundaryEndpointsByCentroid, areCartesianUnitVectorsEqual3D, toVec3D, dotProduct, vec3Norm, vec3Normalize, createVec3D, calculateH3SharedBoundaryLength, assertPentagonalNeighborCount, assertPentagonalNeighborStringElements, } from './h3_adjacency.js';
 export class TopologicalAdjacencyDefectError extends Error {
     constructor(message = 'Topological adjacency defect error: cell topology violation') {
         super(message);
@@ -298,7 +298,7 @@ export class PentagonalSpatialFluxMonad {
     }
 }
 // -----------------------------------------------------------------------------
-// UNIFIED POLYMORPHIC SPATIAL FLUX MONAD (SPRINTS 069 - 079 COMPATIBILITY)
+// UNIFIED POLYMORPHIC SPATIAL FLUX MONAD (SPRINTS 069 - 081 COMPATIBILITY)
 // -----------------------------------------------------------------------------
 export class SpatialFluxMonad {
     cells = new Map();
@@ -306,9 +306,20 @@ export class SpatialFluxMonad {
     boundaryFacets = new Map();
     history = [];
     state;
+    cellIndex;
+    neighbors;
+    stocks;
     lastError = null;
     cellStates = {};
-    constructor(initialData, neighborsOrStates) {
+    constructor(initialData, neighborsOrStates, stocksArg) {
+        if (typeof initialData === 'string' && Array.isArray(neighborsOrStates)) {
+            this.cellIndex = initialData;
+            this.neighbors = neighborsOrStates;
+            this.stocks = stocksArg;
+            this.state = initialData;
+            this.adjacencies.set(initialData, neighborsOrStates);
+            return;
+        }
         if (initialData instanceof Map) {
             this.cells = new Map(initialData);
             this.state = initialData;
@@ -326,7 +337,6 @@ export class SpatialFluxMonad {
                 this.cells = new Map(initialData.cells);
             }
             else if (initialData.stocks && initialData.geometries) {
-                // Sprint 078 SpatialGridState
                 this.state = initialData;
             }
             else {
@@ -355,8 +365,8 @@ export class SpatialFluxMonad {
             }
         }
     }
-    static of(data, neighbors) {
-        return new SpatialFluxMonad(data, neighbors);
+    static of(data, neighbors, stocks) {
+        return new SpatialFluxMonad(data, neighbors, stocks);
     }
     static validateCellTopology(state) {
         const isPent = isPentagonCell(state.cellIndex) || state.cellIndex.includes('pentagon');
@@ -416,6 +426,38 @@ export class SpatialFluxMonad {
             },
             entropyProductionJPerK: 1e-4,
         };
+    }
+    distributePentagonalFlux(fluxTensors) {
+        const nbrs = this.neighbors ?? [];
+        assertPentagonalNeighborCount(nbrs);
+        assertPentagonalNeighborStringElements(nbrs);
+        if (fluxTensors.length !== 5) {
+            throw new Error(`Pentagonal flux distribution requires exactly 5 flux vectors, received ${fluxTensors.length}`);
+        }
+        const transfers = new Map();
+        let totalCarbonOut = 0;
+        let totalWaterOut = 0;
+        let totalEnergyOut = 0;
+        for (let k = 0; k < 5; k++) {
+            const neighborId = nbrs[k];
+            const flux = fluxTensors[k];
+            totalCarbonOut += flux.carbonKg;
+            totalWaterOut += flux.waterKg;
+            totalEnergyOut += flux.energyJoules;
+            transfers.set(neighborId, flux);
+        }
+        if (this.stocks) {
+            if (totalCarbonOut > this.stocks.carbonKg) {
+                throw new Error(`Insufficient carbon stock in cell ${this.cellIndex} for pentagonal flux`);
+            }
+            if (totalWaterOut > this.stocks.waterKg) {
+                throw new Error(`Insufficient water stock in cell ${this.cellIndex} for pentagonal flux`);
+            }
+            if (totalEnergyOut > this.stocks.energyJoules) {
+                throw new Error(`Insufficient thermal energy in cell ${this.cellIndex} for pentagonal flux`);
+            }
+        }
+        return transfers;
     }
     getCell(id) {
         return this.cells.get(id);

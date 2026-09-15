@@ -1,0 +1,202 @@
+@startuml sprint_081_schema
+!theme cerulean-outline
+skinparam backgroundColor #FAFAFA
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Web of Life - Sprint 081\nTopological Pentagonal Neighbor Assertion & Conserved Spatial Flux Architecture
+
+package "Discrete Global Grid & Topological Core (src/spatial)" {
+
+    enum CoordinationTopology {
+        HEXAGONAL_COORDINATION = 6
+        PENTAGONAL_COORDINATION = 5
+    }
+
+    interface IH3CellDescriptor {
+        +cellId: string
+        +resolution: number
+        +isPentagon: boolean
+        +coordination: CoordinationTopology
+        +centroidLat: number
+        +centroidLng: number
+    }
+
+    class H3AdjacencyValidator <<utility>> {
+        +assertHexagonalNeighborCount(neighbors: readonly unknown[]): asserts neighbors is readonly [string, string, string, string, string, string]
+        +assertPentagonalNeighborCount(neighbors: readonly unknown[]): asserts neighbors is readonly unknown[]
+        +assertPentagonalNeighborStringElements(neighbors: readonly unknown[]): asserts neighbors is readonly string[]
+        +validatePentagonalAdjacency(neighbors: readonly unknown[]): readonly string[]
+        +validateCellIdentifier(cellId: unknown): string
+    }
+
+    class H3GridRegistry {
+        -cells: Map<string, IH3CellDescriptor>
+        -adjacencyGraph: Map<string, readonly string[]>
+        +registerCell(desc: IH3CellDescriptor): void
+        +registerPentagon(cellId: string, neighbors: readonly unknown[]): void
+        +getNeighbors(cellId: string): readonly string[]
+        +assertPlanetaryContinuity(): boolean
+    }
+}
+
+package "Thermodynamic Spatial Monad Subsystem (src/monads)" {
+
+    enum ChemicalStockKey {
+        CARBON_ORGANIC
+        CARBON_MINERAL
+        NITROGEN_ACTIVE
+        PHOSPHORUS_LABILE
+        WATER_SOIL
+        BIOMASS_CANOPY
+        ENTROPY_THERMAL
+    }
+
+    class ThermodynamicStock {
+        +stockKey: ChemicalStockKey
+        +amountMoles: number
+        +internalEnergyJoules: number
+        +temperatureKelvin: number
+        +entropyJoulesPerKelvin: number
+        +addFlux(moles: number, enthalpyJoules: number): ThermodynamicStock
+        +dissipateEntropy(entropyJoulesPerK: number): ThermodynamicStock
+    }
+
+    class FluxTensor {
+        +stockType: ChemicalStockKey
+        +molesTransferred: number
+        +enthalpyJoules: number
+        +entropyProducedJoulePerK: number
+        +conservationProof: Uint8Array
+        +verifyContinuity(): boolean
+    }
+
+    class SpatialFluxMonad<A> {
+        -cellId: string
+        -neighbors: readonly string[]
+        -stocks: Map<ChemicalStockKey, ThermodynamicStock>
+        -stagedOutflows: Map<string, FluxTensor>
+        +of(cellId: string, neighbors: readonly unknown[], stocks: Map<ChemicalStockKey, ThermodynamicStock>): SpatialFluxMonad<A>
+        +map<B>(fn: (val: A) => B): SpatialFluxMonad<B>
+        +flatMap<B>(fn: (val: A) => SpatialFluxMonad<B>): SpatialFluxMonad<B>
+        +stageFlux(targetNeighbor: string, flux: FluxTensor): SpatialFluxMonad<A>
+        +commitStep(): SpatialFluxMonad<A>
+        +validateNeighborhoodInvariant(): boolean
+    }
+}
+
+package "Database & Thermodynamic Blockchain Ledger (db/schema.sql)" {
+
+    entity "spatial_cells" as SpatialCells {
+        * cell_id: VARCHAR(16) [PK]
+        --
+        resolution: SMALLINT
+        is_pentagon: BOOLEAN
+        coordination_number: SMALLINT
+        centroid_lat: DOUBLE PRECISION
+        centroid_lng: DOUBLE PRECISION
+        created_at: TIMESTAMPTZ
+    }
+
+    entity "spatial_adjacency_edges" as AdjacencyEdges {
+        * source_cell_id: VARCHAR(16) [PK, FK]
+        * neighbor_index: SMALLINT [PK]
+        --
+        target_cell_id: VARCHAR(16) [FK]
+        distance_meters: DOUBLE PRECISION
+        boundary_conductance: DOUBLE PRECISION
+        verified_at: TIMESTAMPTZ
+    }
+
+    entity "pentagonal_neighbor_validations" as PentagonValidations {
+        * validation_id: UUID [PK]
+        --
+        pentagon_cell_id: VARCHAR(16) [FK]
+        neighbor_strings: TEXT[]
+        neighbor_count: SMALLINT (=5)
+        assertion_name: VARCHAR(64)
+        is_valid: BOOLEAN
+        validation_timestamp: TIMESTAMPTZ
+        validator_node_id: VARCHAR(64)
+        error_message: TEXT
+    }
+
+    entity "cellular_stock_states" as CellularStocks {
+        * cell_id: VARCHAR(16) [PK, FK]
+        * stock_type: chemical_stock_type [PK]
+        --
+        amount_moles: DOUBLE PRECISION
+        internal_energy_joules: DOUBLE PRECISION
+        temperature_kelvin: DOUBLE PRECISION
+        entropy_joules_per_kelvin: DOUBLE PRECISION
+        updated_at: TIMESTAMPTZ
+    }
+
+    entity "spatial_flux_transactions" as FluxLedger {
+        * flux_id: UUID [PK]
+        --
+        block_height: BIGINT [FK]
+        source_cell_id: VARCHAR(16) [FK]
+        target_cell_id: VARCHAR(16) [FK]
+        stock_type: chemical_stock_type
+        flux_moles: DOUBLE PRECISION
+        enthalpy_transferred_joules: DOUBLE PRECISION
+        entropy_generated_joules_per_kelvin: DOUBLE PRECISION
+        conservation_checksum: BYTEA
+        timestamp: TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_blocks" as ThermoBlocks {
+        * block_height: BIGINT [PK]
+        --
+        previous_block_hash: BYTEA
+        block_hash: BYTEA [UNIQUE]
+        merkle_state_root: BYTEA
+        merkle_flux_root: BYTEA
+        total_entropy_production_jk: DOUBLE PRECISION
+        net_planetary_mass_delta_moles: DOUBLE PRECISION (=0)
+        solar_inflow_joules: DOUBLE PRECISION
+        thermal_radiation_outflow_joules: DOUBLE PRECISION
+        validator_signature: BYTEA
+        witness_timestamp: TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invariant Bindings
+H3AdjacencyValidator ..> H3GridRegistry : validates inputs for
+H3GridRegistry o-- IH3CellDescriptor : tracks topology
+SpatialFluxMonad ..> H3AdjacencyValidator : asserts pentagonal string elements
+SpatialFluxMonad *-- ThermodynamicStock : stores localized stocks
+SpatialFluxMonad o-- FluxTensor : computes conserved edge transfers
+
+SpatialCells "1" *-- "5..6" AdjacencyEdges : defines edges
+SpatialCells "1" *-- "0..1" PentagonValidations : audited by
+SpatialCells "1" *-- "1..*" CellularStocks : balances maintained in
+AdjacencyEdges "1" <.. "0..*" FluxLedger : restricts flow to edge
+ThermoBlocks "1" *-- "0..*" FluxLedger : commits conserved block
+
+H3GridRegistry ..> SpatialCells : synchronizes state
+SpatialFluxMonad ..> FluxLedger : materializes committed transactions
+ThermodynamicStock ..> CellularStocks : maps directly to SQL stocks
+
+note bottom of H3AdjacencyValidator
+    <b>RFC-081 Invariant:</b>
+    Pentagonal neighbor array must satisfy:
+    1. Array.isArray(neighbors) === true
+    2. neighbors.length === 5
+    3. for each elem:
+       - typeof elem === 'string'
+       - elem.trim().length > 0
+    Prevents empty-string or non-string flux leakage
+    across icosahedral topological singularities.
+end note
+
+note bottom of ThermoBlocks
+    <b>Thermodynamic Closed-System Invariant:</b>
+    Net planetary mass delta:
+    $$\sum_{i \in \mathcal{V}} \frac{d M_i}{d t} = \sum_{(i,j) \in \mathcal{E}} J_{ij}^{\text{matter}} = 0$$
+    Adjacency failures would violate conservation by
+    diverting conserved moles into invalid sink addresses.
+end note
+
+@enduml

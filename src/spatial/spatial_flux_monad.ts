@@ -9,6 +9,7 @@ import {
   CellThermodynamicState,
   SpatialFluxState,
   Vector3D,
+  Vector3DInput,
   Point2D,
   CellThermodynamicStocks,
   StockTransferDelta,
@@ -32,6 +33,9 @@ import {
   createVec3D,
   EARTH_RADIUS_METERS,
   calculateH3SharedBoundaryLength,
+  assertPentagonalNeighborCount,
+  assertPentagonalNeighborStringElements,
+  ConservedStockDelta,
 } from './h3_adjacency.js';
 
 export { CellThermodynamicState };
@@ -245,10 +249,10 @@ export function computeBoundaryFlux(
 export function computeOrientedEdgeFlux(
   stateA: BoundaryFluxState,
   stateB: BoundaryFluxState,
-  centroidA: Point2D | Vector3D,
-  centroidB: Point2D | Vector3D,
-  p1: Point2D | Vector3D,
-  p2: Point2D | Vector3D,
+  centroidA: Point2D | Vector3DInput,
+  centroidB: Point2D | Vector3DInput,
+  p1: Point2D | Vector3DInput,
+  p2: Point2D | Vector3DInput,
   dt: number = 1.0
 ) {
   const ordered = orderSharedBoundaryEndpointsByCentroid(p1 as Point2D, p2 as Point2D, centroidA as Point2D, centroidB as Point2D);
@@ -508,7 +512,7 @@ export class PentagonalSpatialFluxMonad {
 }
 
 // -----------------------------------------------------------------------------
-// UNIFIED POLYMORPHIC SPATIAL FLUX MONAD (SPRINTS 069 - 079 COMPATIBILITY)
+// UNIFIED POLYMORPHIC SPATIAL FLUX MONAD (SPRINTS 069 - 081 COMPATIBILITY)
 // -----------------------------------------------------------------------------
 
 export class SpatialFluxMonad<T = any> {
@@ -517,10 +521,22 @@ export class SpatialFluxMonad<T = any> {
   public boundaryFacets: Map<string, any> = new Map();
   public history: any[] = [];
   public state: T;
+  public readonly cellIndex?: string;
+  public readonly neighbors?: readonly string[];
+  public readonly stocks?: Readonly<ConservedStockDelta>;
   private lastError: Error | null = null;
   private cellStates: Record<string, any> = {};
 
-  constructor(initialData?: any, neighborsOrStates?: any) {
+  constructor(initialData?: any, neighborsOrStates?: any, stocksArg?: any) {
+    if (typeof initialData === 'string' && Array.isArray(neighborsOrStates)) {
+      this.cellIndex = initialData;
+      this.neighbors = neighborsOrStates;
+      this.stocks = stocksArg;
+      this.state = initialData as any;
+      this.adjacencies.set(initialData, neighborsOrStates);
+      return;
+    }
+
     if (initialData instanceof Map) {
       this.cells = new Map(initialData);
       this.state = initialData as any;
@@ -535,7 +551,6 @@ export class SpatialFluxMonad<T = any> {
       if (initialData.cells && initialData.cells instanceof Map) {
         this.cells = new Map(initialData.cells);
       } else if (initialData.stocks && initialData.geometries) {
-        // Sprint 078 SpatialGridState
         this.state = initialData as any;
       } else {
         const id = initialData.cellIndex ?? initialData.h3Index ?? 'center';
@@ -562,8 +577,8 @@ export class SpatialFluxMonad<T = any> {
     }
   }
 
-  public static of<U = any>(data?: any, neighbors?: any): SpatialFluxMonad<U> {
-    return new SpatialFluxMonad<U>(data, neighbors);
+  public static of<U = any>(data?: any, neighbors?: any, stocks?: any): SpatialFluxMonad<U> {
+    return new SpatialFluxMonad<U>(data, neighbors, stocks);
   }
 
   public static validateCellTopology(state: SpatialFluxState): IResult<SpatialFluxState, TopologicalAdjacencyDefectError> {
@@ -638,6 +653,50 @@ export class SpatialFluxMonad<T = any> {
       },
       entropyProductionJPerK: 1e-4,
     };
+  }
+
+  public distributePentagonalFlux(
+    fluxTensors: readonly ConservedStockDelta[]
+  ): Map<string, ConservedStockDelta> {
+    const nbrs = this.neighbors ?? [];
+    assertPentagonalNeighborCount(nbrs);
+    assertPentagonalNeighborStringElements(nbrs);
+
+    if (fluxTensors.length !== 5) {
+      throw new Error(
+        `Pentagonal flux distribution requires exactly 5 flux vectors, received ${fluxTensors.length}`
+      );
+    }
+
+    const transfers = new Map<string, ConservedStockDelta>();
+    let totalCarbonOut = 0;
+    let totalWaterOut = 0;
+    let totalEnergyOut = 0;
+
+    for (let k = 0; k < 5; k++) {
+      const neighborId = nbrs[k];
+      const flux = fluxTensors[k];
+
+      totalCarbonOut += flux.carbonKg;
+      totalWaterOut += flux.waterKg;
+      totalEnergyOut += flux.energyJoules;
+
+      transfers.set(neighborId, flux);
+    }
+
+    if (this.stocks) {
+      if (totalCarbonOut > this.stocks.carbonKg) {
+        throw new Error(`Insufficient carbon stock in cell ${this.cellIndex} for pentagonal flux`);
+      }
+      if (totalWaterOut > this.stocks.waterKg) {
+        throw new Error(`Insufficient water stock in cell ${this.cellIndex} for pentagonal flux`);
+      }
+      if (totalEnergyOut > this.stocks.energyJoules) {
+        throw new Error(`Insufficient thermal energy in cell ${this.cellIndex} for pentagonal flux`);
+      }
+    }
+
+    return transfers;
   }
 
   public getCell(id: string): any {
@@ -794,7 +853,7 @@ export class SpatialFluxMonad<T = any> {
   public computeFacetTransfer(
     originId: string,
     neighborId: string,
-    velocity: Vector3D,
+    velocity: Vector3DInput,
     diffCoeffs: DiffusionCoefficients = {},
     dt: number = 1.0
   ) {
