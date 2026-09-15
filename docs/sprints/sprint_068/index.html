@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thermodynamic Web of Life - Sprint 068: 3D Spherical Shared Boundary Vertex Extraction</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.92);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(740px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.12rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  border: 1px solid #00e1ff44;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #64d8ff;
+  font-family: monospace;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(940px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 140px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(370px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+  font-size: 0.74rem;
+}
+
+.telemetry-title {
+  color: #00ffe1;
+  font-weight: bold;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #00e1ff28;
+  padding-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+
+.telemetry-label {
+  color: var(--muted);
+}
+
+.telemetry-val {
+  color: #ffffff;
+  font-weight: bold;
+  text-align: right;
+  word-break: break-all;
+}
+
+.val-boundary {
+  color: var(--boundary);
+}
+
+.val-normal {
+  color: var(--normal);
+}
+
+.val-active {
+  color: var(--flora);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  background: rgba(0, 225, 255, 0.2);
+  color: #00e1ff;
+  border: 1px solid #00e1ff55;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>GAIA SPHERICAL TOPOLOGY // SPRINT 068</h1>
+  <h2>3D Spherical Shared Boundary Vertex Extraction & Dual Geodesic Normal</h2>
+  <p>
+    Extracting exact 3D Cartesian coordinates for shared boundary vertices (<span class="highlight">v₀, v₁</span>) between adjacent spherical cells. Supports conservative topological flux routing, surface boundary tension, and dual geodesic boundary normals.
+  </p>
+  <div class="social-links">
+    <a href="01_RFC.md">RFC: Shared Boundary</a>
+    <a href="02_METHODS.md">Methods & Geodesics</a>
+    <a href="../../index.html">Master Dashboard</a>
+  </div>
+</div>
+
+<div id="sprint-telemetry">
+  <div class="telemetry-title">
+    <span>SHARED BOUNDARY TELEMETRY</span>
+    <span class="badge" id="telStatus">ACTIVE</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Primary Cell (A):</span>
+    <span class="telemetry-val" id="telCellA">cell-00</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Neighbor Cell (B):</span>
+    <span class="telemetry-val" id="telCellB">cell-01</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Shared Vertex 0 (v₀):</span>
+    <span class="telemetry-val val-boundary" id="telV0">[0.000, 0.000, 0.000]</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Shared Vertex 1 (v₁):</span>
+    <span class="telemetry-val val-boundary" id="telV1">[0.000, 0.000, 0.000]</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Boundary Arc Length:</span>
+    <span class="telemetry-val" id="telArcLen">0.0000 rad</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Chord Distance:</span>
+    <span class="telemetry-val" id="telChordDist">0.0000 R</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Boundary Normal (n):</span>
+    <span class="telemetry-val val-normal" id="telNormal">[0.000, 0.000, 0.000]</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Topological Flux:</span>
+    <span class="telemetry-val val-active" id="telFlux">+412.5 W/m²</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">FPS / Latency:</span>
+    <span class="telemetry-val" id="telFps">60 fps (16.6ms)</span>
+  </div>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search cell ID (e.g. cell-03)..." />
+  <button id="btnNextPair">Next Adjacent Pair</button>
+  <button id="btnRotate">Toggle Rotate</button>
+  <button id="btnReset">Reset View</button>
+  <label class="zoom-container">
+    Zoom <input type="range" id="zoomSlider" min="0.6" max="2.2" step="0.05" value="1.0" />
+  </label>
+  <label class="debug-container">
+    <input type="checkbox" id="chkDebug" checked /> Boundary Normals
+  </label>
+</div>
+
+<script>
+// 3D Cartesian Vector Class (Standard JS ES6)
+class Vec3 {
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = Number(x);
+    this.y = Number(y);
+    this.z = Number(z);
+  }
+
+  clone() {
+    return new Vec3(this.x, this.y, this.z);
+  }
+
+  add(v) {
+    return new Vec3(this.x + v.x, this.y + v.y, this.z + v.z);
+  }
+
+  sub(v) {
+    return new Vec3(this.x - v.x, this.y - v.y, this.z - v.z);
+  }
+
+  scale(s) {
+    return new Vec3(this.x * s, this.y * s, this.z * s);
+  }
+
+  dot(v) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
+  }
+
+  cross(v) {
+    return new Vec3(
+      this.y * v.z - this.z * v.y,
+      this.z * v.x - this.x * v.z,
+      this.x * v.y - this.y * v.x
+    );
+  }
+
+  lengthSq() {
+    return this.x * this.x + this.y * this.y + this.z * this.z;
+  }
+
+  length() {
+    return Math.sqrt(this.lengthSq());
+  }
+
+  normalize() {
+    const len = this.length();
+    if (len < 1e-9) return new Vec3(0, 1, 0);
+    return new Vec3(this.x / len, this.y / len, this.z / len);
+  }
+
+  distanceTo(v) {
+    return this.sub(v).length();
+  }
+
+  angleTo(v) {
+    const d = Math.max(-1, Math.min(1, this.dot(v) / (this.length() * v.length() || 1)));
+    return Math.acos(d);
+  }
+}
+
+// Spherical Cell Definition
+class SphericalCell {
+  constructor(id, center, vertices) {
+    this.id = id;
+    this.center = center.normalize();
+    this.vertices = vertices.map(v => v.normalize());
+    this.neighbors = [];
+    this.flux = (Math.sin(center.x * 5) * 300 + 400).toFixed(1);
+  }
+}
+
+// Generate Geodesic Dual Cells on Sphere
+function generateSphericalGrid(radius = 1) {
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const rawIcoVerts = [
+    new Vec3(-1, phi, 0), new Vec3(1, phi, 0), new Vec3(-1, -phi, 0), new Vec3(1, -phi, 0),
+    new Vec3(0, -1, phi), new Vec3(0, 1, phi), new Vec3(0, -1, -phi), new Vec3(0, 1, -phi),
+    new Vec3(phi, 0, -1), new Vec3(phi, 0, 1), new Vec3(-phi, 0, -1), new Vec3(-phi, 0, 1)
+  ].map(v => v.normalize());
+
+  const icoFaces = [
+    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+    [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+    [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
+  ];
+
+  // Dual cell construction: each icosahedron vertex corresponds to a spherical cell
+  const cells = [];
+  for (let i = 0; i < rawIcoVerts.length; i++) {
+    const center = rawIcoVerts[i];
+    // Find all faces incident to this vertex to construct perimeter vertices
+    const incidentFaces = icoFaces.filter(f => f.includes(i));
+    // Face centroids become boundary vertices
+    const boundaryVerts = incidentFaces.map(f => {
+      const v0 = rawIcoVerts[f[0]];
+      const v1 = rawIcoVerts[f[1]];
+      const v2 = rawIcoVerts[f[2]];
+      return v0.add(v1).add(v2).normalize();
+    });
+
+    // Sort boundary vertices angularly around cell center
+    const ref = boundaryVerts[0];
+    const normal = center;
+    const tangentU = ref.sub(normal.scale(ref.dot(normal))).normalize();
+    const tangentV = normal.cross(tangentU);
+
+    boundaryVerts.sort((a, b) => {
+      const projA = new Vec3(a.dot(tangentU), a.dot(tangentV), 0);
+      const projB = new Vec3(b.dot(tangentU), b.dot(tangentV), 0);
+      return Math.atan2(projA.y, projA.x) - Math.atan2(projB.y, projB.x);
+    });
+
+    cells.push(new SphericalCell(`cell-${i < 10 ? '0' + i : i}`, center, boundaryVerts));
+  }
+
+  // Populate neighbor adjacency: two cells are adjacent if they share faces / edges
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      const shared = extractSharedBoundaryVertices(cells[i], cells[j]);
+      if (shared.length >= 2) {
+        cells[i].neighbors.push(j);
+        cells[j].neighbors.push(i);
+      }
+    }
+  }
+
+  return cells;
+}
+
+// Extract Shared Boundary Vertices between Cell A and Cell B
+function extractSharedBoundaryVertices(cellA, cellB, eps = 0.08) {
+  const shared = [];
+  for (const va of cellA.vertices) {
+    for (const vb of cellB.vertices) {
+      if (va.distanceTo(vb) < eps) {
+        if (!shared.some(s => s.distanceTo(va) < 1e-4)) {
+          shared.push(va);
+        }
+      }
+    }
+  }
+  return shared;
+}
+
+// App State
+const state = {
+  cells: [],
+  selectedPairIndex: 0,
+  adjacentPairs: [],
+  zoom: 1.0,
+  autoRotate: true,
+  debugNormals: true,
+  rotX: 0.35,
+  rotY: 0.65,
+  isDragging: false,
+  lastMouseX: 0,
+  lastMouseY: 0,
+  sphereRadius: 220,
+  fps: 60,
+  lastTime: performance.now()
+};
+
+// Canvas Setup
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Grid Initialization
+state.cells = generateSphericalGrid();
+
+// Collect all unique adjacent pairs
+for (let i = 0; i < state.cells.length; i++) {
+  for (const nb of state.cells[i].neighbors) {
+    if (i < nb) {
+      state.adjacentPairs.push([i, nb]);
+    }
+  }
+}
+
+// 3D Projection Helper
+function project3D(v, rotX, rotY, radius, zoom, cx, cy) {
+  // Rotate around Y
+  const cosY = Math.cos(rotY);
+  const sinY = Math.sin(rotY);
+  const x1 = v.x * cosY + v.z * sinY;
+  const y1 = v.y;
+  const z1 = -v.x * sinY + v.z * cosY;
+
+  // Rotate around X
+  const cosX = Math.cos(rotX);
+  const sinX = Math.sin(rotX);
+  const x2 = x1;
+  const y2 = y1 * cosX - z1 * sinX;
+  const z2 = y1 * sinX + z1 * cosX;
+
+  // Perspective factor
+  const camDist = 650;
+  const factor = (camDist / (camDist - z2 * radius * zoom)) * zoom;
+  const screenX = cx + x2 * radius * factor;
+  const screenY = cy - y2 * radius * factor;
+
+  return {
+    x: screenX,
+    y: screenY,
+    z: z2,
+    factor: factor
+  };
+}
+
+// Update Telemetry Panel
+function updateTelemetry(cellA, cellB, sharedVerts) {
+  const telA = document.getElementById('telCellA');
+  const telB = document.getElementById('telCellB');
+  const telV0 = document.getElementById('telV0');
+  const telV1 = document.getElementById('telV1');
+  const telArcLen = document.getElementById('telArcLen');
+  const telChordDist = document.getElementById('telChordDist');
+  const telNormal = document.getElementById('telNormal');
+  const telFlux = document.getElementById('telFlux');
+
+  telA.textContent = cellA ? cellA.id : 'N/A';
+  telB.textContent = cellB ? cellB.id : 'N/A';
+
+  if (sharedVerts.length >= 2) {
+    const v0 = sharedVerts[0];
+    const v1 = sharedVerts[1];
+    telV0.textContent = `[${v0.x.toFixed(3)}, ${v0.y.toFixed(3)}, ${v0.z.toFixed(3)}]`;
+    telV1.textContent = `[${v1.x.toFixed(3)}, ${v1.y.toFixed(3)}, ${v1.z.toFixed(3)}]`;
+
+    const arc = v0.angleTo(v1);
+    const chord = v0.distanceTo(v1);
+    telArcLen.textContent = `${arc.toFixed(4)} rad (${(arc * 180 / Math.PI).toFixed(1)}°)`;
+    telChordDist.textContent = `${chord.toFixed(4)} R`;
+
+    const mid = v0.add(v1).normalize();
+    const edgeTan = v1.sub(v0).normalize();
+    const normal = mid.cross(edgeTan).normalize();
+    telNormal.textContent = `[${normal.x.toFixed(3)}, ${normal.y.toFixed(3)}, ${normal.z.toFixed(3)}]`;
+    telFlux.textContent = `+${cellA.flux} W/m² (inward)`;
+  } else {
+    telV0.textContent = 'None';
+    telV1.textContent = 'None';
+    telArcLen.textContent = '0.0000 rad';
+    telChordDist.textContent = '0.0000 R';
+    telNormal.textContent = '[0.000, 0.000, 0.000]';
+  }
+}
+
+// Render Loop
+function render(now) {
+  const dt = (now - state.lastTime) / 1000;
+  state.lastTime = now;
+  state.fps = Math.round(1 / (dt || 0.016));
+
+  if (state.autoRotate && !state.isDragging) {
+    state.rotY += 0.006;
+  }
+
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const R = state.sphereRadius;
+  const Z = state.zoom;
+
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+  // Background Cosmic Glow
+  const bgGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, Math.max(window.innerWidth, window.innerHeight) * 0.7);
+  bgGrad.addColorStop(0, '#041525');
+  bgGrad.addColorStop(1, '#02050a');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+  // Wireframe Latitude/Longitude Base Sphere
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0, 225, 255, 0.06)';
+  ctx.lineWidth = 1;
+  for (let lat = -60; lat <= 60; lat += 30) {
+    ctx.beginPath();
+    const rLat = (lat * Math.PI) / 180;
+    const yLat = Math.sin(rLat);
+    const radLat = Math.cos(rLat);
+    for (let lon = 0; lon <= 360; lon += 10) {
+      const rLon = (lon * Math.PI) / 180;
+      const pt = new Vec3(radLat * Math.cos(rLon), yLat, radLat * Math.sin(rLon));
+      const p = project3D(pt, state.rotX, state.rotY, R, Z, cx, cy);
+      if (lon === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Active pair
+  const currentPair = state.adjacentPairs[state.selectedPairIndex] || [0, 1];
+  const cellA = state.cells[currentPair[0]];
+  const cellB = state.cells[currentPair[1]];
+  const sharedVerts = extractSharedBoundaryVertices(cellA, cellB);
+
+  // Sort cells by center depth for back-to-front rendering
+  const sortedCells = state.cells.map((cell, idx) => {
+    const proj = project3D(cell.center, state.rotX, state.rotY, R, Z, cx, cy);
+    return { cell, idx, z: proj.z };
+  }).sort((a, b) => a.z - b.z);
+
+  // Render Cells
+  for (const item of sortedCells) {
+    const cell = item.cell;
+    const idx = item.idx;
+    const isA = idx === currentPair[0];
+    const isB = idx === currentPair[1];
+    const isNeighbor = cellA.neighbors.includes(idx) || cellB.neighbors.includes(idx);
+
+    const projectedVerts = cell.vertices.map(v => project3D(v, state.rotX, state.rotY, R, Z, cx, cy));
+    const projCenter = project3D(cell.center, state.rotX, state.rotY, R, Z, cx, cy);
+
+    // Front-facing opacity
+    const isFront = projCenter.z > -0.2;
+    const alpha = isFront ? Math.min(1, Math.max(0.15, (projCenter.z + 0.3) * 0.9)) : 0.08;
+
+    ctx.beginPath();
+    for (let i = 0; i < projectedVerts.length; i++) {
+      const p = projectedVerts[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+
+    if (isA) {
+      ctx.fillStyle = `rgba(0, 225, 255, ${0.45 * alpha})`;
+      ctx.strokeStyle = '#00e1ff';
+      ctx.lineWidth = 2.5;
+    } else if (isB) {
+      ctx.fillStyle = `rgba(0, 255, 102, ${0.45 * alpha})`;
+      ctx.strokeStyle = '#00ff66';
+      ctx.lineWidth = 2.5;
+    } else if (isNeighbor) {
+      ctx.fillStyle = `rgba(16, 40, 60, ${0.35 * alpha})`;
+      ctx.strokeStyle = `rgba(100, 216, 255, ${0.4 * alpha})`;
+      ctx.lineWidth = 1;
+    } else {
+      ctx.fillStyle = `rgba(6, 20, 32, ${0.2 * alpha})`;
+      ctx.strokeStyle = `rgba(49, 80, 100, ${0.25 * alpha})`;
+      ctx.lineWidth = 0.8;
+    }
+
+    ctx.fill();
+    ctx.stroke();
+
+    // Center Node Dot
+    if (isFront) {
+      ctx.beginPath();
+      ctx.arc(projCenter.x, projCenter.y, isA || isB ? 4 : 2, 0, Math.PI * 2);
+      ctx.fillStyle = isA ? '#00e1ff' : (isB ? '#00ff66' : 'rgba(117, 151, 168, 0.4)');
+      ctx.fill();
+
+      // Cell Labels for Active Pair
+      if (isA || isB) {
+        ctx.font = '10px "Courier New", monospace';
+        ctx.fillStyle = isA ? '#00e1ff' : '#00ff66';
+        ctx.fillText(cell.id, projCenter.x + 8, projCenter.y - 6);
+      }
+    }
+  }
+
+  // Render Dual Geodesic Connection between Cell A and Cell B
+  const pA = project3D(cellA.center, state.rotX, state.rotY, R, Z, cx, cy);
+  const pB = project3D(cellB.center, state.rotX, state.rotY, R, Z, cx, cy);
+  if (pA.z > -0.2 || pB.z > -0.2) {
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(192, 132, 252, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pA.x, pA.y);
+    ctx.lineTo(pB.x, pB.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Highlight Shared Boundary Vertices and Edge
+  if (sharedVerts.length >= 2) {
+    const v0 = sharedVerts[0];
+    const v1 = sharedVerts[1];
+    const pv0 = project3D(v0, state.rotX, state.rotY, R, Z, cx, cy);
+    const pv1 = project3D(v1, state.rotX, state.rotY, R, Z, cx, cy);
+
+    // Glowing Shared Boundary Edge
+    ctx.save();
+    ctx.strokeStyle = '#ffe600';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = '#ffe600';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.moveTo(pv0.x, pv0.y);
+    ctx.lineTo(pv1.x, pv1.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // Vertices Markers
+    const vertPoints = [pv0, pv1];
+    vertPoints.forEach((pv, idx) => {
+      ctx.save();
+      // Outer aura
+      const aura = ctx.createRadialGradient(pv.x, pv.y, 1, pv.x, pv.y, 12);
+      aura.addColorStop(0, 'rgba(255, 230, 0, 0.9)');
+      aura.addColorStop(1, 'rgba(255, 119, 0, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(pv.x, pv.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Core point
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(pv.x, pv.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label
+      ctx.font = 'bold 11px monospace';
+      ctx.fillStyle = '#ffe600';
+      ctx.fillText(`v${idx}`, pv.x + 8, pv.y + 4);
+      ctx.restore();
+    });
+
+    // Debug: Boundary Normal Vector
+    if (state.debugNormals) {
+      const mid = v0.add(v1).normalize();
+      const edgeTan = v1.sub(v0).normalize();
+      const normal = mid.cross(edgeTan).normalize();
+      const normalTip = mid.add(normal.scale(0.35));
+
+      const pMid = project3D(mid, state.rotX, state.rotY, R, Z, cx, cy);
+      const pTip = project3D(normalTip, state.rotX, state.rotY, R, Z, cx, cy);
+
+      ctx.save();
+      ctx.strokeStyle = '#ff7700';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pMid.x, pMid.y);
+      ctx.lineTo(pTip.x, pTip.y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ff7700';
+      ctx.beginPath();
+      ctx.arc(pTip.x, pTip.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '10px monospace';
+      ctx.fillText('n_boundary', pTip.x + 6, pTip.y - 2);
+      ctx.restore();
+    }
+  }
+
+  // Update Telemetry Panel
+  updateTelemetry(cellA, cellB, sharedVerts);
+  document.getElementById('telFps').textContent = `${state.fps} fps (${dt ? (dt * 1000).toFixed(1) : '16.6'}ms)`;
+
+  requestAnimationFrame(render);
+}
+
+// Mouse and Touch Interaction
+canvas.addEventListener('mousedown', e => {
+  state.isDragging = true;
+  state.lastMouseX = e.clientX;
+  state.lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+  state.isDragging = false;
+});
+
+window.addEventListener('mousemove', e => {
+  if (!state.isDragging) return;
+  const dx = e.clientX - state.lastMouseX;
+  const dy = e.clientY - state.lastMouseY;
+  state.rotY += dx * 0.007;
+  state.rotX += dy * 0.007;
+  state.lastMouseX = e.clientX;
+  state.lastMouseY = e.clientY;
+});
+
+// UI Controls Binding
+document.getElementById('btnNextPair').addEventListener('click', () => {
+  state.selectedPairIndex = (state.selectedPairIndex + 1) % state.adjacentPairs.length;
+});
+
+document.getElementById('btnRotate').addEventListener('click', () => {
+  state.autoRotate = !state.autoRotate;
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.rotX = 0.35;
+  state.rotY = 0.65;
+  state.zoom = 1.0;
+  document.getElementById('zoomSlider').value = 1.0;
+});
+
+document.getElementById('zoomSlider').addEventListener('input', e => {
+  state.zoom = parseFloat(e.target.value);
+});
+
+document.getElementById('chkDebug').addEventListener('change', e => {
+  state.debugNormals = e.target.checked;
+});
+
+document.getElementById('search').addEventListener('input', e => {
+  const query = e.target.value.trim().toLowerCase();
+  if (!query) return;
+  const foundIdx = state.cells.findIndex(c => c.id.toLowerCase().includes(query));
+  if (foundIdx !== -1) {
+    const pairIdx = state.adjacentPairs.findIndex(p => p[0] === foundIdx || p[1] === foundIdx);
+    if (pairIdx !== -1) {
+      state.selectedPairIndex = pairIdx;
+    }
+  }
+});
+
+// Start Render Loop
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

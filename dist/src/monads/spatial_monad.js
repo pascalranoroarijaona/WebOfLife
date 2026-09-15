@@ -1,6 +1,6 @@
 /**
  * Planetary Thermodynamic Spatial Monad Kernel
- * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 066)
+ * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 068)
  */
 import { H3ErrorCode, SpatialGuardClauseException, } from '../spatial/h3_types.js';
 import { isValidH3Index, validateH3Token, assertCanonicalH3Pattern, assertH3Resolution, matchesCanonicalH3Pattern, } from '../spatial/h3_grid.js';

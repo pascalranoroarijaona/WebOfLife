@@ -1,0 +1,201 @@
+@startuml
+!theme vibrant
+title Web of Life - Sprint 068: Shared Boundary Vertex Extraction (3D Manifold) & Thermodynamic Ledger Architecture
+
+skinparam class {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2980B9
+}
+
+package "Spatial Manifold & Geometry (src/spatial)" {
+    class Vec3 <<(T,#52BE80) Type>> {
+        +0: number (x)
+        +1: number (y)
+        +2: number (z)
+        --
+        +norm(): number
+        +dot(other: Vec3): number
+        +cross(other: Vec3): Vec3
+        +distanceTo(other: Vec3): number
+    }
+
+    class SharedBoundaryEdge3D <<(I,#F39C12) Interface>> {
+        +cellA: string
+        +cellB: string
+        +v1: Vec3
+        +v2: Vec3
+        +midpoint: Vec3
+        +normalAtoB: Vec3
+        +lengthMeters: number
+    }
+
+    class SpatialAdjacencyGraph {
+        -edgeCache: Map<string, SharedBoundaryEdge3D>
+        -adjacencyList: Map<string, Set<string>>
+        -radiusMeters: number
+        --
+        +getNeighbors(cell: string): string[]
+        +getSharedBoundary(cellA: string, cellB: string): SharedBoundaryEdge3D
+        +computeEdgeTransmissibility(cellA: string, cellB: string): number
+        +buildCanonicalEdgeKey(cellA: string, cellB: string): string
+    }
+
+    class AnalyticalSphericalTopology <<(M,#8E44AD) Module>> {
+        +{static} extractSharedBoundaryVertices3D(cellA: string, cellB: string, radius: number): [Vec3, Vec3] | null
+        +{static} latLngToCartesian3D(lat: number, lng: number, radius: number): Vec3
+        +{static} computeGeodesicArcLength(v1: Vec3, v2: Vec3, radius: number): number
+        +{static} computeDirectedInterfaceNormal(v1: Vec3, v2: Vec3, centroidA: Vec3, centroidB: Vec3): Vec3
+    }
+}
+
+package "Thermodynamic State Monads (src/monads)" {
+    class SpatialMonad<TState> {
+        +cellId: string
+        +state: TState
+        +timestamp: Date
+        --
+        +bind<B>(transform: (state: TState) => SpatialMonad<B>): SpatialMonad<B>
+        +exchangeFlux(neighbor: SpatialMonad<TState>, edge: SharedBoundaryEdge3D, dt: number): FluxResult<TState>
+    }
+
+    class ControlVolumeThermodynamicState {
+        +enthalpyJoules: number
+        +temperatureKelvin: number
+        +massTotalKg: number
+        +carbonStockKg: number
+        +entropyJoulesPerKelvin: number
+        --
+        +computeThermalGradient(other: ControlVolumeThermodynamicState): number
+        +computeEntropyProduction(heatFlux: number, neighborTemp: number): number
+    }
+
+    class InterfaceFluxPacket {
+        +edgeHash: string
+        +sourceCell: string
+        +targetCell: string
+        +sensibleHeatWatts: number
+        +massFlowKgPerSec: number
+        +entropyProductionRateWK: number
+        +firstLawResidual: number
+        --
+        +verifyAntisymmetry(reversePacket: InterfaceFluxPacket): boolean
+    }
+}
+
+package "Thermodynamic Blockchain Ledger (db/schema.sql)" {
+    class spatial_cells <<(E,#3498DB) Entity>> {
+        *cell_id: VARCHAR(32) [PK]
+        --
+        resolution: INTEGER
+        is_pentagon: BOOLEAN
+        centroid_lat: DOUBLE
+        centroid_lng: DOUBLE
+        centroid_x: DOUBLE
+        centroid_y: DOUBLE
+        centroid_z: DOUBLE
+        surface_area_m2: DOUBLE
+        created_at: TIMESTAMPTZ
+    }
+
+    class shared_boundary_edges_3d <<(E,#3498DB) Entity>> {
+        *edge_hash: CHAR(64) [PK]
+        --
+        cell_a: VARCHAR(32) [FK]
+        cell_b: VARCHAR(32) [FK]
+        v1_x: DOUBLE
+        v1_y: DOUBLE
+        v1_z: DOUBLE
+        v2_x: DOUBLE
+        v2_y: DOUBLE
+        v2_z: DOUBLE
+        midpoint_x: DOUBLE
+        midpoint_y: DOUBLE
+        midpoint_z: DOUBLE
+        normal_a_to_b_x: DOUBLE
+        normal_a_to_b_y: DOUBLE
+        normal_a_to_b_z: DOUBLE
+        geodesic_length_m: DOUBLE
+        transmissibility: DOUBLE
+        created_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_cell_states <<(E,#3498DB) Hypertable>> {
+        *cell_id: VARCHAR(32) [FK]
+        *epoch_timestamp: TIMESTAMPTZ
+        --
+        enthalpy_joules: DOUBLE
+        temperature_kelvin: DOUBLE
+        pressure_pascals: DOUBLE
+        mass_total_kg: DOUBLE
+        carbon_stock_kg: DOUBLE
+        moisture_mass_kg: DOUBLE
+        entropy_joules_per_kelvin: DOUBLE
+        entropy_generation_rate_w_k: DOUBLE
+    }
+
+    class boundary_flux_transactions <<(E,#3498DB) Hypertable>> {
+        *flux_id: UUID [PK]
+        --
+        edge_hash: CHAR(64) [FK]
+        source_cell: VARCHAR(32) [FK]
+        target_cell: VARCHAR(32) [FK]
+        epoch_timestamp: TIMESTAMPTZ
+        vertical_layer_thickness_m: DOUBLE
+        exchange_area_m2: DOUBLE
+        sensible_heat_flux_watts: DOUBLE
+        latent_heat_flux_watts: DOUBLE
+        mass_flux_kg_per_sec: DOUBLE
+        carbon_advection_kg_per_sec: DOUBLE
+        entropy_production_watts_per_kelvin: DOUBLE
+        flux_normal_alignment: DOUBLE
+        tx_hash: CHAR(64)
+    }
+
+    class thermodynamic_blocks <<(E,#3498DB) Entity>> {
+        *block_height: BIGSERIAL [PK]
+        --
+        block_hash: CHAR(64)
+        parent_hash: CHAR(64)
+        epoch_timestamp: TIMESTAMPTZ
+        merkle_flux_root: CHAR(64)
+        merkle_state_root: CHAR(64)
+        total_energy_joules: DOUBLE
+        total_mass_kg: DOUBLE
+        net_global_entropy_production_w_k: DOUBLE
+        first_law_residual_joules: DOUBLE
+        validator_node_signature: TEXT
+        created_at: TIMESTAMPTZ
+    }
+}
+
+' Relationships & Dependencies
+SpatialAdjacencyGraph ..> AnalyticalSphericalTopology : invokes extractSharedBoundaryVertices3D
+SpatialAdjacencyGraph *-- SharedBoundaryEdge3D : caches
+SharedBoundaryEdge3D *-- Vec3 : endpoints & normal
+
+SpatialMonad *-- ControlVolumeThermodynamicState : encapsulates
+SpatialMonad ..> SharedBoundaryEdge3D : queries geometric interface
+SpatialMonad ..> InterfaceFluxPacket : generates flux
+
+shared_boundary_edges_3d "1" -- "many" boundary_flux_transactions : defines facet for
+spatial_cells "1" -- "many" shared_boundary_edges_3d : cell_a
+spatial_cells "1" -- "many" shared_boundary_edges_3d : cell_b
+spatial_cells "1" -- "many" thermodynamic_cell_states : tracks state over time
+boundary_flux_transactions "many" -- "1" thermodynamic_blocks : included in Merkle root
+
+note right of AnalyticalSphericalTopology
+  <b>Mathematical & Thermodynamic Invariants:</b>
+  1. Geodesic Edge Length:
+     L_ij = R * arccos((v1 · v2) / R²)
+  2. Directed Outward Normal:
+     n_ij = ((v2 - v1) x x_c) / ||(v2 - v1) x x_c||
+  3. Strict Antisymmetry:
+     n_ji = -n_ij, L_ij == L_ji
+  4. First Law Balance:
+     Phi(A->B) + Phi(B->A) == 0
+  5. Second Law Entropy Generation:
+     dS_irr/dt >= 0
+end note
+
+@enduml

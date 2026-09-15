@@ -1,9 +1,10 @@
 /**
  * Planetary Thermodynamic Spatial Monad Kernel
- * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 066)
+ * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 068)
  */
 
 import {
+  Vec3,
   Vec3D,
   Vector3D,
   Vector3DInput,

@@ -2,9 +2,8 @@
 // WEB OF LIFE - PLANETARY H3 GRID MANIFOLD & VALIDATION KERNEL
 // =============================================================================
 import { H3ErrorCode, SpatialGuardClauseException, } from "./h3_types.js";
-import { EARTH_RADIUS_METERS } from "../thermodynamics/constants.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
-import { createVec3D } from "./h3_adjacency.js";
+import { h3CellToLatLng, h3CellToBoundary, h3GridDisk, } from "./h3_adjacency.js";
 export { SpatialMonad, H3ErrorCode };
 export const MIN_H3_RESOLUTION = 0;
 export const MAX_H3_RESOLUTION = 15;
@@ -681,7 +680,70 @@ export class H3Grid {
         }
     }
     get size() {
-        return this.cellsSet.size + this.activeCells.size + this.cellDataMap.size;
+        return this.getCells().length;
+    }
+    cellCount() {
+        return this.getCells().length;
+    }
+    validateIndex(index) {
+        if (index === null || index === undefined || index === "") {
+            return { isValid: false, code: H3ErrorCode.NULL_INDEX };
+        }
+        if (typeof index !== "string") {
+            return { isValid: false, code: H3ErrorCode.INVALID_CHARACTER };
+        }
+        if (index.length !== 15) {
+            return { isValid: false, code: H3ErrorCode.INVALID_LENGTH };
+        }
+        if (!/^[0-9a-fA-F]{15}$/.test(index)) {
+            return { isValid: false, code: H3ErrorCode.INVALID_CHARACTER };
+        }
+        const res = parseInt(index.charAt(1), 16);
+        return { isValid: true, code: H3ErrorCode.SUCCESS, resolution: res };
+    }
+    assertValidIndex(index) {
+        const validation = this.validateIndex(index);
+        if (!validation.isValid) {
+            throw new Error(`[Spatial Validation Error] Invalid index: ${index}`);
+        }
+    }
+    validateResolution(res) {
+        return isValidH3Resolution(res);
+    }
+    assertValidResolution(res) {
+        assertValidH3Resolution(res);
+    }
+    registerPayload(payload) {
+        const guarded = guardH3Payload(payload);
+        this.addCell(guarded);
+        return guarded;
+    }
+    hasIndex(index) {
+        if (typeof index !== "string")
+            return false;
+        return this.hasCell(index);
+    }
+    resolveCell(token) {
+        validateH3Token(token);
+        return this.getCell(token);
+    }
+    extractTokens(text) {
+        return extractUniqueCanonicalH3Tokens(text);
+    }
+    parseTokens(text) {
+        return extractUniqueCanonicalH3Tokens(text);
+    }
+    activateCell(token) {
+        const norm = token.toLowerCase();
+        this.activeCells.set(norm, {
+            index: norm,
+            resolution: parseInt(norm.charAt(1), 16),
+            mode: 1,
+        });
+        this.cellsSet.add(norm);
+    }
+    getActiveCellCount() {
+        return this.activeCells.size;
     }
     registerCell(h3Index, coord) {
         this.registeredCentroids.set(h3Index, coord);
@@ -695,92 +757,54 @@ export class H3Grid {
             if (parts.length === 3) {
                 const lat = parseFloat(parts[1]);
                 const lng = parseFloat(parts[2]);
-                if (!isNaN(lat) && !isNaN(lng))
+                if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
                     return { lat, lng };
+                }
             }
         }
-        return { lat: 0.0, lng: 0.0 };
-    }
-    validateIndex(h3Index) {
-        if (!h3Index || typeof h3Index !== "string") {
-            return { isValid: false, code: H3ErrorCode.NULL_INDEX };
+        try {
+            const [lat, lng] = h3CellToLatLng(h3Index);
+            return { lat, lng };
         }
-        if (h3Index.length !== 15) {
-            return { isValid: false, code: H3ErrorCode.INVALID_LENGTH };
-        }
-        if (!/^[0-9a-fA-F]{15}$/.test(h3Index)) {
-            return { isValid: false, code: H3ErrorCode.INVALID_CHARACTER };
-        }
-        const res = parseInt(h3Index.charAt(1), 16);
-        return { isValid: true, code: H3ErrorCode.SUCCESS, resolution: res };
-    }
-    assertValidIndex(h3Index) {
-        const res = this.validateIndex(h3Index);
-        if (!res.isValid) {
-            throw new Error(`Spatial Validation Error: ${res.code}`);
+        catch {
+            return { lat: 0, lng: 0 };
         }
     }
-    validateResolution(res) {
-        return isValidH3Resolution(res);
-    }
-    assertValidResolution(res) {
-        if (!this.validateResolution(res)) {
-            throw new RangeError(`Resolution ${res} is invalid`);
-        }
-    }
-    resolveCell(token) {
-        validateH3Token(token);
-        return { token };
-    }
-    addCell(token) {
-        if (!matchesCanonicalH3Pattern(token))
+    addCell(cell, data) {
+        if (!isValidH3Index(cell) && !matchesCanonicalH3Pattern(cell) && !cell.startsWith("cell")) {
             return false;
-        this.cellsSet.add(token);
+        }
+        this.cellsSet.add(cell);
+        if (data !== undefined) {
+            this.cellDataMap.set(cell, data);
+        }
         return true;
     }
-    hasCell(token) {
-        if (typeof token === "string") {
-            return this.cellsSet.has(token) || this.activeCells.has(token.toLowerCase()) || this.cellDataMap.has(token);
-        }
-        return false;
+    getCell(cell) {
+        if (!cell || typeof cell !== "string")
+            return undefined;
+        const lower = cell.toLowerCase();
+        return (this.cellDataMap.get(cell) ??
+            this.cellDataMap.get(lower) ??
+            this.activeCells.get(cell) ??
+            this.activeCells.get(lower));
     }
-    cellCount() {
-        return this.cellsSet.size;
+    setCell(cell, data) {
+        this.cellsSet.add(cell);
+        this.cellDataMap.set(cell, data);
     }
-    registerPayload(payload) {
-        guardH3Payload(payload);
-        this.cellsSet.add(payload);
-        return payload;
-    }
-    hasIndex(token) {
-        if (!token)
+    hasCell(cell) {
+        if (!cell || typeof cell !== "string")
             return false;
-        return this.cellsSet.has(token);
+        const lower = cell.toLowerCase();
+        return (this.cellsSet.has(cell) ||
+            this.cellsSet.has(lower) ||
+            this.cellDataMap.has(cell) ||
+            this.cellDataMap.has(lower) ||
+            this.activeCells.has(cell) ||
+            this.activeCells.has(lower));
     }
-    extractTokens(text) {
-        return extractUniqueCanonicalH3Tokens(text);
-    }
-    parseTokens(text) {
-        return extractUniqueCanonicalH3Tokens(text);
-    }
-    activateCell(token) {
-        const lower = token.toLowerCase();
-        this.activeCells.set(lower, {
-            index: lower,
-            resolution: parseInt(lower.charAt(1), 16) || 8,
-            mode: 1,
-        });
-    }
-    getActiveCellCount() {
-        return this.activeCells.size;
-    }
-    getCell(token) {
-        return this.activeCells.get(token.toLowerCase()) ?? this.cellDataMap.get(token);
-    }
-    setCell(id, data) {
-        this.cellDataMap.set(id, data);
-    }
-    linkNeighbors(a, b) {
+    addEdge(a, b) {
         if (!this.neighborLinks.has(a))
             this.neighborLinks.set(a, new Set());
         if (!this.neighborLinks.has(b))
@@ -788,53 +812,63 @@ export class H3Grid {
         this.neighborLinks.get(a).add(b);
         this.neighborLinks.get(b).add(a);
     }
-    getNeighbors(id) {
-        return Array.from(this.neighborLinks.get(id) || []);
+    linkNeighbors(a, b) {
+        this.addEdge(a, b);
     }
-    static approximateFacetLengthMeters(resolution) {
-        const baseLengthM = 1107712.0;
-        return baseLengthM / Math.pow(Math.sqrt(7), resolution);
-    }
-    static sphericalToCartesianUnit(coord) {
-        const DEG_TO_RAD = Math.PI / 180.0;
-        const phi = coord.lat * DEG_TO_RAD;
-        const lambda = coord.lng * DEG_TO_RAD;
-        const cosPhi = Math.cos(phi);
-        return createVec3D(cosPhi * Math.cos(lambda), cosPhi * Math.sin(lambda), Math.sin(phi));
-    }
-    static sphericalToCartesianMeters(coord) {
-        const unit = H3Grid.sphericalToCartesianUnit(coord);
-        return createVec3D(unit.x * EARTH_RADIUS_METERS, unit.y * EARTH_RADIUS_METERS, unit.z * EARTH_RADIUS_METERS);
-    }
-    static validate(index) {
-        return H3GridValidator.isValidIndex(index);
-    }
-    static cellToBoundary(payload) {
-        guardH3Payload(payload);
+    getNeighbors(cell) {
+        if (this.neighborLinks.has(cell)) {
+            return Array.from(this.neighborLinks.get(cell));
+        }
         return [];
     }
-    static getResolution(payload) {
-        guardH3Payload(payload);
-        return getResolution(payload);
+    getCells() {
+        const set = new Set();
+        for (const k of this.cellsSet)
+            set.add(k.toLowerCase());
+        for (const k of this.cellDataMap.keys())
+            set.add(k.toLowerCase());
+        for (const k of this.activeCells.keys())
+            set.add(k.toLowerCase());
+        return Array.from(set);
     }
-    static getNeighbors(index) {
-        assertCanonicalH3Pattern(index);
-        return [
-            `${index.slice(0, 14)}0`,
-            `${index.slice(0, 14)}1`,
-            `${index.slice(0, 14)}2`,
-            `${index.slice(0, 14)}3`,
-            `${index.slice(0, 14)}4`,
-            `${index.slice(0, 14)}5`,
-        ];
+    clear() {
+        this.registeredCentroids.clear();
+        this.cellsSet.clear();
+        this.cellDataMap.clear();
+        this.activeCells.clear();
+        this.neighborLinks.clear();
     }
-    static kRing(index, k) {
-        assertCanonicalH3Pattern(index);
-        if (k < 0)
-            throw new SpatialGridError("kRing radius must be non-negative");
-        if (k === 0)
-            return [index];
-        return [index, ...H3Grid.getNeighbors(index)];
+    // Static methods
+    static validate(token) {
+        return H3GridValidator.isValidIndex(token);
+    }
+    static cellToBoundary(cell) {
+        guardH3Payload(cell);
+        return h3CellToBoundary(cell);
+    }
+    static getResolution(cell) {
+        guardH3Payload(cell);
+        assertCanonicalH3Pattern(cell);
+        return parseInt(cell.charAt(1), 16);
+    }
+    static getNeighbors(token) {
+        assertCanonicalH3Pattern(token);
+        const disk = h3GridDisk(token, 1);
+        const nbrs = disk.filter((c) => c.toLowerCase() !== token.toLowerCase());
+        if (nbrs.length === 6)
+            return nbrs;
+        const res = [];
+        for (let i = 0; i < 6; i++) {
+            res.push(`${token.slice(0, 14)}${i}`);
+        }
+        return res;
+    }
+    static kRing(token, k) {
+        assertCanonicalH3Pattern(token);
+        if (k < 0) {
+            throw new SpatialGridError(`kRing radius cannot be negative: ${k}`);
+        }
+        return h3GridDisk(token, k);
     }
     static extractCanonicalTokens(text) {
         return extractCanonicalH3Tokens(text);
@@ -843,9 +877,11 @@ export class H3Grid {
         return extractUniqueCanonicalH3Tokens(text);
     }
     static isValidCanonicalIndex(index) {
-        return isValidH3CanonicalIndex(index);
+        return isValidCanonicalH3(index);
     }
     static normalizeIndex(index) {
-        return H3GridManager.normalizeIndex(index);
+        if (!isValidCanonicalH3(index))
+            return null;
+        return index.toLowerCase();
     }
 }
