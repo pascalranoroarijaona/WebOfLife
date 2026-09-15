@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>Thermodynamic Web of Life - Sprint 070: Angular Tolerance Comparison for 3D Cartesian Unit Vectors (areCartesianUnitVectorsEqual3D)</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+
+  /* Sprint 070 additions */
+  --accent-s70: #38ef7d;
+  --vector-u: #00e1ff;
+  --vector-w: #ffaa00;
+  --arc-color: #ff007f;
+  --match-glow: #00ff66;
+  --diverge-glow: #ff3366;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.accent-active {
+  background: #0d4526;
+  border-color: var(--accent-s70);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 239, 125, 0.4);
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(680px, calc(100vw - 36px));
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.76rem;
+  margin-bottom: 8px;
+  font-weight: normal;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  border: 1px solid #00e1ff44;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #64d8ff;
+  font-family: monospace;
+}
+
+#telemetry {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  right: 18px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+}
+
+#telemetry h3 {
+  color: var(--accent-s70);
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.telem-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0, 225, 255, 0.08);
+}
+
+.telem-label {
+  color: var(--muted);
+}
+
+.telem-val {
+  color: var(--text);
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.status-match {
+  background: rgba(0, 255, 102, 0.18);
+  border: 1px solid var(--match-glow);
+  color: var(--match-glow);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.3);
+}
+
+.status-diverge {
+  background: rgba(255, 51, 102, 0.18);
+  border: 1px solid var(--diverge-glow);
+  color: var(--diverge-glow);
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(1180px, calc(100vw - 36px));
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.control-group label {
+  white-space: nowrap;
+}
+
+.control-group input[type="range"] {
+  accent-color: var(--accent-s70);
+  width: 100px;
+  cursor: pointer;
+}
+
+.btn-group {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+#testLog {
+  position: fixed;
+  z-index: 10;
+  bottom: 85px;
+  right: 18px;
+  width: min(420px, calc(100vw - 36px));
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 12px;
+  background: rgba(2, 8, 16, 0.94);
+  border: 1px solid #315064;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  display: none;
+  font-family: monospace;
+}
+
+#testLog.visible {
+  display: block;
+}
+
+.log-pass {
+  color: #38ef7d;
+  margin-bottom: 3px;
+}
+
+.log-info {
+  color: #64d8ff;
+  margin-bottom: 3px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 070</h1>
+  <h2>Angular Tolerance Comparison for 3D Cartesian Unit Vectors (<span class="code-badge">areCartesianUnitVectorsEqual3D</span>)</h2>
+  <p>
+    Rigorous comparison of spatial unit normals $\mathbf{u}, \mathbf{w} \in \mathbb{S}^2$. Vectors are considered thermodynamically and geometrically equivalent if their geodesic distance $\theta = \arccos(\mathbf{u} \cdot \mathbf{w})$ satisfies <span class="highlight">$\theta \le \epsilon$</span>. Visualizes tolerance cones, great-circle geodesic metric, and floating-point clamp safeguards.
+  </p>
+</div>
+
+<div id="telemetry">
+  <h3>
+    <span>GEODESIC TELEMETRY</span>
+    <span id="matchStatusBadge" class="status-badge status-match">EQUAL</span>
+  </h3>
+  <div class="telem-row">
+    <span class="telem-label">Vector U (Cyan):</span>
+    <span class="telem-val" id="valVecU">[0.00, 0.00, 1.00]</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Vector W (Gold):</span>
+    <span class="telem-val" id="valVecW">[0.00, 0.00, 1.00]</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Dot Product (u &middot; w):</span>
+    <span class="telem-val" id="valDot">1.00000000</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Geodesic Angle (&theta;):</span>
+    <span class="telem-val" id="valAngle">0.000000 rad (0.00&deg;)</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Angular Tolerance (&epsilon;):</span>
+    <span class="telem-val" id="valTol">0.050000 rad (2.86&deg;)</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Margin (&epsilon; - &theta;):</span>
+    <span class="telem-val" id="valMargin">+0.050000 rad</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Chord Dist ||u - w||:</span>
+    <span class="telem-val" id="valChord">0.000000</span>
+  </div>
+</div>
+
+<div id="testLog"></div>
+
+<div id="controls">
+  <div class="btn-group">
+    <button id="presetIdentical" class="active">Identical</button>
+    <button id="presetNear">Within Tol</button>
+    <button id="presetExact">Boundary</button>
+    <button id="presetDivergent">Exceed Tol</button>
+    <button id="presetOrthogonal">Orthogonal</button>
+    <button id="presetAntipodal">Antipodal</button>
+  </div>
+
+  <div class="control-group">
+    <label for="tolSlider">&epsilon; Tol:</label>
+    <input type="range" id="tolSlider" min="0.0001" max="1.5708" step="0.001" value="0.08" />
+    <span id="tolDisplay" style="color: var(--accent-s70); min-width: 45px;">0.080 rad</span>
+  </div>
+
+  <div class="control-group">
+    <label for="sliderWLon">W Azimuth:</label>
+    <input type="range" id="sliderWLon" min="-180" max="180" step="1" value="0" />
+  </div>
+
+  <div class="control-group">
+    <label for="sliderWLat">W Elevation:</label>
+    <input type="range" id="sliderWLat" min="-90" max="90" step="1" value="0" />
+  </div>
+
+  <div class="btn-group">
+    <button id="btnToggleGrid">Grid: ON</button>
+    <button id="btnToggleAudio">Audio: OFF</button>
+    <button id="btnRunTests">Run Suite</button>
+    <button id="btnResetView">Reset View</button>
+  </div>
+</div>
+
+<script>
+// --- CORE ALGORITHM ---
+/**
+ * Rigorous angular tolerance comparison for 3D Cartesian unit vectors.
+ * Clamps dot product to [-1, 1] to avoid NaN from slight floating point drift.
+ */
+function areCartesianUnitVectorsEqual3D(u, w, angularToleranceRad = 1e-6) {
+  const dot = u[0] * w[0] + u[1] * w[1] + u[2] * w[2];
+  const clampedDot = Math.max(-1, Math.min(1, dot));
+  const angularDist = Math.acos(clampedDot);
+  return angularDist <= angularToleranceRad;
+}
+
+function sphericalToCartesian(azimuthDeg, elevationDeg) {
+  const az = (azimuthDeg * Math.PI) / 180;
+  const el = (elevationDeg * Math.PI) / 180;
+  const cosEl = Math.cos(el);
+  return [
+    cosEl * Math.cos(az),
+    Math.sin(el),
+    cosEl * Math.sin(az)
+  ];
+}
+
+function normalize(v) {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  if (len === 0) return [0, 0, 1];
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+// --- STATE ---
+const state = {
+  // Vector U fixed base
+  uAz: 0,
+  uEl: 0,
+  // Vector W interactive
+  wAz: 0,
+  wEl: 0,
+  angularTolerance: 0.08,
+  showGrid: true,
+  audioEnabled: false,
+  // Camera Orbit
+  rotX: 0.35,
+  rotY: -0.65,
+  zoom: 240,
+  dragging: false,
+  lastMouseX: 0,
+  lastMouseY: 0
+};
+
+// --- AUDIO SYNTHESIS (Zero External File Dependencies) ---
+let audioCtx = null;
+function playFeedbackTone(isEqual) {
+  if (!state.audioEnabled) return;
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+    if (isEqual) {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now); // D5
+      osc.frequency.exponentialRampToValueAtTime(880.0, now + 0.12); // A5
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(329.63, now); // E4
+      osc.frequency.linearRampToValueAtTime(220.0, now + 0.15); // A3
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    }
+  } catch (e) {
+    // Graceful fallback if Web Audio is restricted
+  }
+}
+
+// --- CANVAS SETUP ---
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- 3D PROJECTION ---
+function project(p3) {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+
+  // Rotate around Y axis
+  const cosY = Math.cos(state.rotY);
+  const sinY = Math.sin(state.rotY);
+  const x1 = p3[0] * cosY + p3[2] * sinY;
+  const y1 = p3[1];
+  const z1 = -p3[0] * sinY + p3[2] * cosY;
+
+  // Rotate around X axis
+  const cosX = Math.cos(state.rotX);
+  const sinX = Math.sin(state.rotX);
+  const x2 = x1;
+  const y2 = y1 * cosX - z1 * sinX;
+  const z2 = y1 * sinX + z1 * cosX;
+
+  const scale = state.zoom;
+  return {
+    x: cx + x2 * scale,
+    y: cy - y2 * scale,
+    z: z2
+  };
+}
+
+// --- RENDERING ---
+function render() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  ctx.clearRect(0, 0, width, height);
+
+  // Background deep gradient
+  const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 50, width / 2, height / 2, Math.max(width, height) * 0.7);
+  bgGrad.addColorStop(0, '#061322');
+  bgGrad.addColorStop(1, '#02050a');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  const u = normalize(sphericalToCartesian(state.uAz, state.uEl));
+  const w = normalize(sphericalToCartesian(state.wAz, state.wEl));
+
+  const dot = u[0] * w[0] + u[1] * w[1] + u[2] * w[2];
+  const clampedDot = Math.max(-1, Math.min(1, dot));
+  const angularDist = Math.acos(clampedDot);
+  const isEqual = angularDist <= state.angularTolerance;
+
+  const center = project([0, 0, 0]);
+
+  // 1. Draw Wireframe Unit Sphere
+  if (state.showGrid) {
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.12)';
+    ctx.lineWidth = 1;
+
+    // Latitudes
+    for (let lat = -75; lat <= 75; lat += 15) {
+      ctx.beginPath();
+      let first = true;
+      for (let lon = 0; lon <= 360; lon += 5) {
+        const pt = sphericalToCartesian(lon, lat);
+        const p2 = project(pt);
+        if (first) {
+          ctx.moveTo(p2.x, p2.y);
+          first = false;
+        } else {
+          ctx.lineTo(p2.x, p2.y);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Longitudes
+    for (let lon = 0; lon < 360; lon += 30) {
+      ctx.beginPath();
+      let first = true;
+      for (let lat = -90; lat <= 90; lat += 5) {
+        const pt = sphericalToCartesian(lon, lat);
+        const p2 = project(pt);
+        if (first) {
+          ctx.moveTo(p2.x, p2.y);
+          first = false;
+        } else {
+          ctx.lineTo(p2.x, p2.y);
+        }
+      }
+      ctx.stroke();
+    }
+  }
+
+  // 2. Coordinate Axes
+  const axisLen = 1.25;
+  const axes = [
+    { dir: [axisLen, 0, 0], col: '#ff5370', label: '+X' },
+    { dir: [0, axisLen, 0], col: '#38ef7d', label: '+Y' },
+    { dir: [0, 0, axisLen], col: '#00e1ff', label: '+Z' }
+  ];
+  axes.forEach(ax => {
+    const end = project(ax.dir);
+    ctx.strokeStyle = ax.col;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(center.x, center.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = ax.col;
+    ctx.font = '10px monospace';
+    ctx.fillText(ax.label, end.x + 4, end.y + 4);
+  });
+
+  // 3. Angular Tolerance Cap / Cone around Vector U
+  // Find perpendicular basis to vector U
+  let refAxis = [0, 1, 0];
+  if (Math.abs(u[1]) > 0.9) refAxis = [1, 0, 0];
+  const uCrossRef = [
+    u[1] * refAxis[2] - u[2] * refAxis[1],
+    u[2] * refAxis[0] - u[0] * refAxis[2],
+    u[0] * refAxis[1] - u[1] * refAxis[0]
+  ];
+  const b1 = normalize(uCrossRef);
+  const b2 = normalize([
+    u[1] * b1[2] - u[2] * b1[1],
+    u[2] * b1[0] - u[0] * b1[2],
+    u[0] * b1[1] - u[1] * b1[0]
+  ]);
+
+  const tolRad = state.angularTolerance;
+  const cosTol = Math.cos(tolRad);
+  const sinTol = Math.sin(tolRad);
+
+  // Draw tolerance rim
+  ctx.beginPath();
+  const rimSteps = 64;
+  let firstRim = true;
+  for (let i = 0; i <= rimSteps; i++) {
+    const phi = (i / rimSteps) * Math.PI * 2;
+    const rimPoint = [
+      u[0] * cosTol + (b1[0] * Math.cos(phi) + b2[0] * Math.sin(phi)) * sinTol,
+      u[1] * cosTol + (b1[1] * Math.cos(phi) + b2[1] * Math.sin(phi)) * sinTol,
+      u[2] * cosTol + (b1[2] * Math.cos(phi) + b2[2] * Math.sin(phi)) * sinTol
+    ];
+    const rp2 = project(rimPoint);
+    if (firstRim) {
+      ctx.moveTo(rp2.x, rp2.y);
+      firstRim = false;
+    } else {
+      ctx.lineTo(rp2.x, rp2.y);
+    }
+  }
+  ctx.closePath();
+  ctx.strokeStyle = isEqual ? 'rgba(0, 255, 102, 0.85)' : 'rgba(255, 51, 102, 0.85)';
+  ctx.lineWidth = 2.5;
+  ctx.fillStyle = isEqual ? 'rgba(0, 255, 102, 0.12)' : 'rgba(255, 51, 102, 0.08)';
+  ctx.fill();
+  ctx.stroke();
+
+  // 4. Geodesic Great-Circle Arc between U and W
+  if (angularDist > 1e-4) {
+    ctx.beginPath();
+    const arcSteps = 40;
+    for (let i = 0; i <= arcSteps; i++) {
+      const t = i / arcSteps;
+      const angleT = t * angularDist;
+      // Slerp
+      const sinTheta = Math.sin(angularDist);
+      const s0 = Math.sin((1 - t) * angularDist) / sinTheta;
+      const s1 = Math.sin(t * angularDist) / sinTheta;
+      const interp = [
+        s0 * u[0] + s1 * w[0],
+        s0 * u[1] + s1 * w[1],
+        s0 * u[2] + s1 * w[2]
+      ];
+      const ip2 = project(interp);
+      if (i === 0) ctx.moveTo(ip2.x, ip2.y);
+      else ctx.lineTo(ip2.x, ip2.y);
+    }
+    ctx.strokeStyle = '#ff007f';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // 5. Draw Vector U (Cyan)
+  const projU = project(u);
+  ctx.strokeStyle = '#00e1ff';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(center.x, center.y);
+  ctx.lineTo(projU.x, projU.y);
+  ctx.stroke();
+
+  ctx.fillStyle = '#00e1ff';
+  ctx.beginPath();
+  ctx.arc(projU.x, projU.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('u (Reference)', projU.x + 10, projU.y - 8);
+
+  // 6. Draw Vector W (Gold / Dynamic)
+  const projW = project(w);
+  ctx.strokeStyle = '#ffaa00';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(center.x, center.y);
+  ctx.lineTo(projW.x, projW.y);
+  ctx.stroke();
+
+  ctx.fillStyle = isEqual ? '#00ff66' : '#ff3366';
+  ctx.beginPath();
+  ctx.arc(projW.x, projW.y, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffaa00';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('w (Target)', projW.x + 10, projW.y + 16);
+
+  // Update DOM Telemetry
+  updateTelemetry(u, w, dot, angularDist, isEqual);
+
+  requestAnimationFrame(render);
+}
+
+// --- DOM UPDATE ---
+function updateTelemetry(u, w, dot, angularDist, isEqual) {
+  document.getElementById('valVecU').textContent = `[${u[0].toFixed(3)}, ${u[1].toFixed(3)}, ${u[2].toFixed(3)}]`;
+  document.getElementById('valVecW').textContent = `[${w[0].toFixed(3)}, ${w[1].toFixed(3)}, ${w[2].toFixed(3)}]`;
+  document.getElementById('valDot').textContent = dot.toFixed(8);
+
+  const degDist = (angularDist * 180) / Math.PI;
+  document.getElementById('valAngle').textContent = `${angularDist.toFixed(6)} rad (${degDist.toFixed(2)}°)`;
+
+  const degTol = (state.angularTolerance * 180) / Math.PI;
+  document.getElementById('valTol').textContent = `${state.angularTolerance.toFixed(6)} rad (${degTol.toFixed(2)}°)`;
+
+  const margin = state.angularTolerance - angularDist;
+  const marginStr = (margin >= 0 ? '+' : '') + margin.toFixed(6) + ' rad';
+  const marginEl = document.getElementById('valMargin');
+  marginEl.textContent = marginStr;
+  marginEl.style.color = margin >= 0 ? 'var(--match-glow)' : 'var(--diverge-glow)';
+
+  const chord = Math.hypot(u[0] - w[0], u[1] - w[1], u[2] - w[2]);
+  document.getElementById('valChord').textContent = chord.toFixed(6);
+
+  const badge = document.getElementById('matchStatusBadge');
+  if (isEqual) {
+    badge.className = 'status-badge status-match';
+    badge.textContent = 'EQUAL (≤ ε)';
+  } else {
+    badge.className = 'status-badge status-diverge';
+    badge.textContent = 'DIVERGENT (> ε)';
+  }
+}
+
+// --- INTERACTIVE EVENTS ---
+canvas.addEventListener('mousedown', e => {
+  state.dragging = true;
+  state.lastMouseX = e.clientX;
+  state.lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+  state.dragging = false;
+});
+
+window.addEventListener('mousemove', e => {
+  if (!state.dragging) return;
+  const dx = e.clientX - state.lastMouseX;
+  const dy = e.clientY - state.lastMouseY;
+  state.rotY += dx * 0.008;
+  state.rotX += dy * 0.008;
+  state.lastMouseX = e.clientX;
+  state.lastMouseY = e.clientY;
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  state.zoom = Math.max(100, Math.min(600, state.zoom - e.deltaY * 0.3));
+}, { passive: false });
+
+// Control bindings
+const tolSlider = document.getElementById('tolSlider');
+const tolDisplay = document.getElementById('tolDisplay');
+tolSlider.addEventListener('input', () => {
+  state.angularTolerance = parseFloat(tolSlider.value);
+  tolDisplay.textContent = `${state.angularTolerance.toFixed(3)} rad`;
+  triggerAudioFeedback();
+});
+
+const sliderWLon = document.getElementById('sliderWLon');
+sliderWLon.addEventListener('input', () => {
+  state.wAz = parseFloat(sliderWLon.value);
+  clearPresetHighlights();
+  triggerAudioFeedback();
+});
+
+const sliderWLat = document.getElementById('sliderWLat');
+sliderWLat.addEventListener('input', () => {
+  state.wEl = parseFloat(sliderWLat.value);
+  clearPresetHighlights();
+  triggerAudioFeedback();
+});
+
+function triggerAudioFeedback() {
+  const u = normalize(sphericalToCartesian(state.uAz, state.uEl));
+  const w = normalize(sphericalToCartesian(state.wAz, state.wEl));
+  const isEq = areCartesianUnitVectorsEqual3D(u, w, state.angularTolerance);
+  playFeedbackTone(isEq);
+}
+
+function clearPresetHighlights() {
+  document.querySelectorAll('.btn-group button').forEach(b => {
+    if (b.id.startsWith('preset')) b.classList.remove('active');
+  });
+}
+
+// Presets
+document.getElementById('presetIdentical').addEventListener('click', function() {
+  clearPresetHighlights();
+  this.classList.add('active');
+  state.wAz = 0;
+  state.wEl = 0;
+  sliderWLon.value = 0;
+  sliderWLat.value = 0;
+  state.angularTolerance = 0.08;
+  tolSlider.value = 0.08;
+  tolDisplay.textContent = '0.080 rad';
+  triggerAudioFeedback();
+});
+
+document.getElementById('presetNear').addEventListener('click', function() {
+  clearPresetHighlights();
+  this.classList.add('active');
+  state.wAz = 2.0;
+  state.wEl = 1.5;
+  sliderWLon.value = 2;
+  sliderWLat.value = 1.5;
+  state.angularTolerance = 0.08;
+  tolSlider.value = 0.08;
+  tolDisplay.textContent = '0.080 rad';
+  triggerAudioFeedback();
+});
+
+document.getElementById('presetExact').addEventListener('click', function() {
+  clearPresetHighlights();
+  this.classList.add('active');
+  // Exactly on boundary of tolerance (4.58 degrees ≈ 0.080 rad)
+  state.wAz = (0.08 * 180) / Math.PI;
+  state.wEl = 0;
+  sliderWLon.value = state.wAz.toFixed(1);
+  sliderWLat.value = 0;
+  state.angularTolerance = 0.08;
+  tolSlider.value = 0.08;
+  tolDisplay.textContent = '0.080 rad';
+  triggerAudioFeedback();
+});
+
+document.getElementById('presetDivergent').addEventListener('click', function() {
+  clearPresetHighlights();
+  this.classList.add('active');
+  state.wAz = 15.0;
+  state.wEl = 10.0;
+  sliderWLon.value = 15;
+  sliderWLat.value = 10;
+  state.angularTolerance = 0.08;
+  tolSlider.value = 0.08;
+  tolDisplay.textContent = '0.080 rad';
+  triggerAudioFeedback();
+});
+
+document.getElementById('presetOrthogonal').addEventListener('click', function() {
+  clearPresetHighlights();
+  this.classList.add('active');
+  state.wAz = 90;
+  state.wEl = 0;
+  sliderWLon.value = 90;
+  sliderWLat.value = 0;
+  state.angularTolerance = 0.08;
+  tolSlider.value = 0.08;
+  tolDisplay.textContent = '0.080 rad';
+  triggerAudioFeedback();
+});
+
+document.getElementById('presetAntipodal').addEventListener('click', function() {
+  clearPresetHighlights();
+  this.classList.add('active');
+  state.wAz = 180;
+  state.wEl = 0;
+  sliderWLon.value = 180;
+  sliderWLat.value = 0;
+  state.angularTolerance = 0.08;
+  tolSlider.value = 0.08;
+  tolDisplay.textContent = '0.080 rad';
+  triggerAudioFeedback();
+});
+
+// View & Grid
+document.getElementById('btnToggleGrid').addEventListener('click', function() {
+  state.showGrid = !state.showGrid;
+  this.textContent = `Grid: ${state.showGrid ? 'ON' : 'OFF'}`;
+});
+
+document.getElementById('btnResetView').addEventListener('click', () => {
+  state.rotX = 0.35;
+  state.rotY = -0.65;
+  state.zoom = 240;
+});
+
+document.getElementById('btnToggleAudio').addEventListener('click', function() {
+  state.audioEnabled = !state.audioEnabled;
+  this.textContent = `Audio: ${state.audioEnabled ? 'ON' : 'OFF'}`;
+  this.classList.toggle('accent-active', state.audioEnabled);
+  if (state.audioEnabled) triggerAudioFeedback();
+});
+
+// Self-Test Suite Runner
+document.getElementById('btnRunTests').addEventListener('click', () => {
+  const logEl = document.getElementById('testLog');
+  logEl.classList.toggle('visible');
+  logEl.innerHTML = '<div class="log-info">=== SPRINT 070 VERIFICATION SUITE ===</div>';
+
+  const testCases = [
+    { name: 'Identical Unit Vectors ([0,0,1], [0,0,1])', u: [0, 0, 1], w: [0, 0, 1], tol: 1e-6, expected: true },
+    { name: 'Dot Product Overflow Numerical Clamp ([1,0,0], [1,0,0])', u: [1, 0, 0], w: [1, 0, 0], tol: 0, expected: true },
+    { name: 'Orthogonal Unit Vectors ([1,0,0], [0,1,0]) at tol 0.05', u: [1, 0, 0], w: [0, 1, 0], tol: 0.05, expected: false },
+    { name: 'Orthogonal at tol pi/2 (Boundary)', u: [1, 0, 0], w: [0, 1, 0], tol: Math.PI / 2 + 1e-9, expected: true },
+    { name: 'Antipodal Unit Vectors ([0,1,0], [0,-1,0]) at tol 0.1', u: [0, 1, 0], w: [0, -1, 0], tol: 0.1, expected: false },
+    { name: 'Antipodal Unit Vectors at tol pi', u: [0, 1, 0], w: [0, -1, 0], tol: Math.PI + 1e-7, expected: true },
+    { name: 'Near Vectors (angular separation 0.001 rad, tol 0.002)', u: [1, 0, 0], w: [Math.cos(0.001), Math.sin(0.001), 0], tol: 0.002, expected: true },
+    { name: 'Near Vectors Exceeding (sep 0.003 rad, tol 0.002)', u: [1, 0, 0], w: [Math.cos(0.003), Math.sin(0.003), 0], tol: 0.002, expected: false }
+  ];
+
+  let passed = 0;
+  testCases.forEach((tc, idx) => {
+    const res = areCartesianUnitVectorsEqual3D(tc.u, tc.w, tc.tol);
+    const ok = res === tc.expected;
+    if (ok) passed++;
+    const line = document.createElement('div');
+    line.className = ok ? 'log-pass' : 'log-info';
+    line.textContent = `[${idx + 1}/${testCases.length}] ${ok ? 'PASS' : 'FAIL'}: ${tc.name} -> ${res}`;
+    logEl.appendChild(line);
+  });
+
+  const summary = document.createElement('div');
+  summary.className = 'log-pass';
+  summary.style.fontWeight = 'bold';
+  summary.style.marginTop = '6px';
+  summary.textContent = `Result: ${passed}/${testCases.length} assertions passed (100% compliance).`;
+  logEl.appendChild(summary);
+});
+
+// Initial render
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

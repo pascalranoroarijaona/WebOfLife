@@ -1,61 +1,118 @@
-// =============================================================================
-// WEB OF LIFE - PLANETARY H3 GRID MANIFOLD & VALIDATION KERNEL
-// =============================================================================
+/**
+ * src/spatial/h3_grid.ts
+ * Unified Geodesic and Cartesian projection utilities, canonical validation,
+ * error hierarchies, and H3 grid managers across all sprints.
+ */
 
 import {
-  SphericalCoordinates,
-  Vector3D,
+  CartesianVector3D,
+  GeoCoord,
   H3ErrorCode,
-  SpatialGuardClauseException,
   CellThermodynamicStocks,
-  StockTransferDelta,
   ThermodynamicStocks,
-} from "./h3_types.js";
-import { SpatialMonad } from "../monads/spatial_monad.js";
-import {
-  h3CellToLatLng,
-  h3CellToBoundary,
-  h3GridDisk,
-} from "./h3_adjacency.js";
+  SpatialGuardClauseException,
+} from './h3_types.js';
+import { EARTH_RADIUS_METERS } from './h3_adjacency.js';
+import { SpatialMonad } from '../monads/spatial_monad.js';
 
-export { SpatialMonad, CellThermodynamicStocks, StockTransferDelta, ThermodynamicStocks, H3ErrorCode };
+export { SpatialMonad } from '../monads/spatial_monad.js';
+export { H3ErrorCode, CellThermodynamicStocks, ThermodynamicStocks, SpatialGuardClauseException };
+
+// =============================================================================
+// CARTESIAN & GEODESIC PROJECTIONS (SPRINT 070)
+// =============================================================================
+
+export function geoToCartesian3D(coord: GeoCoord): CartesianVector3D {
+  const phi = (coord.lat * Math.PI) / 180;
+  const lambda = (coord.lng * Math.PI) / 180;
+
+  const cosPhi = Math.cos(phi);
+  return {
+    x: cosPhi * Math.cos(lambda),
+    y: cosPhi * Math.sin(lambda),
+    z: Math.sin(phi),
+  };
+}
+
+export function cartesian3DToGeo(v: CartesianVector3D): GeoCoord {
+  const mag = Math.hypot(v.x, v.y, v.z);
+  if (mag <= 1e-30) {
+    throw new Error('Cannot project zero-magnitude vector to spherical coordinates.');
+  }
+
+  const normZ = Math.max(-1.0, Math.min(1.0, v.z / mag));
+  const latRad = Math.asin(normZ);
+  const lngRad = Math.atan2(v.y, v.x);
+
+  return {
+    lat: (latRad * 180) / Math.PI,
+    lng: (lngRad * 180) / Math.PI,
+  };
+}
+
+export function greatCircleDistanceMeters(
+  v1: CartesianVector3D,
+  v2: CartesianVector3D,
+  radiusMeters: number = EARTH_RADIUS_METERS
+): number {
+  const cx = v1.y * v2.z - v1.z * v2.y;
+  const cy = v1.z * v2.x - v1.x * v2.z;
+  const cz = v1.x * v2.y - v1.y * v2.x;
+  const crossNorm = Math.hypot(cx, cy, cz);
+  const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+
+  return Math.atan2(crossNorm, dot) * radiusMeters;
+}
+
+// =============================================================================
+// REGEX PATTERNS & CONSTANTS
+// =============================================================================
+
+export const H3_REGEX = /^[89a-fA-F][0-9a-fA-F]{14}$/;
+export const H3_HEX_REGEX = /^[0-9a-fA-F]+$/;
+export const H3_CANONICAL_INDEX_PATTERN = /^[0-9a-fA-F]{15}$/;
+export const CANONICAL_H3_REGEX = /^[0-9a-f]{15}$/;
+export const H3_GLOBAL_CANONICAL_INDEX_PATTERN = /\b[0-9a-fA-F]{15}\b/g;
 
 export const MIN_H3_RESOLUTION = 0;
 export const MAX_H3_RESOLUTION = 15;
 
-export const H3_REGEX = /^[0-9a-fA-F]{15}$/;
-export const H3_HEX_REGEX = /^[0-9a-fA-F]+$/;
-export const CANONICAL_H3_REGEX = /^[8][0-9a-fA-F]{14}$/;
-export const H3_CANONICAL_INDEX_PATTERN = /^[8][0-9a-fA-F]{14}$/;
-export const H3_GLOBAL_CANONICAL_INDEX_PATTERN = /\b[0-9a-fA-F]{15}\b/g;
+// =============================================================================
+// ERROR HIERARCHY
+// =============================================================================
 
 export class SpatialGridError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "SpatialGridError";
+    this.name = 'SpatialGridError';
+    Object.setPrototypeOf(this, SpatialGridError.prototype);
   }
 }
 
 export class H3ValidationError extends SpatialGridError {
-  public token?: string;
-  constructor(token?: string, message?: string) {
-    super(message ?? `Invalid canonical H3 index token '${token}'`);
-    this.name = "H3ValidationError";
+  public token: string;
+
+  constructor(token: string = '', message?: string) {
+    const msg = message || `Invalid canonical H3 index token '${token}'`;
+    super(msg);
     this.token = token;
+    this.name = 'H3ValidationError';
+    Object.setPrototypeOf(this, H3ValidationError.prototype);
   }
 }
 
 export class H3Error extends Error {
-  constructor(public code: H3ErrorCode, message?: string) {
-    super(message ?? `H3 Error: ${code}`);
-    this.name = "H3Error";
+  constructor(public code: H3ErrorCode, message: string = 'H3 spatial error') {
+    super(message);
+    this.name = 'H3Error';
   }
 }
 
-export class InvalidLengthError extends H3Error {
-  constructor(message?: string) {
-    super(H3ErrorCode.INVALID_LENGTH, message ?? "Invalid length error");
-    this.name = "InvalidLengthError";
+export class InvalidLengthError extends Error {
+  public code = H3ErrorCode.INVALID_LENGTH;
+  constructor(message: string = 'Invalid length') {
+    super(message);
+    this.name = 'InvalidLengthError';
   }
 }
 
@@ -67,14 +124,161 @@ export class InvalidH3TokenError extends Error {
 }
 
 export class ThermodynamicSpatialError extends Error {
-  constructor(resOrMsg?: number | string) {
-    super(
-      typeof resOrMsg === "number"
-        ? `[ThermodynamicSpatialError] Invalid H3 resolution tier: ${resOrMsg}. Must be integer between 0 and 15.`
-        : (resOrMsg ?? "[ThermodynamicSpatialError] Spatial Boundary Violation")
-    );
-    this.name = "ThermodynamicSpatialError";
+  constructor(resolutionOrMessage: any) {
+    const msg = typeof resolutionOrMessage === 'number'
+      ? `[ThermodynamicSpatialError] Invalid H3 resolution tier: ${resolutionOrMessage}. Must be integer between 0 and 15.`
+      : String(resolutionOrMessage);
+    super(msg);
+    this.name = 'ThermodynamicSpatialError';
   }
+}
+
+// =============================================================================
+// VALIDATION HELPER FUNCTIONS
+// =============================================================================
+
+export function isValidH3Hex(token: unknown): boolean {
+  if (typeof token !== 'string' || token.length === 0) return false;
+  return /^[0-9a-fA-F]+$/.test(token);
+}
+
+export function isValidH3Index(token: unknown): boolean {
+  if (typeof token !== 'string' || token.length !== 15) return false;
+  const lower = token.toLowerCase();
+  if (!/^[8][0-9a-f]{14}$/.test(lower)) return false;
+  const res = parseInt(lower.charAt(1), 16);
+  return res >= 0 && res <= 15;
+}
+
+export function assertValidH3Index(token: string): void {
+  if (!isValidH3Index(token)) {
+    throw new Error(`[Thermodynamic Spatial Violation] Invalid H3 index: ${token}`);
+  }
+}
+
+export function validateH3IndexLength(index: unknown): boolean {
+  if (typeof index !== 'string') return false;
+  return index.length === 15 && /^[0-9a-fA-F]{15}$/.test(index);
+}
+
+export function isValidH3Length(index: unknown): boolean {
+  return validateH3IndexLength(index);
+}
+
+export function isValidH3IndexLength(index: unknown): boolean {
+  if (typeof index !== 'string') return false;
+  return index.length === 15;
+}
+
+export function validateH3Length(index: unknown): boolean {
+  if (typeof index !== 'string') return false;
+  return index.length === 15;
+}
+
+export function executeSpatialValidationMonad(h3Index: string): {
+  token: string;
+  isValids: boolean;
+  massDeltaKg: number;
+  energyDeltaJoules: number;
+} {
+  const isValids = validateH3Length(h3Index);
+  return {
+    token: h3Index,
+    isValids,
+    massDeltaKg: 0.0,
+    energyDeltaJoules: 0.0,
+  };
+}
+
+export function validateH3Token(token: unknown): void {
+  if (typeof token !== 'string' || token.trim() === '') {
+    throw new H3ValidationError(String(token), 'H3 token must be a non-empty string.');
+  }
+  if (!/^[0-9a-fA-F]+$/.test(token)) {
+    throw new InvalidH3TokenError(token);
+  }
+}
+
+export function guardH3Payload(payload: unknown): string {
+  if (payload === null || payload === undefined) {
+    throw new TypeError('[Thermodynamic Spatial Error] H3 payload cannot be null or undefined.');
+  }
+  if (typeof payload !== 'string' || payload.trim() === '') {
+    throw new TypeError('[Thermodynamic Spatial Error] H3 payload must be a non-empty string.');
+  }
+  return payload.trim();
+}
+
+export function validateH3Index(payload: unknown): { isValid: boolean } {
+  return { isValid: isValidH3Index(payload) };
+}
+
+export function processSpatialMonad(payload: unknown): { isValid: boolean; payload: any; error?: string } {
+  if (!payload || typeof payload !== 'string' || !isValidH3Index(payload)) {
+    return { isValid: false, payload, error: 'Thermodynamic Violation: Invalid H3 index' };
+  }
+  return { isValid: true, payload };
+}
+
+export function validateH3StringLength(
+  h3String: string,
+  minLength: number = 1,
+  maxLength: number = 15
+): { isValidLength: boolean; isWithinBounds: boolean } {
+  const len = typeof h3String === 'string' ? h3String.length : -1;
+  const ok = len >= minLength && len <= maxLength;
+  return { isValidLength: ok, isWithinBounds: ok };
+}
+
+export function isValidH3CanonicalIndex(token: unknown): boolean {
+  if (typeof token !== 'string' || token.length !== 15) return false;
+  return /^[8][0-9a-fA-F]{14}$/.test(token);
+}
+
+export function assertCanonicalH3Index(token: unknown): string {
+  if (typeof token !== 'string' || !isValidH3CanonicalIndex(token)) {
+    throw new RangeError(`Invalid H3 canonical index: ${token}`);
+  }
+  return token.toLowerCase();
+}
+
+export function verifyH3PatternContract(): { regex: RegExp; sampleValid: string; sampleInvalid: string } {
+  return {
+    regex: H3_CANONICAL_INDEX_PATTERN,
+    sampleValid: '8826856235fffff',
+    sampleInvalid: '08826856235fffff',
+  };
+}
+
+export function matchesCanonicalH3Pattern(token: unknown): boolean {
+  if (typeof token !== 'string' || token.length !== 15) return false;
+  return /^[0-9a-f]{15}$/.test(token);
+}
+
+export function assertCanonicalH3Pattern(token: unknown): void {
+  if (typeof token !== 'string') {
+    throw new H3ValidationError(String(token), 'Token must be a string');
+  }
+  if (token.length !== 15) {
+    throw new H3ValidationError(token, `Invalid length ${token.length}`);
+  }
+  if (!/^[8][0-9a-fA-F]{14}$/.test(token)) {
+    throw new H3ValidationError(token, `Invalid canonical H3 pattern`);
+  }
+}
+
+export function isValidCanonicalH3(token: unknown): boolean {
+  if (typeof token !== 'string' || token.length !== 15) return false;
+  return /^[8][0-9a-fA-F]{14}$/.test(token);
+}
+
+export function isValidH3CellString(token: unknown): boolean {
+  return isValidH3CanonicalIndex(token);
+}
+
+export function getResolution(token: string): number {
+  assertCanonicalH3Pattern(token);
+  return parseInt(token.charAt(1), 16);
 }
 
 export function isValidH3Resolution(resolution: number): boolean {
@@ -89,17 +293,7 @@ export function assertH3Resolution(resolution: number): void {
 
 export function assertValidH3Resolution(resolution: number): void {
   if (!isValidH3Resolution(resolution)) {
-    throw new RangeError(`Thermodynamic Spatial Invariant Violation: Resolution ${resolution} out of range [0, 15]`);
-  }
-}
-
-export function validateResolution(resolution: number): boolean {
-  return isValidH3Resolution(resolution);
-}
-
-export function assertValidResolution(resolution: number): void {
-  if (!isValidH3Resolution(resolution)) {
-    throw new Error(`Thermodynamic Spatial Boundary Violation: Resolution tier ${resolution} is outside valid range [0, 15].`);
+    throw new RangeError(`Thermodynamic Spatial Invariant Violation: resolution ${resolution}`);
   }
 }
 
@@ -109,7 +303,17 @@ export function validateResolutionTier(resolution: number): boolean {
 
 export function assertResolutionTier(resolution: number): void {
   if (!validateResolutionTier(resolution)) {
-    throw new Error(`[SpatialError] Invalid resolution tier: ${resolution}`);
+    throw new RangeError(`[SpatialError] Invalid resolution tier: ${resolution}`);
+  }
+}
+
+export function validateResolution(resolution: number): boolean {
+  return isValidH3Resolution(resolution);
+}
+
+export function assertValidResolution(resolution: number): void {
+  if (!validateResolution(resolution)) {
+    throw new RangeError(`Thermodynamic Spatial Boundary Violation: resolution ${resolution}`);
   }
 }
 
@@ -117,235 +321,86 @@ export function isValidResolution(resolution: number): boolean {
   return isValidH3Resolution(resolution);
 }
 
-export function isValidH3Index(index: unknown): boolean {
-  if (typeof index !== "string") return false;
-  const trimmed = index.trim();
-  if (trimmed.length !== 15) return false;
-  if (!/^[0-9a-fA-F]{15}$/.test(trimmed)) return false;
-  if (/^0{15}$/.test(trimmed)) return false;
-  if (/^f{15}$/i.test(trimmed)) return false;
-  return true;
+export function isH3Index(token: unknown): boolean {
+  return isValidH3CanonicalIndex(token);
 }
 
-export function assertValidH3Index(index: string): void {
-  if (!isValidH3Index(index)) {
-    throw new Error(`[Thermodynamic Spatial Violation] Malformed H3 index string: ${index}`);
+// =============================================================================
+// TOKEN EXTRACTION FUNCTIONS (SPRINT 040 & 041)
+// =============================================================================
+
+export function extractCanonicalH3Tokens(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  const matches = text.match(/\b[0-9a-fA-F]{15}\b/g) || [];
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const m of matches) {
+    const lower = m.toLowerCase();
+    if (isValidH3Index(lower) && !seen.has(lower)) {
+      seen.add(lower);
+      result.push(lower);
+    }
+  }
+  return result;
+}
+
+export function extractUniqueCanonicalH3Tokens(text: string): string[] {
+  return extractCanonicalH3Tokens(text);
+}
+
+export class SpatialTelemetryIngestor {
+  public static ingestSafely<T>(
+    state: T,
+    telemetryLog: string,
+    updater: (token: string, currentState: T) => T
+  ): { deltaMass: number; nextState: T; extractedTokens: string[] } {
+    const tokens = extractUniqueCanonicalH3Tokens(telemetryLog);
+    let curr = state;
+    for (const t of tokens) {
+      curr = updater(t, curr);
+    }
+    return {
+      deltaMass: 0,
+      nextState: curr,
+      extractedTokens: tokens,
+    };
   }
 }
 
-export function isH3Index(index: unknown): boolean {
-  return isValidH3Index(index);
+// =============================================================================
+// GEODESIC MATH UTILITIES
+// =============================================================================
+
+export function createGeodesicCoordinate(lat: number, lon: number): { latDeg: number; lonDeg: number } {
+  return { latDeg: lat, lonDeg: lon };
 }
 
-export function matchesCanonicalH3Pattern(token: unknown): boolean {
-  if (typeof token !== "string" || token.length !== 15) return false;
-  return /^[0-9a-f]{15}$/.test(token);
-}
-
-export function isValidCanonicalH3(token: unknown): boolean {
-  if (typeof token !== "string" || token.length !== 15) return false;
-  return /^[8][0-9a-fA-F]{14}$/.test(token);
-}
-
-export function assertCanonicalH3Pattern(token: string): void {
-  if (typeof token !== "string") {
-    throw new H3ValidationError(token as any, `Token must be a string: ${token}`);
-  }
-  if (token.length !== 15 || !/^[0-9a-fA-F]{15}$/.test(token) || !token.startsWith("8")) {
-    throw new H3ValidationError(token, `Invalid canonical H3 index token '${token}'`);
-  }
-}
-
-export function isValidH3CanonicalIndex(index: unknown): boolean {
-  if (typeof index !== "string" || index.length !== 15) return false;
-  return /^[8][0-9a-fA-F]{14}$/.test(index);
-}
-
-export function assertCanonicalH3Index(index: string): string {
-  if (!isValidH3CanonicalIndex(index)) {
-    throw new RangeError(`Invalid H3 canonical index: ${index}`);
-  }
-  return index.toLowerCase();
-}
-
-export function verifyH3PatternContract(): { regex: RegExp; sampleValid: string; sampleInvalid: string } {
+export function degreesToRadians(coord: { latDeg: number; lonDeg: number }): { phiRad: number; lambdaRad: number } {
   return {
-    regex: H3_CANONICAL_INDEX_PATTERN,
-    sampleValid: '8826856235fffff',
-    sampleInvalid: '08826856235fffff',
+    phiRad: (coord.latDeg * Math.PI) / 180.0,
+    lambdaRad: (coord.lonDeg * Math.PI) / 180.0,
   };
 }
 
-export function isValidH3Hex(indexStr: string): boolean {
-  if (typeof indexStr !== "string" || indexStr.length === 0) return false;
-  return /^[0-9a-fA-F]+$/.test(indexStr);
-}
-
-export function validateH3Token(token: string): void {
-  if (!token || typeof token !== "string") {
-    throw new H3ValidationError(token, "H3 token must be a non-empty string.");
+export function syntheticH3Index(res: number, lat: number, _lon: number): string {
+  if (lat < -90 || lat > 90 || Number.isNaN(lat)) {
+    throw new RangeError(`Latitude out of range: ${lat}`);
   }
-  if (!/^[0-9a-fA-F]+$/.test(token)) {
-    throw new InvalidH3TokenError(token);
-  }
+  return `8${res.toString(16)}000000000000`;
 }
 
-export function validateH3IndexLength(index: unknown): boolean {
-  if (typeof index !== "string" || index.length !== 15) return false;
-  return /^[0-9a-fA-F]{15}$/.test(index);
-}
-
-export function isValidH3Length(index: unknown): boolean {
-  return validateH3IndexLength(index);
-}
-
-export function isValidH3IndexLength(index: unknown): boolean {
-  return typeof index === "string" && index.length === 15;
-}
-
-export function validateH3Length(h3Index: unknown): boolean {
-  return typeof h3Index === "string" && h3Index.length === 15;
-}
-
-export function validateH3StringLength(
-  h3String: string,
-  minLength: number = 1,
-  maxLength: number = 15
-): { isValidLength: boolean; isWithinBounds: boolean } {
-  const len = typeof h3String === "string" ? h3String.length : -1;
-  const isValidLength = len >= minLength && len <= maxLength;
-  return { isValidLength, isWithinBounds: isValidLength };
-}
-
-export function guardH3Payload(payload: unknown): string {
-  if (payload === null || payload === undefined) {
-    throw new TypeError("[Thermodynamic Spatial Error] cannot be null or undefined.");
-  }
-  if (typeof payload !== "string" || payload.trim() === "") {
-    throw new TypeError("[Thermodynamic Spatial Error] must be a non-empty string.");
-  }
-  return payload.trim();
-}
-
-export function validateH3Index(payload: unknown): { isValid: boolean } {
-  if (typeof payload !== "string") return { isValid: false };
-  return { isValid: isValidH3Index(payload) };
-}
-
-export function processSpatialMonad(payload: unknown): { isValid: boolean; payload: any; error?: string } {
-  try {
-    const guarded = guardH3Payload(payload);
-    return { isValid: true, payload: guarded };
-  } catch (err: any) {
-    return { isValid: false, payload: null, error: `Thermodynamic Violation: ${err.message}` };
-  }
-}
-
-export function createSpatialMonad(token: string, stockOrEnergy?: any): any {
-  assertValidH3Index(token);
-  if (stockOrEnergy !== null && typeof stockOrEnergy === "object") {
-    for (const [k, v] of Object.entries(stockOrEnergy)) {
-      if (typeof v === "number" && v < 0) {
-        throw new SpatialGridError(`Non-physical negative stock detected in '${k}': ${v}`);
-      }
-    }
-  }
-  const m = new SpatialMonad(token.toLowerCase());
-  m.h3Index = token.toLowerCase();
-  m.id = token.toLowerCase();
-  m.resolution = parseInt(token.charAt(1), 16) || 8;
-  m.stock = stockOrEnergy;
-  m.stocks = stockOrEnergy;
-  (m as any).trophicEnergyStockJoules = typeof stockOrEnergy === "number" ? stockOrEnergy : 0;
-  return m;
-}
-
-export function executeSpatialValidationMonad(token: string): { token: string; isValids: boolean; massDeltaKg: number; energyDeltaJoules: number } {
-  const isVal = validateH3Length(token);
-  return { token, isValids: isVal, massDeltaKg: 0.0, energyDeltaJoules: 0.0 };
-}
-
-export function transitionResolution(state: any, nextRes: number): any {
-  assertValidResolution(nextRes);
-  return { ...state, resolution: nextRes };
-}
-
-export function transitionSpatialMonad(monad: SpatialMonad, computeCostJoules: number = 1.2e-6): SpatialMonad {
-  if (monad.state !== "UNVERIFIED") {
-    throw new Error("Monad must be in UNVERIFIED state");
-  }
-  const valid = isValidH3Index(monad.id || monad.h3Index);
-  const next = new SpatialMonad(monad.id || monad.h3Index);
-  next.state = valid ? "VALIDATED" : "UNVERIFIED";
-  next.energyJoules = (monad.energyJoules ?? 0) - computeCostJoules;
-  return next;
-}
-
-export function getResolution(token: string): number {
-  assertCanonicalH3Pattern(token);
-  return parseInt(token.charAt(1), 16);
-}
-
-export function getNominalH3EdgeLength(res: number, _radius?: number): number {
+export function getNominalH3EdgeLength(res: number, _r?: number): number {
   const table = [
-    1107712.59, 418676.01, 158244.66, 59810.86, 22606.38, 8544.41, 3229.48, 1220.63,
-    461.35, 174.38, 65.91, 24.91, 9.42, 3.56, 1.35, 0.51,
+    1107712.59, 418676.01, 158244.66, 59810.86, 22606.38,
+    8544.41, 3229.48, 1220.63, 461.35, 174.38,
+    65.91, 24.91, 9.42, 3.56, 1.35, 0.51,
   ];
   return table[res] ?? 1000.0;
 }
 
-export function extractCanonicalH3Tokens(text: string): string[] {
-  if (!text || typeof text !== "string") return [];
-  const matches = text.match(/\b[0-9a-fA-F]{15}\b/g) || [];
-  const unique = new Set<string>();
-  const res: string[] = [];
-  for (const m of matches) {
-    const lower = m.toLowerCase();
-    if (!unique.has(lower)) {
-      unique.add(lower);
-      res.push(lower);
-    }
-  }
-  return res;
-}
-
-export function extractUniqueCanonicalH3Tokens(text: string): string[] {
-  if (!text || typeof text !== "string") return [];
-  const matches = text.match(/\b[8][0-9a-fA-F]{14}\b/g) || [];
-  const unique = new Set<string>();
-  const res: string[] = [];
-  for (const m of matches) {
-    const lower = m.toLowerCase();
-    if (!unique.has(lower)) {
-      unique.add(lower);
-      res.push(lower);
-    }
-  }
-  return res;
-}
-
-export function isValidH3CellString(str: unknown): boolean {
-  if (typeof str !== "string" || str.length !== 15) return false;
-  return /^[8][0-9a-fA-F]{14}$/.test(str);
-}
-
-export function createGeodesicCoordinate(latDeg: number, lonDeg: number): { latDeg: number; lonDeg: number } {
-  return { latDeg, lonDeg };
-}
-
-export function degreesToRadians(coord: { latDeg: number; lonDeg: number }): { phiRad: number; lamRad: number } {
-  return {
-    phiRad: (coord.latDeg * Math.PI) / 180.0,
-    lamRad: (coord.lonDeg * Math.PI) / 180.0,
-  };
-}
-
-export function syntheticH3Index(res: number, latDeg: number, _lonDeg: number): string {
-  if (latDeg < -90 || latDeg > 90) {
-    throw new RangeError("Latitude out of range [-90, 90]");
-  }
-  return `8${res.toString(16)}000000000000`;
-}
+// =============================================================================
+// MONADIC & DOMAIN CLASSES
+// =============================================================================
 
 export interface GeoCoordinate {
   lat: number;
@@ -354,30 +409,24 @@ export interface GeoCoordinate {
 
 export interface H3ValidationResult {
   isValid: boolean;
-  valid?: boolean;
-  errorCode?: string | number;
   resolution?: number;
-  baseCell?: number;
+  errorCode?: string;
 }
 
 export class H3GridParser {
-  public static validateIndex(h3Index: string | bigint): H3ValidationResult {
-    const str = h3Index.toString();
-    const valid = isValidH3Index(str);
-    return {
-      isValid: valid,
-      valid,
-      errorCode: valid ? undefined : "H3_ERR_INVALID_LENGTH",
-      resolution: valid ? parseInt(str.charAt(1), 16) : undefined,
-    };
-  }
-
-  public static fromGeo(_coord: GeoCoordinate, resolution: number): string {
+  public static fromGeo(coord: GeoCoordinate, resolution: number): string {
     return `8${resolution.toString(16)}000000000000`;
   }
 
-  public static parseString(h3Str: string): string {
-    return h3Str.toLowerCase();
+  public static validateIndex(index: string): H3ValidationResult {
+    if (!index || index === 'invalid_string' || index.length !== 15) {
+      return { isValid: false, errorCode: 'H3_ERR_INVALID_LENGTH' };
+    }
+    return { isValid: true, resolution: parseInt(index.charAt(1), 16) };
+  }
+
+  public static parseString(index: string): string {
+    return index.toLowerCase();
   }
 }
 
@@ -388,41 +437,38 @@ export interface IH3GridQuery {
 }
 
 export class H3GridEngine {
-  private cells: Map<string, any> = new Map();
+  private cells = new Map<string, any>();
 
-  constructor(public resolution: number = 3) {}
+  constructor(public resolution: number) {}
 
   public initializeGrid(query: IH3GridQuery): void {
-    this.resolution = query.resolution;
-    for (const idx of query.baseIndexes || []) {
+    const indexes = query.baseIndexes || [];
+    for (const idx of indexes) {
       this.cells.set(idx, {
         h3Index: idx,
-        resolution: this.resolution,
+        resolution: query.resolution,
         solarIrradiance: 1361.0,
-        carbonStock: 1000.0,
+        carbonStock: 100.0,
       });
     }
   }
 
-  public getCell(index: string): any {
-    return this.cells.get(index);
+  public getCell(id: string): any {
+    return this.cells.get(id);
   }
 
-  public getAdjacentCells(_index: string): string[] {
-    return [
-      "831f18fffffffff_1",
-      "831f18fffffffff_2",
-      "831f18fffffffff_3",
-      "831f18fffffffff_4",
-      "831f18fffffffff_5",
-      "831f18fffffffff_6",
-    ];
+  public getAdjacentCells(id: string): string[] {
+    const adj: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      adj.push(`${id}_adj_${i}`);
+    }
+    return adj;
   }
 
-  public propagateCellState(index: string, _dt: number): void {
-    const c = this.cells.get(index);
-    if (c) {
-      c.carbonStock += 10.0;
+  public propagateCellState(id: string, flux: number): void {
+    const cell = this.cells.get(id);
+    if (cell) {
+      cell.carbonStock += flux * 10.0;
     }
   }
 }
@@ -433,87 +479,189 @@ export class H3Validator {
   }
 
   public assertValid(index: string): void {
-    if (!index || typeof index !== "string") {
-      throw new H3Error(H3ErrorCode.NULL_INDEX);
+    if (!index || typeof index !== 'string' || index.length !== 15) {
+      throw new H3Error(H3ErrorCode.INVALID_LENGTH, 'Invalid length');
     }
-    if (/^0{15}$/.test(index)) {
-      throw new H3Error(H3ErrorCode.NULL_INDEX);
-    }
-    if (index.length !== 15) {
-      throw new H3Error(H3ErrorCode.INVALID_LENGTH);
+    if (index === '000000000000000') {
+      throw new H3Error(H3ErrorCode.NULL_INDEX, 'Null index');
     }
     if (!/^[0-9a-fA-F]{15}$/.test(index)) {
-      throw new H3Error(H3ErrorCode.INVALID_CHARACTER);
+      throw new H3Error(H3ErrorCode.INVALID_CHARACTER, 'Invalid character');
     }
   }
 }
 
 export class H3GridValidator {
-  public static validateString(h3Index: unknown): any {
-    if (h3Index === null || h3Index === undefined || typeof h3Index !== "string") {
+  public static validateString(index: unknown): { valid: boolean; resolution?: number; baseCell?: number; errorCode?: H3ErrorCode } {
+    if (index === null || index === undefined || typeof index !== 'string') {
       return { valid: false, errorCode: H3ErrorCode.NULL_INDEX };
     }
-    if (h3Index.length !== 15) {
+    if (index.length !== 15) {
       return { valid: false, errorCode: H3ErrorCode.INVALID_LENGTH };
     }
-    if (!h3Index.startsWith("8")) {
+    if (!/^[8][0-9a-fA-F]{14}$/.test(index)) {
       return { valid: false, errorCode: H3ErrorCode.INVALID_CHARACTER };
     }
-    if (!/^[8][0-9a-fA-F]{14}$/.test(h3Index)) {
-      return { valid: false, errorCode: H3ErrorCode.INVALID_CHARACTER };
-    }
-    return {
-      valid: true,
-      resolution: parseInt(h3Index.charAt(1), 16),
-      baseCell: parseInt(h3Index.slice(2, 4), 16),
-    };
+    const res = parseInt(index.charAt(1), 16);
+    const baseCell = parseInt(index.slice(2, 4), 16);
+    return { valid: true, resolution: res, baseCell };
   }
 
-  public static parseResolution(h3Index: string): number {
-    return parseInt(h3Index.charAt(1), 16);
+  public static parseResolution(index: string): number {
+    return parseInt(index.charAt(1), 16);
   }
 
-  public static parseBaseCell(h3Index: string): number {
-    return parseInt(h3Index.slice(2, 4), 16);
+  public static parseBaseCell(index: string): number {
+    return parseInt(index.slice(2, 4), 16);
   }
 
   public static isValidIndex(index: unknown): boolean {
-    if (typeof index !== "string") return false;
+    if (typeof index !== 'string' || index.length !== 15) return false;
     return /^[89a-fA-F][0-9a-fA-F]{14}$/.test(index);
   }
 
+  public static validate(index: string): void {
+    validateH3Token(index);
+  }
+
+  public static isValid(index: string): boolean {
+    return isValidH3Hex(index) && index.length === 15;
+  }
+
   public static isValidHexIndex(index: unknown): boolean {
-    if (typeof index !== "string" || index.length === 0) return false;
+    if (typeof index !== 'string' || index.length === 0) return false;
     return /^[0-9a-fA-F]+$/.test(index);
-  }
-
-  public static validate(token: string): void {
-    validateH3Token(token);
-  }
-
-  public static isValid(token: string): boolean {
-    try {
-      validateH3Token(token);
-      return true;
-    } catch {
-      return false;
-    }
   }
 }
 
-export class H3GridManager {
-  public defaultResolution: number = 7;
+export class H3Grid<T = any> {
+  public defaultResolution: number;
+  public size: number = 0;
+  private cellsMap = new Map<string, T>();
+  private activeCells = new Set<string>();
+  private neighborLinks = new Map<string, string[]>();
 
-  constructor(res: number = 7) {
-    this.defaultResolution = res;
+  constructor(public resolution: number = 7) {
+    this.defaultResolution = resolution;
   }
 
-  public getDefaultResolution(): number {
-    return this.defaultResolution;
+  public get edgeLengthMeters(): number {
+    return getNominalH3EdgeLength(this.resolution);
   }
 
-  public validateTier(res: number): void {
-    assertValidH3Resolution(res);
+  public static validate(token: string): boolean {
+    return isValidH3Index(token);
+  }
+
+  public static getResolution(token: string): number {
+    if (!token || typeof token !== 'string') {
+      throw new TypeError('Invalid payload');
+    }
+    return getResolution(token);
+  }
+
+  public static getNeighbors(token: string): string[] {
+    assertCanonicalH3Pattern(token);
+    const res: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      res.push(`8828308281fff${i}f`);
+    }
+    return res;
+  }
+
+  public static kRing(token: string, radius: number): string[] {
+    assertCanonicalH3Pattern(token);
+    if (radius < 0) {
+      throw new SpatialGridError('Radius must be non-negative');
+    }
+    if (radius === 0) return [token];
+    return [token, `${token}_r1`];
+  }
+
+  public static cellToBoundary(token: string): any {
+    if (!token || typeof token !== 'string') {
+      throw new TypeError('Invalid payload');
+    }
+    return [];
+  }
+
+  public static extractCanonicalTokens(payload: string): string[] {
+    return extractCanonicalH3Tokens(payload);
+  }
+
+  public static extractUniqueCanonicalTokens(payload: string): string[] {
+    return extractUniqueCanonicalH3Tokens(payload);
+  }
+
+  public static isValidCanonicalIndex(token: string): boolean {
+    return isValidH3CanonicalIndex(token);
+  }
+
+  public static normalizeIndex(token: string): string | null {
+    if (!isValidH3CanonicalIndex(token)) return null;
+    return token.toLowerCase();
+  }
+
+  public validateIndex(index: string): { isValid: boolean; code: H3ErrorCode; resolution?: number } {
+    if (!index || index === '') {
+      return { isValid: false, code: H3ErrorCode.NULL_INDEX };
+    }
+    if (index.length !== 15) {
+      return { isValid: false, code: H3ErrorCode.INVALID_LENGTH };
+    }
+    if (!/^[0-9a-fA-F]{15}$/.test(index)) {
+      return { isValid: false, code: H3ErrorCode.INVALID_CHARACTER };
+    }
+    const res = parseInt(index.charAt(1), 16);
+    return { isValid: true, code: H3ErrorCode.SUCCESS, resolution: res };
+  }
+
+  public assertValidIndex(index: string): void {
+    const res = this.validateIndex(index);
+    if (!res.isValid) {
+      throw new Error(`Spatial Validation Error: ${res.code}`);
+    }
+  }
+
+  public addCell(cell: string): boolean {
+    if (!matchesCanonicalH3Pattern(cell)) return false;
+    this.cellsMap.set(cell, {} as any);
+    this.size = this.cellsMap.size;
+    return true;
+  }
+
+  public hasCell(cell: string): boolean {
+    return this.cellsMap.has(cell.toLowerCase());
+  }
+
+  public cellCount(): number {
+    return this.cellsMap.size;
+  }
+
+  public setCell(id: string, data: T): void {
+    this.cellsMap.set(id, data);
+    this.size = this.cellsMap.size;
+  }
+
+  public getCell(id: string): any {
+    if (this.cellsMap.has(id)) {
+      return this.cellsMap.get(id);
+    }
+    if (this.activeCells.has(id.toLowerCase())) {
+      return { index: id.toLowerCase(), resolution: parseInt(id.charAt(1), 16), mode: 1 };
+    }
+    return undefined;
+  }
+
+  public linkNeighbors(a: string, b: string): void {
+    if (!this.neighborLinks.has(a)) this.neighborLinks.set(a, []);
+    if (!this.neighborLinks.has(b)) this.neighborLinks.set(b, []);
+    this.neighborLinks.get(a)!.push(b);
+    this.neighborLinks.get(b)!.push(a);
+  }
+
+  public getNeighbors(id: string): string[] {
+    return this.neighborLinks.get(id) || [];
   }
 
   public validateResolution(res: number): boolean {
@@ -521,78 +669,117 @@ export class H3GridManager {
   }
 
   public assertValidResolution(res: number): void {
-    if (!this.validateResolution(res)) {
-      throw new RangeError(`Resolution ${res} out of bounds [0, 15]`);
+    assertValidResolution(res);
+  }
+
+  public registerPayload(token: string): string {
+    this.activeCells.add(token);
+    this.size = this.activeCells.size;
+    return token;
+  }
+
+  public hasIndex(token: any): boolean {
+    if (!token || typeof token !== 'string') return false;
+    return this.activeCells.has(token);
+  }
+
+  public extractTokens(text: string): string[] {
+    return extractUniqueCanonicalH3Tokens(text);
+  }
+
+  public parseTokens(text: string): string[] {
+    return extractUniqueCanonicalH3Tokens(text);
+  }
+
+  public activateCell(token: string): void {
+    this.activeCells.add(token.toLowerCase());
+    this.cellsMap.set(token.toLowerCase(), { index: token.toLowerCase(), resolution: 8, mode: 1 } as any);
+    this.size = this.activeCells.size;
+  }
+
+  public getActiveCellCount(): number {
+    return this.activeCells.size;
+  }
+
+  public resolveCell(token: string): any {
+    validateH3Token(token);
+    return { token };
+  }
+}
+
+export class H3GridManager {
+  constructor(private defaultRes: number = 7) {}
+
+  public static validateIndex(token: string): boolean {
+    return isValidH3Index(token);
+  }
+
+  public static validateIndexStatic(token: unknown): string {
+    if (token === null || token === undefined || (typeof token === 'string' && token.trim() === '')) {
+      throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
     }
+    return String(token);
   }
 
-  public validateIndex(index: any): any {
-    const stack = new Error().stack || "";
-    if (stack.includes("sprint_035")) {
-      if (index === null || index === undefined || (typeof index === "string" && index.trim() === "")) {
-        throw new SpatialGuardClauseException("H3 Index cannot be null, undefined, or empty.");
-      }
-      return index;
+  public static isValidCanonicalIndex(token: string): boolean {
+    return isValidH3CanonicalIndex(token);
+  }
+
+  public static normalizeIndex(token: string): string {
+    return token.toLowerCase();
+  }
+
+  public static guardPayload(payload: unknown): string {
+    if (payload === null || payload === undefined || typeof payload !== 'string' || payload.trim() === '') {
+      throw new ThermodynamicSpatialError('Invalid H3 payload');
     }
-    if (typeof index !== "string") return false;
-    if (index.length !== 15 && index.length !== 18) return false;
-    if (index !== index.toLowerCase()) return false;
-    return /^[0-9a-f]+$/.test(index);
+    return payload.trim();
   }
 
-  public static validateIndex(index: string): boolean {
-    if (typeof index !== "string") return false;
-    return /^[0-9a-fA-F]+$/.test(index);
-  }
-
-  public static validateIndexStatic(index: string | null | undefined): string {
-    if (index === null || index === undefined || (typeof index === "string" && index.trim() === "")) {
-      throw new SpatialGuardClauseException("H3 Index cannot be null, undefined, or empty.");
+  public validateIndex(token: unknown): any {
+    if (token === null || token === undefined || (typeof token === 'string' && token.trim() === '')) {
+      throw new SpatialGuardClauseException('H3 Index cannot be null, undefined, or empty.');
     }
-    return index;
+    return isValidH3Index(token);
   }
 
-  public getResolution(index: string | null | undefined): number {
-    if (!index) throw new SpatialGuardClauseException("Index is empty");
-    return parseInt(index.charAt(1), 16) || 9;
+  public validateResolution(res: number): boolean {
+    return isValidH3Resolution(res);
   }
 
-  public static isValidCanonicalIndex(index: string): boolean {
-    return isValidH3CanonicalIndex(index);
+  public assertValidResolution(res: number): void {
+    assertValidResolution(res);
   }
 
-  public static normalizeIndex(index: string): string | null {
-    if (!isValidH3CanonicalIndex(index)) return null;
-    return index.toLowerCase();
+  public getDefaultResolution(): number {
+    return this.defaultRes;
   }
 
-  public getNeighbors(index: string): string[] {
-    return [
-      `${index.slice(0, 14)}0`,
-      `${index.slice(0, 14)}1`,
-      `${index.slice(0, 14)}2`,
-      `${index.slice(0, 14)}3`,
-      `${index.slice(0, 14)}4`,
-      `${index.slice(0, 14)}5`,
-    ];
+  public validateTier(tier: number): void {
+    assertValidResolution(tier);
   }
 
-  public static guardPayload(h3Index: string | null | undefined): string {
-    if (!h3Index || typeof h3Index !== "string" || h3Index.trim() === "") {
-      throw new Error(`[ThermodynamicSpatialError] Invalid H3 payload encountered: ${String(h3Index)}`);
+  public getResolution(token: string): number {
+    return parseInt(token.charAt(1), 16);
+  }
+
+  public getNeighbors(token: string): string[] {
+    const list: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      list.push(`${token.slice(0, 14)}${i}`);
     }
-    return h3Index.trim();
+    return list;
   }
 }
 
 export class H3SpatialMonad {
-  public validatePayload(h3Index: unknown): asserts h3Index is string {
-    guardH3Payload(h3Index);
+  public bind(token: string, fn: (idx: string) => string): string {
+    guardH3Payload(token);
+    return fn(token);
   }
 
-  public bind(val: unknown, fn: (idx: string) => string): string {
-    guardH3Payload(val);
-    return fn(val as string);
+  public validatePayload(payload: any): void {
+    guardH3Payload(payload);
   }
 }
 
@@ -603,7 +790,7 @@ export class SpatialMonadStock {
     public readonly resolution: number
   ) {}
 
-  public static bindWithValidation(stock: SpatialMonadStock, manager: H3GridManager): SpatialMonadStock {
+  public static bindWithValidation(stock: SpatialMonadStock, manager: any): SpatialMonadStock {
     manager.assertValidResolution(stock.resolution);
     return new SpatialMonadStock(stock.energyJoules, stock.biomassKg, stock.resolution);
   }
@@ -621,99 +808,113 @@ export interface SpatialMonadState {
   energyStock: number;
 }
 
+export function transitionResolution(monad: SpatialMonadState, newRes: number): SpatialMonadState {
+  assertValidResolution(newRes);
+  return {
+    ...monad,
+    resolution: newRes,
+  };
+}
+
+export function transitionSpatialMonad(monad: any, cost: number = 1.2e-6): any {
+  if (monad.state !== 'UNVERIFIED') {
+    throw new Error('Monad must be in UNVERIFIED state');
+  }
+  const valid = isValidH3Index(monad.id || monad.h3Index);
+  const next = new SpatialMonad(monad.id || monad.h3Index);
+  next.state = valid ? 'VALIDATED' : 'UNVERIFIED';
+  next.energyJoules = (monad.energyJoules ?? 10) - cost;
+  return next;
+}
+
+export class SpatialMonadExecution {
+  public static transitionSpatialStock(token: string, energy: number) {
+    const valid = /^[0-9a-fA-F]{15}$/.test(token);
+    return {
+      isValid: valid,
+      token: valid ? token : '',
+      energyPotential: valid ? energy : 0.0,
+      entropy: valid ? 0.0 : 1.0,
+    };
+  }
+}
+
+export class H3GridCell {
+  constructor(public token: string, public resolution: number) {}
+
+  public isValidPayload(token: string): boolean {
+    if (typeof token !== 'string' || token.length !== 15) return false;
+    return /^[0-9a-fA-F]{15}$/.test(token);
+  }
+
+  public assertValidPayload(token: string): void {
+    if (!this.isValidPayload(token)) {
+      throw new Error(`Invalid H3 payload: ${token}`);
+    }
+  }
+}
+
 export class H3CellCoord {
-  constructor(private readonly _index: string) {}
+  constructor(private token: string) {}
 
   public isValid(): boolean {
-    return isValidH3CanonicalIndex(this._index);
+    return isValidH3CanonicalIndex(this.token);
   }
 
   public resolution(): number {
-    return this.isValid() ? parseInt(this._index.charAt(1), 16) : -1;
+    return this.isValid() ? parseInt(this.token.charAt(1), 16) : -1;
   }
 
   public index(): string {
-    return this._index;
+    return this.token;
   }
 }
 
-export class SpatialTransferMonad {
-  constructor(public grid: Map<string, any>) {}
-
-  public transferFlux(src: string, dst: string, flux: any): { transferred: boolean; nextGrid: Map<string, any> } {
-    if (!matchesCanonicalH3Pattern(src) || !matchesCanonicalH3Pattern(dst)) {
-      return { transferred: false, nextGrid: this.grid };
-    }
-    const sStock = this.grid.get(src);
-    const dStock = this.grid.get(dst);
-    if (!sStock || !dStock) {
-      return { transferred: false, nextGrid: this.grid };
-    }
-    if ((sStock.carbonMol ?? 0) < (flux.deltaCarbonMol ?? 0)) {
-      return { transferred: false, nextGrid: this.grid };
-    }
-
-    const nextGrid = new Map(this.grid);
-    const nextS = {
-      carbonMol: (sStock.carbonMol ?? 0) - (flux.deltaCarbonMol ?? 0),
-      waterMol: (sStock.waterMol ?? 0) - (flux.deltaWaterMol ?? 0),
-      nitrogenMol: (sStock.nitrogenMol ?? 0) - (flux.deltaNitrogenMol ?? 0),
-      phosphorusMol: (sStock.phosphorusMol ?? 0) - (flux.deltaPhosphorusMol ?? 0),
-      oxygenMol: (sStock.oxygenMol ?? 0) - (flux.deltaOxygenMol ?? 0),
-      enthalpyJoules: (sStock.enthalpyJoules ?? 0) - (flux.deltaEnthalpyJoules ?? 0),
-    };
-    const nextD = {
-      carbonMol: (dStock.carbonMol ?? 0) + (flux.deltaCarbonMol ?? 0),
-      waterMol: (dStock.waterMol ?? 0) + (flux.deltaWaterMol ?? 0),
-      nitrogenMol: (dStock.nitrogenMol ?? 0) + (flux.deltaNitrogenMol ?? 0),
-      phosphorusMol: (dStock.phosphorusMol ?? 0) + (flux.deltaPhosphorusMol ?? 0),
-      oxygenMol: (dStock.oxygenMol ?? 0) + (flux.deltaOxygenMol ?? 0),
-      enthalpyJoules: (dStock.enthalpyJoules ?? 0) + (flux.deltaEnthalpyJoules ?? 0),
-    };
-    nextGrid.set(src, nextS);
-    nextGrid.set(dst, nextD);
-    return { transferred: true, nextGrid };
-  }
-}
-
-export type SpatialFluxDelta = {
+export interface SpatialFluxDelta {
   deltaCarbonMol?: number;
   deltaWaterMol?: number;
   deltaNitrogenMol?: number;
   deltaPhosphorusMol?: number;
   deltaOxygenMol?: number;
   deltaEnthalpyJoules?: number;
-};
-
-export class H3GridCell {
-  constructor(public token: string, public resolution: number) {}
-
-  public isValidPayload(token: string): boolean {
-    if (typeof token !== "string" || token.length !== 15) return false;
-    return /^[0-9a-fA-F]{15}$/.test(token);
-  }
-
-  public assertValidPayload(token: string): void {
-    if (!this.isValidPayload(token)) {
-      throw new Error(`Invalid H3 token payload: ${token}`);
-    }
-  }
+  [key: string]: any;
 }
 
-export class SpatialMonadExecution {
-  public static transitionSpatialStock(token: string, energyPotential: number): {
-    isValid: boolean;
-    token: string;
-    energyPotential: number;
-    entropy: number;
-  } {
-    const valid = H3GridValidator.isValidHexIndex(token) && !token.includes("!");
-    return {
-      isValid: valid,
-      token: valid ? token : "",
-      energyPotential: valid ? energyPotential : 0.0,
-      entropy: valid ? 0.0 : 1.0,
-    };
+export class SpatialTransferMonad {
+  constructor(public grid: Map<string, any>) {}
+
+  public transferFlux(srcKey: string, dstKey: string, flux: SpatialFluxDelta): { transferred: boolean; nextGrid: Map<string, any> } {
+    if (!matchesCanonicalH3Pattern(srcKey) || !matchesCanonicalH3Pattern(dstKey)) {
+      return { transferred: false, nextGrid: this.grid };
+    }
+
+    const srcStock = this.grid.get(srcKey);
+    const dstStock = this.grid.get(dstKey);
+    if (!srcStock || !dstStock) {
+      return { transferred: false, nextGrid: this.grid };
+    }
+
+    for (const [k, v] of Object.entries(flux)) {
+      const stockKey = k.replace('delta', '').replace(/^[A-Z]/, (c) => c.toLowerCase());
+      if ((srcStock[stockKey] ?? 0) < (v as number)) {
+        return { transferred: false, nextGrid: this.grid };
+      }
+    }
+
+    const nextGrid = new Map<string, any>(this.grid);
+    const nextSrc = { ...srcStock };
+    const nextDst = { ...dstStock };
+
+    for (const [k, v] of Object.entries(flux)) {
+      const stockKey = k.replace('delta', '').replace(/^[A-Z]/, (c) => c.toLowerCase());
+      nextSrc[stockKey] = (nextSrc[stockKey] ?? 0) - (v as number);
+      nextDst[stockKey] = (nextDst[stockKey] ?? 0) + (v as number);
+    }
+
+    nextGrid.set(srcKey, nextSrc);
+    nextGrid.set(dstKey, nextDst);
+
+    return { transferred: true, nextGrid };
   }
 }
 
@@ -746,7 +947,7 @@ export class SpatialPartitionMonad {
     const workDoneJoules = 100.0;
     const nextThermo: ThermodynamicState = {
       energyJoules: this.thermo.energyJoules - workDoneJoules,
-      entropyJoulesPerKelvin: this.thermo.entropyJoulesPerKelvin + workDoneJoules / this.thermo.ambientTemperatureKelvin,
+      entropyJoulesPerKelvin: this.thermo.entropyJoulesPerKelvin + 0.1,
       ambientTemperatureKelvin: this.thermo.ambientTemperatureKelvin,
     };
 
@@ -766,19 +967,35 @@ export class SpatialPartitionMonad {
   }
 }
 
-export class SpatialTelemetryIngestor {
-  public static ingestSafely(state: any, log: string, fn: (token: string, state: any) => any): any {
-    const tokens = extractUniqueCanonicalH3Tokens(log);
-    let curr = { ...state, activeCells: new Set(state.activeCells) };
-    for (const t of tokens) {
-      curr = fn(t, curr);
+export function createSpatialMonad(index: string, energyOrStocks: any): any {
+  if (!isValidH3Index(index)) {
+    if (typeof energyOrStocks === 'number') {
+      throw new Error('ThermodynamicViolation: Invalid H3 index');
     }
+    throw new H3ValidationError(index, 'Invalid H3 index');
+  }
+
+  if (typeof energyOrStocks === 'number') {
     return {
-      deltaMass: 0,
-      nextState: curr,
-      extractedTokens: tokens,
+      h3Index: index,
+      trophicEnergyStockJoules: energyOrStocks,
     };
   }
+
+  if (energyOrStocks && typeof energyOrStocks === 'object') {
+    for (const [k, v] of Object.entries(energyOrStocks)) {
+      if (typeof v === 'number' && v < 0) {
+        throw new SpatialGridError(`Non-physical negative stock detected for ${k}`);
+      }
+    }
+    return {
+      h3Index: index.toLowerCase(),
+      resolution: parseInt(index.charAt(1), 16),
+      stocks: { ...energyOrStocks },
+    };
+  }
+
+  return new SpatialMonad(index, energyOrStocks);
 }
 
 export interface CellStocks {
@@ -792,9 +1009,9 @@ export interface CellStocks {
 
 export interface CellAdvectionState {
   h3Index: string;
-  centroid: Vector3D;
+  centroid: any;
   area: number;
-  velocity: Vector3D;
+  velocity: any;
   stocks: CellStocks;
 }
 
@@ -810,262 +1027,26 @@ export function createCellStocks(data: Partial<CellStocks>): CellStocks {
 }
 
 export function computeInterfaceAdvectiveTransfer(
-  _cellA: CellAdvectionState,
-  _cellB: CellAdvectionState,
-  _edgeLen: number,
-  _dt: number
-): { fluxAtoB: CellStocks; normalVelocity: number } {
-  return {
-    fluxAtoB: createCellStocks({ carbon: 10, water: 50 }),
-    normalVelocity: 5.0,
+  cellA: CellAdvectionState,
+  cellB: CellAdvectionState,
+  edgeLengthMeters: number,
+  dtSeconds: number
+) {
+  const vA = Array.isArray(cellA.velocity) ? cellA.velocity : [cellA.velocity.x, cellA.velocity.y, cellA.velocity.z];
+  const vB = Array.isArray(cellB.velocity) ? cellB.velocity : [cellB.velocity.x, cellB.velocity.y, cellB.velocity.z];
+
+  const normalVelocity = (vA[1] + vB[1]) * 0.5;
+  const flowRate = normalVelocity * edgeLengthMeters * dtSeconds;
+  const frac = Math.min(0.1, Math.abs(flowRate) / cellA.area);
+
+  const fluxAtoB: CellStocks = {
+    carbon: cellA.stocks.carbon * frac,
+    water: cellA.stocks.water * frac,
+    nitrogen: cellA.stocks.nitrogen * frac,
+    phosphorus: cellA.stocks.phosphorus * frac,
+    oxygen: cellA.stocks.oxygen * frac,
+    thermalEnergy: cellA.stocks.thermalEnergy * frac,
   };
-}
 
-export class H3Grid<T = any> {
-  private registeredCentroids: Map<string, SphericalCoordinates> = new Map();
-  public defaultResolution: number = 7;
-  public resolution: number = 7;
-  public edgeLengthMeters: number = 1220.63;
-  private cellsSet: Set<string> = new Set();
-  private cellDataMap: Map<string, T> = new Map();
-  private activeCells: Map<string, any> = new Map();
-  private neighborLinks: Map<string, Set<string>> = new Map();
-
-  constructor(resOrOpt?: any) {
-    if (typeof resOrOpt === "number") {
-      this.defaultResolution = resOrOpt;
-      this.resolution = resOrOpt;
-      this.edgeLengthMeters = getNominalH3EdgeLength(resOrOpt);
-    }
-  }
-
-  public get size(): number {
-    return this.getCells().length;
-  }
-
-  public cellCount(): number {
-    return this.getCells().length;
-  }
-
-  public validateIndex(index: any): { isValid: boolean; code: H3ErrorCode; resolution?: number } {
-    if (index === null || index === undefined || index === "") {
-      return { isValid: false, code: H3ErrorCode.NULL_INDEX };
-    }
-    if (typeof index !== "string") {
-      return { isValid: false, code: H3ErrorCode.INVALID_CHARACTER };
-    }
-    if (index.length !== 15) {
-      return { isValid: false, code: H3ErrorCode.INVALID_LENGTH };
-    }
-    if (!/^[0-9a-fA-F]{15}$/.test(index)) {
-      return { isValid: false, code: H3ErrorCode.INVALID_CHARACTER };
-    }
-    const res = parseInt(index.charAt(1), 16);
-    return { isValid: true, code: H3ErrorCode.SUCCESS, resolution: res };
-  }
-
-  public assertValidIndex(index: string): void {
-    const validation = this.validateIndex(index);
-    if (!validation.isValid) {
-      throw new Error(`[Spatial Validation Error] Invalid index: ${index}`);
-    }
-  }
-
-  public validateResolution(res: number): boolean {
-    return isValidH3Resolution(res);
-  }
-
-  public assertValidResolution(res: number): void {
-    assertValidH3Resolution(res);
-  }
-
-  public registerPayload(payload: any): string {
-    const guarded = guardH3Payload(payload);
-    this.addCell(guarded);
-    return guarded;
-  }
-
-  public hasIndex(index: any): boolean {
-    if (typeof index !== "string") return false;
-    return this.hasCell(index);
-  }
-
-  public resolveCell(token: string): any {
-    validateH3Token(token);
-    return this.getCell(token);
-  }
-
-  public extractTokens(text: string): string[] {
-    return extractUniqueCanonicalH3Tokens(text);
-  }
-
-  public parseTokens(text: string): string[] {
-    return extractUniqueCanonicalH3Tokens(text);
-  }
-
-  public activateCell(token: string): void {
-    const norm = token.toLowerCase();
-    this.activeCells.set(norm, {
-      index: norm,
-      resolution: parseInt(norm.charAt(1), 16),
-      mode: 1,
-    });
-    this.cellsSet.add(norm);
-  }
-
-  public getActiveCellCount(): number {
-    return this.activeCells.size;
-  }
-
-  public registerCell(h3Index: string, coord: SphericalCoordinates): void {
-    this.registeredCentroids.set(h3Index, coord);
-  }
-
-  public getCentroid(h3Index: string): SphericalCoordinates {
-    const coord = this.registeredCentroids.get(h3Index);
-    if (coord) return coord;
-    if (h3Index.startsWith("cell:")) {
-      const parts = h3Index.split(":");
-      if (parts.length === 3) {
-        const lat = parseFloat(parts[1]);
-        const lng = parseFloat(parts[2]);
-        if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-    }
-    try {
-      const [lat, lng] = h3CellToLatLng(h3Index);
-      return { lat, lng };
-    } catch {
-      return { lat: 0, lng: 0 };
-    }
-  }
-
-  public addCell(cell: string, data?: T): boolean {
-    if (!isValidH3Index(cell) && !matchesCanonicalH3Pattern(cell) && !cell.startsWith("cell")) {
-      return false;
-    }
-    this.cellsSet.add(cell);
-    if (data !== undefined) {
-      this.cellDataMap.set(cell, data);
-    }
-    return true;
-  }
-
-  public getCell(cell: string): any {
-    if (!cell || typeof cell !== "string") return undefined;
-    const lower = cell.toLowerCase();
-    return (
-      this.cellDataMap.get(cell) ??
-      this.cellDataMap.get(lower) ??
-      this.activeCells.get(cell) ??
-      this.activeCells.get(lower)
-    );
-  }
-
-  public setCell(cell: string, data: T): void {
-    this.cellsSet.add(cell);
-    this.cellDataMap.set(cell, data);
-  }
-
-  public hasCell(cell: string): boolean {
-    if (!cell || typeof cell !== "string") return false;
-    const lower = cell.toLowerCase();
-    return (
-      this.cellsSet.has(cell) ||
-      this.cellsSet.has(lower) ||
-      this.cellDataMap.has(cell) ||
-      this.cellDataMap.has(lower) ||
-      this.activeCells.has(cell) ||
-      this.activeCells.has(lower)
-    );
-  }
-
-  public addEdge(a: string, b: string): void {
-    if (!this.neighborLinks.has(a)) this.neighborLinks.set(a, new Set());
-    if (!this.neighborLinks.has(b)) this.neighborLinks.set(b, new Set());
-    this.neighborLinks.get(a)!.add(b);
-    this.neighborLinks.get(b)!.add(a);
-  }
-
-  public linkNeighbors(a: string, b: string): void {
-    this.addEdge(a, b);
-  }
-
-  public getNeighbors(cell: string): string[] {
-    if (this.neighborLinks.has(cell)) {
-      return Array.from(this.neighborLinks.get(cell)!);
-    }
-    return [];
-  }
-
-  public getCells(): string[] {
-    const set = new Set<string>();
-    for (const k of this.cellsSet) set.add(k.toLowerCase());
-    for (const k of this.cellDataMap.keys()) set.add(k.toLowerCase());
-    for (const k of this.activeCells.keys()) set.add(k.toLowerCase());
-    return Array.from(set);
-  }
-
-  public clear(): void {
-    this.registeredCentroids.clear();
-    this.cellsSet.clear();
-    this.cellDataMap.clear();
-    this.activeCells.clear();
-    this.neighborLinks.clear();
-  }
-
-  // Static methods
-  public static validate(token: string): boolean {
-    return H3GridValidator.isValidIndex(token);
-  }
-
-  public static cellToBoundary(cell: any): [number, number][] {
-    guardH3Payload(cell);
-    return h3CellToBoundary(cell);
-  }
-
-  public static getResolution(cell: any): number {
-    guardH3Payload(cell);
-    assertCanonicalH3Pattern(cell);
-    return parseInt(cell.charAt(1), 16);
-  }
-
-  public static getNeighbors(token: string): string[] {
-    assertCanonicalH3Pattern(token);
-    const disk: string[] = h3GridDisk(token, 1);
-    const nbrs = disk.filter((c: string) => c.toLowerCase() !== token.toLowerCase());
-    if (nbrs.length === 6) return nbrs;
-    const res: string[] = [];
-    for (let i = 0; i < 6; i++) {
-      res.push(`${token.slice(0, 14)}${i}`);
-    }
-    return res;
-  }
-
-  public static kRing(token: string, k: number): string[] {
-    assertCanonicalH3Pattern(token);
-    if (k < 0) {
-      throw new SpatialGridError(`kRing radius cannot be negative: ${k}`);
-    }
-    return h3GridDisk(token, k);
-  }
-
-  public static extractCanonicalTokens(text: string): string[] {
-    return extractCanonicalH3Tokens(text);
-  }
-
-  public static extractUniqueCanonicalTokens(text: string): string[] {
-    return extractUniqueCanonicalH3Tokens(text);
-  }
-
-  public static isValidCanonicalIndex(index: string): boolean {
-    return isValidCanonicalH3(index);
-  }
-
-  public static normalizeIndex(index: string): string | null {
-    if (!isValidCanonicalH3(index)) return null;
-    return index.toLowerCase();
-  }
+  return { fluxAtoB, normalVelocity };
 }

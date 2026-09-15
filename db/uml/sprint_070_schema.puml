@@ -1,0 +1,137 @@
+@startuml sprint_070_schema
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+
+title Web of Life: Sprint 070 - 3D Cartesian Angular Tolerance & Thermodynamic Adjacency
+
+package "Spatial Topology & H3 Geodesics" {
+    interface CartesianVector3D {
+        +x: number
+        +y: number
+        +z: number
+    }
+
+    class H3CartesianCoordinate implements CartesianVector3D {
+        +x: number
+        +y: number
+        +z: number
+        +norm(): number
+        +normalize(): H3CartesianCoordinate
+        +dot(other: CartesianVector3D): number
+    }
+
+    class H3AdjacencyComparator {
+        {static} +DEFAULT_ANGULAR_EPSILON: number = 1e-9
+        {static} +areCartesianUnitVectorsEqual3D(v1: CartesianVector3D, v2: CartesianVector3D, epsilon: number): boolean
+        {static} +clampedAngularDistance(v1: CartesianVector3D, v2: CartesianVector3D): number
+    }
+
+    class H3CellBoundaryFacet {
+        +facetId: string
+        +sourceH3Index: bigint
+        +targetH3Index: bigint
+        +v1: CartesianVector3D
+        +v2: CartesianVector3D
+        +unitNormal: CartesianVector3D
+        +boundaryAreaM2: number
+        +angularToleranceEpsilon: number
+        +isSymmetricFacet(other: H3CellBoundaryFacet): boolean
+    }
+
+    class H3BoundaryVertexMatcher {
+        -toleranceEpsilon: number
+        +deduplicateVertices(vertices: CartesianVector3D[]): CartesianVector3D[]
+        +matchSharedFacets(cellA: bigint, cellB: bigint): H3CellBoundaryFacet
+    }
+}
+
+package "Thermodynamic State & Stocks" {
+    class ThermodynamicStock {
+        +h3Index: bigint
+        +blockHeight: bigint
+        +carbonMassKg: number
+        +nitrogenMassKg: number
+        +waterMassKg: number
+        +phosphorusMassKg: number
+        +enthalpyJoules: number
+        +temperatureKelvin: number
+        +chemicalPotentials: Map<string, number>
+        +gibbsFreeEnergy(): number
+    }
+
+    class SpatialFluxVector {
+        +carbonFluxKgSec: number
+        +nitrogenFluxKgSec: number
+        +waterFluxKgSec: number
+        +heatFluxWatts: number
+        +calculateEntropyProduction(tempGrad: number, chemPotGrad: number): number
+    }
+}
+
+package "Monadic Advection Pipeline" {
+    class SpatialFluxMonad<T> {
+        -state: T
+        -facet: H3CellBoundaryFacet
+        -divergenceResidual: number
+        +bind<U>(transform: (val: T) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        +assertConservation(epsilon: number): SpatialFluxMonad<T>
+        +assertSecondLaw(): SpatialFluxMonad<T>
+        +run(): T
+    }
+}
+
+package "Thermodynamic Blockchain Ledger" {
+    class Block {
+        +blockHeight: bigint
+        +blockHash: Uint8Array
+        +parentHash: Uint8Array
+        +stateMerkleRoot: Uint8Array
+        +spatialFluxMerkleRoot: Uint8Array
+        +totalEntropyProduction: number
+        +netMassDivergence: number
+        +verifyPoCConservation(): boolean
+    }
+
+    class BlockchainTransaction {
+        +transactionId: string
+        +sourceCell: bigint
+        +targetCell: bigint
+        +facet: H3CellBoundaryFacet
+        +flux: SpatialFluxVector
+        +firstLawResidual: number
+        +secondLawEntropyDelta: number
+        +witnessSignature: Uint8Array
+        +verify(): boolean
+    }
+}
+
+' Structural Relations and Dependencies
+H3CartesianCoordinate ..> H3AdjacencyComparator : validates via
+H3BoundaryVertexMatcher --> H3AdjacencyComparator : uses
+H3BoundaryVertexMatcher --> H3CellBoundaryFacet : instantiates
+H3CellBoundaryFacet *-- CartesianVector3D : contains v1, v2, normal
+
+SpatialFluxMonad --> H3CellBoundaryFacet : bounds across
+SpatialFluxMonad --> SpatialFluxVector : computes
+BlockchainTransaction --> H3CellBoundaryFacet : operates on
+BlockchainTransaction *-- SpatialFluxVector : records
+Block *-- BlockchainTransaction : aggregates
+ThermodynamicStock --> Block : checkpoints at
+
+note bottom of H3AdjacencyComparator
+  **Invariance Guarantee:**
+  theta = arccos(clamp(u . w, -1.0, 1.0))
+  areCartesianUnitVectorsEqual3D <==> theta <= epsilon
+  Prevents boundary tears in spatial flux routing.
+end note
+
+note bottom of SpatialFluxMonad
+  **Thermodynamic Proof-of-Conservation (PoC):**
+  1st Law: Flux(i -> j) + Flux(j -> i) == 0
+  2nd Law: dS/dt = - sum(J_k . grad(mu_k)) >= 0
+end note
+
+@enduml

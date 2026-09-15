@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 35%
-SPRINT_GOAL: Implement extractH3BoundaryCartesianVertices3D converting boundary lat/lng into Cartesian unit coordinates in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 36%
+SPRINT_GOAL: Implement areCartesianUnitVectorsEqual3D testing angular tolerance epsilon between two Cartesian vectors in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -48,10 +48,11 @@ SPRINT_GOAL: Implement extractH3BoundaryCartesianVertices3D converting boundary 
 - [x] Implement `computeBoundaryOutwardNormal3D` combining midpoint horizontal normal with centroid displacement direction in `src/spatial/h3_adjacency.ts`
 - [x] Define `DetailedInterfaceNormalResult` interface with normal, arcLengthMeters, and alignmentCos in `src/spatial/h3_types.ts`
 - [x] Implement `computeDetailedInterfaceNormal` returning oriented boundary normal and alignment metrics in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `extractH3BoundaryCartesianVertices3D` converting boundary lat/lng into Cartesian unit coordinates in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `findSharedBoundaryVertexPairs3D` matching adjacent boundary points within epsilon tolerance in `src/spatial/h3_adjacency.ts`
+- [x] Implement `extractH3BoundaryCartesianVertices3D` converting boundary lat/lng into Cartesian unit coordinates in `src/spatial/h3_adjacency.ts`
+- [x] Implement `extractSharedBoundaryVertices3D` composite edge endpoint extractor in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `areCartesianUnitVectorsEqual3D` testing angular tolerance epsilon between two Cartesian vectors in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `findSharedBoundaryVertexPairs3D` matching coincident boundary vertices between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `extractSharedBoundaryVertices3D` composite edge endpoint extractor in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Define environmental dead-state datum constants ($T_0, P_0, \mu_i^0$) in `src/thermodynamics/constants.ts`
