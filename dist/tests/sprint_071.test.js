@@ -50,11 +50,9 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
             { x: -0.08, y: 0.05, z: Math.sqrt(1 - 0.08 * 0.08 - 0.05 * 0.05) },
         ];
         // Spherical Hex B shares vertices 1 and 2 of Hex A
-        const v1 = sphereHexA[1];
-        const v2 = sphereHexA[2];
         const sphereHexB = [
-            { x: v1.x + 1e-8, y: v1.y, z: v1.z },
-            { x: v2.x, y: v2.y - 1e-8, z: v2.z },
+            { x: sphereHexA[1].x + 1e-8, y: sphereHexA[1].y, z: sphereHexA[1].z },
+            { x: sphereHexA[2].x, y: sphereHexA[2].y - 1e-8, z: sphereHexA[2].z },
             { x: 0.25, y: 0.15, z: Math.sqrt(1 - 0.25 * 0.25 - 0.15 * 0.15) },
             { x: 0.3, y: 0.05, z: Math.sqrt(1 - 0.3 * 0.3 - 0.05 * 0.05) },
             { x: 0.25, y: -0.05, z: Math.sqrt(1 - 0.25 * 0.25 - 0.05 * 0.05) },

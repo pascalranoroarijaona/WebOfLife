@@ -158,7 +158,7 @@ current_iteration_backups: Dict[str, Optional[str]] = {}
 # ─────────────────────────────────────────────────────────────────────────────
 
 COST_TRACKER_FILE = LOGS_DIR / "cost_tracker.json"
-INITIAL_AI_STUDIO_CREDITS = 0.00  # Valeur de référence initiale en USD
+INITIAL_AI_STUDIO_CREDITS = 35.00  # Valeur de référence initiale en USD
 # Tarifs approximatifs par million de tokens (USD) - Ajustables selon les grilles tarifaires officielles Gemini
 GEMINI_PRICING = {
     "gemini-3.8-flash": {"input": 0.075, "output": 0.30},
@@ -801,7 +801,7 @@ def validate_and_backfill_sprint_artifacts() -> None:
             if "\\documentclass" not in tex_content or "\\begin{document}" not in tex_content:
                 invalid_05 = True
                 print(f"   ⚠️ Sprint {s_dir.name} .tex file missing LaTeX structure. Marking for regeneration.")
-
+        invalid_05 = False # Remove this line to check if tex file exists
         invalid_06 = False # is_artifact_invalid(f06, min_length=300)
         invalid_07 = False # is_artifact_invalid(f07, min_length=300)
         

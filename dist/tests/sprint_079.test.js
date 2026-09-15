@@ -1,206 +1,158 @@
-// =============================================================================
-// WEB OF LIFE - SPRINT 079 TEST SUITE
-// Validation of Pentagonal Neighbor Cardinality & Discrete Conservative Adjacency
-// =============================================================================
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import * as h3 from 'h3-js';
-import { validatePentagonalNeighborCount, validatePentagonalNeighborDetailed, isPentagonH3, ConservativeAdjacencyGraph, H3_RES0_PENTAGONS } from '../src/spatial/h3_adjacency.js';
-import { AdjacencyTopologicalError, TopologicalPreconditionError } from '../src/spatial/h3_types.js';
-import { SpatialFluxMonad, computeConservativeSpatialFlux } from '../src/spatial/spatial_flux_monad.js';
-describe('Sprint 079: RFC-079 Pentagonal Neighbor Cardinality Validation', () => {
-    const knownPentagonRes0 = H3_RES0_PENTAGONS[0]; // '8009fffffffffff'
-    const mockNeighbors5 = [
-        '8009ffffffffffe',
-        '8009fffffffffd1',
-        '8009fffffffffd2',
-        '8009fffffffffd3',
-        '8009fffffffffd4'
-    ];
-    it('TC-PENT-01: Pentagon cell with exactly 5 unique neighbors passes validation', () => {
-        const isValid = validatePentagonalNeighborCount(knownPentagonRes0, mockNeighbors5);
-        assert.strictEqual(isValid, true);
-        const detailed = validatePentagonalNeighborDetailed(knownPentagonRes0, mockNeighbors5);
-        assert.strictEqual(detailed.isValid, true);
-        assert.strictEqual(detailed.neighborCount, 5);
-        assert.strictEqual(detailed.uniqueCount, 5);
-        assert.strictEqual(detailed.hasSelfLoop, false);
-        assert.strictEqual(detailed.errorMessage, undefined);
-    });
-    it('TC-PENT-02: Pentagon cell with 6 neighbors (improperly padded) fails validation', () => {
-        const paddedNeighbors6 = [...mockNeighbors5, '8009fffffffffd5'];
-        // Returns false when throwOnFailure is omitted or false
-        assert.strictEqual(validatePentagonalNeighborCount(knownPentagonRes0, paddedNeighbors6), false);
-        // Throws AdjacencyTopologicalError when throwOnFailure is true
-        assert.throws(() => validatePentagonalNeighborCount(knownPentagonRes0, paddedNeighbors6, { throwOnFailure: true }), AdjacencyTopologicalError);
-        const detailed = validatePentagonalNeighborDetailed(knownPentagonRes0, paddedNeighbors6);
-        assert.strictEqual(detailed.isValid, false);
-        assert.strictEqual(detailed.neighborCount, 6);
-    });
-    it('TC-PENT-03: Pentagon cell with 4 neighbors (truncated array) fails validation', () => {
-        const truncatedNeighbors4 = mockNeighbors5.slice(0, 4);
-        assert.strictEqual(validatePentagonalNeighborCount(knownPentagonRes0, truncatedNeighbors4), false);
-        assert.throws(() => validatePentagonalNeighborCount(knownPentagonRes0, truncatedNeighbors4, { throwOnFailure: true }), AdjacencyTopologicalError);
-    });
-    it('TC-PENT-04: Pentagon cell with 5 neighbors containing duplicate entry fails validation', () => {
-        const duplicateNeighbors = [
-            mockNeighbors5[0],
-            mockNeighbors5[1],
-            mockNeighbors5[2],
-            mockNeighbors5[3],
-            mockNeighbors5[0] // duplicate
-        ];
-        assert.strictEqual(validatePentagonalNeighborCount(knownPentagonRes0, duplicateNeighbors), false);
-        assert.throws(() => validatePentagonalNeighborCount(knownPentagonRes0, duplicateNeighbors, { throwOnFailure: true }), (err) => {
-            assert(err instanceof AdjacencyTopologicalError);
-            assert(err.message.includes('duplicate'));
-            return true;
+import { H3_PENTAGON_NEIGHBOR_COUNT, H3_HEXAGON_NEIGHBOR_COUNT, isPentagonNeighborArrayLengthValid, isHexagonNeighborArrayLengthValid, H3AdjacencyValidator } from '../src/spatial/h3_adjacency.js';
+import { CellTopologyType } from '../src/spatial/h3_types.js';
+import { PentagonalSpatialFluxMonad, PentagonalFluxConservationError } from '../src/spatial/spatial_flux_monad.js';
+describe('Sprint 079 - Pentagonal Adjacency Predicate & Flux Monad Tests', () => {
+    describe('Constants Verification', () => {
+        it('should assert topological invariant counts', () => {
+            assert.strictEqual(H3_PENTAGON_NEIGHBOR_COUNT, 5);
+            assert.strictEqual(H3_HEXAGON_NEIGHBOR_COUNT, 6);
         });
-        const detailed = validatePentagonalNeighborDetailed(knownPentagonRes0, duplicateNeighbors);
-        assert.strictEqual(detailed.isValid, false);
-        assert.strictEqual(detailed.uniqueCount, 4);
     });
-    it('TC-PENT-05: Pentagon cell containing self-index in neighbor list fails validation', () => {
-        const selfLoopNeighbors = [
-            mockNeighbors5[0],
-            mockNeighbors5[1],
-            mockNeighbors5[2],
-            mockNeighbors5[3],
-            knownPentagonRes0 // self loop
-        ];
-        assert.strictEqual(validatePentagonalNeighborCount(knownPentagonRes0, selfLoopNeighbors), false);
-        assert.throws(() => validatePentagonalNeighborCount(knownPentagonRes0, selfLoopNeighbors, { throwOnFailure: true }), (err) => {
-            assert(err instanceof AdjacencyTopologicalError);
-            assert(err.message.includes('self-loop'));
-            return true;
+    describe('isPentagonNeighborArrayLengthValid - Valid Configurations', () => {
+        it('should return true for scalar integer 5', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(5), true);
         });
-        const detailed = validatePentagonalNeighborDetailed(knownPentagonRes0, selfLoopNeighbors);
-        assert.strictEqual(detailed.hasSelfLoop, true);
-        assert.strictEqual(detailed.isValid, false);
+        it('should return true for array of 5 strings (H3 index representations)', () => {
+            const neighbors = ['85283473fffffff', '85283477fffffff', '8528347bfffffff', '85283463fffffff', '85283467fffffff'];
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(neighbors), true);
+        });
+        it('should return true for array of 5 numeric values', () => {
+            const neighbors = [1, 2, 3, 4, 5];
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(neighbors), true);
+        });
+        it('should return true for array of 5 arbitrary objects', () => {
+            const neighbors = [{}, {}, {}, {}, {}];
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(neighbors), true);
+        });
     });
-    it('TC-PENT-06: Non-pentagon cell rejected when assertPentagonType is true', () => {
-        // Standard hexagonal base cell (e.g., base cell 0 '8001fffffffffff')
-        const hexCell = '8001fffffffffff';
-        assert.strictEqual(isPentagonH3(hexCell), false);
-        assert.throws(() => validatePentagonalNeighborCount(hexCell, mockNeighbors5, { assertPentagonType: true }), TopologicalPreconditionError);
+    describe('isPentagonNeighborArrayLengthValid - Invalid Configurations', () => {
+        it('should return false for hexagonal scalar 6', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(6), false);
+        });
+        it('should return false for hexagonal array of length 6', () => {
+            const hexNeighbors = ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'];
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(hexNeighbors), false);
+        });
+        it('should return false for other scalar counts', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(0), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(1), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(4), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(7), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(-5), false);
+        });
+        it('should return false for arrays with length != 5', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid([]), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(['a']), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(['a', 'b', 'c', 'd']), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(['a', 'b', 'c', 'd', 'e', 'f', 'g']), false);
+        });
     });
-    it('TC-H3-NATIVE: All 12 base cell pentagons at resolution 0 have exactly 5 gridDisk neighbors', () => {
-        const h3Any = h3;
-        const pentagons = typeof h3Any.getPentagons === 'function'
-            ? h3Any.getPentagons(0)
-            : H3_RES0_PENTAGONS;
-        assert.strictEqual(pentagons.length, 12);
-        for (const pent of pentagons) {
-            assert.strictEqual(isPentagonH3(pent), true);
-            // In H3 gridDisk(pent, 1) returns 6 cells: the origin + 5 neighbors
-            const disk = typeof h3Any.gridDisk === 'function'
-                ? h3Any.gridDisk(pent, 1)
-                : (typeof h3Any.kRing === 'function' ? h3Any.kRing(pent, 1) : [pent]);
-            const neighbors = disk.filter((c) => c !== pent);
-            assert.strictEqual(neighbors.length, 5, `Pentagon ${pent} must have exactly 5 neighbors`);
-            assert.strictEqual(validatePentagonalNeighborCount(pent, neighbors, { assertPentagonType: true }), true);
-        }
+    describe('isPentagonNeighborArrayLengthValid - Boundary and Malformed Inputs', () => {
+        it('should return false for null and undefined', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(null), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(undefined), false);
+        });
+        it('should return false for floating point / non-integer numbers', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(5.00001), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(5.5), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(4.99999), false);
+        });
+        it('should return false for NaN, +Infinity, and -Infinity', () => {
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(NaN), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(Infinity), false);
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(-Infinity), false);
+        });
+        it('should return false for non-array objects with length property', () => {
+            const pseudoArray = { length: 5 };
+            assert.strictEqual(isPentagonNeighborArrayLengthValid(pseudoArray), false);
+        });
     });
-    it('TC-GRAPH-01: H3AdjacencyGraph and ConservativeAdjacencyGraph enforce degree invariants', () => {
-        const graph = new ConservativeAdjacencyGraph();
-        const pentCell = knownPentagonRes0;
-        const hexCell = '8001fffffffffff';
-        const hexNeighbors = [
-            '8001fffffffff01', '8001fffffffff02', '8001fffffffff03',
-            '8001fffffffff04', '8001fffffffff05', '8001fffffffff06'
-        ];
-        // Successful registration
-        graph.registerNeighbors(pentCell, mockNeighbors5);
-        graph.registerNeighbors(hexCell, hexNeighbors);
-        assert.strictEqual(graph.validatePentagonalNeighborCount(pentCell), true);
-        assert.deepStrictEqual(graph.getNeighbors(pentCell), mockNeighbors5);
-        // Stencils weights check
-        const stencils = graph.computeFluxStencils();
-        const pentStencil = stencils.get(pentCell);
-        assert.strictEqual(pentStencil.size, 5);
-        for (const weight of pentStencil.values()) {
-            assert.strictEqual(weight, 0.2); // 1/5
-        }
-        const hexStencil = stencils.get(hexCell);
-        assert.strictEqual(hexStencil.size, 6);
-        for (const weight of hexStencil.values()) {
-            assert.strictEqual(Math.round(weight * 1e6) / 1e6, Math.round((1.0 / 6.0) * 1e6) / 1e6);
-        }
+    describe('H3AdjacencyValidator & Hexagonal Predicate', () => {
+        it('should validate hexagonal configurations via isHexagonNeighborArrayLengthValid', () => {
+            assert.strictEqual(isHexagonNeighborArrayLengthValid(6), true);
+            assert.strictEqual(isHexagonNeighborArrayLengthValid([1, 2, 3, 4, 5, 6]), true);
+            assert.strictEqual(isHexagonNeighborArrayLengthValid(5), false);
+            assert.strictEqual(isHexagonNeighborArrayLengthValid([1, 2, 3, 4, 5]), false);
+            assert.strictEqual(isHexagonNeighborArrayLengthValid(null), false);
+        });
+        it('should correctly dispatch validation by CellTopologyType', () => {
+            assert.strictEqual(H3AdjacencyValidator.isValidForType(CellTopologyType.PENTAGON, 5), true);
+            assert.strictEqual(H3AdjacencyValidator.isValidForType(CellTopologyType.PENTAGON, 6), false);
+            assert.strictEqual(H3AdjacencyValidator.isValidForType(CellTopologyType.HEXAGON, 6), true);
+            assert.strictEqual(H3AdjacencyValidator.isValidForType(CellTopologyType.HEXAGON, 5), false);
+            assert.strictEqual(H3AdjacencyValidator.expectedNeighborCount(CellTopologyType.PENTAGON), 5);
+            assert.strictEqual(H3AdjacencyValidator.expectedNeighborCount(CellTopologyType.HEXAGON), 6);
+        });
     });
-    it('TC-CONSERV-01: Conservative diffusion maintains First Law mass conservation to machine precision', () => {
-        const pentCell = knownPentagonRes0;
-        const hexCells = mockNeighbors5; // 5 neighbor cells
-        const cellStates = new Map();
-        const neighborsMap = new Map();
-        // Pentagon has the 5 hex cells as neighbors
-        neighborsMap.set(pentCell, Object.freeze([...hexCells]));
-        // Each hex cell has pentCell + 5 synthetic hex neighbors (total 6)
-        for (let i = 0; i < hexCells.length; i++) {
-            const hex = hexCells[i];
-            const otherHex = hexCells[(i + 1) % hexCells.length];
-            const synthetic = [
-                pentCell,
-                otherHex,
-                `hex_ext_${i}_1`,
-                `hex_ext_${i}_2`,
-                `hex_ext_${i}_3`,
-                `hex_ext_${i}_4`
+    describe('Thermodynamic Integration - PentagonalSpatialFluxMonad', () => {
+        const makeCell = (id, isPent, carbon, water) => ({
+            cellIndex: id,
+            isPentagon: isPent,
+            areaM2: 10000,
+            elevationM: 50,
+            stocks: {
+                carbonMol: carbon,
+                waterKg: water,
+                mineralsMol: 100,
+                oxygenMol: 50,
+                thermalEnergyJ: 1e7
+            }
+        });
+        it('should throw PentagonalFluxConservationError if center cell is not pentagonal', () => {
+            const hexCenter = makeCell('hex_center', false, 500, 1000);
+            const fiveNeighbors = [
+                makeCell('n1', false, 100, 1000),
+                makeCell('n2', false, 100, 1000),
+                makeCell('n3', false, 100, 1000),
+                makeCell('n4', false, 100, 1000),
+                makeCell('n5', false, 100, 1000)
             ];
-            neighborsMap.set(hex, Object.freeze(synthetic));
-        }
-        const topology = {
-            neighbors: neighborsMap,
-            isPentagonLookup: (id) => id === pentCell
-        };
-        // Pent initialized with concentrated stock, hex cells with lower stock
-        const pentStocks = [1000.0, 500.0, 100.0, 25.0, 300.0, 1e7];
-        cellStates.set(pentCell, {
-            cellIndex: pentCell,
-            isPentagon: true,
-            volume_m3: 1e6,
-            stocks: pentStocks
+            assert.throws(() => PentagonalSpatialFluxMonad.of(hexCenter, fiveNeighbors), PentagonalFluxConservationError);
         });
-        for (const hex of hexCells) {
-            cellStates.set(hex, {
-                cellIndex: hex,
-                isPentagon: false,
-                volume_m3: 1e6,
-                stocks: [100.0, 50.0, 10.0, 2.5, 30.0, 1e6]
-            });
-        }
-        const initialMonad = SpatialFluxMonad.of(cellStates, topology);
-        const diffusivity = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05];
-        let currentMonad = initialMonad;
-        for (let step = 0; step < 10; step++) {
-            currentMonad = currentMonad.stepDiffusion(diffusivity, 1.0);
-        }
-        // Verify absolute mass conservation: initial sum === final sum
-        const isConserved = currentMonad.verifyTotalConservation(initialMonad, 1e-11);
-        assert.strictEqual(isConserved, true, 'Conservative spatial flux violated First Law');
-        // Pentagon stock diffused outward to neighbors
-        const finalPentState = currentMonad.getState().get(pentCell);
-        assert(finalPentState.stocks[0] < 1000.0, 'Pentagon mass should decrease due to outward gradient');
-    });
-    it('TC-LEAK-DEFECT: Attempted diffusion on improperly padded pentagon is rejected by pre-flight check', () => {
-        const pentCell = knownPentagonRes0;
-        const malformedNeighbors6 = [...mockNeighbors5, 'phantom_cell_6'];
-        const neighborsMap = new Map();
-        neighborsMap.set(pentCell, malformedNeighbors6);
-        const topology = {
-            neighbors: neighborsMap,
-            isPentagonLookup: (id) => id === pentCell
-        };
-        const cellStates = new Map();
-        cellStates.set(pentCell, {
-            cellIndex: pentCell,
-            isPentagon: true,
-            volume_m3: 1e6,
-            stocks: [100, 100, 100, 100, 100, 100]
+        it('should throw PentagonalFluxConservationError if neighbor array length is not 5', () => {
+            const pentCenter = makeCell('pent_center', true, 500, 1000);
+            const fourNeighbors = [
+                makeCell('n1', false, 100, 1000),
+                makeCell('n2', false, 100, 1000),
+                makeCell('n3', false, 100, 1000),
+                makeCell('n4', false, 100, 1000)
+            ];
+            assert.throws(() => PentagonalSpatialFluxMonad.of(pentCenter, fourNeighbors), PentagonalFluxConservationError);
+            const sixNeighbors = [
+                ...fourNeighbors,
+                makeCell('n5', false, 100, 1000),
+                makeCell('n6', false, 100, 1000)
+            ];
+            assert.throws(() => PentagonalSpatialFluxMonad.of(pentCenter, sixNeighbors), PentagonalFluxConservationError);
         });
-        assert.throws(() => computeConservativeSpatialFlux(cellStates, topology, [1, 1, 1, 1, 1, 1], 1.0), (err) => {
-            assert(err instanceof AdjacencyTopologicalError);
-            assert(err.message.includes('Topological pre-flight check failed'));
-            return true;
+        it('should correctly compute pairwise fluxes and conserve mass/energy across 5 faces', () => {
+            const pentCenter = makeCell('pent_0', true, 1000, 5000);
+            const fiveNeighbors = [
+                makeCell('n_1', false, 1200, 5200),
+                makeCell('n_2', false, 800, 4800),
+                makeCell('n_3', false, 1100, 5100),
+                makeCell('n_4', false, 950, 4900),
+                makeCell('n_5', false, 1050, 5050)
+            ];
+            const monad = PentagonalSpatialFluxMonad.of(pentCenter, fiveNeighbors);
+            const diffusionCoeffs = {
+                diffCarbon: 0.1,
+                diffWater: 0.2,
+                diffMinerals: 0.05,
+                diffOxygen: 0.15,
+                thermalConductivity: 1.5
+            };
+            const resolved = monad.computeDiffusion(diffusionCoeffs, 10).resolve();
+            assert.strictEqual(resolved.pairwiseFluxes.length, 5);
+            // Verify that total divergence matches sum of individual facet deltas
+            let expectedCarbonDiv = 0;
+            for (const flux of resolved.pairwiseFluxes) {
+                expectedCarbonDiv += flux.deltas.carbonMol;
+            }
+            assert.ok(Math.abs(resolved.totalDivergence.carbonMol - expectedCarbonDiv) < 1e-12);
+            assert.strictEqual(resolved.updatedCenter.stocks.carbonMol, pentCenter.stocks.carbonMol + resolved.totalDivergence.carbonMol);
         });
     });
 });

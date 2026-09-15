@@ -1,193 +1,227 @@
--- ============================================================================
--- Web of Life: Thermodynamic Blockchain & DGGS Adjacency Ledger Schema
--- Sprint 078: Pentagonal Coordination Invariant Enforcement in H3 DGGS
--- ============================================================================
+-- Web of Life Planetary Simulation Database Schema
+-- Sprint 079: H3 Discrete Global Grid System (DGGS) Pentagonal Adjacency,
+-- Conservative Thermodynamic Flux Monad Integration, and Blockchain Proof-of-Conservation
 
--- Extensions required for cryptographic integrity, UUIDs, and time-series
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- Enumeration of cell topological geometries across the icosahedral grid
-CREATE TYPE h3_cell_topology_type AS ENUM (
-    'HEXAGONAL',
-    'PENTAGONAL_DISCLINATION'
+-- ============================================================================
+-- ENUMERATIONS & DOMAINS
+-- ============================================================================
+
+CREATE TYPE cell_topology_type AS ENUM (
+    'HEXAGON',
+    'PENTAGON'
 );
 
--- Enumeration of coordination violation classes
-CREATE TYPE h3_coordination_violation_type AS ENUM (
-    'PENTAGONAL_COORDINATION_VIOLATION',
-    'HEXAGONAL_COORDINATION_VIOLATION',
-    'BOUNDARY_TRUNCATION_VIOLATION'
+CREATE TYPE stock_component_type AS ENUM (
+    'BIOMASS_CARBON',
+    'NITROGEN',
+    'PHOSPHORUS',
+    'WATER',
+    'INTERNAL_ENERGY',
+    'ENTROPY'
 );
 
--- Enumeration of thermodynamic state variables carried by spatial stocks
-CREATE TYPE thermodynamic_carrier_type AS ENUM (
-    'BIOMASS_CARBON_MOLES',
-    'THERMAL_ENERGY_JOULES',
-    'ENTROPY_JOULES_PER_KELVIN',
-    'WATER_MASS_KG',
-    'EXERGY_JOULES'
+CREATE TYPE transaction_status_type AS ENUM (
+    'PENDING',
+    'COMMITTED',
+    'REVERTED',
+    'THERMODYNAMICALLY_INVALID'
 );
 
--- ----------------------------------------------------------------------------
--- 1. H3 DGGS Manifold Cells Table
--- Captures discrete global grid cells, their topological classification,
--- and invariant target coordination number (z = 5 for pentagons, z = 6 for hexagons).
--- ----------------------------------------------------------------------------
-CREATE TABLE h3_grid_cells (
-    cell_id VARCHAR(15) PRIMARY KEY, -- 64-bit integer represented as 15-character hex string
-    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    topology_type h3_cell_topology_type NOT NULL,
-    is_pentagon BOOLEAN NOT NULL GENERATED ALWAYS AS (
-        topology_type = 'PENTAGONAL_DISCLINATION'
-    ) STORED,
-    expected_coordination_number SMALLINT NOT NULL GENERATED ALWAYS AS (
-        CASE 
-            WHEN topology_type = 'PENTAGONAL_DISCLINATION' THEN 5 
-            ELSE 6 
-        END
-    ) STORED,
-    latitude_rad DOUBLE PRECISION NOT NULL CHECK (latitude_rad BETWEEN -PI()/2 AND PI()/2),
-    longitude_rad DOUBLE PRECISION NOT NULL CHECK (longitude_rad BETWEEN -PI() AND PI()),
-    surface_area_m2 DOUBLE PRECISION NOT NULL CHECK (surface_area_m2 > 0.0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+-- Coordination number domain: 5 for pentagons, 6 for hexagons
+CREATE DOMAIN coordination_degree AS INTEGER
+    CHECK (VALUE IN (5, 6));
+
+-- ============================================================================
+-- 1. SPATIAL TOPOLOGY & H3 CELL REGISTRY
+-- ============================================================================
+
+CREATE TABLE h3_cells (
+    cell_index          VARCHAR(15) PRIMARY KEY, -- 64-bit H3 index as hex string
+    resolution          SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    topology_type       cell_topology_type NOT NULL,
+    coordination_target coordination_degree NOT NULL,
+    latitude            NUMERIC(10, 7) NOT NULL,
+    longitude           NUMERIC(10, 7) NOT NULL,
+    boundary_polygon    GEOMETRY(Polygon, 4326) NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_topology_coordination CHECK (
+        (topology_type = 'PENTAGON' AND coordination_target = 5) OR
+        (topology_type = 'HEXAGON'  AND coordination_target = 6)
+    )
 );
 
-CREATE INDEX idx_h3_grid_cells_resolution_pentagon 
-    ON h3_grid_cells (resolution, is_pentagon);
+CREATE INDEX idx_h3_cells_resolution ON h3_cells(resolution);
+CREATE INDEX idx_h3_cells_topology ON h3_cells(topology_type);
+CREATE INDEX idx_h3_cells_spatial ON h3_cells USING GIST(boundary_polygon);
 
--- ----------------------------------------------------------------------------
--- 2. H3 Directed Dual Graph Adjacency Edges
--- Tracks topological edges connecting cell pairs.
--- Every pentagonal cell must have strictly 5 outgoing and 5 incoming dual edges.
--- ----------------------------------------------------------------------------
-CREATE TABLE h3_adjacency_edges (
-    edge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    origin_cell_id VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_id) ON DELETE CASCADE,
-    neighbor_cell_id VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_id) ON DELETE CASCADE,
-    boundary_length_m DOUBLE PRECISION NOT NULL CHECK (boundary_length_m > 0.0),
-    normal_vector_x DOUBLE PRECISION NOT NULL,
-    normal_vector_y DOUBLE PRECISION NOT NULL,
-    normal_vector_z DOUBLE PRECISION NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT uq_origin_neighbor UNIQUE (origin_cell_id, neighbor_cell_id),
-    CONSTRAINT chk_no_self_adjacency CHECK (origin_cell_id <> neighbor_cell_id)
+-- Enforce Euler's Polyhedral Characteristic: Exactly 12 pentagons per resolution level
+CREATE OR REPLACE FUNCTION check_pentagon_count_per_resolution()
+RETURNS TRIGGER AS $$
+DECLARE
+    pentagon_count INTEGER;
+BEGIN
+    IF NEW.topology_type = 'PENTAGON' THEN
+        SELECT COUNT(*) INTO pentagon_count
+        FROM h3_cells
+        WHERE resolution = NEW.resolution AND topology_type = 'PENTAGON';
+        
+        IF pentagon_count > 12 THEN
+            RAISE EXCEPTION 'Euler polyhedral invariant violated: Resolution % already contains 12 pentagons', NEW.resolution;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_pentagon_count
+    BEFORE INSERT OR UPDATE ON h3_cells
+    FOR EACH ROW
+    EXECUTE FUNCTION check_pentagon_count_per_resolution();
+
+-- ============================================================================
+-- 2. TOPOLOGICAL ADJACENCY RELATIONS
+-- ============================================================================
+
+CREATE TABLE h3_adjacencies (
+    adjacency_id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    origin_cell_index   VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index) ON DELETE CASCADE,
+    neighbor_cell_index VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index) ON DELETE CASCADE,
+    direction_index     SMALLINT NOT NULL CHECK (direction_index BETWEEN 0 AND 5),
+    facet_area_m2       NUMERIC(18, 6) NOT NULL CHECK (facet_area_m2 > 0),
+    geodesic_distance_m NUMERIC(18, 6) NOT NULL CHECK (geodesic_distance_m > 0),
+    is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_origin_direction UNIQUE (origin_cell_index, direction_index),
+    CONSTRAINT unique_directed_edge UNIQUE (origin_cell_index, neighbor_cell_index),
+    CONSTRAINT check_no_self_adjacency CHECK (origin_cell_index <> neighbor_cell_index)
 );
 
-CREATE INDEX idx_h3_adjacency_origin ON h3_adjacency_edges (origin_cell_id);
-CREATE INDEX idx_h3_adjacency_neighbor ON h3_adjacency_edges (neighbor_cell_id);
+CREATE INDEX idx_h3_adjacencies_origin ON h3_adjacencies(origin_cell_index);
+CREATE INDEX idx_h3_adjacencies_neighbor ON h3_adjacencies(neighbor_cell_index);
 
--- ----------------------------------------------------------------------------
--- 3. Coordination Invariant Validation Audit Log
--- Logs execution and assertion failures of assertValidNeighborCountForCell.
--- Reifies PentagonalCoordinationViolationError and HexagonalCoordinationViolationError.
--- ----------------------------------------------------------------------------
-CREATE TABLE h3_coordination_audit_log (
-    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL,
-    cell_id VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_id),
-    is_pentagon BOOLEAN NOT NULL,
-    observed_neighbor_count SMALLINT NOT NULL CHECK (observed_neighbor_count >= 0),
-    expected_neighbor_count SMALLINT NOT NULL CHECK (expected_neighbor_count IN (5, 6)),
-    violation_type h3_coordination_violation_type,
-    is_valid BOOLEAN NOT NULL GENERATED ALWAYS AS (
-        observed_neighbor_count = expected_neighbor_count
-    ) STORED,
-    assertion_error_message TEXT,
-    validated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
-);
-
-CREATE INDEX idx_h3_coordination_audit_block_cell 
-    ON h3_coordination_audit_log (block_height, cell_id);
-CREATE INDEX idx_h3_coordination_violations 
-    ON h3_coordination_audit_log (violation_type) 
-    WHERE violation_type IS NOT NULL;
-
--- ----------------------------------------------------------------------------
--- 4. Thermodynamic Stocks Monad Table (State S_i)
--- Maintains intensive and extensive thermodynamic stock balances at each cell.
--- ----------------------------------------------------------------------------
-CREATE TABLE cell_thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cell_id VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_id) ON DELETE RESTRICT,
-    block_height BIGINT NOT NULL,
-    carrier thermodynamic_carrier_type NOT NULL,
-    stock_value NUMERIC(38, 18) NOT NULL CHECK (stock_value >= 0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
-    chemical_potential_j_mol DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    entropy_production_rate_w_k DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    state_merkle_root BYTEA NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT uq_cell_stock_block_carrier UNIQUE (cell_id, block_height, carrier)
-);
-
-CREATE INDEX idx_cell_thermo_stocks_lookup 
-    ON cell_thermodynamic_stocks (block_height, cell_id, carrier);
-
--- ----------------------------------------------------------------------------
--- 5. Inter-Cell Directional Flux Tensors (Flow J_ij)
--- Models finite volume mass, energy, and entropy flux across cell facets.
--- Closed boundary condition: sum of fluxes for closed manifold = 0.
--- ----------------------------------------------------------------------------
-CREATE TABLE spatial_flux_transactions (
-    flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL,
-    edge_id UUID NOT NULL REFERENCES h3_adjacency_edges(edge_id),
-    origin_cell_id VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_id),
-    neighbor_cell_id VARCHAR(15) NOT NULL REFERENCES h3_grid_cells(cell_id),
-    carrier thermodynamic_carrier_type NOT NULL,
-    flux_density_j_per_m2_s DOUBLE PRECISION NOT NULL,
-    total_flux_rate DOUBLE PRECISION NOT NULL, -- J_ij * boundary_length or area
-    entropy_generation_rate DOUBLE PRECISION NOT NULL CHECK (entropy_generation_rate >= 0.0), -- Second Law: \dot{\sigma} >= 0
-    conservative_closure_valid BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT chk_flux_entropy_second_law CHECK (entropy_generation_rate >= 0.0)
-);
-
-CREATE INDEX idx_flux_tx_block_origin 
-    ON spatial_flux_transactions (block_height, origin_cell_id);
-
--- ----------------------------------------------------------------------------
--- 6. DGGS Topology & Thermodynamic Block Transactions
--- Cryptographic anchoring of discrete manifold state transitions.
--- ----------------------------------------------------------------------------
-CREATE TABLE dggs_blockchain_blocks (
-    block_height BIGINT PRIMARY KEY,
-    previous_block_hash BYTEA NOT NULL,
-    block_hash BYTEA NOT NULL UNIQUE,
-    thermodynamic_stock_merkle_root BYTEA NOT NULL,
-    topology_invariant_merkle_root BYTEA NOT NULL,
-    pentagonal_disclination_count SMALLINT NOT NULL CHECK (pentagonal_disclination_count = 12),
-    total_entropy_production_w_k DOUBLE PRECISION NOT NULL CHECK (total_entropy_production_w_k >= 0.0),
-    conservative_mass_divergence_error DOUBLE PRECISION NOT NULL CHECK (abs(conservative_mass_divergence_error) < 1e-12),
-    validator_signature BYTEA NOT NULL,
-    mined_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
-);
-
--- ----------------------------------------------------------------------------
--- View: Cell Adjacency Coordination Real-time Check
--- Materializes live neighbor counts vs geometric invariant.
--- ----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW view_cell_coordination_status AS
+-- Topological validation view verifying neighbor array cardinality
+CREATE OR REPLACE VIEW v_cell_adjacency_validations AS
 SELECT 
-    c.cell_id,
+    c.cell_index,
     c.resolution,
     c.topology_type,
-    c.is_pentagon,
-    c.expected_coordination_number,
-    COUNT(e.neighbor_cell_id) AS current_neighbor_count,
+    c.coordination_target,
+    COUNT(a.neighbor_cell_index)::INTEGER AS active_neighbor_count,
     CASE 
-        WHEN c.is_pentagon AND COUNT(e.neighbor_cell_id) <> 5 THEN 'PENTAGONAL_COORDINATION_VIOLATION'
-        WHEN NOT c.is_pentagon AND COUNT(e.neighbor_cell_id) <> 6 THEN 'HEXAGONAL_COORDINATION_VIOLATION'
-        ELSE 'VALID'
-    END AS coordination_status
-FROM h3_grid_cells c
-LEFT JOIN h3_adjacency_edges e 
-    ON c.cell_id = e.origin_cell_id AND e.is_active = TRUE
-GROUP BY 
-    c.cell_id, 
-    c.resolution, 
-    c.topology_type, 
-    c.is_pentagon, 
-    c.expected_coordination_number;
+        WHEN c.topology_type = 'PENTAGON' AND COUNT(a.neighbor_cell_index) = 5 THEN TRUE
+        WHEN c.topology_type = 'HEXAGON'  AND COUNT(a.neighbor_cell_index) = 6 THEN TRUE
+        ELSE FALSE
+    END AS is_adjacency_topology_valid
+FROM h3_cells c
+LEFT JOIN h3_adjacencies a 
+    ON c.cell_index = a.origin_cell_index AND a.is_active = TRUE
+GROUP BY c.cell_index, c.resolution, c.topology_type, c.coordination_target;
+
+-- ============================================================================
+-- 3. THERMODYNAMIC STATE STOCKS (CONTINUOUS / TIME-SERIES)
+-- ============================================================================
+
+CREATE TABLE cell_thermodynamic_stocks (
+    stock_id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cell_index          VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index),
+    timestamp_epoch_ms  BIGINT NOT NULL,
+    mass_biomass_kg     NUMERIC(24, 8) NOT NULL CHECK (mass_biomass_kg >= 0),
+    mass_nitrogen_kg    NUMERIC(24, 8) NOT NULL CHECK (mass_nitrogen_kg >= 0),
+    mass_water_kg       NUMERIC(24, 8) NOT NULL CHECK (mass_water_kg >= 0),
+    internal_energy_j   NUMERIC(30, 6) NOT NULL CHECK (internal_energy_j >= 0),
+    entropy_j_per_k     NUMERIC(30, 6) NOT NULL CHECK (entropy_j_per_k >= 0),
+    temperature_kelvin  NUMERIC(10, 4) GENERATED ALWAYS AS (
+        CASE WHEN mass_biomass_kg + mass_water_kg > 0 
+             THEN internal_energy_j / ((mass_biomass_kg * 1800.0) + (mass_water_kg * 4184.0))
+             ELSE 0.0 END
+    ) STORED,
+    state_merkle_hash   BYTEA NOT NULL,
+    CONSTRAINT unique_cell_timestamp UNIQUE (cell_index, timestamp_epoch_ms)
+);
+
+CREATE INDEX idx_cell_thermo_stocks_lookup ON cell_thermodynamic_stocks(cell_index, timestamp_epoch_ms DESC);
+
+-- ============================================================================
+-- 4. SPATIAL FLUX MONAD TRANSACTIONS & DIVERGENCE AUDIT
+-- ============================================================================
+
+CREATE TABLE spatial_flux_transactions (
+    flux_tx_id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    step_epoch_ms          BIGINT NOT NULL,
+    source_cell_index      VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index),
+    target_cell_index      VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index),
+    adjacency_id           UUID NOT NULL REFERENCES h3_adjacencies(adjacency_id),
+    component_type         stock_component_type NOT NULL,
+    flux_magnitude         NUMERIC(24, 10) NOT NULL, -- positive: source -> target
+    entropy_production_j_k NUMERIC(24, 10) NOT NULL CHECK (entropy_production_j_k >= 0), -- Second Law: dS >= 0
+    first_law_residual     NUMERIC(24, 12) NOT NULL DEFAULT 0.0,
+    tx_status              transaction_status_type NOT NULL DEFAULT 'COMMITTED',
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_first_law_conservation CHECK (ABS(first_law_residual) < 1e-9)
+);
+
+CREATE INDEX idx_flux_tx_step ON spatial_flux_transactions(step_epoch_ms);
+CREATE INDEX idx_flux_tx_source ON spatial_flux_transactions(source_cell_index);
+CREATE INDEX idx_flux_tx_target ON spatial_flux_transactions(target_cell_index);
+
+-- Trigger: Validate topology and adjacency length prior to spatial flux settlement
+CREATE OR REPLACE FUNCTION validate_flux_transaction_adjacency()
+RETURNS TRIGGER AS $$
+DECLARE
+    origin_topology cell_topology_type;
+    neighbor_count INTEGER;
+BEGIN
+    SELECT topology_type INTO origin_topology FROM h3_cells WHERE cell_index = NEW.source_cell_index;
+    SELECT COUNT(*) INTO neighbor_count FROM h3_adjacencies WHERE origin_cell_index = NEW.source_cell_index AND is_active = TRUE;
+
+    IF origin_topology = 'PENTAGON' AND neighbor_count <> 5 THEN
+        RAISE EXCEPTION 'SpatialFluxMonad Invariant Failed: Pentagon % has invalid neighbor count % (expected exactly 5)', 
+            NEW.source_cell_index, neighbor_count;
+    ELSIF origin_topology = 'HEXAGON' AND neighbor_count <> 6 THEN
+        RAISE EXCEPTION 'SpatialFluxMonad Invariant Failed: Hexagon % has invalid neighbor count % (expected exactly 6)', 
+            NEW.source_cell_index, neighbor_count;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validate_flux_transaction_adjacency
+    BEFORE INSERT ON spatial_flux_transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_flux_transaction_adjacency();
+
+-- ============================================================================
+-- 5. THERMODYNAMIC BLOCKCHAIN LEDGER
+-- ============================================================================
+
+CREATE TABLE blockchain_blocks (
+    block_height            BIGINT PRIMARY KEY,
+    block_hash              BYTEA NOT NULL UNIQUE,
+    parent_hash             BYTEA NOT NULL,
+    epoch_timestamp_ms      BIGINT NOT NULL,
+    state_merkle_root       BYTEA NOT NULL,
+    flux_receipt_root       BYTEA NOT NULL,
+    pentagon_invariance_root BYTEA NOT NULL,
+    total_entropy_generated NUMERIC(30, 8) NOT NULL CHECK (total_entropy_generated >= 0),
+    total_biomass_mass_kg   NUMERIC(30, 8) NOT NULL,
+    net_mass_divergence_kg  NUMERIC(24, 12) NOT NULL DEFAULT 0.0 CHECK (ABS(net_mass_divergence_kg) < 1e-8),
+    validator_signature     BYTEA NOT NULL,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE block_cell_snapshots (
+    snapshot_id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height            BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    cell_index              VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_index),
+    stock_id                UUID NOT NULL REFERENCES cell_thermodynamic_stocks(stock_id),
+    coordination_verified   BOOLEAN NOT NULL,
+    divergence_residual     NUMERIC(24, 12) NOT NULL DEFAULT 0.0,
+    CONSTRAINT unique_block_cell_snapshot UNIQUE (block_height, cell_index)
+);
+
+CREATE INDEX idx_block_cell_snapshots_height ON block_cell_snapshots(block_height);
+CREATE INDEX idx_block_cell_snapshots_cell ON block_cell_snapshots(cell_index);

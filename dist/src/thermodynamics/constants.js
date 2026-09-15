@@ -1,87 +1,86 @@
 // =============================================================================
-// WEB OF LIFE - THERMODYNAMICS CONSTANTS & PARAMETERS
+// WEB OF LIFE - THERMODYNAMIC & PHYSICAL CONSTANTS (RETRO-COMPATIBLE ENGINE)
 // =============================================================================
 /**
- * Fundamental physical and thermodynamic constants governing continuous
- * and discrete biogeochemical flux balance across cellular boundaries.
+ * Universal Gas Constant (R) in J / (mol * K).
  */
-export const THERMODYNAMIC_CONSTANTS = {
-    /** Specific heat capacity of water at 293.15 K (J / (kg * K)) */
-    SPECIFIC_HEAT_WATER_CP: 4184.0,
-    /** Standard water density at 20 deg C (kg / m^3) */
-    WATER_DENSITY_RHO: 1000.0,
-    /** Stefan-Boltzmann constant (W / (m^2 * K^4)) */
-    STEFAN_BOLTZMANN: 5.670374419e-8,
-    /** Standard acceleration due to gravity on Earth (m / s^2) */
-    GRAVITY_EARTH: 9.80665,
-    /** Solar constant / average planetary solar insolation at TOA (W / m^2) */
-    SOLAR_IRRADIANCE_AM0: 1361.0,
-    /** Solar constant at top of atmosphere (W / m^2) */
-    SOLAR_CONSTANT_TOA: 1361.0,
-    /** Universal gas constant (J / (mol * K)) */
-    GAS_CONSTANT_R: 8.314462618,
-    /** Zero Celsius in Kelvin scale offset */
-    ZERO_CELSIUS_IN_KELVIN: 273.15,
-    /** Planetary default albedo */
-    DEFAULT_ALBEDO: 0.3,
-    /** Planetary survival temperature bounds (K) */
-    PLANETARY_TEMP_MIN_K: 200.0,
-    PLANETARY_TEMP_MAX_K: 350.0,
-    /** Absolute minimum physical temperature */
-    MIN_TEMPERATURE_KELVIN: 2.7315,
-    /** Default regolith mass per unit area (kg) */
-    DEFAULT_REGOLITH_MASS_KG: 50000.0,
-    /** Numerical zero tolerance threshold for planar and spherical geometric orientation */
-    EPSILON_TOLERANCE: 1e-12,
-    /** Default thermal conductivity for interface diffusion (W / (m * K)) */
-    DEFAULT_THERMAL_CONDUCTIVITY: 0.598,
-    /** Default hydraulic conductivity for boundary head flow (m / s) */
-    DEFAULT_HYDRAULIC_CONDUCTIVITY: 1e-4,
-    /** Default carbon molecular diffusivity (m^2 / s) */
-    DEFAULT_CARBON_DIFFUSIVITY: 1.5e-9,
-    /** Default oxygen molecular diffusivity in water (m^2 / s) */
-    DEFAULT_OXYGEN_DIFFUSIVITY: 2.1e-9,
-    /** Default mineral/nutrient diffusivity in water (m^2 / s) */
-    DEFAULT_MINERAL_DIFFUSIVITY: 1.0e-9,
-    /** Specific heat capacities of materials (J / (kg * K)) */
-    SPECIFIC_HEAT: {
-        REGOLITH: 840.0,
-        WATER: 4184.0,
-        SOIL_ORGANIC_CARBON: 1800.0,
-        VEGETATION_BIOMASS: 1900.0,
-        ATMOSPHERIC_CO2: 846.0,
-        MINERAL_NITROGEN: 1200.0,
-    },
-    /** Specific enthalpies of materials (J / kg) */
-    SPECIFIC_ENTHALPY: {
-        WATER: -15.87e6,
-        SOIL_ORGANIC_CARBON: -32.79e6,
-        VEGETATION_BIOMASS: -17.50e6,
-        ATMOSPHERIC_CO2: -8.94e6,
-        MINERAL_NITROGEN: -2.85e6,
-    },
-};
+export const UNIVERSAL_GAS_CONSTANT_R = 8.314462618;
+export const GAS_CONSTANT_R = UNIVERSAL_GAS_CONSTANT_R;
+/**
+ * Standard atmospheric reference temperature in Kelvin.
+ */
+export const STANDARD_TEMPERATURE_K = 298.15;
+export const ZERO_CELSIUS_IN_KELVIN = 273.15;
+/**
+ * Standard gravitational acceleration at sea level (m / s^2).
+ */
+export const STANDARD_GRAVITY_G = 9.80665;
+export const STANDARD_GRAVITY = STANDARD_GRAVITY_G;
+/**
+ * Isobaric specific heat capacity of pure liquid water in J / (kg * K).
+ */
+export const SPECIFIC_HEAT_WATER_J_KG_K = 4184.0;
+/**
+ * Stefan-Boltzmann constant (sigma) in W / (m^2 * K^4).
+ */
 export const STEFAN_BOLTZMANN_CONSTANT = 5.670374419e-8;
+/**
+ * Standard molar volume of water (m^3 / mol).
+ */
+export const WATER_MOLAR_VOLUME_M3_MOL = 1.801528e-5;
+/**
+ * Top of atmosphere solar irradiance constant in W / m^2.
+ */
 export const SOLAR_CONSTANT_W_M2 = 1361.0;
-export const EARTH_RADIUS_METERS = 6371000.0;
+export const SOLAR_CONSTANT_TOA = SOLAR_CONSTANT_W_M2;
+/**
+ * Earth radius constants in meters.
+ */
+export const EARTH_RADIUS_METERS = 6371007.2;
 export const EARTH_AUTHALIC_RADIUS_METERS = 6371007.2;
-export const DEFAULT_PLANETARY_RADIUS_METERS = 6371000.0;
-export const EARTH_ANGULAR_VELOCITY_RAD_S = 7.292115e-5;
+export const DEFAULT_PLANETARY_RADIUS_METERS = 6371007.2;
+export const EARTH_MEAN_RADIUS_METERS = 6371008.8;
 export const WGS84_EARTH_RADIUS_METERS = 6371008.8;
+export const WGS84_EARTH_MEAN_RADIUS_METERS = 6371008.8;
+export const MEAN_EARTH_RADIUS_METERS = 6371008.8;
+/**
+ * Earth angular rotation rate in rad / s.
+ */
+export const EARTH_ANGULAR_VELOCITY_RAD_S = 7.292115e-5;
+/**
+ * Atmospheric dry gas composition mole fractions.
+ */
 export const DRY_MOLE_FRACTION_N2 = 0.78084;
 export const DRY_MOLE_FRACTION_O2 = 0.20946;
 export const DRY_MOLE_FRACTION_CO2 = 0.00042;
+export const DRY_MOLE_FRACTION_AR = 0.00934;
+/**
+ * Thermodynamic and planetary temperature limit constants.
+ */
+export const THERMODYNAMIC_CONSTANTS = {
+    STEFAN_BOLTZMANN: STEFAN_BOLTZMANN_CONSTANT,
+    SOLAR_CONSTANT_TOA: SOLAR_CONSTANT_TOA,
+    ZERO_CELSIUS_IN_KELVIN: ZERO_CELSIUS_IN_KELVIN,
+    DEFAULT_ALBEDO: 0.3,
+    GAS_CONSTANT_R: UNIVERSAL_GAS_CONSTANT_R,
+    PLANETARY_TEMP_MIN_K: 200.0,
+    PLANETARY_TEMP_MAX_K: 350.0,
+    BASE_METABOLIC_TEMP_K: 298.15,
+};
+/**
+ * Standard Temperature and Pressure (STP) Baseline Constants.
+ */
 export const STP_CONSTANTS = {
     T_STANDARD: 288.15,
     P_STANDARD: 101325.0,
-    STANDARD_GRAVITY: 9.80665,
+    STANDARD_GRAVITY: STANDARD_GRAVITY_G,
     BASELINE_RELATIVE_HUMIDITY: 0.6,
     H3_BASE_AREA_RES_0: 4.357419e12,
-    MOLAR_MASS_WET_AIR: 0.0289644,
+    MOLAR_MASS_WET_AIR: 0.02896,
     MOLAR_MASS_N2: 0.0280134,
     MOLAR_MASS_O2: 0.0319988,
     MOLAR_MASS_CO2: 0.04401,
-    MOLAR_MASS_H2O: 0.01801528,
+    MOLAR_MASS_H2O: 0.018015,
     BASELINE_SURFACE_WATER_KG_PER_M2: 50.0,
     BASELINE_SOC_KG_PER_M2: 12.0,
     BASELINE_MINERAL_KG_PER_M2: 1288.0,
@@ -91,31 +90,31 @@ export const STP_CONSTANTS = {
     BASELINE_DETRITUS_KG_PER_M2: 0.75,
     CP_WATER_LIQUID: 4184.0,
     CP_MINERAL: 840.0,
-    S_SPECIFIC_LIQUID_WATER: 389.0,
+    S_SPECIFIC_LIQUID_WATER: 69.91,
 };
 /**
- * Computes saturation vapor pressure using the August-Roche-Magnus approximation.
+ * Calculates saturation vapor pressure via August-Roche-Magnus approximation (Pa).
  */
 export function computeAugustRocheMagnusSatVaporPressure(tempK) {
-    const tC = tempK - 273.15;
-    return 610.78 * Math.exp((17.27 * tC) / (tC + 237.3));
+    const tempC = tempK - ZERO_CELSIUS_IN_KELVIN;
+    return 610.94 * Math.exp((17.625 * tempC) / (tempC + 243.04));
 }
 /**
- * Temperature normalization and Arrhenius kinetics engine.
+ * Engine normalizing temperatures between scales with planetary boundary clamping.
  */
 export class TemperatureNormalizationEngine {
-    toKelvin(temp, scale = 'K') {
-        const k = scale === 'C' ? temp + THERMODYNAMIC_CONSTANTS.ZERO_CELSIUS_IN_KELVIN : temp;
-        return Math.max(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MIN_K, Math.min(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MAX_K, k));
+    toKelvin(value, scale = 'K') {
+        const rawK = scale === 'C' ? value + ZERO_CELSIUS_IN_KELVIN : value;
+        return Math.max(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MIN_K, Math.min(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MAX_K, rawK));
     }
     toCelsius(tempK) {
         const clampedK = Math.max(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MIN_K, Math.min(THERMODYNAMIC_CONSTANTS.PLANETARY_TEMP_MAX_K, tempK));
-        return clampedK - THERMODYNAMIC_CONSTANTS.ZERO_CELSIUS_IN_KELVIN;
+        return clampedK - ZERO_CELSIUS_IN_KELVIN;
     }
     getArrheniusScalar(tempK, Ea) {
-        return Math.exp(-Ea / (THERMODYNAMIC_CONSTANTS.GAS_CONSTANT_R * tempK));
+        return Math.exp(-Ea / (UNIVERSAL_GAS_CONSTANT_R * tempK));
     }
-    calculateBlackbodyRadiation(tempK, emissivity) {
-        return emissivity * THERMODYNAMIC_CONSTANTS.STEFAN_BOLTZMANN * Math.pow(tempK, 4);
+    calculateBlackbodyRadiation(tempK, emissivity = 1.0) {
+        return emissivity * STEFAN_BOLTZMANN_CONSTANT * Math.pow(tempK, 4);
     }
 }

@@ -13,9 +13,7 @@ describe('Sprint 072 - RFC-072: Centroid-Relative Boundary Ordering & Outward No
         const result = orderSharedBoundaryEndpointsByCentroid(p1, p2, centroidA, centroidB);
         // Centroid displacement d = (2, 0)
         const [nx, ny] = result.outwardNormal;
-        const cA = centroidA;
-        const cB = centroidB;
-        const dot = nx * (cB[0] - cA[0]) + ny * (cB[1] - cA[1]);
+        const dot = nx * (centroidB[0] - centroidA[0]) + ny * (centroidB[1] - centroidA[1]);
         assert.ok(dot > 0, `Expected outward normal dot product to be positive, got ${dot}`);
         // Normal should point toward +x: [1, 0]
         assert.strictEqual(Math.abs(nx - 1.0) < 1e-10, true);

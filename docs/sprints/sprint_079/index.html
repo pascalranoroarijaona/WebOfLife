@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 078: Pentagonal Coordination Invariant Enforcement (H3 Discrete Global Grid)</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+
+  /* Sprint 078 additions - Pentagonal Coordination Invariant */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --steady-accent: #05ffa1;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-pentagon {
+  background: #4a001f;
+  border-color: var(--pentagon-color);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.4);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(720px, calc(100vw - 36px));
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.02rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.76rem;
+  margin-bottom: 8px;
+  font-weight: normal;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #00f0ff;
+}
+
+#controls {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  right: 18px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.button-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+#statusPanel {
+  position: fixed;
+  z-index: 10;
+  bottom: 18px;
+  left: 18px;
+  width: min(460px, calc(100vw - 36px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.73rem;
+}
+
+.stat-label {
+  color: var(--muted);
+}
+
+.stat-value {
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.val-valid {
+  color: var(--steady-accent);
+}
+
+.val-violation {
+  color: var(--violation-alert);
+}
+
+.val-pentagon {
+  color: var(--pentagon-color);
+}
+
+.val-euler {
+  color: var(--euler-accent);
+}
+
+#inspectorPanel {
+  position: fixed;
+  z-index: 10;
+  bottom: 18px;
+  right: 18px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+#inspectorPanel h3 {
+  font-size: 0.8rem;
+  color: #00e1ff;
+  margin-bottom: 4px;
+}
+
+#enforcementLog {
+  font-size: 0.68rem;
+  color: #a8d5e5;
+  background: #061520;
+  border: 1px solid #16364a;
+  border-radius: 4px;
+  padding: 6px;
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.35;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 078</h1>
+  <h2>Pentagonal Coordination Invariant Enforcement (H3 Discrete Global Grid)</h2>
+  <p>
+    Enforcing the fundamental topological invariant of icosahedral spherical tessellations:
+    <span class="highlight">exactly 12 pentagonal cells</span> (<span class="code-badge">Coordination k = 5</span>)
+    amidst hexagonal cells (<span class="code-badge">k = 6</span>).
+    Preserves Euler Characteristic <span class="highlight val-euler">χ = V - E + F = 2</span>
+    and disclination charge conservation <span class="highlight val-pentagon">∑ Q_i = +12</span>.
+  </p>
+</div>
+
+<div id="controls">
+  <div class="control-group">
+    <div class="control-label">Invariant Verification</div>
+    <div class="button-row">
+      <button id="btnEnforce" class="active">Invariant Guard: ON</button>
+      <button id="btnFocusPentagons" class="s78-pentagon">Focus 12 Pentagons</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <div class="control-label">Stress Testing & Anomaly Injection</div>
+    <div class="button-row">
+      <button id="btnInjectAnomaly" class="s78-violate">Inject Defect Anomaly</button>
+      <button id="btnResetGrid">Reset Grid Topology</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <div class="control-label">Grid & Visual Dynamics</div>
+    <div class="button-row">
+      <button id="btnRotate" class="active">Auto-Rotate: ON</button>
+      <button id="btnFluxLayer" class="active">Topological Flux: ON</button>
+    </div>
+  </div>
+</div>
+
+<div id="statusPanel">
+  <div class="stat-row">
+    <span class="stat-label">Invariant Status:</span>
+    <span id="statStatus" class="stat-value val-valid">ENFORCED (12 Pentagons Preserved)</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Pentagonal Count (Coordination 5):</span>
+    <span id="statPentagons" class="stat-value val-pentagon">12 / 12 (100% Invariant)</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Hexagonal Count (Coordination 6):</span>
+    <span id="statHexagons" class="stat-value">30 cells</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Euler Characteristic χ:</span>
+    <span id="statEuler" class="stat-value val-euler">2 (S² Spherical Topology)</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Total Topological Disclination:</span>
+    <span id="statDisclination" class="stat-value val-pentagon">+12 (∑(6 - k_i) = 12)</span>
+  </div>
+  <div id="enforcementLog">Topological guard initialized. Coordination invariant active across all 42 H3 dual cells.</div>
+</div>
+
+<div id="inspectorPanel">
+  <h3>Cell Inspector</h3>
+  <div id="inspId">Select a cell on the globe...</div>
+  <div id="inspType">-</div>
+  <div id="inspCoord">-</div>
+  <div id="inspCharge">-</div>
+  <div id="inspFlux">-</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("simCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // State flags
+  let autoRotate = true;
+  let showFlux = true;
+  let invariantGuard = true;
+  let highlightPentagons = false;
+  let selectedCellId = null;
+
+  // Camera & view
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+  let rotX = 0.3;
+  let rotY = -0.6;
+  let isDragging = false;
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+  let zoom = 1.0;
+
+  function resizeCanvas() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  // 3D vector helper math
+  function normalize(v) {
+    const len = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / len, v[1] / len, v[2] / len];
+  }
+
+  function cross(a, b) {
+    return [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0]
+    ];
+  }
+
+  function dot(a, b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  }
+
+  function add(a, b) {
+    return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  }
+
+  function scale(v, s) {
+    return [v[0] * s, v[1] * s, v[2] * s];
+  }
+
+  // Construct Geodesic Dual H3-like grid
+  // 12 base vertices of regular icosahedron
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const rawIcoVerts = [
+    [-1,  phi, 0], [ 1,  phi, 0], [-1, -phi, 0], [ 1, -phi, 0],
+    [0, -1,  phi], [0,  1,  phi], [0, -1, -phi], [0,  1, -phi],
+    [ phi, 0, -1], [ phi, 0,  1], [-phi, 0, -1], [-phi, 0,  1]
+  ].map(normalize);
+
+  // 20 triangular faces of regular icosahedron
+  const icoFaces = [
+    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+    [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+    [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
+  ];
+
+  // Cell structures
+  let cells = [];
+
+  function buildGrid() {
+    cells = [];
+    // 12 Pentagonal cells at the icosahedral vertices
+    for (let i = 0; i < 12; i++) {
+      cells.push({
+        id: i,
+        isPentagon: true,
+        center: rawIcoVerts[i],
+        targetCoord: 5,
+        neighbors: [],
+        vertices: [],
+        fluxPhase: Math.random() * Math.PI * 2,
+        anomaly: false
+      });
+    }
+
+    // Hexagonal cells situated at face centroids and edge midpoints (Dual cells)
+    // 30 edge midpoints form hexagons
+    const edgeMap = new Map();
+    function edgeKey(u, v) {
+      return u < v ? `${u}_${v}` : `${v}_${u}`;
+    }
+
+    let hexId = 12;
+    for (const face of icoFaces) {
+      for (let i = 0; i < 3; i++) {
+        const u = face[i];
+        const v = face[(i + 1) % 3];
+        const key = edgeKey(u, v);
+        if (!edgeMap.has(key)) {
+          const mid = normalize(add(rawIcoVerts[u], rawIcoVerts[v]));
+          cells.push({
+            id: hexId,
+            isPentagon: false,
+            center: mid,
+            targetCoord: 6,
+            neighbors: [],
+            vertices: [],
+            fluxPhase: Math.random() * Math.PI * 2,
+            anomaly: false
+          });
+          edgeMap.set(key, hexId);
+          hexId++;
+        }
+      }
+    }
+
+    // Determine neighbor adjacency by angular distance threshold
+    for (let i = 0; i < cells.length; i++) {
+      const distances = [];
+      for (let j = 0; j < cells.length; j++) {
+        if (i === j) continue;
+        const d = dot(cells[i].center, cells[j].center);
+        distances.push({ id: j, cosAngle: d });
+      }
+      distances.sort((a, b) => b.cosAngle - a.cosAngle);
+
+      // Pentagons take exactly 5 nearest; hexagons take 6 nearest
+      const k = cells[i].isPentagon ? 5 : 6;
+      cells[i].neighbors = distances.slice(0, k).map(d => d.id);
+    }
+
+    // Construct polygon boundary vertices around each cell center
+    for (const cell of cells) {
+      const k = cell.neighbors.length;
+      const polyVerts = [];
+      const c = cell.center;
+
+      // Coordinate frame tangent to sphere at c
+      let up = [0, 1, 0];
+      if (Math.abs(dot(up, c)) > 0.9) up = [1, 0, 0];
+      const right = normalize(cross(up, c));
+      const forward = normalize(cross(c, right));
+
+      const radius = cell.isPentagon ? 0.28 : 0.26;
+      for (let s = 0; s < k; s++) {
+        const angle = (s / k) * Math.PI * 2;
+        const offset = add(scale(right, Math.cos(angle) * radius), scale(forward, Math.sin(angle) * radius));
+        polyVerts.push(normalize(add(c, offset)));
+      }
+      cell.vertices = polyVerts;
+    }
+  }
+
+  buildGrid();
+
+  function logEnforcement(msg) {
+    const el = document.getElementById("enforcementLog");
+    if (!el) return;
+    const item = document.createElement("div");
+    item.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.prepend(item);
+  }
+
+  // Invariant Enforcement Engine
+  function verifyAndEnforce() {
+    let pentagonCount = 0;
+    let hexagonCount = 0;
+    let eulerCharge = 0;
+    let violations = [];
+
+    for (const cell of cells) {
+      const k = cell.neighbors.length;
+      const disclination = 6 - k;
+      eulerCharge += disclination;
+
+      if (cell.isPentagon) {
+        if (k === 5) {
+          pentagonCount++;
+        } else {
+          violations.push({ id: cell.id, expected: 5, actual: k });
+        }
+      } else {
+        if (k === 6) {
+          hexagonCount++;
+        } else {
+          violations.push({ id: cell.id, expected: 6, actual: k });
+        }
+      }
+    }
+
+    const statStatus = document.getElementById("statStatus");
+    const statPentagons = document.getElementById("statPentagons");
+    const statHexagons = document.getElementById("statHexagons");
+    const statEuler = document.getElementById("statEuler");
+    const statDisclination = document.getElementById("statDisclination");
+
+    if (violations.length === 0 && pentagonCount === 12 && eulerCharge === 12) {
+      if (statStatus) {
+        statStatus.textContent = "ENFORCED (12 Pentagons Preserved)";
+        statStatus.className = "stat-value val-valid";
+      }
+    } else {
+      if (statStatus) {
+        statStatus.textContent = `CRITICAL DEFECT: ${violations.length} violations detected!`;
+        statStatus.className = "stat-value val-violation";
+      }
+
+      if (invariantGuard) {
+        // Enforce invariant by resolving anomalies
+        logEnforcement(`Topological Invariant Guard active: repairing ${violations.length} coordination anomalies...`);
+        for (const v of violations) {
+          const target = cells[v.id];
+          target.anomaly = false;
+          // Re-establish true geodesic coordination
+          const distances = [];
+          for (let j = 0; j < cells.length; j++) {
+            if (v.id === j) continue;
+            distances.push({ id: j, cosAngle: dot(target.center, cells[j].center) });
+          }
+          distances.sort((a, b) => b.cosAngle - a.cosAngle);
+          target.neighbors = distances.slice(0, target.isPentagon ? 5 : 6).map(d => d.id);
+        }
+        buildGrid();
+        logEnforcement("Topology restored: 12 pentagons invariant (χ = 2, ∑ Q_i = 12) verified.");
+      }
+    }
+
+    if (statPentagons) statPentagons.textContent = `${pentagonCount} / 12 (${pentagonCount === 12 ? 'Invariant OK' : 'VIOLATION'})`;
+    if (statHexagons) statHexagons.textContent = `${hexagonCount} cells`;
+    if (statEuler) statEuler.textContent = `${eulerCharge === 12 ? '2 (S² Sphere Valid)' : `χ ≠ 2 (Broken: ${eulerCharge / 6})`}`;
+    if (statDisclination) statDisclination.textContent = `+${eulerCharge} (${eulerCharge === 12 ? 'Balanced' : 'Defective'})`;
+  }
+
+  // Projection math: 3D to 2D screen
+  function project(v) {
+    // Rotation Y
+    const cy = Math.cos(rotY), sy = Math.sin(rotY);
+    const x1 = v[0] * cy + v[2] * sy;
+    const y1 = v[1];
+    const z1 = -v[0] * sy + v[2] * cy;
+
+    // Rotation X
+    const cx = Math.cos(rotX), sx = Math.sin(rotX);
+    const x2 = x1;
+    const y2 = y1 * cx - z1 * sx;
+    const z2 = y1 * sx + z1 * cx;
+
+    const baseRadius = Math.min(width, height) * 0.36 * zoom;
+    const screenX = width * 0.5 + x2 * baseRadius;
+    const screenY = height * 0.52 - y2 * baseRadius;
+
+    return { x: screenX, y: screenY, z: z2 };
+  }
+
+  // User input handling
+  window.addEventListener("mousedown", (e) => {
+    if (e.target !== canvas) return;
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (isDragging) {
+      const dx = e.clientX - lastMouseX;
+      const dy = e.clientY - lastMouseY;
+      rotY += dx * 0.006;
+      rotX += dy * 0.006;
+      rotX = Math.max(-1.5, Math.min(1.5, rotX));
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }
+  });
+
+  window.addEventListener("mouseup", () => {
+    isDragging = false;
+  });
+
+  window.addEventListener("wheel", (e) => {
+    zoom *= e.deltaY > 0 ? 0.95 : 1.05;
+    zoom = Math.max(0.6, Math.min(2.2, zoom));
+    e.preventDefault();
+  }, { passive: false });
+
+  // Cell raycasting / picking
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    let closestCell = null;
+    let closestDist = 25;
+
+    for (const cell of cells) {
+      const proj = project(cell.center);
+      if (proj.z < 0) continue; // Behind sphere
+      const d = Math.hypot(proj.x - mx, proj.y - my);
+      if (d < closestDist) {
+        closestDist = d;
+        closestCell = cell;
+      }
+    }
+
+    if (closestCell) {
+      selectedCellId = closestCell.id;
+      updateInspector(closestCell);
+    }
+  });
+
+  function updateInspector(cell) {
+    const inspId = document.getElementById("inspId");
+    const inspType = document.getElementById("inspType");
+    const inspCoord = document.getElementById("inspCoord");
+    const inspCharge = document.getElementById("inspCharge");
+    const inspFlux = document.getElementById("inspFlux");
+
+    const k = cell.neighbors.length;
+    const charge = 6 - k;
+
+    if (inspId) inspId.innerHTML = `Cell ID: <span class="highlight">#${cell.id}</span>`;
+    if (inspType) {
+      inspType.innerHTML = `Topology: <span class="${cell.isPentagon ? 'val-pentagon' : 'val-valid'}">${cell.isPentagon ? 'PENTAGON (Disclination)' : 'HEXAGON (Regular Dual)'}</span>`;
+    }
+    if (inspCoord) inspCoord.innerHTML = `Coordination Number (k): <span class="highlight">${k} neighbors</span>`;
+    if (inspCharge) inspCharge.innerHTML = `Disclination Charge: <span class="highlight">${charge > 0 ? '+' + charge : charge}</span>`;
+    if (inspFlux) inspFlux.innerHTML = `Divergence ∇·J: <span class="highlight">${(0.014 * (k / 6)).toFixed(4)} W/m² (Conserved)</span>`;
+  }
+
+  // Controls buttons
+  const btnEnforce = document.getElementById("btnEnforce");
+  const btnFocusPentagons = document.getElementById("btnFocusPentagons");
+  const btnInjectAnomaly = document.getElementById("btnInjectAnomaly");
+  const btnResetGrid = document.getElementById("btnResetGrid");
+  const btnRotate = document.getElementById("btnRotate");
+  const btnFluxLayer = document.getElementById("btnFluxLayer");
+
+  if (btnEnforce) {
+    btnEnforce.addEventListener("click", () => {
+      invariantGuard = !invariantGuard;
+      btnEnforce.textContent = `Invariant Guard: ${invariantGuard ? 'ON' : 'OFF'}`;
+      btnEnforce.classList.toggle("active", invariantGuard);
+      if (invariantGuard) verifyAndEnforce();
+    });
+  }
+
+  if (btnFocusPentagons) {
+    btnFocusPentagons.addEventListener("click", () => {
+      highlightPentagons = !highlightPentagons;
+      btnFocusPentagons.classList.toggle("active", highlightPentagons);
+    });
+  }
+
+  if (btnInjectAnomaly) {
+    btnInjectAnomaly.addEventListener("click", () => {
+      // Forcefully alter a pentagon's coordination to simulate a topological violation
+      const targetPentagon = cells[0];
+      targetPentagon.anomaly = true;
+      targetPentagon.neighbors.pop(); // reduce coordination to 4 (defect)
+      logEnforcement("ATTACK / ANOMALY: Reduced pentagon #0 coordination to 4! Testing Invariant Guard...");
+      verifyAndEnforce();
+    });
+  }
+
+  if (btnResetGrid) {
+    btnResetGrid.addEventListener("click", () => {
+      buildGrid();
+      logEnforcement("Grid reset to canonical H3 dual tessellation (12 pentagons, 30 hexagons).");
+      verifyAndEnforce();
+    });
+  }
+
+  if (btnRotate) {
+    btnRotate.addEventListener("click", () => {
+      autoRotate = !autoRotate;
+      btnRotate.textContent = `Auto-Rotate: ${autoRotate ? 'ON' : 'OFF'}`;
+      btnRotate.classList.toggle("active", autoRotate);
+    });
+  }
+
+  if (btnFluxLayer) {
+    btnFluxLayer.addEventListener("click", () => {
+      showFlux = !showFlux;
+      btnFluxLayer.textContent = `Topological Flux: ${showFlux ? 'ON' : 'OFF'}`;
+      btnFluxLayer.classList.toggle("active", showFlux);
+    });
+  }
+
+  // Animation Loop
+  let time = 0;
+  function animate() {
+    time += 0.016;
+    if (autoRotate && !isDragging) {
+      rotY += 0.003;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw background atmosphere glow
+    const cx = width * 0.5;
+    const cy = height * 0.52;
+    const sphereRadius = Math.min(width, height) * 0.36 * zoom;
+
+    const bgGlow = ctx.createRadialGradient(cx, cy, sphereRadius * 0.2, cx, cy, sphereRadius * 1.3);
+    bgGlow.addColorStop(0, "rgba(0, 30, 60, 0.4)");
+    bgGlow.addColorStop(0.7, "rgba(2, 10, 20, 0.8)");
+    bgGlow.addColorStop(1, "rgba(2, 5, 10, 1.0)");
+    ctx.fillStyle = bgGlow;
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw sphere backdrop circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, sphereRadius, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(4, 18, 32, 0.85)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(0, 225, 255, 0.35)";
+    ctx.stroke();
+
+    // Sort cells by depth z for proper 3D rendering
+    const sortedCells = cells.map(cell => {
+      const proj = project(cell.center);
+      return { cell, proj };
+    }).sort((a, b) => a.proj.z - b.proj.z);
+
+    // Render cells
+    for (const { cell, proj } of sortedCells) {
+      const isVisible = proj.z > -0.2; // slight wrap-around for smooth silhouettes
+      if (!isVisible) continue;
+
+      const alpha = Math.max(0.1, Math.min(1.0, (proj.z + 0.2) / 1.0));
+      const isPent = cell.isPentagon;
+      const isSelected = selectedCellId === cell.id;
+
+      // Project polygon vertices
+      const pts = cell.vertices.map(v => project(v));
+
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        if (i === 0) ctx.moveTo(pts[i].x, pts[i].y);
+        else ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.closePath();
+
+      // Fill color
+      if (cell.anomaly) {
+        ctx.fillStyle = `rgba(255, 0, 50, ${0.45 * alpha})`;
+      } else if (isPent) {
+        const pulse = 0.25 + 0.1 * Math.sin(time * 3 + cell.fluxPhase);
+        ctx.fillStyle = `rgba(255, 0, 85, ${(highlightPentagons ? 0.6 : pulse) * alpha})`;
+      } else {
+        ctx.fillStyle = isSelected
+          ? `rgba(0, 255, 200, ${0.4 * alpha})`
+          : `rgba(0, 180, 240, ${0.12 * alpha})`;
+      }
+      ctx.fill();
+
+      // Stroke polygon
+      ctx.lineWidth = (isPent || isSelected || cell.anomaly) ? 2.2 : 1.0;
+      if (cell.anomaly) {
+        ctx.strokeStyle = `rgba(255, 0, 50, ${alpha})`;
+      } else if (isPent) {
+        ctx.strokeStyle = `rgba(255, 0, 85, ${alpha})`;
+      } else if (isSelected) {
+        ctx.strokeStyle = `rgba(0, 255, 204, ${alpha})`;
+      } else {
+        ctx.strokeStyle = `rgba(0, 225, 255, ${0.45 * alpha})`;
+      }
+      ctx.stroke();
+
+      // Draw centroid and coordination label if front-facing
+      if (proj.z > 0.15) {
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, isPent ? 4 : 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = isPent ? "#ff0055" : (isSelected ? "#00ffcc" : "#00e1ff");
+        ctx.fill();
+
+        if (isPent || highlightPentagons || isSelected) {
+          ctx.font = "bold 9px 'Courier New', monospace";
+          ctx.fillStyle = isPent ? "#ff6699" : "#c8f5f2";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`k=${cell.neighbors.length}`, proj.x, proj.y - 9);
+        }
+      }
+    }
+
+    // Render topological flux arcs between neighbors
+    if (showFlux) {
+      ctx.lineWidth = 1;
+      for (const cell of cells) {
+        const p1 = project(cell.center);
+        if (p1.z < 0) continue;
+
+        for (const nId of cell.neighbors) {
+          if (nId < cell.id) continue; // draw each edge once
+          const neighbor = cells[nId];
+          const p2 = project(neighbor.center);
+          if (p2.z < 0) continue;
+
+          // Animated particle moving along the edge
+          const t = (time * 1.5 + cell.fluxPhase) % 1;
+          const px = p1.x + (p2.x - p1.x) * t;
+          const py = p1.y + (p2.y - p1.y) * t;
+
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.strokeStyle = (cell.isPentagon || neighbor.isPentagon)
+            ? "rgba(255, 0, 85, 0.22)"
+            : "rgba(0, 225, 255, 0.12)";
+          ctx.stroke();
+
+          // Particle
+          ctx.beginPath();
+          ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = (cell.isPentagon || neighbor.isPentagon) ? "#ff007f" : "#00ffcc";
+          ctx.fill();
+        }
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

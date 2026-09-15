@@ -5,7 +5,6 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import * as h3 from 'h3-js';
 
 import {
   isPentagon,
@@ -18,10 +17,9 @@ import {
   SpatialFluxMonad,
   computeHarmonizedFluxDeltas,
   TopologicalAdjacencyDefectError,
-  FluxConservationError,
-  Result
+  FluxConservationError
 } from '../src/spatial/spatial_flux_monad.js';
-import { SpatialFluxState, SPATIAL_CONSTANTS } from '../src/spatial/h3_types.js';
+import { SpatialFluxState } from '../src/spatial/h3_types.js';
 
 describe('Sprint 075: Topological Adjacency & isExpectedNeighborCount', () => {
   // Retrieve standard test cells
@@ -231,7 +229,7 @@ describe('Sprint 075: Topological Adjacency & isExpectedNeighborCount', () => {
       }
 
       const reverseFlux = computeHarmonizedFluxDeltas(neighborState, reverseMap as any, 1.0).unwrap();
-      const transferBackToA = reverseFlux.find(t => t.targetCell === cellA);
+      const transferBackToA = reverseFlux.find((t: any) => t.targetCell === cellA);
       assert.ok(transferBackToA !== undefined);
 
       // Exact pairwise antisymmetry check: Delta S_{A -> B} + Delta S_{B -> A} === 0

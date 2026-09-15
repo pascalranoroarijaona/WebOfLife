@@ -3,7 +3,7 @@
  * Retro-Compatible Multi-Sprint Implementation (Sprints 002 - 068)
  */
 import { H3ErrorCode, SpatialGuardClauseException, } from '../spatial/h3_types.js';
-import { isValidH3Index, isValidH3Hex, validateH3Token, assertCanonicalH3Pattern, assertH3Resolution, matchesCanonicalH3Pattern, } from '../spatial/h3_grid.js';
+import { isValidH3Index, validateH3Token, assertCanonicalH3Pattern, assertH3Resolution, matchesCanonicalH3Pattern, } from '../spatial/h3_grid.js';
 import { calculateH3BoundaryContactArea, computeAdvectiveEdgeTransfer, computeAdvectiveTransfer, projectVectorOntoSphereTangentSpace, dotProduct, toVec3D, latLngToUnitVector3D, unitVectorDotProduct, } from '../spatial/h3_adjacency.js';
 import { SOLAR_CONSTANT_W_M2 } from '../thermodynamics/constants.js';
 import { applyThermodynamicOverrides } from '../spatial/h3_state_tensor.js';
@@ -39,7 +39,6 @@ export class SpatialMonad {
     stocks = null;
     state = 'UNVERIFIED';
     energyJoules = 0;
-    trophicEnergyStockJoules = 0;
     verified = false;
     rightState = true;
     history = [];
@@ -55,7 +54,6 @@ export class SpatialMonad {
             this.id = arg1;
             this.h3Index = arg1;
             this.energyJoules = arg2;
-            this.trophicEnergyStockJoules = arg2;
             this.state = arg3;
             this.value = arg1;
             return;
@@ -76,7 +74,6 @@ export class SpatialMonad {
             this.id = arg1;
             this.h3Index = arg1;
             this.energyJoules = arg2;
-            this.trophicEnergyStockJoules = arg2;
             this.verified = false;
             this.value = arg1;
             return;
@@ -275,7 +272,7 @@ export class SpatialMonad {
         return this.verified;
     }
     verifySpatialIndex() {
-        const valid = isValidH3Hex(this.id) && !this.id.includes('INVALID');
+        const valid = isValidH3Index(this.id);
         this.verified = valid;
         return valid;
     }

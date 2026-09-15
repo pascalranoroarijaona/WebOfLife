@@ -2,9 +2,8 @@
 // WEB OF LIFE - H3 GRID GEOMETRY, VALIDATION & PROJECTION UTILITIES
 // =============================================================================
 import { H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
-import { toVec3D, projectVectorOntoSphereTangentSpace, dotProduct, } from './h3_adjacency.js';
-import { SpatialMonad, transitionSpatialMonad, } from '../monads/spatial_monad.js';
-export { H3ErrorCode, SpatialGuardClauseException, SpatialMonad, transitionSpatialMonad, };
+import { createVec3D } from './h3_adjacency.js';
+export { H3ErrorCode, SpatialGuardClauseException };
 export const MIN_H3_RESOLUTION = 0;
 export const MAX_H3_RESOLUTION = 15;
 export const H3_REGEX = /^[0-9a-fA-F]{15}$/;
@@ -21,7 +20,7 @@ export class SpatialGridError extends Error {
 export class H3ValidationError extends SpatialGridError {
     token;
     constructor(token, message) {
-        super(message ?? `ThermodynamicViolation: Invalid canonical H3 index token '${token}'`);
+        super(message ?? `Invalid canonical H3 index token '${token}'`);
         this.token = token;
         this.name = 'H3ValidationError';
     }
@@ -386,7 +385,7 @@ export class H3GridManager {
         return /^[0-9a-f]+$/.test(index) ? index : false;
     }
     static validateIndex(index) {
-        return typeof index === 'string' && index.length >= 15 && /^[0-9a-fA-F]+$/.test(index);
+        return typeof index === 'string' && index.length === 15 && /^[0-9a-f]+$/.test(index);
     }
     static validateIndexStatic(index) {
         if (index === null || index === undefined || (typeof index === 'string' && index.trim() === '')) {
@@ -708,71 +707,125 @@ export class SpatialTelemetryIngestor {
         };
     }
 }
-export function createCellStocks(partial) {
+export function createCellStocks(stocks) {
     return {
-        carbon: partial.carbon ?? 0,
-        water: partial.water ?? 0,
-        nitrogen: partial.nitrogen ?? 0,
-        phosphorus: partial.phosphorus ?? 0,
-        oxygen: partial.oxygen ?? 0,
-        thermalEnergy: partial.thermalEnergy ?? 0,
+        carbon: stocks.carbon ?? 0,
+        water: stocks.water ?? 0,
+        nitrogen: stocks.nitrogen ?? 0,
+        phosphorus: stocks.phosphorus ?? 0,
+        oxygen: stocks.oxygen ?? 0,
+        thermalEnergy: stocks.thermalEnergy ?? 0,
     };
 }
-export function computeInterfaceAdvectiveTransfer(cellA, cellB, edgeLength, dt) {
-    const cA = toVec3D(cellA.centroid);
-    const cB = toVec3D(cellB.centroid);
-    const vA = projectVectorOntoSphereTangentSpace(cellA.velocity, cA);
-    const vB = projectVectorOntoSphereTangentSpace(cellB.velocity, cB);
-    const midV = [
-        (vA[0] + vB[0]) * 0.5,
-        (vA[1] + vB[1]) * 0.5,
-        (vA[2] + vB[2]) * 0.5,
-    ];
-    const dx = cB[0] - cA[0];
-    const dy = cB[1] - cA[1];
-    const dz = cB[2] - cA[2];
-    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    const normal = dist > 1e-12 ? [dx / dist, dy / dist, dz / dist] : [1, 0, 0];
-    const normalVelocity = dotProduct(midV, normal);
-    const volRate = normalVelocity * edgeLength * dt;
-    const src = normalVelocity >= 0 ? cellA : cellB;
-    const frac = Math.min(0.5, Math.abs(volRate) / src.area);
-    const sign = normalVelocity >= 0 ? 1 : -1;
+export function computeInterfaceAdvectiveTransfer(cellA, _cellB, edgeLength, dt) {
+    const vy = cellA.velocity[1] ?? cellA.velocity.y ?? 0;
+    const vz = cellA.velocity[2] ?? cellA.velocity.z ?? 0;
+    const normalVelocity = Math.hypot(vy, vz);
+    const fluxFraction = Math.min(1.0, (normalVelocity * edgeLength * dt) / cellA.area);
     const fluxAtoB = {
-        carbon: sign * (src.stocks.carbon ?? 0) * frac,
-        water: sign * (src.stocks.water ?? 0) * frac,
-        nitrogen: sign * (src.stocks.nitrogen ?? 0) * frac,
-        phosphorus: sign * (src.stocks.phosphorus ?? 0) * frac,
-        oxygen: sign * (src.stocks.oxygen ?? 0) * frac,
-        thermalEnergy: sign * (src.stocks.thermalEnergy ?? 0) * frac,
+        carbon: cellA.stocks.carbon * fluxFraction,
+        water: cellA.stocks.water * fluxFraction,
+        nitrogen: cellA.stocks.nitrogen * fluxFraction,
+        phosphorus: cellA.stocks.phosphorus * fluxFraction,
+        oxygen: cellA.stocks.oxygen * fluxFraction,
+        thermalEnergy: cellA.stocks.thermalEnergy * fluxFraction,
     };
     return { fluxAtoB, normalVelocity };
 }
-// =============================================================================
-// SPATIAL MONAD FACTORY (SPRINT 016 & 039 INTEGRATION)
-// =============================================================================
-export function createSpatialMonad(token, stocksOrEnergy) {
-    assertCanonicalH3Pattern(token);
-    if (typeof stocksOrEnergy === 'number') {
-        const m = new SpatialMonad(token, stocksOrEnergy);
-        m.trophicEnergyStockJoules = stocksOrEnergy;
-        m.h3Index = token.toLowerCase();
-        m.id = token.toLowerCase();
-        m.resolution = parseInt(token.charAt(1), 16);
-        return m;
+export function latLonToVector3D(lonDeg, latDeg) {
+    const lonRad = (lonDeg * Math.PI) / 180.0;
+    const latRad = (latDeg * Math.PI) / 180.0;
+    const cosLat = Math.cos(latRad);
+    return createVec3D(cosLat * Math.cos(lonRad), cosLat * Math.sin(lonRad), Math.sin(latRad));
+}
+export function vector3DToLatLon(v) {
+    const x = v[0] ?? v.x;
+    const y = v[1] ?? v.y;
+    const z = v[2] ?? v.z;
+    const norm = Math.sqrt(x * x + y * y + z * z);
+    if (norm < 1e-12)
+        return [0, 0];
+    const latRad = Math.asin(Math.max(-1.0, Math.min(1.0, z / norm)));
+    const lonRad = Math.atan2(y, x);
+    return [(lonRad * 180.0) / Math.PI, (latRad * 180.0) / Math.PI];
+}
+export function distance2D(a, b) {
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
+}
+export function distance3D(a, b) {
+    const ax = a[0] ?? a.x;
+    const ay = a[1] ?? a.y;
+    const az = a[2] ?? a.z;
+    const bx = b[0] ?? b.x;
+    const by = b[1] ?? b.y;
+    const bz = b[2] ?? b.z;
+    return Math.hypot(bx - ax, by - ay, bz - az);
+}
+export function greatCircleDistance(a, b) {
+    const ax = a[0] ?? a.x;
+    const ay = a[1] ?? a.y;
+    const az = a[2] ?? a.z;
+    const bx = b[0] ?? b.x;
+    const by = b[1] ?? b.y;
+    const bz = b[2] ?? b.z;
+    const dot = ax * bx + ay * by + az * bz;
+    return Math.acos(Math.max(-1.0, Math.min(1.0, dot)));
+}
+export function crossProduct3D(a, b) {
+    const ax = a[0] ?? a.x;
+    const ay = a[1] ?? a.y;
+    const az = a[2] ?? a.z;
+    const bx = b[0] ?? b.x;
+    const by = b[1] ?? b.y;
+    const bz = b[2] ?? b.z;
+    return [
+        ay * bz - az * by,
+        az * bx - ax * bz,
+        ax * by - ay * bx,
+    ];
+}
+export function dotProduct3D(a, b) {
+    const ax = a[0] ?? a.x;
+    const ay = a[1] ?? a.y;
+    const az = a[2] ?? a.z;
+    const bx = b[0] ?? b.x;
+    const by = b[1] ?? b.y;
+    const bz = b[2] ?? b.z;
+    return ax * bx + ay * by + az * bz;
+}
+export function normalizeVector3D(v) {
+    const x = v[0] ?? v.x;
+    const y = v[1] ?? v.y;
+    const z = v[2] ?? v.z;
+    const mag = Math.hypot(x, y, z);
+    if (mag < 1e-15)
+        return [0, 0, 0];
+    if (Array.isArray(v)) {
+        return [x / mag, y / mag, z / mag];
     }
-    for (const [key, val] of Object.entries(stocksOrEnergy)) {
-        if (typeof val === 'number' && val < 0) {
-            throw new SpatialGridError(`Non-physical negative stock detected for ${key}: ${val}`);
+    return { x: x / mag, y: y / mag, z: z / mag };
+}
+export function createSpatialMonad(token, energyOrStocks) {
+    if (typeof energyOrStocks === 'number') {
+        if (!isValidH3Index(token))
+            throw new Error('ThermodynamicViolation');
+        return {
+            h3Index: token,
+            trophicEnergyStockJoules: energyOrStocks,
+        };
+    }
+    assertCanonicalH3Pattern(token);
+    if (energyOrStocks) {
+        for (const [k, v] of Object.entries(energyOrStocks)) {
+            if (typeof v === 'number' && v < 0) {
+                throw new SpatialGridError(`Non-physical negative stock detected in ${k}`);
+            }
         }
     }
-    const normToken = token.toLowerCase();
-    const res = parseInt(normToken.charAt(1), 16);
-    const m = SpatialMonad.of(normToken, res, stocksOrEnergy);
-    m.h3Index = normToken;
-    m.id = normToken;
-    m.stocks = stocksOrEnergy;
-    m.stock = stocksOrEnergy;
-    m.resolution = res;
-    return m;
+    return {
+        h3Index: token.toLowerCase(),
+        resolution: parseInt(token.charAt(1), 16),
+        stocks: { ...energyOrStocks },
+    };
 }
+export { SpatialMonad, transitionSpatialMonad } from '../monads/spatial_monad.js';

@@ -173,7 +173,7 @@ describe('Sprint 076: Topological Adjacency Validation & Discrete Flux Conservat
     );
     assert.strictEqual(failResult.success, false);
     if (!failResult.success) {
-      assert.ok(failResult.reason.includes('Neighbor count mismatch'));
+      assert.ok(failResult.reason?.includes('Neighbor count mismatch'));
     }
 
     // 2. Evaluation succeeds when topology strictly matches 6 neighbors for hex cell

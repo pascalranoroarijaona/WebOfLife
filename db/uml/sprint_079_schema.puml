@@ -1,0 +1,155 @@
+@startuml sprint_079_schema
+!theme plain
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam hand杖 false
+
+title Web of Life - Sprint 079 Architectural Domain Model\nPentagonal Adjacency Predicates, H3 DGGS Topologies & Thermodynamic Ledger
+
+package "Domain Model :: Spatial DGGS" {
+    enum CellTopologyType {
+        HEXAGON
+        PENTAGON
+    }
+
+    interface IH3CellIndex {
+        +value: string
+        +resolution: number
+        +isPentagon(): boolean
+    }
+
+    class H3Cell {
+        +cellIndex: IH3CellIndex
+        +resolution: number
+        +topologyType: CellTopologyType
+        +coordinationTarget: number
+        +latitude: number
+        +longitude: number
+        +boundaryPolygon: Polygon
+        +getCoordinationNumber(): number
+    }
+
+    class H3AdjacencyValidator <<utility>> {
+        +{static} H3_PENTAGON_NEIGHBOR_COUNT: 5 = 5
+        +{static} H3_HEXAGON_NEIGHBOR_COUNT: 6 = 6
+        +{static} isPentagonNeighborArrayLengthValid(input: unknown[] | number | null | undefined): boolean
+        +{static} isHexagonNeighborArrayLengthValid(input: unknown[] | number | null | undefined): boolean
+        +{static} validateTopologyNeighborhood(cell: H3Cell, neighbors: unknown[]): boolean
+    }
+
+    class H3AdjacencyEdge {
+        +adjacencyId: UUID
+        +originCellIndex: IH3CellIndex
+        +neighborCellIndex: IH3CellIndex
+        +directionIndex: number
+        +facetAreaM2: number
+        +geodesicDistanceM: number
+        +isActive: boolean
+    }
+}
+
+package "Domain Model :: Thermodynamics & Monads" {
+    enum StockComponentType {
+        BIOMASS_CARBON
+        NITROGEN
+        PHOSPHORUS
+        WATER
+        INTERNAL_ENERGY
+        ENTROPY
+    }
+
+    class ThermodynamicStock {
+        +massBiomassKg: number
+        +massNitrogenKg: number
+        +massWaterKg: number
+        +internalEnergyJ: number
+        +entropyJPerK: number
+        +computeTemperature(): number
+        +generateMerkleHash(): byte[]
+    }
+
+    class SpatialFluxMonad<T> {
+        -cell: H3Cell
+        -state: ThermodynamicStock
+        -neighbors: List<H3AdjacencyEdge>
+        +unit(cell: H3Cell, state: ThermodynamicStock): SpatialFluxMonad<T>
+        +bind<U>(transform: (state: ThermodynamicStock) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        +validateAdjacencyInvariants(): boolean
+        +diffuseStock(targetNeighbor: H3AdjacencyEdge, component: StockComponentType, quantity: number): SpatialFluxMonad<T>
+        +computeConservativeDivergence(): number
+        +assertSecondLawEntropyGeneration(dS: number): boolean
+    }
+
+    class SpatialFluxTransaction {
+        +fluxTxId: UUID
+        +stepEpochMs: number
+        +sourceCellIndex: IH3CellIndex
+        +targetCellIndex: IH3CellIndex
+        +componentType: StockComponentType
+        +fluxMagnitude: number
+        +entropyProductionJK: number
+        +firstLawResidual: number
+        +txStatus: string
+    }
+}
+
+package "Domain Model :: Blockchain Ledger & Proof of Conservation" {
+    class BlockchainBlock {
+        +blockHeight: number
+        +blockHash: byte[]
+        +parentHash: byte[]
+        +epochTimestampMs: number
+        +stateMerkleRoot: byte[]
+        +fluxReceiptRoot: byte[]
+        +pentagonInvarianceRoot: byte[]
+        +totalEntropyGenerated: number
+        +totalBiomassMassKg: number
+        +netMassDivergenceKg: number
+        +validatorSignature: byte[]
+        +verifyEulerSingularities(): boolean
+    }
+
+    class BlockCellSnapshot {
+        +snapshotId: UUID
+        +blockHeight: number
+        +cellIndex: IH3CellIndex
+        +stockId: UUID
+        +coordinationVerified: boolean
+        +divergenceResidual: number
+    }
+}
+
+' Relationships & Invariants
+H3Cell "1" *-- "5..6" H3AdjacencyEdge : originates
+H3Cell --> CellTopologyType : typed as
+H3AdjacencyValidator ..> H3Cell : validates
+H3AdjacencyValidator ..> H3AdjacencyEdge : audits cardinality
+
+SpatialFluxMonad --> H3Cell : encapsulates
+SpatialFluxMonad --> ThermodynamicStock : mutates strictly
+SpatialFluxMonad ..> H3AdjacencyValidator : invokes isPentagonNeighborArrayLengthValid()
+SpatialFluxMonad --> SpatialFluxTransaction : generates
+
+BlockchainBlock "1" *-- "many" BlockCellSnapshot : contains
+BlockCellSnapshot --> H3Cell : references
+SpatialFluxTransaction --> BlockchainBlock : verified in fluxReceiptRoot
+
+note top of H3AdjacencyValidator
+  **Euler Characteristic Invariant (S²)**:
+  V - E + F = 2  ==> Exactly 12 Pentagons (|N|=5)
+  at every DGGS resolution level.
+  Hexagonal cells maintain |N|=6.
+  `isPentagonNeighborArrayLengthValid` guarantees
+  no flux leakage across pentagonal boundaries.
+end note
+
+note bottom of SpatialFluxMonad
+  **Thermodynamic Flux Divergence**:
+  dM_i/dt = Σ (J_j->i) + Φ_i
+  dS_univ >= 0 (Entropy Non-decrease)
+  Pentagonal vertices with |N_p| != 5 reject
+  execution via Monad failure branch.
+end note
+
+@enduml
