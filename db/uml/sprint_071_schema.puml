@@ -1,0 +1,233 @@
+@startuml
+!theme plain
+skinparam roundcorner 6
+skinparam linetype ortho
+skinparam classFontSize 12
+skinparam classHeaderBackgroundColor #2D3748
+skinparam classFontColor #FFFFFF
+skinparam classBorderColor #1A202C
+skinparam packageBorderColor #718096
+skinparam noteBackgroundColor #FEFCBF
+skinparam noteBorderColor #B7791F
+
+package "src/spatial/h3_types.ts" {
+    interface Vector3D <<ValueObject>> {
+        + x: number
+        + y: number
+        + z: number
+    }
+
+    interface BoundaryVertexPair3D <<ValueObject>> {
+        + indexA: number
+        + indexB: number
+        + vertexA: Vector3D
+        + vertexB: Vector3D
+        + distance: number
+    }
+
+    interface BoundaryEdge3D <<Entity>> {
+        + cellA: string
+        + cellB: string
+        + pair1: BoundaryVertexPair3D
+        + pair2: BoundaryVertexPair3D
+        + edgeLength: number
+        + layerHeight: number
+        + midpoint: Vector3D
+        + outwardNormal: Vector3D
+        + getContactArea(): number
+    }
+}
+
+package "src/spatial/h3_adjacency.ts" {
+    class H3AdjacencyService <<Service>> {
+        - epsilonGeom: number
+        + findSharedBoundaryVertexPairs3D(verticesA: Vector3D[], verticesB: Vector3D[], epsilon?: number): BoundaryVertexPair3D[]
+        + extractSharedBoundaryEdge3D(cellA: string, verticesA: Vector3D[], cellB: string, verticesB: Vector3D[], epsilon?: number): BoundaryEdge3D
+        - computeEuclideanDistance3D(v1: Vector3D, v2: Vector3D): number
+        - computeCrossProduct(v1: Vector3D, v2: Vector3D): Vector3D
+        - normalize(v: Vector3D): Vector3D
+    }
+}
+
+package "src/spatial/spatial_flux_monad.ts" {
+    class H3StateTensor <<State>> {
+        + cellIndex: string
+        + massDensity: number
+        + totalMass: number
+        + temperatureK: number
+        + enthalpyJoules: number
+        + computeEntropy(): number
+    }
+
+    class BoundaryFluxReceipt <<Immutable>> {
+        + fluxId: UUID
+        + cellSource: string
+        + cellTarget: string
+        + deltaMassSource: number
+        + deltaMassTarget: number
+        + enthalpyFlux: number
+        + entropyGenerated: number
+        + isConservative(): boolean
+        + signature: Uint8Array
+    }
+
+    class SpatialFluxMonad <<Monad>> {
+        - tensor: H3StateTensor
+        - adjacencyService: H3AdjacencyService
+        + unit(tensor: H3StateTensor): SpatialFluxMonad
+        + bind(transform: (tensor: H3StateTensor) => SpatialFluxMonad): SpatialFluxMonad
+        + computeConservativeBoundaryFlux(neighborTensor: H3StateTensor, edge: BoundaryEdge3D, dtSeconds: number, diffusionCoeff: number): BoundaryFluxReceipt
+        + verifyFirstLawInvariant(receipt: BoundaryFluxReceipt): boolean
+        + verifySecondLawInvariant(receipt: BoundaryFluxReceipt): boolean
+    }
+}
+
+package "db/schema.sql (Relational & Thermodynamic Ledger)" {
+    entity "h3_cell_centroids" as DBCell {
+        * cell_index: VARCHAR(15) [PK]
+        --
+        resolution: SMALLINT
+        is_pentagon: BOOLEAN
+        centroid_lat: DOUBLE
+        centroid_lng: DOUBLE
+        centroid_x: DOUBLE
+        centroid_y: DOUBLE
+        centroid_z: DOUBLE
+        surface_area_m2: DOUBLE
+    }
+
+    entity "h3_boundary_vertices" as DBVertex {
+        * vertex_id: UUID [PK]
+        --
+        cell_index: VARCHAR(15) [FK]
+        vertex_order_index: SMALLINT
+        coord_x: DOUBLE
+        coord_y: DOUBLE
+        coord_z: DOUBLE
+        radial_norm: DOUBLE [VIRTUAL]
+    }
+
+    entity "h3_coincident_vertex_pairs" as DBPair {
+        * pair_id: UUID [PK]
+        --
+        cell_a: VARCHAR(15) [FK]
+        cell_b: VARCHAR(15) [FK]
+        index_a: SMALLINT
+        index_b: SMALLINT
+        vertex_a_x: DOUBLE
+        vertex_a_y: DOUBLE
+        vertex_a_z: DOUBLE
+        vertex_b_x: DOUBLE
+        vertex_b_y: DOUBLE
+        vertex_b_z: DOUBLE
+        euclidean_distance: DOUBLE
+        epsilon_applied: DOUBLE
+    }
+
+    entity "h3_boundary_edges" as DBEdge {
+        * edge_id: UUID [PK]
+        --
+        cell_a: VARCHAR(15) [FK]
+        cell_b: VARCHAR(15) [FK]
+        pair1_id: UUID [FK]
+        pair2_id: UUID [FK]
+        symmetric_edge_length_m: DOUBLE
+        layer_height_m: DOUBLE
+        contact_area_m2: DOUBLE [VIRTUAL]
+        midpoint_x: DOUBLE
+        midpoint_y: DOUBLE
+        midpoint_z: DOUBLE
+        normal_x: DOUBLE
+        normal_y: DOUBLE
+        normal_z: DOUBLE
+    }
+
+    entity "thermodynamic_cell_states" as DBState {
+        * state_id: UUID [PK]
+        --
+        cell_index: VARCHAR(15) [FK]
+        timestamp_epoch_ms: BIGINT
+        mass_density_kg_m3: DOUBLE
+        total_mass_kg: DOUBLE
+        temperature_k: DOUBLE
+        enthalpy_j: DOUBLE
+        entropy_j_k: DOUBLE
+        tensor_merkle_hash: BYTEA
+    }
+
+    entity "boundary_flux_transactions" as DBFlux {
+        * flux_id: UUID [PK]
+        --
+        edge_id: UUID [FK]
+        cell_source: VARCHAR(15) [FK]
+        cell_target: VARCHAR(15) [FK]
+        timestep_start_ms: BIGINT
+        timestep_end_ms: BIGINT
+        diffusion_coefficient: DOUBLE
+        mass_flux_kg_per_sec: DOUBLE
+        enthalpy_flux_w: DOUBLE
+        delta_mass_source_kg: DOUBLE
+        delta_mass_target_kg: DOUBLE
+        first_law_residual_kg: DOUBLE [VIRTUAL]
+        entropy_production_rate_w_k: DOUBLE
+        flux_signature: BYTEA
+    }
+
+    entity "thermodynamic_blocks" as DBBlock {
+        * block_height: BIGINT [PK]
+        --
+        previous_block_hash: BYTEA
+        state_merkle_root: BYTEA
+        flux_receipts_root: BYTEA
+        block_hash: BYTEA
+        total_boundary_mass_leak_kg: DOUBLE
+        total_entropy_generated_j_k: DOUBLE
+        validator_node_id: VARCHAR(64)
+        validator_signature: BYTEA
+    }
+
+    entity "block_flux_inclusions" as DBBlockTx {
+        * block_height: BIGINT [PK, FK]
+        * tx_index: INTEGER [PK]
+        --
+        flux_id: UUID [FK]
+    }
+}
+
+' TypeScript Class and Structure Relations
+BoundaryVertexPair3D *-- Vector3D : contains A & B
+BoundaryEdge3D *-- BoundaryVertexPair3D : pair1 & pair2
+BoundaryEdge3D *-- Vector3D : midpoint & normal
+H3AdjacencyService ..> BoundaryVertexPair3D : produces
+H3AdjacencyService ..> BoundaryEdge3D : produces
+SpatialFluxMonad o-- H3AdjacencyService : uses
+SpatialFluxMonad ..> BoundaryEdge3D : evaluates across
+SpatialFluxMonad *-- H3StateTensor : wraps
+SpatialFluxMonad ..> BoundaryFluxReceipt : returns
+
+' Database Relational Schema Mappings
+DBCell "1" <-- "5..6" DBVertex : boundaries
+DBCell "1" <-- "0..*" DBPair : cell_a
+DBCell "1" <-- "0..*" DBPair : cell_b
+DBPair "1" <-- "1" DBEdge : pair1
+DBPair "1" <-- "1" DBEdge : pair2
+DBCell "1" <-- "0..*" DBState : temporal states
+DBEdge "1" <-- "0..*" DBFlux : shared interface
+DBFlux "1" <-- "0..1" DBBlockTx : indexed into
+DBBlock "1" <-- "0..*" DBBlockTx : bundles
+
+' Alignment notes
+note top of H3AdjacencyService
+  **RFC-071 Invariant**:
+  Boundary vertex pairing bounded by:
+  ||vA_i - vB_j|| <= epsilon_geom
+  Identical shared edge: L_AB = (||eA|| + ||eB||) / 2
+end note
+
+note bottom of DBFlux
+  **Thermodynamic Proof-of-Conservation**:
+  1. First Law: delta_mass_source + delta_mass_target = 0
+  2. Second Law: entropy_production_rate >= 0
+end note
+
+@enduml

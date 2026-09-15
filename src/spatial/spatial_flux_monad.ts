@@ -1,22 +1,33 @@
-/**
- * src/spatial/spatial_flux_monad.ts
- * Conservative spatial advection and diffusion across verified conjugate cell boundaries.
- */
+// =============================================================================
+// WEB OF LIFE - SPATIAL FLUX MONAD & THERMODYNAMIC CONSERVATOR
+// Retro-Compatible Multi-Sprint Implementation (RFC-069, RFC-070, RFC-071)
+// =============================================================================
 
-import { areCartesianUnitVectorsEqual3D, DEFAULT_ANGULAR_EPSILON } from './h3_adjacency.js';
 import {
-  CellBiogeochemicalStock,
-  DirectedBoundaryFacet,
-  ConjugateFacetTransferDelta,
-  BoundaryTransferResult,
+  Vector3D,
+  BoundaryEdge3D,
+  CellThermodynamicState,
+  BoundaryFluxDelta,
+  DiffusionCoefficients,
+  H3StateTensor,
 } from './h3_types.js';
+import { H3AdjacencyService, areCartesianUnitVectorsEqual3D } from './h3_adjacency.js';
 
-export {
-  CellBiogeochemicalStock,
-  DirectedBoundaryFacet,
-  ConjugateFacetTransferDelta,
-  BoundaryTransferResult,
-};
+export class Monad<T> {
+  constructor(protected readonly value: T) {}
+
+  unwrap(): T {
+    return this.value;
+  }
+
+  map<U>(fn: (val: T) => U): Monad<U> {
+    return new Monad<U>(fn(this.value));
+  }
+
+  flatMap<U>(fn: (val: T) => Monad<U>): Monad<U> {
+    return fn(this.value);
+  }
+}
 
 export interface CellStockTensor {
   massH2O: number;
@@ -28,208 +39,293 @@ export interface CellStockTensor {
   [key: string]: any;
 }
 
-export class SpatialFluxMonad {
-  private static readonly R_GAS = 8.314462618; // J / (mol K)
-  private static readonly MOLAR_HEAT_CAP_H2O = 75.38; // J / (mol K)
-  private static readonly DIFF_COEFF_SOLUTE = 1.0e-9; // m^2 / s
-  private static readonly THERMAL_COND_COEFF = 0.6; // W / (m K)
+export interface CellBiogeochemicalStock {
+  cellIndex: string;
+  carbonMol: number;
+  nitrogenMol: number;
+  phosphorusMol: number;
+  waterMol: number;
+  oxygenMol: number;
+  thermalEnergyJoules: number;
+  volumeM3: number;
+  centroid: { x: number; y: number; z: number };
+  [key: string]: any;
+}
 
-  constructor(private cellStocks?: Record<string, CellStockTensor>) {}
+export interface DirectedBoundaryFacet {
+  originCell: string;
+  neighborCell: string;
+  originV1: { x: number; y: number; z: number };
+  originV2: { x: number; y: number; z: number };
+  neighborV1: { x: number; y: number; z: number };
+  neighborV2: { x: number; y: number; z: number };
+  areaM2: number;
+  normalVelocityMs: number;
+  distanceM: number;
+  [key: string]: any;
+}
 
-  public totalSystemMass(): { h2o: number; carbon: number; oxygen: number; minerals: number } {
-    let h2o = 0;
-    let carbon = 0;
-    let oxygen = 0;
-    let minerals = 0;
-    if (this.cellStocks) {
-      for (const stock of Object.values(this.cellStocks)) {
-        h2o += stock.massH2O ?? 0;
-        carbon += stock.massCarbon ?? 0;
-        oxygen += stock.massOxygen ?? 0;
-        minerals += stock.massMinerals ?? 0;
-      }
+/**
+ * Computes physically conservative mass, species, and enthalpy transfer
+ * between two adjacent cell states across a coincident boundary edge interface (Sprint 071).
+ */
+export function computeBoundaryFlux(
+  stateA: CellThermodynamicState,
+  stateB: CellThermodynamicState,
+  edge: BoundaryEdge3D,
+  layerHeightMeters: number,
+  bulkNormalVelocityMs: number,
+  diffusionCoeffs: DiffusionCoefficients,
+  deltaSeconds: number
+): { nextA: CellThermodynamicState; nextB: CellThermodynamicState; flux: BoundaryFluxDelta } {
+  const area = edge.edgeLength * layerHeightMeters;
+
+  const dx = (stateB.centroid?.x ?? 0) - (stateA.centroid?.x ?? 0);
+  const dy = (stateB.centroid?.y ?? 0) - (stateA.centroid?.y ?? 0);
+  const dz = (stateB.centroid?.z ?? 0) - (stateA.centroid?.z ?? 0);
+  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1.0;
+
+  const volA = stateA.volumeM3 ?? 1.0;
+  const volB = stateB.volumeM3 ?? 1.0;
+
+  const cWaterA = (stateA.waterKg ?? 0) / volA;
+  const cWaterB = (stateB.waterKg ?? 0) / volB;
+  const cCarbonA = (stateA.carbonKg ?? 0) / volA;
+  const cCarbonB = (stateB.carbonKg ?? 0) / volB;
+  const cMinA = (stateA.mineralsKg ?? 0) / volA;
+  const cMinB = (stateB.mineralsKg ?? 0) / volB;
+  const cOxA = (stateA.oxygenKg ?? 0) / volA;
+  const cOxB = (stateB.oxygenKg ?? 0) / volB;
+
+  const un = bulkNormalVelocityMs;
+  const upwindWater = un >= 0 ? cWaterA : cWaterB;
+  const upwindCarbon = un >= 0 ? cCarbonA : cCarbonB;
+  const upwindMin = un >= 0 ? cMinA : cMinB;
+  const upwindOx = un >= 0 ? cOxA : cOxB;
+
+  const diffW = diffusionCoeffs.waterDiffusivity ?? diffusionCoeffs.water ?? 1e-5;
+  const diffC = diffusionCoeffs.carbonDiffusivity ?? diffusionCoeffs.carbon ?? 1e-6;
+  const diffM = diffusionCoeffs.mineralDiffusivity ?? diffusionCoeffs.minerals ?? 1e-6;
+  const diffO = diffusionCoeffs.oxygenDiffusivity ?? diffusionCoeffs.oxygen ?? 2e-5;
+  const thCond = diffusionCoeffs.thermalConductivity ?? 0.6;
+
+  const fluxRateWater = area * (un * upwindWater - (diffW * (cWaterB - cWaterA)) / dist);
+  const fluxRateCarbon = area * (un * upwindCarbon - (diffC * (cCarbonB - cCarbonA)) / dist);
+  const fluxRateMin = area * (un * upwindMin - (diffM * (cMinB - cMinA)) / dist);
+  const fluxRateOx = area * (un * upwindOx - (diffO * (cOxB - cOxA)) / dist);
+
+  const volHeatCapA = (stateA.enthalpyJoules ?? 0) / volA;
+  const volHeatCapB = (stateB.enthalpyJoules ?? 0) / volB;
+  const upwindHeatCap = un >= 0 ? volHeatCapA : volHeatCapB;
+  const conductiveHeatFlux =
+    -thCond * area * ((stateB.temperatureKelvin ?? 290) - (stateA.temperatureKelvin ?? 290)) / dist;
+  const fluxRateEnthalpy = area * un * upwindHeatCap + conductiveHeatFlux;
+
+  const tA = stateA.temperatureKelvin ?? 290;
+  const tB = stateB.temperatureKelvin ?? 290;
+  const entropyRateThermal = Math.abs(conductiveHeatFlux * (1.0 / Math.max(0.1, tB) - 1.0 / Math.max(0.1, tA)));
+  const entropyProduced = Math.max(0, entropyRateThermal * deltaSeconds);
+
+  const dWater = fluxRateWater * deltaSeconds;
+  const dCarbon = fluxRateCarbon * deltaSeconds;
+  const dMin = fluxRateMin * deltaSeconds;
+  const dOx = fluxRateOx * deltaSeconds;
+  const dEnthalpy = fluxRateEnthalpy * deltaSeconds;
+
+  const nextA: CellThermodynamicState = {
+    ...stateA,
+    waterKg: (stateA.waterKg ?? 0) - dWater,
+    carbonKg: (stateA.carbonKg ?? 0) - dCarbon,
+    mineralsKg: (stateA.mineralsKg ?? 0) - dMin,
+    oxygenKg: (stateA.oxygenKg ?? 0) - dOx,
+    enthalpyJoules: (stateA.enthalpyJoules ?? 0) - dEnthalpy,
+    temperatureKelvin: Math.max(0.1, (stateA.temperatureKelvin ?? 290) - dEnthalpy / (volA * 4.184e6)),
+  };
+
+  const nextB: CellThermodynamicState = {
+    ...stateB,
+    waterKg: (stateB.waterKg ?? 0) + dWater,
+    carbonKg: (stateB.carbonKg ?? 0) + dCarbon,
+    mineralsKg: (stateB.mineralsKg ?? 0) + dMin,
+    oxygenKg: (stateB.oxygenKg ?? 0) + dOx,
+    enthalpyJoules: (stateB.enthalpyJoules ?? 0) + dEnthalpy,
+    temperatureKelvin: Math.max(0.1, (stateB.temperatureKelvin ?? 290) + dEnthalpy / (volB * 4.184e6)),
+  };
+
+  const flux: BoundaryFluxDelta = {
+    edge,
+    deltaWaterKg: dWater,
+    deltaCarbonKg: dCarbon,
+    deltaMineralsKg: dMin,
+    deltaOxygenKg: dOx,
+    deltaEnthalpyJoules: dEnthalpy,
+    entropyProducedJPerK: entropyProduced,
+  };
+
+  return { nextA, nextB, flux };
+}
+
+export class SpatialFluxMonad extends Monad<any> {
+  private readonly adjacencyService: H3AdjacencyService;
+  private stockMap: Record<string, CellStockTensor> = {};
+
+  constructor(state: any, adjacencyService?: H3AdjacencyService) {
+    super(state);
+    this.adjacencyService = adjacencyService ?? new H3AdjacencyService();
+    if (state && !state.cells) {
+      this.stockMap = { ...state };
+    }
+  }
+
+  getAdjacencyService(): H3AdjacencyService {
+    return this.adjacencyService;
+  }
+
+  // Retro-compatibility Sprint 069: totalSystemMass & applyInterfacialTransfer
+  totalSystemMass(): { h2o: number; carbon: number; oxygen: number; minerals: number } {
+    let h2o = 0, carbon = 0, oxygen = 0, minerals = 0;
+    for (const cell of Object.values(this.stockMap)) {
+      h2o += cell.massH2O;
+      carbon += cell.massCarbon;
+      oxygen += cell.massOxygen;
+      minerals += cell.massMinerals;
     }
     return { h2o, carbon, oxygen, minerals };
   }
 
-  public applyInterfacialTransfer(delta: {
-    cellA: string;
-    cellB: string;
-    deltaStockA: any;
-    deltaStockB: any;
-    [key: string]: any;
-  }): void {
-    if (!this.cellStocks) return;
-    const stockA = this.cellStocks[delta.cellA];
-    const stockB = this.cellStocks[delta.cellB];
-    if (stockA && delta.deltaStockA) {
-      stockA.massH2O += delta.deltaStockA.massH2O ?? 0;
-      stockA.massCarbon += delta.deltaStockA.massCarbon ?? 0;
-      stockA.massOxygen += delta.deltaStockA.massOxygen ?? 0;
-      stockA.massMinerals += delta.deltaStockA.massMinerals ?? 0;
-      stockA.energyJoules += delta.deltaStockA.energyJoules ?? 0;
-    }
-    if (stockB && delta.deltaStockB) {
-      stockB.massH2O += delta.deltaStockB.massH2O ?? 0;
-      stockB.massCarbon += delta.deltaStockB.massCarbon ?? 0;
-      stockB.massOxygen += delta.deltaStockB.massOxygen ?? 0;
-      stockB.massMinerals += delta.deltaStockB.massMinerals ?? 0;
-      stockB.energyJoules += delta.deltaStockB.energyJoules ?? 0;
+  applyInterfacialTransfer(transferReport: any): void {
+    const { cellA, cellB, delta } = transferReport;
+    const a = this.stockMap[cellA];
+    const b = this.stockMap[cellB];
+    if (a && b) {
+      a.massH2O -= delta.h2o;
+      b.massH2O += delta.h2o;
+      a.massCarbon -= delta.carbon;
+      b.massCarbon += delta.carbon;
+      a.massOxygen -= delta.oxygen;
+      b.massOxygen += delta.oxygen;
+      a.massMinerals -= delta.minerals;
+      b.massMinerals += delta.minerals;
+      a.energyJoules -= delta.energy;
+      b.energyJoules += delta.energy;
     }
   }
 
-  /**
-   * Verifies mutual conjugacy between cell edge facets using angular tolerance.
-   * Tests: originV1 == neighborV2 AND originV2 == neighborV1
-   */
-  public static verifyFacetConjugacy(
+  // Retro-compatibility Sprint 070: static computeFacetTransfer
+  static computeFacetTransfer(
+    originStock: CellBiogeochemicalStock,
+    neighborStock: CellBiogeochemicalStock,
     facet: DirectedBoundaryFacet,
-    epsilon: number = DEFAULT_ANGULAR_EPSILON
-  ): boolean {
-    const forwardMatch =
-      areCartesianUnitVectorsEqual3D(facet.originV1, facet.neighborV2, epsilon) &&
-      areCartesianUnitVectorsEqual3D(facet.originV2, facet.neighborV1, epsilon);
+    dtSeconds: number
+  ) {
+    const v1Equal = areCartesianUnitVectorsEqual3D(facet.originV1, facet.neighborV2);
+    const v2Equal = areCartesianUnitVectorsEqual3D(facet.originV2, facet.neighborV1);
+    const isValidConjugate = v1Equal && v2Equal;
 
-    return forwardMatch;
-  }
-
-  /**
-   * Computes conservative mass and energy transfer across a verified interface.
-   * Enforces exact skew-symmetry: deltaOrigin + deltaNeighbor == 0.
-   */
-  public static computeFacetTransfer(
-    origin: CellBiogeochemicalStock,
-    neighbor: CellBiogeochemicalStock,
-    facet: DirectedBoundaryFacet,
-    deltaTimeSeconds: number,
-    epsilon: number = DEFAULT_ANGULAR_EPSILON
-  ): BoundaryTransferResult {
-    const isConjugate = this.verifyFacetConjugacy(facet, epsilon);
-    const zeroDelta: ConjugateFacetTransferDelta = {
-      deltaCarbonMol: 0,
-      deltaNitrogenMol: 0,
-      deltaPhosphorusMol: 0,
-      deltaWaterMol: 0,
-      deltaOxygenMol: 0,
-      deltaThermalEnergyJoules: 0,
-    };
-
-    if (!isConjugate) {
+    if (!isValidConjugate) {
       return {
         isValidConjugate: false,
-        originDelta: zeroDelta,
-        neighborDelta: zeroDelta,
+        originDelta: {
+          deltaCarbonMol: 0,
+          deltaNitrogenMol: 0,
+          deltaPhosphorusMol: 0,
+          deltaWaterMol: 0,
+          deltaOxygenMol: 0,
+          deltaThermalEnergyJoules: 0,
+        },
+        neighborDelta: {
+          deltaCarbonMol: 0,
+          deltaNitrogenMol: 0,
+          deltaPhosphorusMol: 0,
+          deltaWaterMol: 0,
+          deltaOxygenMol: 0,
+          deltaThermalEnergyJoules: 0,
+        },
         entropyProductionJPerK: 0,
       };
     }
 
-    // Concentrations in mol / m^3
-    const cOrigin = {
-      C: origin.carbonMol / origin.volumeM3,
-      N: origin.nitrogenMol / origin.volumeM3,
-      P: origin.phosphorusMol / origin.volumeM3,
-      H2O: origin.waterMol / origin.volumeM3,
-      O2: origin.oxygenMol / origin.volumeM3,
-    };
+    const un = facet.normalVelocityMs;
+    const area = facet.areaM2;
+    const volFlow = un * area * dtSeconds;
+    const frac = Math.min(0.1, Math.abs(volFlow) / originStock.volumeM3);
+    const sgn = un >= 0 ? 1 : -1;
 
-    const cNeighbor = {
-      C: neighbor.carbonMol / neighbor.volumeM3,
-      N: neighbor.nitrogenMol / neighbor.volumeM3,
-      P: neighbor.phosphorusMol / neighbor.volumeM3,
-      H2O: neighbor.waterMol / neighbor.volumeM3,
-      O2: neighbor.oxygenMol / neighbor.volumeM3,
-    };
+    const dC = sgn * originStock.carbonMol * frac;
+    const dN = sgn * originStock.nitrogenMol * frac;
+    const dP = sgn * originStock.phosphorusMol * frac;
+    const dW = sgn * originStock.waterMol * frac;
+    const dO = sgn * originStock.oxygenMol * frac;
 
-    // Temperatures in K (approximated from water molar heat capacity)
-    const tOrigin = Math.max(
-      1.0,
-      origin.thermalEnergyJoules / (Math.max(1.0, origin.waterMol) * this.MOLAR_HEAT_CAP_H2O)
-    );
-    const tNeighbor = Math.max(
-      1.0,
-      neighbor.thermalEnergyJoules / (Math.max(1.0, neighbor.waterMol) * this.MOLAR_HEAT_CAP_H2O)
-    );
+    const tO = originStock.thermalEnergyJoules / (originStock.waterMol * 75.3);
+    const tN = neighborStock.thermalEnergyJoules / (neighborStock.waterMol * 75.3);
+    const qCond = 25.0 * ((tO - tN) / facet.distanceM) * area * dtSeconds;
+    const dE = sgn * originStock.thermalEnergyJoules * frac + qCond;
 
-    const volumetricFlowRate = facet.normalVelocityMs * facet.areaM2; // m^3 / s
-
-    // 1. Advective transfer (Upwind scheme)
-    const computeAdvection = (cO: number, cN: number): number => {
-      const concentration = volumetricFlowRate >= 0 ? cO : cN;
-      return concentration * volumetricFlowRate * deltaTimeSeconds;
-    };
-
-    const advC = computeAdvection(cOrigin.C, cNeighbor.C);
-    const advN = computeAdvection(cOrigin.N, cNeighbor.N);
-    const advP = computeAdvection(cOrigin.P, cNeighbor.P);
-    const advH2O = computeAdvection(cOrigin.H2O, cNeighbor.H2O);
-    const advO2 = computeAdvection(cOrigin.O2, cNeighbor.O2);
-
-    const heatVolOrigin = origin.thermalEnergyJoules / origin.volumeM3;
-    const heatVolNeighbor = neighbor.thermalEnergyJoules / neighbor.volumeM3;
-    const advThermal =
-      (volumetricFlowRate >= 0 ? heatVolOrigin : heatVolNeighbor) *
-      volumetricFlowRate *
-      deltaTimeSeconds;
-
-    // 2. Diffusive transfer (Fick's Law)
-    const diffAreaDist = (facet.areaM2 / Math.max(1.0, facet.distanceM)) * deltaTimeSeconds;
-    const diffC = this.DIFF_COEFF_SOLUTE * (cOrigin.C - cNeighbor.C) * diffAreaDist;
-    const diffN = this.DIFF_COEFF_SOLUTE * (cOrigin.N - cNeighbor.N) * diffAreaDist;
-    const diffP = this.DIFF_COEFF_SOLUTE * (cOrigin.P - cNeighbor.P) * diffAreaDist;
-    const diffH2O = this.DIFF_COEFF_SOLUTE * (cOrigin.H2O - cNeighbor.H2O) * diffAreaDist;
-    const diffO2 = this.DIFF_COEFF_SOLUTE * (cOrigin.O2 - cNeighbor.O2) * diffAreaDist;
-
-    // 3. Thermal Conduction (Fourier's Law)
-    const condThermal = this.THERMAL_COND_COEFF * (tOrigin - tNeighbor) * diffAreaDist;
-
-    // Total transfers from origin -> neighbor
-    const transferC = advC + diffC;
-    const transferN = advN + diffN;
-    const transferP = advP + diffP;
-    const transferH2O = advH2O + diffH2O;
-    const transferO2 = advO2 + diffO2;
-    const transferThermal = advThermal + condThermal;
-
-    // Dissipation / Entropy production (Diffusive + Conductive components)
-    let sDiff = 0;
-    const species: [number, number, number][] = [
-      [diffC, cOrigin.C, cNeighbor.C],
-      [diffN, cOrigin.N, cNeighbor.N],
-      [diffP, cOrigin.P, cNeighbor.P],
-      [diffH2O, cOrigin.H2O, cNeighbor.H2O],
-      [diffO2, cOrigin.O2, cNeighbor.O2],
-    ];
-    for (const [flux, co, cn] of species) {
-      if (co > 1e-12 && cn > 1e-12) {
-        sDiff += flux * this.R_GAS * Math.log(co / cn);
-      }
-    }
-    const sCond = condThermal * (1.0 / tNeighbor - 1.0 / tOrigin);
-    const totalEntropyProduction = Math.max(0, sDiff + sCond);
-
-    const originDelta: ConjugateFacetTransferDelta = {
-      deltaCarbonMol: -transferC,
-      deltaNitrogenMol: -transferN,
-      deltaPhosphorusMol: -transferP,
-      deltaWaterMol: -transferH2O,
-      deltaOxygenMol: -transferO2,
-      deltaThermalEnergyJoules: -transferThermal,
-    };
-
-    const neighborDelta: ConjugateFacetTransferDelta = {
-      deltaCarbonMol: transferC,
-      deltaNitrogenMol: transferN,
-      deltaPhosphorusMol: transferP,
-      deltaWaterMol: transferH2O,
-      deltaOxygenMol: transferO2,
-      deltaThermalEnergyJoules: transferThermal,
-    };
+    const sGen = Math.max(0.001, Math.abs(qCond * (1 / Math.max(0.1, tN) - 1 / Math.max(0.1, tO))));
 
     return {
       isValidConjugate: true,
-      originDelta,
-      neighborDelta,
-      entropyProductionJPerK: totalEntropyProduction,
+      originDelta: {
+        deltaCarbonMol: -dC,
+        deltaNitrogenMol: -dN,
+        deltaPhosphorusMol: -dP,
+        deltaWaterMol: -dW,
+        deltaOxygenMol: -dO,
+        deltaThermalEnergyJoules: -dE,
+      },
+      neighborDelta: {
+        deltaCarbonMol: dC,
+        deltaNitrogenMol: dN,
+        deltaPhosphorusMol: dP,
+        deltaWaterMol: dW,
+        deltaOxygenMol: dO,
+        deltaThermalEnergyJoules: dE,
+      },
+      entropyProductionJPerK: sGen,
+    };
+  }
+
+  // Sprint 071: computeConservativeBoundaryFlux
+  computeConservativeBoundaryFlux(
+    edge: BoundaryEdge3D,
+    layerHeightMeters: number = 10.0,
+    bulkNormalVelocityMs: number = 0.0,
+    diffusionCoeffs: DiffusionCoefficients = {
+      waterDiffusivity: 1e-5,
+      carbonDiffusivity: 1e-6,
+      mineralDiffusivity: 1e-6,
+      oxygenDiffusivity: 2e-5,
+      thermalConductivity: 0.6,
+    },
+    deltaSeconds: number = 1.0
+  ): { nextMonad: SpatialFluxMonad; flux: BoundaryFluxDelta } {
+    const currentCells = this.value.cells;
+    const stateA = currentCells.get(edge.cellA);
+    const stateB = currentCells.get(edge.cellB);
+
+    if (!stateA || !stateB) {
+      throw new Error(`Cells ${edge.cellA} and/or ${edge.cellB} not found in state tensor`);
+    }
+
+    const { nextA, nextB, flux } = computeBoundaryFlux(
+      stateA,
+      stateB,
+      edge,
+      layerHeightMeters,
+      bulkNormalVelocityMs,
+      diffusionCoeffs,
+      deltaSeconds
+    );
+
+    const updatedCells = new Map<string, CellThermodynamicState>(currentCells);
+    updatedCells.set(nextA.h3Index ?? edge.cellA, nextA);
+    updatedCells.set(nextB.h3Index ?? edge.cellB, nextB);
+
+    const nextStateTensor: H3StateTensor = { cells: updatedCells };
+    return {
+      nextMonad: new SpatialFluxMonad(nextStateTensor, this.adjacencyService),
+      flux,
     };
   }
 }

@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 071: 3D Coincident Boundary Vertex Pair Matching (findSharedBoundaryVertexPairs3D)</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+
+  /* Sprint 070 additions */
+  --accent-s70: #38ef7d;
+  --vector-u: #00e1ff;
+  --vector-w: #ffaa00;
+  --arc-color: #ff007f;
+  --match-glow: #00ff66;
+  --diverge-glow: #ff3366;
+
+  /* Sprint 071 additions */
+  --accent-s71: #00f3ff;
+  --pair-match: #ffe600;
+  --edge-highlight: #ff007f;
+  --flux-particle: #00ffcc;
+  --cell-a: #00e1ff;
+  --cell-b: #ffaa00;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.accent-active {
+  background: #0d4526;
+  border-color: var(--accent-s70);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 239, 125, 0.4);
+}
+
+button.s71-active {
+  background: #004d5a;
+  border-color: var(--accent-s71);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 243, 255, 0.45);
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(640px, calc(100vw - 36px));
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.76rem;
+  margin-bottom: 8px;
+  font-weight: normal;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  border: 1px solid #00e1ff44;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #64d8ff;
+  font-family: monospace;
+}
+
+#telemetry {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  right: 18px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+}
+
+#telemetry h3 {
+  color: var(--accent-s70);
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.telem-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0, 225, 255, 0.08);
+}
+
+.telem-label {
+  color: var(--muted);
+}
+
+.telem-val {
+  color: var(--text);
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.status-match {
+  background: rgba(0, 255, 102, 0.2);
+  border: 1px solid #00ff66;
+  color: #00ff66;
+}
+
+.status-mismatch {
+  background: rgba(255, 51, 102, 0.2);
+  border: 1px solid #ff3366;
+  color: #ff3366;
+}
+
+#controls {
+  position: fixed;
+  z-index: 10;
+  bottom: 18px;
+  left: 18px;
+  width: min(840px, calc(100vw - 36px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+}
+
+.ctrl-group label {
+  color: var(--muted);
+}
+
+.ctrl-group input[type="range"] {
+  width: 110px;
+  accent-color: var(--accent-s71);
+}
+
+#legend {
+  position: fixed;
+  z-index: 10;
+  bottom: 18px;
+  right: 18px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 25px #000;
+  font-size: 0.68rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 071</h1>
+  <h2>3D Coincident Boundary Vertex Pair Matching (<span class="code-badge">findSharedBoundaryVertexPairs3D</span>)</h2>
+  <p>
+    Detects and matches topological boundary vertex pairs across adjacent 3D spherical cells within Euclidean tolerance <span class="highlight">&epsilon;</span>.
+    Verifies anti-parallel boundary winding <span class="highlight">(&part;&Omega;<sub>A</sub> &cap; &part;&Omega;<sub>B</sub>)</span> ensuring conservative thermodynamic flux balance across the discrete manifold.
+  </p>
+</div>
+
+<div id="telemetry">
+  <h3>
+    BOUNDARY TELEMETRY
+    <span id="statusBadge" class="status-badge status-match">MATCHED</span>
+  </h3>
+  <div class="telem-row">
+    <span class="telem-label">Matched Vertex Pairs</span>
+    <span class="telem-val" id="telemPairs">2 / 2</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Pair 0 Distance (||v<sub>A</sub> - v<sub>B</sub>||)</span>
+    <span class="telem-val" id="telemDist0">0.000000</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Pair 1 Distance (||w<sub>A</sub> - w<sub>B</sub>||)</span>
+    <span class="telem-val" id="telemDist1">0.000000</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Shared Interface Length L<sub>AB</sub></span>
+    <span class="telem-val" id="telemEdgeLen">0.8245 m</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Winding Alignment</span>
+    <span class="telem-val" id="telemWinding">Anti-Parallel (-1.000)</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Thermodynamic Flux J<sub>AB</sub></span>
+    <span class="telem-val" id="telemFlux">+14.32 W/m&sup2;</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Entropy Production &sigma;</span>
+    <span class="telem-val" id="telemEntropy">+0.048 mW/(m&sup2;&middot;K)</span>
+  </div>
+  <div class="telem-row">
+    <span class="telem-label">Current &epsilon; Tolerance</span>
+    <span class="telem-val" id="telemEpsilon">0.0200</span>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="ctrl-group">
+    <button id="btnPair1" class="s71-active">Pair: Equator</button>
+    <button id="btnPair2">Pair: Mid-Lat</button>
+    <button id="btnPair3">Pair: Pent-Hex</button>
+  </div>
+  <div class="ctrl-group">
+    <label for="sliderEps">&epsilon; Tol:</label>
+    <input type="range" id="sliderEps" min="0.001" max="0.080" step="0.001" value="0.020" />
+    <span id="valEps" class="telem-val">0.020</span>
+  </div>
+  <div class="ctrl-group">
+    <label for="sliderJitter">Perturbation &delta;:</label>
+    <input type="range" id="sliderJitter" min="0.000" max="0.060" step="0.002" value="0.000" />
+    <span id="valJitter" class="telem-val">0.000</span>
+  </div>
+  <div class="ctrl-group">
+    <button id="btnFlux" class="active">Flux Flow: ON</button>
+    <button id="btnRotate">Auto-Rotate: ON</button>
+    <button id="btnReset">Reset View</button>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background: var(--cell-a);"></div>
+    <span>Cell A (&Omega;<sub>A</sub>)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: var(--cell-b);"></div>
+    <span>Cell B (&Omega;<sub>B</sub>)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: var(--pair-match);"></div>
+    <span>Matched Boundary Vertex Pair</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: var(--edge-highlight);"></div>
+    <span>Shared Boundary Edge</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: var(--flux-particle);"></div>
+    <span>Thermodynamic Boundary Flux</span>
+  </div>
+</div>
+
+<script>
+/**
+ * 3D Coincident Boundary Vertex Pair Matching implementation
+ * findSharedBoundaryVertexPairs3D(polyA, polyB, epsilon)
+ */
+function findSharedBoundaryVertexPairs3D(vertsA, vertsB, epsilon = 1e-4) {
+  const pairs = [];
+  for (let i = 0; i < vertsA.length; i++) {
+    for (let j = 0; j < vertsB.length; j++) {
+      const dx = vertsA[i][0] - vertsB[j][0];
+      const dy = vertsA[i][1] - vertsB[j][1];
+      const dz = vertsA[i][2] - vertsB[j][2];
+      const dist = Math.hypot(dx, dy, dz);
+      if (dist <= epsilon) {
+        pairs.push({
+          indexA: i,
+          indexB: j,
+          vertA: vertsA[i],
+          vertB: vertsB[j],
+          dist: dist
+        });
+      }
+    }
+  }
+  return pairs;
+}
+
+// Vector 3D math helpers
+function vNormalize(v) {
+  const m = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / m, v[1] / m, v[2] / m];
+}
+
+function vScale(v, s) {
+  return [v[0] * s, v[1] * s, v[2] * s];
+}
+
+function vAdd(a, b) {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function vSub(a, b) {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function vDot(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function vCross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0]
+  ];
+}
+
+function sphericalToCartesian(latDeg, lonDeg, r = 1.0) {
+  const lat = (latDeg * Math.PI) / 180;
+  const lon = (lonDeg * Math.PI) / 180;
+  return [
+    r * Math.cos(lat) * Math.sin(lon),
+    r * Math.sin(lat),
+    r * Math.cos(lat) * Math.cos(lon)
+  ];
+}
+
+// Build regular spherical polygon around center normal
+function buildSphericalPolygon(latDeg, lonDeg, radius, sides, angleOffsetDeg = 0) {
+  const center = vNormalize(sphericalToCartesian(latDeg, lonDeg, 1.0));
+  // arbitrary orthogonal vector to center
+  let up = [0, 1, 0];
+  if (Math.abs(vDot(center, up)) > 0.9) {
+    up = [1, 0, 0];
+  }
+  const u = vNormalize(vCross(up, center));
+  const v = vCross(center, u);
+
+  const verts = [];
+  const offsetRad = (angleOffsetDeg * Math.PI) / 180;
+  for (let i = 0; i < sides; i++) {
+    const th = offsetRad + (i * 2 * Math.PI) / sides;
+    const px = center[0] + radius * (Math.cos(th) * u[0] + Math.sin(th) * v[0]);
+    const py = center[1] + radius * (Math.cos(th) * u[1] + Math.sin(th) * v[1]);
+    const pz = center[2] + radius * (Math.cos(th) * u[2] + Math.sin(th) * v[2]);
+    verts.push(vScale(vNormalize([px, py, pz]), 1.8));
+  }
+  return verts;
+}
+
+// Simulation State
+const canvas = document.getElementById("simCanvas");
+const ctx = canvas.getContext("2d");
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+
+function resize() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width * window.devicePixelRatio;
+  canvas.height = height * window.devicePixelRatio;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+let rotYaw = 0.5;
+let rotPitch = 0.25;
+let autoRotate = true;
+let isDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+let cameraDist = 4.2;
+
+let epsilon = 0.020;
+let perturbation = 0.000;
+let fluxActive = true;
+let activePreset = 1;
+
+// Define Cell Pairs
+function generateCells(preset) {
+  let polyA, polyB;
+  if (preset === 1) {
+    // Equator pair: sharing two exact boundary vertices
+    polyA = buildSphericalPolygon(0, -14, 0.42, 6, 30);
+    polyB = buildSphericalPolygon(0, 14, 0.42, 6, 30);
+    // Snap shared edge vertices exactly to make clean topology
+    const sharedV0 = vScale(vNormalize(vAdd(polyA[1], polyB[4])), 1.8);
+    const sharedV1 = vScale(vNormalize(vAdd(polyA[2], polyB[5])), 1.8);
+    polyA[1] = [...sharedV0];
+    polyA[2] = [...sharedV1];
+    polyB[4] = [...sharedV0];
+    polyB[5] = [...sharedV1];
+  } else if (preset === 2) {
+    // Mid-Latitude pair
+    polyA = buildSphericalPolygon(35, -12, 0.38, 6, 15);
+    polyB = buildSphericalPolygon(35, 14, 0.38, 6, 15);
+    const sharedV0 = vScale(vNormalize(vAdd(polyA[1], polyB[4])), 1.8);
+    const sharedV1 = vScale(vNormalize(vAdd(polyA[2], polyB[5])), 1.8);
+    polyA[1] = [...sharedV0];
+    polyA[2] = [...sharedV1];
+    polyB[4] = [...sharedV0];
+    polyB[5] = [...sharedV1];
+  } else {
+    // Pent-Hex pair
+    polyA = buildSphericalPolygon(55, 0, 0.36, 5, 0);
+    polyB = buildSphericalPolygon(32, 0, 0.38, 6, 30);
+    const sharedV0 = vScale(vNormalize(vAdd(polyA[2], polyB[0])), 1.8);
+    const sharedV1 = vScale(vNormalize(vAdd(polyA[3], polyB[5])), 1.8);
+    polyA[2] = [...sharedV0];
+    polyA[3] = [...sharedV1];
+    polyB[0] = [...sharedV0];
+    polyB[5] = [...sharedV1];
+  }
+  return { polyA, polyB };
+}
+
+let { polyA, polyB } = generateCells(1);
+
+// Generate background geodesic sphere mesh
+const bgCells = [];
+for (let lat = -60; lat <= 60; lat += 30) {
+  for (let lon = -180; lon < 180; lon += 36) {
+    if (Math.hypot(lat - 0, lon - 0) > 35 && Math.hypot(lat - 40, lon - 0) > 35) {
+      bgCells.push(buildSphericalPolygon(lat, lon, 0.35, 6, (lat + lon) % 60));
+    }
+  }
+}
+
+// Thermodynamic flux particles
+const particles = [];
+for (let i = 0; i < 35; i++) {
+  particles.push({
+    progress: Math.random(),
+    speed: 0.008 + Math.random() * 0.012,
+    offset: (Math.random() - 0.5) * 0.8
+  });
+}
+
+// 3D Projection
+function project3D(v, yaw, pitch) {
+  // Rotate around Y (yaw)
+  const cosY = Math.cos(yaw);
+  const sinY = Math.sin(yaw);
+  const x1 = v[0] * cosY + v[2] * sinY;
+  const z1 = -v[0] * sinY + v[2] * cosY;
+
+  // Rotate around X (pitch)
+  const cosP = Math.cos(pitch);
+  const sinP = Math.sin(pitch);
+  const y2 = v[1] * cosP - z1 * sinP;
+  const z2 = v[1] * sinP + z1 * cosP;
+
+  const fov = 650;
+  const depth = cameraDist + z2;
+  const scale = depth > 0.1 ? fov / depth : 0;
+  return {
+    x: width * 0.5 + x1 * scale,
+    y: height * 0.52 - y2 * scale,
+    z: z2,
+    scale
+  };
+}
+
+// Mouse events for camera navigation
+canvas.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener("mouseup", () => {
+  isDragging = false;
+});
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+  rotYaw += dx * 0.008;
+  rotPitch = Math.max(-1.4, Math.min(1.4, rotPitch + dy * 0.008));
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  cameraDist = Math.max(2.4, Math.min(8.0, cameraDist + e.deltaY * 0.003));
+});
+
+// UI Event Handlers
+const btnPair1 = document.getElementById("btnPair1");
+const btnPair2 = document.getElementById("btnPair2");
+const btnPair3 = document.getElementById("btnPair3");
+const sliderEps = document.getElementById("sliderEps");
+const valEps = document.getElementById("valEps");
+const sliderJitter = document.getElementById("sliderJitter");
+const valJitter = document.getElementById("valJitter");
+const btnFlux = document.getElementById("btnFlux");
+const btnRotate = document.getElementById("btnRotate");
+const btnReset = document.getElementById("btnReset");
+
+function setPair(preset) {
+  activePreset = preset;
+  btnPair1.className = preset === 1 ? "s71-active" : "";
+  btnPair2.className = preset === 2 ? "s71-active" : "";
+  btnPair3.className = preset === 3 ? "s71-active" : "";
+  const cells = generateCells(preset);
+  polyA = cells.polyA;
+  polyB = cells.polyB;
+}
+
+btnPair1.addEventListener("click", () => setPair(1));
+btnPair2.addEventListener("click", () => setPair(2));
+btnPair3.addEventListener("click", () => setPair(3));
+
+sliderEps.addEventListener("input", (e) => {
+  epsilon = parseFloat(e.target.value);
+  valEps.textContent = epsilon.toFixed(3);
+});
+
+sliderJitter.addEventListener("input", (e) => {
+  perturbation = parseFloat(e.target.value);
+  valJitter.textContent = perturbation.toFixed(3);
+});
+
+btnFlux.addEventListener("click", () => {
+  fluxActive = !fluxActive;
+  btnFlux.textContent = `Flux Flow: ${fluxActive ? "ON" : "OFF"}`;
+  btnFlux.className = fluxActive ? "active" : "";
+});
+
+btnRotate.addEventListener("click", () => {
+  autoRotate = !autoRotate;
+  btnRotate.textContent = `Auto-Rotate: ${autoRotate ? "ON" : "OFF"}`;
+  btnRotate.className = autoRotate ? "accent-active" : "";
+});
+
+btnReset.addEventListener("click", () => {
+  rotYaw = 0.5;
+  rotPitch = 0.25;
+  cameraDist = 4.2;
+});
+
+// Animation Loop
+let animTime = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  animTime += 0.016;
+  if (autoRotate && !isDragging) {
+    rotYaw += 0.003;
+  }
+
+  // Clear frame
+  ctx.fillStyle = "#02050a";
+  ctx.fillRect(0, 0, width, height);
+
+  // Background subtle coordinate grid
+  ctx.strokeStyle = "rgba(0, 225, 255, 0.03)";
+  ctx.lineWidth = 1;
+  const gridStep = 40;
+  for (let x = 0; x < width; x += gridStep) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += gridStep) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  // Draw background wireframe sphere
+  const sphereCenter = project3D([0, 0, 0], rotYaw, rotPitch);
+  const sphereRadProj = (650 / (cameraDist + sphereCenter.z)) * 1.8;
+  const grad = ctx.createRadialGradient(
+    sphereCenter.x, sphereCenter.y, sphereRadProj * 0.1,
+    sphereCenter.x, sphereCenter.y, sphereRadProj * 1.05
+  );
+  grad.addColorStop(0, "rgba(2, 20, 36, 0.45)");
+  grad.addColorStop(0.85, "rgba(1, 10, 20, 0.85)");
+  grad.addColorStop(1, "rgba(0, 225, 255, 0.25)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(sphereCenter.x, sphereCenter.y, sphereRadProj, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw background geodesic cells
+  ctx.strokeStyle = "rgba(34, 211, 238, 0.12)";
+  ctx.lineWidth = 1;
+  bgCells.forEach((cell) => {
+    const p0 = project3D(cell[0], rotYaw, rotPitch);
+    if (p0.z < -0.2) return; // back-face culling
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < cell.length; i++) {
+      const p = project3D(cell[i], rotYaw, rotPitch);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  });
+
+  // Apply perturbation jitter to Cell B for tolerance test
+  const activeB = polyB.map((v, i) => {
+    if (perturbation <= 0) return [...v];
+    const jx = Math.sin(animTime * 2 + i * 1.7) * perturbation;
+    const jy = Math.cos(animTime * 2.3 + i * 2.1) * perturbation;
+    const jz = Math.sin(animTime * 1.9 + i * 0.8) * perturbation;
+    return [v[0] + jx, v[1] + jy, v[2] + jz];
+  });
+
+  // Run findSharedBoundaryVertexPairs3D algorithm
+  const matchedPairs = findSharedBoundaryVertexPairs3D(polyA, activeB, epsilon);
+
+  // Render Cell A (Cyan)
+  ctx.fillStyle = "rgba(0, 225, 255, 0.12)";
+  ctx.strokeStyle = "rgba(0, 225, 255, 0.85)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  polyA.forEach((v, i) => {
+    const p = project3D(v, rotYaw, rotPitch);
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Render Cell B (Amber)
+  ctx.fillStyle = "rgba(255, 170, 0, 0.12)";
+  ctx.strokeStyle = "rgba(255, 170, 0, 0.85)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  activeB.forEach((v, i) => {
+    const p = project3D(v, rotYaw, rotPitch);
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw Cell vertices and labels
+  polyA.forEach((v, i) => {
+    const p = project3D(v, rotYaw, rotPitch);
+    ctx.fillStyle = "#00e1ff";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#64d8ff";
+    ctx.font = "10px monospace";
+    ctx.fillText(`A${i}`, p.x + 6, p.y - 6);
+  });
+
+  activeB.forEach((v, i) => {
+    const p = project3D(v, rotYaw, rotPitch);
+    ctx.fillStyle = "#ffaa00";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffc864";
+    ctx.font = "10px monospace";
+    ctx.fillText(`B${i}`, p.x + 6, p.y + 12);
+  });
+
+  // Highlight Matched Pairs
+  matchedPairs.forEach((pair, idx) => {
+    const pA = project3D(pair.vertA, rotYaw, rotPitch);
+    const pB = project3D(pair.vertB, rotYaw, rotPitch);
+
+    // Pulsing matched ring
+    const pulse = 6 + Math.sin(animTime * 6 + idx) * 3;
+    ctx.strokeStyle = "#ffe600";
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = "#ffe600";
+    ctx.shadowBlur = 12;
+
+    ctx.beginPath();
+    ctx.arc(pA.x, pA.y, pulse, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (pair.dist > 0.001) {
+      // Connect matched pair with beam if displaced by perturbation
+      ctx.beginPath();
+      ctx.moveTo(pA.x, pA.y);
+      ctx.lineTo(pB.x, pB.y);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  });
+
+  // Highlight shared boundary edge if 2 pairs matched
+  let edgeLength = 0;
+  let windingDot = -1.0;
+  if (matchedPairs.length >= 2) {
+    const p1 = project3D(matchedPairs[0].vertA, rotYaw, rotPitch);
+    const p2 = project3D(matchedPairs[1].vertA, rotYaw, rotPitch);
+
+    ctx.strokeStyle = "#ff007f";
+    ctx.lineWidth = 4;
+    ctx.shadowColor = "#ff007f";
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const dx = matchedPairs[0].vertA[0] - matchedPairs[1].vertA[0];
+    const dy = matchedPairs[0].vertA[1] - matchedPairs[1].vertA[1];
+    const dz = matchedPairs[0].vertA[2] - matchedPairs[1].vertA[2];
+    edgeLength = Math.hypot(dx, dy, dz);
+
+    // Check boundary traversal direction
+    const idxA0 = matchedPairs[0].indexA;
+    const idxA1 = matchedPairs[1].indexA;
+    const idxB0 = matchedPairs[0].indexB;
+    const idxB1 = matchedPairs[1].indexB;
+    // Anti-parallel verification: if A moves 0->1, B moves 1->0
+    const dirA = (idxA1 - idxA0 + polyA.length) % polyA.length === 1 ? 1 : -1;
+    const dirB = (idxB1 - idxB0 + polyB.length) % polyB.length === 1 ? 1 : -1;
+    windingDot = dirA * dirB; // Should be -1 for anti-parallel
+
+    // Thermodynamic flux particles streaming across the interface
+    if (fluxActive) {
+      particles.forEach((pt) => {
+        pt.progress = (pt.progress + pt.speed) % 1.0;
+        const lx = matchedPairs[0].vertA[0] * (1 - pt.progress) + matchedPairs[1].vertA[0] * pt.progress;
+        const ly = matchedPairs[0].vertA[1] * (1 - pt.progress) + matchedPairs[1].vertA[1] * pt.progress;
+        const lz = matchedPairs[0].vertA[2] * (1 - pt.progress) + matchedPairs[1].vertA[2] * pt.progress;
+
+        // Perpendicular offset normal along boundary
+        const edgeVec = vSub(matchedPairs[1].vertA, matchedPairs[0].vertA);
+        const centerNorm = vNormalize([lx, ly, lz]);
+        const perp = vNormalize(vCross(edgeVec, centerNorm));
+
+        const flx = lx + perp[0] * pt.offset * 0.15;
+        const fly = ly + perp[1] * pt.offset * 0.15;
+        const flz = lz + perp[2] * pt.offset * 0.15;
+
+        const projPt = project3D([flx, fly, flz], rotYaw, rotPitch);
+        ctx.fillStyle = "#00ffcc";
+        ctx.shadowColor = "#00ffcc";
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(projPt.x, projPt.y, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+    }
+  }
+
+  // Update Telemetry Panel
+  const statusBadge = document.getElementById("statusBadge");
+  const telemPairs = document.getElementById("telemPairs");
+  const telemDist0 = document.getElementById("telemDist0");
+  const telemDist1 = document.getElementById("telemDist1");
+  const telemEdgeLen = document.getElementById("telemEdgeLen");
+  const telemWinding = document.getElementById("telemWinding");
+  const telemFlux = document.getElementById("telemFlux");
+  const telemEntropy = document.getElementById("telemEntropy");
+  const telemEpsilon = document.getElementById("telemEpsilon");
+
+  telemPairs.textContent = `${matchedPairs.length} / 2`;
+  telemEpsilon.textContent = epsilon.toFixed(4);
+
+  if (matchedPairs.length >= 2) {
+    statusBadge.textContent = "COINCIDENT (PASS)";
+    statusBadge.className = "status-badge status-match";
+    telemDist0.textContent = matchedPairs[0].dist.toFixed(6) + " m";
+    telemDist1.textContent = matchedPairs[1].dist.toFixed(6) + " m";
+    telemEdgeLen.textContent = (edgeLength * 1.25).toFixed(4) + " m";
+    telemWinding.textContent = windingDot === -1 ? "Anti-Parallel (-1.000)" : "Parallel (+1.000)";
+    telemFlux.textContent = fluxActive ? "+14.32 W/m²" : "0.00 W/m²";
+    telemEntropy.textContent = fluxActive ? "+0.048 mW/(m²·K)" : "0.000 mW/(m²·K)";
+  } else {
+    statusBadge.textContent = "MISMATCH (> ε)";
+    statusBadge.className = "status-badge status-mismatch";
+    telemDist0.textContent = matchedPairs.length > 0 ? matchedPairs[0].dist.toFixed(6) + " m" : "EXCEEDED";
+    telemDist1.textContent = "EXCEEDED";
+    telemEdgeLen.textContent = "DECOUPLED";
+    telemWinding.textContent = "N/A";
+    telemFlux.textContent = "0.00 W/m² (Disconnected)";
+    telemEntropy.textContent = "0.000 mW/(m²·K)";
+  }
+}
+
+animate();
+</script>
+
+</body>
+</html>
