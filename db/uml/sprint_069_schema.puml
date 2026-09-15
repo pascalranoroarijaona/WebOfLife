@@ -1,0 +1,142 @@
+@startuml sprint_069_schema
+!pragma layout smetana
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam shadowing true
+
+package "Spatial Geometry & DGGS (RFC-069)" {
+    interface Cartesian3D <<DataType>> {
+        +x: number
+        +y: number
+        +z: number
+    }
+
+    interface CartesianBoundaryOptions <<Options>> {
+        +closeLoop: boolean?
+        +radius: number?
+    }
+
+    interface H3BoundaryCartesian3D <<ValueObject>> {
+        +h3Index: string
+        +vertexCount: number
+        +vertices: readonly Cartesian3D[]
+        +isClosed: boolean
+        +centroid: Cartesian3D
+    }
+
+    class SpatialGeometryBridge <<Pure Function>> {
+        +geodeticToCartesian(lat: number, lng: number, radius: number): Cartesian3D
+        +cartesianNorm(v: Cartesian3D): number
+        +crossProduct(a: Cartesian3D, b: Cartesian3D): Cartesian3D
+        +dotProduct(a: Cartesian3D, b: Cartesian3D): number
+    }
+
+    class H3BoundaryProjector {
+        +extractH3BoundaryCartesianVertices3D(h3Index: string, options?: CartesianBoundaryOptions): H3BoundaryCartesian3D
+        -verifyUnitSphereNorm(vertices: Cartesian3D[], radius: number, epsilon: number): boolean
+        -calculateCentroid(vertices: Cartesian3D[], radius: number): Cartesian3D
+    }
+
+    class H3AdjacencyGraph {
+        -adjacencyMap: Map<string, string[]>
+        +extractDirectedEdge(cellA: string, cellB: string): InterfacialEdge
+        +computeOutwardNormal(v1: Cartesian3D, v2: Cartesian3D): Cartesian3D
+        +computeGeodesicLength(v1: Cartesian3D, v2: Cartesian3D): number
+    }
+}
+
+package "Thermodynamic Stock & Interfacial Flow Mechanics" {
+    class ThermodynamicStockTensor <<Entity>> {
+        +h3Index: string
+        +epochHeight: bigint
+        +massKg: number
+        +internalEnergyJoules: number
+        +entropyJPerK: number
+        +exergyJoules: number
+        +temperatureKelvin: number
+        +pressurePascals: number
+        +applyInterfacialFlux(flux: InterfacialFluxTransaction): void
+    }
+
+    class InterfacialEdge <<Entity>> {
+        +edgeId: UUID
+        +cellA: string
+        +cellB: string
+        +v1: Cartesian3D
+        +v2: Cartesian3D
+        +edgeVector: Cartesian3D
+        +outwardNormal: Cartesian3D
+        +geodesicLength: number
+        +thermalConductanceKappa: number
+    }
+
+    class InterfacialFluxTransaction <<LedgerEntry>> {
+        +transactionId: UUID
+        +edgeId: UUID
+        +epochHeight: bigint
+        +massFluxKg: number
+        +heatFluxJoules: number
+        +entropyProductionJPerK: number
+        +deltaTSeconds: number
+        +verifyAntisymmetry(reverseTx: InterfacialFluxTransaction): boolean
+    }
+}
+
+package "Blockchain Consensus & Thermodynamic Invariants" {
+    class BlockchainThermodynamicBlock <<Block>> {
+        +epochHeight: bigint
+        +previousBlockHash: Buffer
+        +stateTensorRoot: Buffer
+        +interfacialFluxMerkleRoot: Buffer
+        +boundaryGeometryMerkleRoot: Buffer
+        +netMassDeltaKg: number
+        +netEntropyProductionJPerK: number
+        +firstLawResidualJoules: number
+        +validatorNodeSignature: Buffer
+        +timestampUtc: Date
+        +verifyConservationLaws(): boolean
+    }
+
+    class SpatialMonad<T> <<Monad>> {
+        -state: T
+        +map<U>(fn: (state: T) => U): SpatialMonad<U>
+        +flatMap<U>(fn: (state: T) => SpatialMonad<U>): SpatialMonad<U>
+        +bindBoundaryGeometry(projector: H3BoundaryProjector): SpatialMonad<T>
+        +commitToBlock(epoch: bigint): BlockchainThermodynamicBlock
+    }
+}
+
+' Relationships & Invariants
+H3BoundaryProjector ..> SpatialGeometryBridge : uses
+H3BoundaryProjector ..> Cartesian3D : constructs
+H3BoundaryProjector ..> H3BoundaryCartesian3D : produces
+H3BoundaryProjector ..> CartesianBoundaryOptions : configures
+
+H3AdjacencyGraph --> H3BoundaryProjector : queries boundaries
+H3AdjacencyGraph *-- InterfacialEdge : resolves
+
+InterfacialEdge --> Cartesian3D : defines vertices (v1, v2)
+InterfacialFluxTransaction --> InterfacialEdge : directed through
+ThermodynamicStockTensor "1" *-- "many" InterfacialFluxTransaction : balances state
+
+BlockchainThermodynamicBlock *-- InterfacialFluxTransaction : seals in Merkle tree
+BlockchainThermodynamicBlock *-- ThermodynamicStockTensor : verifies state root
+SpatialMonad ..> BlockchainThermodynamicBlock : creates
+SpatialMonad o-- H3BoundaryCartesian3D : wraps
+
+note right of SpatialGeometryBridge
+  **First Law Interfacial Invariant:**
+  e_AB = v2 - v1
+  e_BA = -e_AB
+  J_M,AB = -J_M,BA
+  Net mass loss = 0
+end note
+
+note right of InterfacialFluxTransaction
+  **Second Law Transport Dissipation:**
+  S_dot = (J_Q,AB)^2 / (kappa * L_AB) >= 0
+  L_AB = arccos(v1 . v2)
+end note
+
+@enduml

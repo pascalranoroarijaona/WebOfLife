@@ -5,18 +5,14 @@
 import {
   SphericalCoordinates,
   Vector3D,
-  Vector3DInput,
   H3ErrorCode,
   SpatialGuardClauseException,
   CellThermodynamicStocks,
   StockTransferDelta,
   ThermodynamicStocks,
 } from "./h3_types.js";
-import { EARTH_RADIUS_METERS } from "../thermodynamics/constants.js";
 import { SpatialMonad } from "../monads/spatial_monad.js";
 import {
-  createVec3D,
-  toVec3D,
   h3CellToLatLng,
   h3CellToBoundary,
   h3GridDisk,
@@ -1038,8 +1034,8 @@ export class H3Grid<T = any> {
 
   public static getNeighbors(token: string): string[] {
     assertCanonicalH3Pattern(token);
-    const disk = h3GridDisk(token, 1);
-    const nbrs = disk.filter((c) => c.toLowerCase() !== token.toLowerCase());
+    const disk: string[] = h3GridDisk(token, 1);
+    const nbrs = disk.filter((c: string) => c.toLowerCase() !== token.toLowerCase());
     if (nbrs.length === 6) return nbrs;
     const res: string[] = [];
     for (let i = 0; i < 6; i++) {

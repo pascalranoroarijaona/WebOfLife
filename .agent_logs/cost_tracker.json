@@ -34,7 +34,12 @@
       "input_tokens": 1249852,
       "output_tokens": 342321,
       "cost": 0.19643519999999998
+    },
+    "sprint_069": {
+      "input_tokens": 826491,
+      "output_tokens": 197407,
+      "cost": 0.12120892499999998
     }
   },
-  "total_cost": 1.0187076749999997
+  "total_cost": 1.1399165999999998
 }

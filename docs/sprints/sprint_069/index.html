@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>Thermodynamic Web of Life - Sprint 069: 3D Cartesian Boundary Vertex Extraction (extractH3BoundaryCartesianVertices3D)</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.92);
+  --panel-light: rgba(17, 35, 48, 0.9);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 18px;
+  left: 18px;
+  width: min(780px, calc(100vw - 36px));
+  padding: 17px 20px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.12rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  border: 1px solid #00e1ff44;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #64d8ff;
+  font-family: monospace;
+}
+
+.social-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.social-links a {
+  color: #00e1ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #00e1ff38;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(0, 225, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.social-links a:hover {
+  background: rgba(0, 225, 255, 0.2);
+  border-color: #00e1ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+}
+
+#controls {
+  position: fixed;
+  z-index: 11;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(1060px, calc(100vw - 36px));
+  padding: 11px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+}
+
+#search {
+  flex: 1;
+  min-width: 140px;
+  background: #07131d;
+  color: white;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+#search:focus {
+  border-color: var(--human);
+}
+
+.zoom-container,
+.debug-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9fc7d8;
+  background: #07131d;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-container input[type="range"] {
+  width: 75px;
+  cursor: pointer;
+  accent-color: #00e1ff;
+}
+
+.debug-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--sun);
+}
+
+#sprint-telemetry {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(390px, calc(100vw - 36px));
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+#sprint-telemetry h3 {
+  color: var(--accent-s69);
+  font-size: 0.86rem;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #00e1ff28;
+  padding-bottom: 4px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.telemetry-label {
+  color: var(--muted);
+}
+
+.telemetry-val {
+  color: #ffffff;
+  font-weight: bold;
+  text-align: right;
+  word-break: break-all;
+}
+
+.vertex-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 0.67rem;
+}
+
+.vertex-table th {
+  color: var(--sun);
+  text-align: left;
+  padding: 2px 4px;
+  border-bottom: 1px solid #315064;
+}
+
+.vertex-table td {
+  padding: 3px 4px;
+  border-bottom: 1px solid rgba(49, 80, 100, 0.3);
+  color: #a8d5e5;
+  font-family: monospace;
+}
+
+.vertex-table tr:hover td {
+  background: rgba(0, 225, 255, 0.1);
+  color: #ffffff;
+}
+
+#sonify-btn {
+  background: #193247;
+  border-color: var(--accent-s69);
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>GAIA THERMODYNAMICS // SPRINT 069</h1>
+  <h2>3D Cartesian Boundary Vertex Extraction (extractH3BoundaryCartesianVertices3D)</h2>
+  <p>
+    Transforms planar/geodetic H3 hexagonal boundary rings into exact <span class="highlight">3D Cartesian vectors</span>
+    <span class="code-badge">r⃗ᵢ = (x, y, z)</span> on the planetary geoid with outwards surface normals
+    <span class="code-badge">n̂ = r⃗ / |r⃗|</span>. Enables continuous thermodynamic fluxes across adjacent polyhedral cell boundaries.
+  </p>
+  <div class="social-links">
+    <a href="../sprint_068/index.html">← Sprint 068</a>
+    <a href="./01_RFC.md">01_RFC Spec</a>
+    <a href="./02_METHODS.md">02_METHODS Math</a>
+    <a href="../../index.html">Root Index</a>
+  </div>
+</div>
+
+<div id="sprint-telemetry">
+  <h3>BOUNDARY VERTEX 3D TELEMETRY</h3>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Selected Cell:</span>
+    <span class="telemetry-val" id="tel-cell-id">8828308281fffff</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Topology Type:</span>
+    <span class="telemetry-val" id="tel-cell-type">HEXAGON (6 Vertices)</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Planetary Radius (R):</span>
+    <span class="telemetry-val" id="tel-radius">6,371.00 km</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Centroid (x, y, z):</span>
+    <span class="telemetry-val" id="tel-centroid">[0.00, 0.00, 0.00]</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Entropy Flux (dS/dt):</span>
+    <span class="telemetry-val" id="tel-flux" style="color: var(--sun);">+4.812 mW/m²K</span>
+  </div>
+  <div class="telemetry-row">
+    <span class="telemetry-label">Exergy Dissipation:</span>
+    <span class="telemetry-val" id="tel-exergy" style="color: var(--accent-s69);">92.4 J/m²s</span>
+  </div>
+
+  <div style="margin-top: 10px; color: var(--sun); font-size: 0.72rem; font-weight: bold;">
+    3D CARTESIAN VERTICES & NORMALS:
+  </div>
+  <table class="vertex-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>X (km)</th>
+        <th>Y (km)</th>
+        <th>Z (km)</th>
+        <th>|n̂|</th>
+      </tr>
+    </thead>
+    <tbody id="tel-vertex-body">
+      <!-- Injected by script -->
+    </tbody>
+  </table>
+</div>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search cell ID (e.g. 8828...)" />
+  <button id="btn-autorotate" class="active">Auto-Rotate [ON]</button>
+  <button id="btn-layer-flux" class="active">Flux View</button>
+  <button id="btn-layer-normals">Toggle Normals</button>
+  <button id="btn-extrude">Extrude 3D</button>
+  <button id="sonify-btn">Audio Drone [OFF]</button>
+  <button id="btn-reset">Reset Camera</button>
+
+  <div class="zoom-container">
+    <span>Zoom</span>
+    <input type="range" id="zoomRange" min="0.6" max="2.6" step="0.05" value="1.0" />
+  </div>
+
+  <div class="debug-container">
+    <input type="checkbox" id="chk-grid" checked />
+    <label for="chk-grid">Wireframe</label>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Constants and Thermodynamics ---
+  const EARTH_RADIUS_KM = 6371.0;
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // Resize Handling
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  // Camera State
+  let rotX = 0.35;
+  let rotY = -0.45;
+  let zoom = 1.0;
+  let autoRotate = true;
+  let showNormals = false;
+  let extrudeMode = false;
+  let showWireframe = true;
+  let viewMode = 'flux'; // 'flux' or 'biomass'
+
+  // Drag interaction
+  let isDragging = false;
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    rotY += dx * 0.005;
+    rotX += dy * 0.005;
+    rotX = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, rotX));
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoom -= e.deltaY * 0.001;
+    zoom = Math.max(0.5, Math.min(2.8, zoom));
+    document.getElementById('zoomRange').value = zoom;
+  }, { passive: false });
+
+  // Web Audio Sonification (Zero external dependencies)
+  let audioCtx = null;
+  let droneOsc = null;
+  let droneGain = null;
+  let audioRunning = false;
+
+  function toggleAudio() {
+    if (!audioRunning) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      audioCtx = new AudioContext();
+      droneOsc = audioCtx.createOscillator();
+      droneGain = audioCtx.createGain();
+
+      droneOsc.type = 'sine';
+      droneOsc.frequency.setValueAtTime(108, audioCtx.currentTime); // A2 / 108Hz Earth resonance
+      droneGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+
+      droneOsc.connect(droneGain);
+      droneGain.connect(audioCtx.destination);
+      droneOsc.start();
+
+      audioRunning = true;
+      document.getElementById('sonify-btn').textContent = 'Audio Drone [ON]';
+      document.getElementById('sonify-btn').style.background = '#005060';
+    } else {
+      if (droneGain) droneGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+      setTimeout(() => {
+        if (droneOsc) droneOsc.stop();
+        if (audioCtx) audioCtx.close();
+        audioRunning = false;
+        document.getElementById('sonify-btn').textContent = 'Audio Drone [OFF]';
+        document.getElementById('sonify-btn').style.background = '#193247';
+      }, 120);
+    }
+  }
+
+  // --- Vector Math & 3D Cartesian Boundary Extraction ---
+  function sphericalToCartesian3D(latRad, lonRad, radius) {
+    const cosLat = Math.cos(latRad);
+    return {
+      x: radius * cosLat * Math.cos(lonRad),
+      y: radius * Math.sin(latRad),
+      z: radius * cosLat * Math.sin(lonRad)
+    };
+  }
+
+  /**
+   * Client-side reference extraction of 3D Cartesian boundary vertices
+   * Implementation of extractH3BoundaryCartesianVertices3D
+   */
+  function extractH3BoundaryCartesianVertices3D(centerLat, centerLon, baseRadius, vertexCount = 6, cellRadiusRad = 0.18) {
+    const vertices = [];
+    const normals = [];
+
+    for (let i = 0; i < vertexCount; i++) {
+      const angle = (i / vertexCount) * Math.PI * 2;
+      const lat = centerLat + Math.sin(angle) * cellRadiusRad;
+      const lon = centerLon + (Math.cos(angle) * cellRadiusRad) / Math.cos(centerLat || 0.0001);
+
+      const cart = sphericalToCartesian3D(lat, lon, baseRadius);
+      const mag = Math.hypot(cart.x, cart.y, cart.z) || 1.0;
+      const normal = { x: cart.x / mag, y: cart.y / mag, z: cart.z / mag };
+
+      vertices.push(cart);
+      normals.push(normal);
+    }
+
+    // Compute Centroid
+    let cx = 0, cy = 0, cz = 0;
+    vertices.forEach(v => {
+      cx += v.x;
+      cy += v.y;
+      cz += v.z;
+    });
+    const centroid = {
+      x: cx / vertices.length,
+      y: cy / vertices.length,
+      z: cz / vertices.length
+    };
+
+    return {
+      vertices,
+      normals,
+      centroid
+    };
+  }
+
+  // Generate Planetary Geodesic Cells
+  const cells = [];
+  const latSteps = 9;
+  const lonSteps = 16;
+  let cellIndexCounter = 0x88283000;
+
+  for (let r = 1; r < latSteps - 1; r++) {
+    const lat = ((r / (latSteps - 1)) - 0.5) * Math.PI * 0.85;
+    const count = Math.max(6, Math.floor(lonSteps * Math.cos(lat)));
+    for (let c = 0; c < count; c++) {
+      const lon = (c / count) * Math.PI * 2 - Math.PI;
+      const isPentagon = (r === 2 && c === 1) || (r === 6 && c === 4);
+      const sides = isPentagon ? 5 : 6;
+      const cellId = (cellIndexCounter++).toString(16) + 'fffff';
+
+      const extraction = extractH3BoundaryCartesianVertices3D(lat, lon, EARTH_RADIUS_KM, sides, 0.14);
+
+      // Thermodynamic State
+      const solarFlux = Math.max(0, Math.cos(lat)) * 340; // W/m²
+      const entropyProduction = 2.0 + Math.sin(lat * 3 + lon * 2) * 1.5 + (solarFlux * 0.012);
+      const exergyDissipation = entropyProduction * 288.15 * 0.1;
+
+      cells.push({
+        id: cellId,
+        lat,
+        lon,
+        sides,
+        centroid: extraction.centroid,
+        vertices: extraction.vertices,
+        normals: extraction.normals,
+        entropyProduction,
+        exergyDissipation,
+        solarFlux,
+        color: sides === 5 ? '#ff3366' : (r % 2 === 0 ? '#00e1ff' : '#00ffaa')
+      });
+    }
+  }
+
+  let selectedCell = cells[0];
+
+  function updateTelemetryUI(cell) {
+    if (!cell) return;
+    document.getElementById('tel-cell-id').textContent = cell.id;
+    document.getElementById('tel-cell-type').textContent = cell.sides === 5 ? 'PENTAGON (5 Vertices)' : 'HEXAGON (6 Vertices)';
+    document.getElementById('tel-radius').textContent = EARTH_RADIUS_KM.toFixed(2) + ' km';
+    document.getElementById('tel-centroid').textContent =
+      `[${cell.centroid.x.toFixed(1)}, ${cell.centroid.y.toFixed(1)}, ${cell.centroid.z.toFixed(1)}]`;
+    document.getElementById('tel-flux').textContent = `+${cell.entropyProduction.toFixed(3)} mW/m²K`;
+    document.getElementById('tel-exergy').textContent = `${cell.exergyDissipation.toFixed(1)} J/m²s`;
+
+    const tbody = document.getElementById('tel-vertex-body');
+    tbody.innerHTML = '';
+    cell.vertices.forEach((v, idx) => {
+      const n = cell.normals[idx];
+      const normLen = Math.hypot(n.x, n.y, n.z).toFixed(2);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>v${idx + 1}</td>
+        <td>${v.x.toFixed(1)}</td>
+        <td>${v.y.toFixed(1)}</td>
+        <td>${v.z.toFixed(1)}</td>
+        <td style="color: var(--sun)">${normLen}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  updateTelemetryUI(selectedCell);
+
+  // 3D Vector Transform Pipeline
+  function project3D(v, globeRadiusPx, cx, cy) {
+    // 1. Rotate Y
+    const cosY = Math.cos(rotY);
+    const sinY = Math.sin(rotY);
+    let x1 = v.x * cosY + v.z * sinY;
+    let y1 = v.y;
+    let z1 = -v.x * sinY + v.z * cosY;
+
+    // 2. Rotate X
+    const cosX = Math.cos(rotX);
+    const sinX = Math.sin(rotX);
+    let x2 = x1;
+    let y2 = y1 * cosX - z1 * sinX;
+    let z2 = y1 * sinX + z1 * cosX;
+
+    // 3. Perspective / Orthographic projection
+    const scale = (globeRadiusPx / EARTH_RADIUS_KM) * zoom;
+    return {
+      x: cx + x2 * scale,
+      y: cy - y2 * scale,
+      z: z2,
+      visible: z2 > -EARTH_RADIUS_KM * 0.15
+    };
+  }
+
+  // --- Animation Loop ---
+  function render() {
+    if (autoRotate && !isDragging) {
+      rotY += 0.003;
+    }
+
+    ctx.fillStyle = '#02050a';
+    ctx.fillRect(0, 0, width, height);
+
+    const cx = width * 0.45;
+    const cy = height * 0.52;
+    const globeRadiusPx = Math.min(width, height) * 0.35;
+
+    // Draw Atmosphere Glow
+    const glowGrad = ctx.createRadialGradient(cx, cy, globeRadiusPx * zoom * 0.8, cx, cy, globeRadiusPx * zoom * 1.25);
+    glowGrad.addColorStop(0, 'rgba(0, 225, 255, 0.22)');
+    glowGrad.addColorStop(0.6, 'rgba(0, 100, 200, 0.08)');
+    glowGrad.addColorStop(1, 'rgba(2, 5, 10, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, globeRadiusPx * zoom * 1.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw Planet Base Sphere
+    const sphereGrad = ctx.createRadialGradient(
+      cx - globeRadiusPx * zoom * 0.3,
+      cy - globeRadiusPx * zoom * 0.3,
+      globeRadiusPx * zoom * 0.1,
+      cx,
+      cy,
+      globeRadiusPx * zoom
+    );
+    sphereGrad.addColorStop(0, '#0a273b');
+    sphereGrad.addColorStop(0.7, '#041320');
+    sphereGrad.addColorStop(1, '#02070d');
+
+    ctx.fillStyle = sphereGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, globeRadiusPx * zoom, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Sort cells by depth for proper back-to-front rendering
+    const sortedCells = cells.map(cell => {
+      const projCenter = project3D(cell.centroid, globeRadiusPx, cx, cy);
+      return { cell, projCenter, depth: projCenter.z };
+    }).sort((a, b) => a.depth - b.depth);
+
+    // Render cells
+    for (const item of sortedCells) {
+      const cell = item.cell;
+      if (item.depth < 0) continue; // Back-face cull
+
+      const isSelected = cell.id === selectedCell.id;
+      const extrusion = extrudeMode ? (cell.entropyProduction * 80) : 0;
+
+      // Project all boundary vertices
+      const projVertices = cell.vertices.map((v, idx) => {
+        let vx = v.x;
+        let vy = v.y;
+        let vz = v.z;
+        if (extrudeMode) {
+          const n = cell.normals[idx];
+          vx += n.x * extrusion;
+          vy += n.y * extrusion;
+          vz += n.z * extrusion;
+        }
+        return project3D({ x: vx, y: vy, z: vz }, globeRadiusPx, cx, cy);
+      });
+
+      // Render cell polygon
+      ctx.beginPath();
+      projVertices.forEach((pv, i) => {
+        if (i === 0) ctx.moveTo(pv.x, pv.y);
+        else ctx.lineTo(pv.x, pv.y);
+      });
+      ctx.closePath();
+
+      // Fill color
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(255, 230, 0, 0.45)';
+      } else if (cell.sides === 5) {
+        ctx.fillStyle = 'rgba(255, 51, 102, 0.35)';
+      } else if (viewMode === 'flux') {
+        const alpha = Math.min(0.6, Math.max(0.1, cell.entropyProduction / 5.0));
+        ctx.fillStyle = `rgba(0, 255, 204, ${alpha})`;
+      } else {
+        ctx.fillStyle = 'rgba(0, 136, 255, 0.25)';
+      }
+      ctx.fill();
+
+      // Stroke outline
+      if (showWireframe || isSelected) {
+        ctx.strokeStyle = isSelected ? '#ffe600' : (cell.sides === 5 ? '#ff3366' : 'rgba(34, 211, 238, 0.7)');
+        ctx.lineWidth = isSelected ? 2.5 : 1.0;
+        ctx.stroke();
+      }
+
+      // Draw Normal Vectors if enabled or selected
+      if (showNormals || isSelected) {
+        projVertices.forEach((pv, i) => {
+          const norm = cell.normals[i];
+          const normTip = {
+            x: cell.vertices[i].x + norm.x * 600,
+            y: cell.vertices[i].y + norm.y * 600,
+            z: cell.vertices[i].z + norm.z * 600
+          };
+          const projTip = project3D(normTip, globeRadiusPx, cx, cy);
+
+          ctx.strokeStyle = isSelected ? '#ff7700' : 'rgba(255, 170, 0, 0.5)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(pv.x, pv.y);
+          ctx.lineTo(projTip.x, projTip.y);
+          ctx.stroke();
+
+          // Vertex Dot
+          ctx.fillStyle = isSelected ? '#ffffff' : '#00ffcc';
+          ctx.beginPath();
+          ctx.arc(pv.x, pv.y, isSelected ? 3.5 : 2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+
+  // --- Interaction & Event Handlers ---
+  document.getElementById('btn-autorotate').addEventListener('click', (e) => {
+    autoRotate = !autoRotate;
+    e.target.textContent = `Auto-Rotate [${autoRotate ? 'ON' : 'OFF'}]`;
+    e.target.classList.toggle('active', autoRotate);
+  });
+
+  document.getElementById('btn-layer-flux').addEventListener('click', (e) => {
+    viewMode = viewMode === 'flux' ? 'biomass' : 'flux';
+    e.target.textContent = viewMode === 'flux' ? 'Flux View' : 'Biomass View';
+  });
+
+  document.getElementById('btn-layer-normals').addEventListener('click', (e) => {
+    showNormals = !showNormals;
+    e.target.classList.toggle('active', showNormals);
+  });
+
+  document.getElementById('btn-extrude').addEventListener('click', (e) => {
+    extrudeMode = !extrudeMode;
+    e.target.classList.toggle('active', extrudeMode);
+  });
+
+  document.getElementById('sonify-btn').addEventListener('click', toggleAudio);
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    rotX = 0.35;
+    rotY = -0.45;
+    zoom = 1.0;
+    document.getElementById('zoomRange').value = '1.0';
+  });
+
+  document.getElementById('zoomRange').addEventListener('input', (e) => {
+    zoom = parseFloat(e.target.value);
+  });
+
+  document.getElementById('chk-grid').addEventListener('change', (e) => {
+    showWireframe = e.target.checked;
+  });
+
+  // Cell Click Selection
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const cx = width * 0.45;
+    const cy = height * 0.52;
+    const globeRadiusPx = Math.min(width, height) * 0.35;
+
+    let closestCell = null;
+    let minDist = 36; // px tolerance
+
+    for (const cell of cells) {
+      const p = project3D(cell.centroid, globeRadiusPx, cx, cy);
+      if (p.z > 0) {
+        const dist = Math.hypot(p.x - mx, p.y - my);
+        if (dist < minDist) {
+          minDist = dist;
+          closestCell = cell;
+        }
+      }
+    }
+
+    if (closestCell) {
+      selectedCell = closestCell;
+      updateTelemetryUI(selectedCell);
+    }
+  });
+
+  // Cell Search
+  document.getElementById('search').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) return;
+    const match = cells.find(c => c.id.toLowerCase().includes(q));
+    if (match) {
+      selectedCell = match;
+      updateTelemetryUI(selectedCell);
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
