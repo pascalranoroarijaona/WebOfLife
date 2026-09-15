@@ -1,0 +1,181 @@
+@startuml sprint_076_schema
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+
+title Web of Life - Sprint 076 Architecture
+subtitle Discrete Global Grid Adjacency Valence & Thermodynamic Flux Monad
+
+package "DGGS Spatial Core (src/spatial)" {
+    enum CellValence {
+        PENTAGON = 5
+        HEXAGON = 6
+    }
+
+    interface IDGGSCell {
+        +cellId: string
+        +resolution: number
+        +isPentagon(): boolean
+        +getExpectedNeighborCount(): number
+    }
+
+    class H3Adjacency <<utility>> {
+        +isCellPentagon(cellId: string): boolean
+        +getExpectedNeighborCount(cellId: string): number
+        +isExpectedNeighborCount(cellId: string, count: number): boolean
+        +isExpectedNeighborCountForCell(cellId: string, neighbors: readonly string[]): boolean
+    }
+
+    class SpatialFluxKernel {
+        +cellId: string
+        +neighbors: readonly string[]
+        +weights: readonly number[]
+        +validateBoundaryCompleteness(): boolean
+    }
+
+    class SpatialFluxMonad<T> {
+        -state: T
+        -kernel: SpatialFluxKernel
+        +unit(value: T, kernel: SpatialFluxKernel): SpatialFluxMonad<T>
+        +bind<U>(f: (value: T) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        +computeAdvectiveDiffusion(): FluxTensor
+        -validateKernelTopology(cellId: string, neighbors: readonly string[]): boolean
+    }
+
+    class FluxTensor {
+        +sourceCellId: string
+        +fluxVector: Map<string, number>
+        +divergence: number
+        +assertConservativeSum(): boolean
+    }
+}
+
+package "Thermodynamic Core (src/thermodynamics)" {
+    class CellStateStock {
+        +cellId: string
+        +massStockKg: number
+        +internalEnergyJoules: number
+        +entropyJoulesPerKelvin: number
+        +temperatureKelvin(): number
+        +applyFlux(tensor: FluxTensor): CellStateStock
+    }
+
+    class ThermodynamicLedgerBlock {
+        +blockHeight: number
+        +previousBlockHash: Buffer
+        +merkleRoot: Buffer
+        +stateRoot: Buffer
+        +totalMassStock: number
+        +totalEnergyStock: number
+        +netEntropyProduction: number
+        +validatorSignature: Buffer
+    }
+
+    class SpatialFluxTransaction {
+        +txId: string
+        +blockHeight: number
+        +sourceCellId: string
+        +targetCellId: string
+        +massFluxKg: number
+        +energyFluxJoules: number
+        +entropyGenerated: number
+        +kernelValidationHash: Buffer
+    }
+}
+
+package "Database Schema Model (db/schema.sql)" {
+    entity "dggs_cells" as DggsCells {
+        * cell_id: VARCHAR(15) <<PK>>
+        --
+        resolution: SMALLINT
+        is_pentagon: BOOLEAN
+        expected_valence: SMALLINT <<generated>>
+        surface_area_m2: NUMERIC(18,6)
+        centroid_lat: NUMERIC(9,6)
+        centroid_lon: NUMERIC(10,6)
+    }
+
+    entity "spatial_kernel_validations" as KernelValidations {
+        * validation_id: UUID <<PK>>
+        --
+        * cell_id: VARCHAR(15) <<FK>>
+        observed_neighbor_count: INT
+        expected_neighbor_count: INT
+        is_topologically_valid: BOOLEAN <<generated>>
+        neighbors_hash: BYTEA
+        validated_at: TIMESTAMPTZ
+        validator_node_id: VARCHAR(64)
+    }
+
+    entity "cell_thermodynamic_stocks" as CellStocks {
+        * cell_id: VARCHAR(15) <<PK, FK>>
+        --
+        mass_stock_kg: NUMERIC(24,8)
+        internal_energy_j: NUMERIC(28,8)
+        entropy_j_k: NUMERIC(24,8)
+        temperature_k: NUMERIC(10,4) <<generated>>
+        last_block_height: BIGINT
+    }
+
+    entity "spatial_flux_transactions" as FluxTx {
+        * transaction_id: UUID <<PK>>
+        --
+        * block_height: BIGINT <<FK>>
+        * kernel_validation_id: UUID <<FK>>
+        * source_cell_id: VARCHAR(15) <<FK>>
+        * target_cell_id: VARCHAR(15) <<FK>>
+        mass_flux_kg: NUMERIC(20,8)
+        energy_flux_j: NUMERIC(24,8)
+        entropy_generated_j_k: NUMERIC(20,8)
+        laplacian_potential: NUMERIC(16,8)
+        tx_hash: BYTEA
+    }
+
+    entity "thermodynamic_blocks" as Blocks {
+        * block_height: BIGINT <<PK>>
+        --
+        previous_block_hash: BYTEA
+        merkle_root: BYTEA
+        state_root: BYTEA
+        total_mass_stock_kg: NUMERIC(32,8)
+        total_energy_stock_j: NUMERIC(36,8)
+        net_entropy_production_j_k: NUMERIC(28,8)
+        validator_signature: BYTEA
+        timestamp: TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invariants
+H3Adjacency ..> CellValence : evaluates
+SpatialFluxKernel ..> H3Adjacency : delegates to isExpectedNeighborCountForCell
+SpatialFluxMonad *-- SpatialFluxKernel : encapsulates
+SpatialFluxMonad ..> FluxTensor : produces
+
+CellStateStock ..> FluxTensor : updates state by
+SpatialFluxTransaction ..> CellStateStock : records directional transfer
+ThermodynamicLedgerBlock *-- SpatialFluxTransaction : aggregates
+
+DggsCells ||--o{ KernelValidations : "verifies boundary"
+DggsCells ||--|| CellStocks : "tracks stock"
+KernelValidations ||--o{ FluxTx : "permits execution"
+DggsCells ||--o{ FluxTx : "source / target"
+Blocks ||--o{ FluxTx : "settles"
+
+note bottom of H3Adjacency
+  Euler Invariant:
+  Exactly 12 pentagonal cells (valence = 5)
+  All remaining cells hexagonal (valence = 6)
+  isExpectedNeighborCountForCell ensures
+  neighbors.length matches topology.
+end note
+
+note bottom of FluxTx
+  First Law Conservation Trigger:
+  Kernel validation must be topologically
+  complete before flux execution, preventing
+  thermodynamic mass/energy leakage.
+end note
+
+@enduml

@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 39%
-SPRINT_GOAL: Implement isExpectedNeighborCount comparing a numeric candidate count against getCoordinationNumber in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 40%
+SPRINT_GOAL: Implement isExpectedNeighborCountForCell validating neighbor string array length using isExpectedNeighborCount in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -261,7 +261,7 @@ SPRINT_GOAL: Implement isExpectedNeighborCount comparing a numeric candidate cou
 - [x] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
 - [x] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
 - [x] Define `PentagonalCoordinationViolationError` class with cellIndex, expectedCount, and actualCount in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `isExpectedNeighborCount` comparing a numeric candidate count against getCoordinationNumber in `src/spatial/h3_adjacency.ts`
+- [x] Implement `isExpectedNeighborCount` comparing a numeric candidate count against getCoordinationNumber in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `isExpectedNeighborCountForCell` validating neighbor string array length using isExpectedNeighborCount in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertValidNeighborCountForCell` throwing PentagonalCoordinationViolationError on coordination mismatch in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalNeighborCount` verifying neighbor collection length matches coordination number in `src/spatial/h3_adjacency.ts`
