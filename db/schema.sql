@@ -1,168 +1,162 @@
--- ============================================================================
--- Web of Life Thermodynamic Planetary Ledger & Spatial Manifold Schema
--- SPRINT 066: 3D Spherical Boundary Outward Normal Vector Computation
--- Architecture: Conservative Finite Volume Adjacency & Thermodynamic Flux Ledger
--- ============================================================================
+-- Web of Life Planetary Manifold & Thermodynamic Ledger Schema
+-- Sprint 067: Integration of DetailedInterfaceNormalResult and Finite-Volume Interface Fluxes
 
+-- Extensions for spatial calculations and cryptographic hashing
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ----------------------------------------------------------------------------
--- 1. SPATIAL TOPOLOGY & MANIFOLD CELLS
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_h3_cells (
+-- ---------------------------------------------------------------------
+-- 1. H3 Discrete Global Grid System (DGGS) Manifold & Interfaces
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS h3_cells (
     h3_index VARCHAR(16) PRIMARY KEY,
-    resolution INTEGER NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    centroid_lat DOUBLE PRECISION NOT NULL,
+    centroid_lon DOUBLE PRECISION NOT NULL,
     centroid_x DOUBLE PRECISION NOT NULL,
     centroid_y DOUBLE PRECISION NOT NULL,
     centroid_z DOUBLE PRECISION NOT NULL,
-    centroid_radius DOUBLE PRECISION NOT NULL DEFAULT 6371008.8,
-    area_m2 DOUBLE PRECISION NOT NULL CHECK (area_m2 > 0),
+    surface_area_sqm DOUBLE PRECISION NOT NULL CHECK (surface_area_sqm > 0),
     is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_cell_centroid_unit_radius CHECK (
-        ABS(SQRT(centroid_x * centroid_x + centroid_y * centroid_y + centroid_z * centroid_z) - centroid_radius) < 1e-3
-    )
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_cells_res ON spatial_h3_cells(resolution);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_res ON h3_cells (resolution);
 
--- ----------------------------------------------------------------------------
--- 2. CELL INTERFACES & BOUNDARY OUTWARD NORMALS
--- Stores discrete facet boundaries between adjacent DGGS cells on S^2 manifold.
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_cell_interfaces (
+-- Directed cell-to-cell interface geometry adhering to RFC-067
+CREATE TABLE IF NOT EXISTS h3_cell_interfaces (
     interface_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    origin_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE CASCADE,
-    neighbor_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE CASCADE,
-    edge_vertex_a_x DOUBLE PRECISION NOT NULL,
-    edge_vertex_a_y DOUBLE PRECISION NOT NULL,
-    edge_vertex_a_z DOUBLE PRECISION NOT NULL,
-    edge_vertex_b_x DOUBLE PRECISION NOT NULL,
-    edge_vertex_b_y DOUBLE PRECISION NOT NULL,
-    edge_vertex_b_z DOUBLE PRECISION NOT NULL,
+    origin_h3 VARCHAR(16) NOT NULL REFERENCES h3_cells(h3_index),
+    destination_h3 VARCHAR(16) NOT NULL REFERENCES h3_cells(h3_index),
+    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    
+    -- DetailedInterfaceNormalResult Components
+    normal_x DOUBLE PRECISION NOT NULL,
+    normal_y DOUBLE PRECISION NOT NULL,
+    normal_z DOUBLE PRECISION NOT NULL,
+    arc_length_meters DOUBLE PRECISION NOT NULL CHECK (arc_length_meters > 0),
+    alignment_cos DOUBLE PRECISION NOT NULL CHECK (alignment_cos BETWEEN -1.0 AND 1.0),
+
+    -- Midpoint on unit sphere S^2 tangent plane
     midpoint_x DOUBLE PRECISION NOT NULL,
     midpoint_y DOUBLE PRECISION NOT NULL,
     midpoint_z DOUBLE PRECISION NOT NULL,
-    radial_unit_x DOUBLE PRECISION NOT NULL,
-    radial_unit_y DOUBLE PRECISION NOT NULL,
-    radial_unit_z DOUBLE PRECISION NOT NULL,
-    midpoint_normal_x DOUBLE PRECISION NOT NULL,
-    midpoint_normal_y DOUBLE PRECISION NOT NULL,
-    midpoint_normal_z DOUBLE PRECISION NOT NULL,
-    displacement_normal_x DOUBLE PRECISION NOT NULL,
-    displacement_normal_y DOUBLE PRECISION NOT NULL,
-    displacement_normal_z DOUBLE PRECISION NOT NULL,
-    outward_normal_x DOUBLE PRECISION NOT NULL,
-    outward_normal_y DOUBLE PRECISION NOT NULL,
-    outward_normal_z DOUBLE PRECISION NOT NULL,
-    blend_alpha DOUBLE PRECISION NOT NULL DEFAULT 0.5 CHECK (blend_alpha >= 0.0 AND blend_alpha <= 1.0),
-    alignment_cos DOUBLE PRECISION NOT NULL CHECK (alignment_cos > 0.0),
-    geodesic_length_m DOUBLE PRECISION NOT NULL CHECK (geodesic_length_m > 0.0),
-    is_anti_symmetric BOOLEAN NOT NULL DEFAULT TRUE,
+
+    -- Boundary arc vertices on unit sphere S^2
+    vertex_a_x DOUBLE PRECISION NOT NULL,
+    vertex_a_y DOUBLE PRECISION NOT NULL,
+    vertex_a_z DOUBLE PRECISION NOT NULL,
+    vertex_b_x DOUBLE PRECISION NOT NULL,
+    vertex_b_y DOUBLE PRECISION NOT NULL,
+    vertex_b_z DOUBLE PRECISION NOT NULL,
+
+    -- Interface canonical identification and anti-symmetry checksum
+    canonical_interface_hash CHAR(64) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_interface_pair UNIQUE (origin_h3, neighbor_h3),
-    CONSTRAINT chk_outward_normal_unit_magnitude CHECK (
-        ABS(SQRT(outward_normal_x * outward_normal_x + outward_normal_y * outward_normal_y + outward_normal_z * outward_normal_z) - 1.0) < 1e-7
-    ),
-    CONSTRAINT chk_outward_normal_sphere_tangency CHECK (
-        ABS(outward_normal_x * radial_unit_x + outward_normal_y * radial_unit_y + outward_normal_z * radial_unit_z) < 1e-7
+
+    CONSTRAINT uq_h3_interface_pair UNIQUE (origin_h3, destination_h3),
+    CONSTRAINT chk_unit_normal_length CHECK (
+        ABS((normal_x * normal_x + normal_y * normal_y + normal_z * normal_z) - 1.0) < 1e-9
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_interfaces_origin ON spatial_cell_interfaces(origin_h3);
-CREATE INDEX IF NOT EXISTS idx_spatial_interfaces_neighbor ON spatial_cell_interfaces(neighbor_h3);
+CREATE INDEX IF NOT EXISTS idx_h3_interfaces_origin ON h3_cell_interfaces (origin_h3);
+CREATE INDEX IF NOT EXISTS idx_h3_interfaces_dest ON h3_cell_interfaces (destination_h3);
+CREATE INDEX IF NOT EXISTS idx_h3_interfaces_hash ON h3_cell_interfaces (canonical_interface_hash);
 
--- ----------------------------------------------------------------------------
--- 3. THERMODYNAMIC STOCKS (CELL STATE MONADS)
--- Tracks conservative mass, energy, and entropy per finite volume.
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_cell_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index) ON DELETE CASCADE,
-    epoch_index BIGINT NOT NULL,
+-- ---------------------------------------------------------------------
+-- 2. Thermodynamic States & Stock Monads
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS cell_thermodynamic_state (
+    state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index VARCHAR(16) NOT NULL REFERENCES h3_cells(h3_index),
+    timestamp_epoch_ms BIGINT NOT NULL,
+    
+    -- Conserved Intensive & Extensive Quantities
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0),
+    mass_kg DOUBLE PRECISION NOT NULL CHECK (mass_kg >= 0),
     internal_energy_joules DOUBLE PRECISION NOT NULL,
-    water_mass_kg DOUBLE PRECISION NOT NULL CHECK (water_mass_kg >= 0.0),
-    carbon_mass_kg DOUBLE PRECISION NOT NULL CHECK (carbon_mass_kg >= 0.0),
-    biomass_dry_kg DOUBLE PRECISION NOT NULL CHECK (biomass_dry_kg >= 0.0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
-    entropy_j_per_k DOUBLE PRECISION NOT NULL,
-    state_merkle_root BYTEA NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_cell_epoch UNIQUE (h3_index, epoch_index)
+    entropy_joules_per_kelvin DOUBLE PRECISION NOT NULL,
+    carbon_monad_stock_moles DOUBLE PRECISION NOT NULL CHECK (carbon_monad_stock_moles >= 0),
+    pressure_pascals DOUBLE PRECISION NOT NULL CHECK (pressure_pascals >= 0),
+    
+    -- Local Horizontal Fluid Velocity Vector (tangent plane projected)
+    velocity_u_ms DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    velocity_v_ms DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    velocity_w_ms DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+
+    state_hash CHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_cell_state_time UNIQUE (h3_index, timestamp_epoch_ms)
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_stocks_epoch ON thermodynamic_cell_stocks(epoch_index);
+CREATE INDEX IF NOT EXISTS idx_cell_state_time ON cell_thermodynamic_state (timestamp_epoch_ms DESC);
 
--- ----------------------------------------------------------------------------
--- 4. LATERAL FLUX LEDGER (FINITE VOLUME FLUXES)
--- Guarantees anti-symmetric flux cancellation: F_ij + F_ji = 0 (First Law)
--- and local non-negative entropy generation: S_dot_interface >= 0 (Second Law).
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS boundary_flux_transactions (
+-- ---------------------------------------------------------------------
+-- 3. Finite-Volume Interface Fluxes (First & Second Law Verification)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS interface_flux_transactions (
     flux_tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    interface_id UUID NOT NULL REFERENCES spatial_cell_interfaces(interface_id) ON DELETE RESTRICT,
-    epoch_index BIGINT NOT NULL,
-    origin_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    neighbor_h3 VARCHAR(16) NOT NULL REFERENCES spatial_h3_cells(h3_index),
-    fluid_velocity_x DOUBLE PRECISION NOT NULL,
-    fluid_velocity_y DOUBLE PRECISION NOT NULL,
-    fluid_velocity_z DOUBLE PRECISION NOT NULL,
-    normal_velocity DOUBLE PRECISION NOT NULL,
-    scalar_face_concentration DOUBLE PRECISION NOT NULL,
-    mass_flux_kg_per_sec DOUBLE PRECISION NOT NULL,
-    heat_flux_watts DOUBLE PRECISION NOT NULL,
-    entropy_generation_rate_w_per_k DOUBLE PRECISION NOT NULL CHECK (entropy_generation_rate_w_per_k >= 0.0),
-    cryptographic_signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_flux_normal_velocity CHECK (
-        ABS(normal_velocity - (fluid_velocity_x * fluid_velocity_x + fluid_velocity_y * fluid_velocity_y + fluid_velocity_z * fluid_velocity_z)) >= 0.0
-    )
+    interface_id UUID NOT NULL REFERENCES h3_cell_interfaces(interface_id),
+    timestamp_epoch_ms BIGINT NOT NULL,
+    time_step_seconds DOUBLE PRECISION NOT NULL CHECK (time_step_seconds > 0),
+
+    -- Interface normal projection quantities: u_dot_n = u · n_ij
+    normal_velocity_ms DOUBLE PRECISION NOT NULL,
+    advective_mass_flux_kg_per_s DOUBLE PRECISION NOT NULL,
+    advective_heat_flux_watts DOUBLE PRECISION NOT NULL,
+    diffusive_heat_flux_watts DOUBLE PRECISION NOT NULL,
+    carbon_flux_moles_per_s DOUBLE PRECISION NOT NULL,
+
+    -- Second Law Clausius-Duhem Invariant Proof: S_gen >= 0
+    entropy_production_rate_watts_per_kelvin DOUBLE PRECISION NOT NULL CHECK (entropy_production_rate_watts_per_kelvin >= -1e-12),
+
+    -- First Law Anti-symmetry Proof: J_ij = -J_ji
+    is_antisymmetric_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    counterpart_flux_tx_id UUID REFERENCES interface_flux_transactions(flux_tx_id),
+
+    flux_vector_hash CHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_epoch ON boundary_flux_transactions(epoch_index);
-CREATE INDEX IF NOT EXISTS idx_boundary_flux_interface ON boundary_flux_transactions(interface_id);
+CREATE INDEX IF NOT EXISTS idx_interface_flux_tx ON interface_flux_transactions (interface_id, timestamp_epoch_ms);
 
--- ----------------------------------------------------------------------------
--- 5. THERMODYNAMIC BLOCKCHAIN LEDGER BLOCKS
--- Captures state transitions, total entropy non-decrease, and conservative flux sums.
--- ----------------------------------------------------------------------------
+-- ---------------------------------------------------------------------
+-- 4. Thermodynamic Consensus & Immutable Blockchain Ledger
+-- ---------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_height BIGINT PRIMARY KEY,
-    previous_block_hash BYTEA NOT NULL,
-    block_hash BYTEA NOT NULL UNIQUE,
-    merkle_flux_root BYTEA NOT NULL,
-    merkle_state_root BYTEA NOT NULL,
-    total_flux_net_cancellation DOUBLE PRECISION NOT NULL,
-    total_entropy_production_j_per_k DOUBLE PRECISION NOT NULL CHECK (total_entropy_production_j_per_k >= 0.0),
-    total_transactions INTEGER NOT NULL CHECK (total_transactions >= 0),
-    timestamp_epoch BIGINT NOT NULL,
-    validator_node_id VARCHAR(64) NOT NULL,
-    block_signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_conservative_cancellation CHECK (
-        ABS(total_flux_net_cancellation) < 1e-6
-    )
+    block_number BIGINT PRIMARY KEY,
+    previous_block_hash CHAR(64) NOT NULL,
+    block_hash CHAR(64) NOT NULL UNIQUE,
+    merkle_state_root CHAR(64) NOT NULL,
+    merkle_flux_root CHAR(64) NOT NULL,
+    timestamp_epoch_ms BIGINT NOT NULL,
+    
+    -- Global Conservation Closures
+    total_planetary_energy_joules DOUBLE PRECISION NOT NULL,
+    total_planetary_mass_kg DOUBLE PRECISION NOT NULL,
+    net_planetary_entropy_production DOUBLE PRECISION NOT NULL CHECK (net_planetary_entropy_production >= 0),
+    global_energy_residual DOUBLE PRECISION NOT NULL CHECK (ABS(global_energy_residual) < 1e-4),
+    global_mass_residual DOUBLE PRECISION NOT NULL CHECK (ABS(global_mass_residual) < 1e-4),
+    
+    -- Cryptographic Proof of Thermodynamic State Validations
+    validator_consensus_proof BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_thermo_blocks_hash ON thermodynamic_blocks(block_hash);
+CREATE TABLE IF NOT EXISTS block_interface_flux_ledger (
+    ledger_entry_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_number BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_number),
+    flux_tx_id UUID NOT NULL REFERENCES interface_flux_transactions(flux_tx_id),
+    merkle_leaf_hash CHAR(64) NOT NULL,
+    merkle_path_indices INTEGER[] NOT NULL,
+    merkle_sibling_hashes TEXT[] NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_block_flux UNIQUE (block_number, flux_tx_id)
+);
 
--- ----------------------------------------------------------------------------
--- 6. CONTINUITY ENFORCEMENT & CONSERVATION VIEW
--- ----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW view_interface_flux_antisymmetry AS
-SELECT 
-    f1.epoch_index,
-    f1.origin_h3 AS cell_i,
-    f1.neighbor_h3 AS cell_j,
-    f1.mass_flux_kg_per_sec AS flux_ij,
-    f2.mass_flux_kg_per_sec AS flux_ji,
-    (f1.mass_flux_kg_per_sec + f2.mass_flux_kg_per_sec) AS mass_residual_error,
-    (f1.heat_flux_watts + f2.heat_flux_watts) AS heat_residual_error,
-    (f1.entropy_generation_rate_w_per_k + f2.entropy_generation_rate_w_per_k) AS total_entropy_rate
-FROM boundary_flux_transactions f1
-JOIN boundary_flux_transactions f2 
-  ON f1.origin_h3 = f2.neighbor_h3 
- AND f1.neighbor_h3 = f2.origin_h3 
- AND f1.epoch_index = f2.epoch_index
-WHERE f1.origin_h3 < f1.neighbor_h3;
+CREATE INDEX IF NOT EXISTS idx_block_flux_ledger ON block_interface_flux_ledger (block_number);

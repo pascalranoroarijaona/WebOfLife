@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
 Roadmap Completion: 35%
-SPRINT_GOAL: Implement computeBoundaryOutwardNormal3D combining midpoint horizontal normal with centroid displacement direction in src/spatial/h3_adjacency.ts.
+SPRINT_GOAL: Define DetailedInterfaceNormalResult interface with normal, arcLengthMeters, and alignmentCos in src/spatial/h3_types.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -45,7 +45,8 @@ SPRINT_GOAL: Implement computeBoundaryOutwardNormal3D combining midpoint horizon
 - [x] Implement `computeBoundaryHorizontalNormal3D` computing unoriented cross product of midpoint tangent and radial normal in `src/spatial/h3_adjacency.ts`
 - [x] Implement `orientVectorTowardsTarget3D` applying sign flip if dot product with displacement vector is negative in `src/spatial/h3_adjacency.ts`
 - [x] Implement `computeBoundaryCentroidDisplacement3D` calculating normalized 3D displacement vector between two spherical coordinates in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `computeBoundaryOutwardNormal3D` combining midpoint horizontal normal with centroid displacement direction in `src/spatial/h3_adjacency.ts`
+- [x] Implement `computeBoundaryOutwardNormal3D` combining midpoint horizontal normal with centroid displacement direction in `src/spatial/h3_adjacency.ts`
+- [ ] Define `DetailedInterfaceNormalResult` interface with normal, arcLengthMeters, and alignmentCos in `src/spatial/h3_types.ts`
 - [ ] Implement `computeDetailedInterfaceNormal3D` returning oriented boundary normal and alignment metrics in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`

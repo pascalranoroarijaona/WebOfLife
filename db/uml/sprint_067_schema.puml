@@ -1,0 +1,127 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam classFontStyle bold
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam packageFontSize 12
+
+package "src::spatial::h3_types" #F8F9FA {
+    interface DetailedInterfaceNormalResult <<interface>> {
+        +normal: readonly [number, number, number]
+        +arcLengthMeters: number
+        +alignmentCos: number
+    }
+
+    interface H3CellMetric <<interface>> {
+        +h3Index: string
+        +resolution: number
+        +centroid3D: readonly [number, number, number]
+        +surfaceAreaM2: number
+        +isPentagon: boolean
+    }
+}
+
+package "src::spatial::h3_adjacency" #E9ECEF {
+    class H3InterfaceGeometryEngine <<service>> {
+        +computeDetailedInterfaceNormal(originH3: string, destinationH3: string): DetailedInterfaceNormalResult
+        +computeInterfaceMidpoint(originH3: string, destinationH3: string): [number, number, number]
+        +verifyInterfaceAntisymmetry(resAB: DetailedInterfaceNormalResult, resBA: DetailedInterfaceNormalResult): boolean
+    }
+
+    class H3InterfaceEntity {
+        +interfaceId: string
+        +originH3: string
+        +destinationH3: string
+        +normalResult: DetailedInterfaceNormalResult
+        +midpoint: [number, number, number]
+        +canonicalHash: string
+    }
+}
+
+package "src::monads::spatial_monad" #E3F2FD {
+    class SpatialFluxMonad<M> {
+        -cellStates: Map<string, CellThermodynamicState>
+        -interfaces: Map<string, DetailedInterfaceNormalResult>
+        +divergenceField(layer: FluxLayer): Map<string, number>
+        +advectMass(dt: number): SpatialFluxMonad<MassState>
+        +diffuseThermalEnergy(dt: number, conductivity: number): SpatialFluxMonad<ThermalState>
+        +assertConservation(): ConservationProof
+    }
+
+    class CellThermodynamicState {
+        +h3Index: string
+        +timestampMs: number
+        +temperatureKelvin: number
+        +massKg: number
+        +internalEnergyJoules: number
+        +entropyJoulesPerKelvin: number
+        +carbonStockMoles: number
+        +velocityU: number
+        +velocityV: number
+        +velocityW: number
+    }
+
+    class InterfaceFluxTransaction {
+        +fluxTxId: string
+        +interfaceId: string
+        +normalVelocity: number
+        +advectiveMassFlux: number
+        +diffusiveHeatFlux: number
+        +entropyProductionRate: number
+        +isAntisymmetricVerified: boolean
+    }
+}
+
+package "src::blockchain::thermodynamic_ledger" #FFF3E0 {
+    class ThermodynamicBlock {
+        +blockNumber: number
+        +previousBlockHash: string
+        +blockHash: string
+        +merkleStateRoot: string
+        +merkleFluxRoot: string
+        +globalEnergyResidual: number
+        +globalMassResidual: number
+        +netEntropyProduction: number
+    }
+
+    class ThermodynamicInvariantVerifier <<verifier>> {
+        +verifyFirstLawAntisymmetry(fluxAB: InterfaceFluxTransaction, fluxBA: InterfaceFluxTransaction): boolean
+        +verifySecondLawEntropyGeneration(flux: InterfaceFluxTransaction): boolean
+        +verifyGlobalManifoldClosure(blocks: ThermodynamicBlock[]): boolean
+    }
+}
+
+' Relationships & Typings
+H3InterfaceGeometryEngine ..> DetailedInterfaceNormalResult : produces
+H3InterfaceEntity o-- DetailedInterfaceNormalResult : contains
+H3InterfaceEntity --> H3CellMetric : binds adjacent cells
+SpatialFluxMonad *-- CellThermodynamicState : tracks
+SpatialFluxMonad o-- DetailedInterfaceNormalResult : projects fluxes with
+SpatialFluxMonad ..> InterfaceFluxTransaction : creates
+InterfaceFluxTransaction --> H3InterfaceEntity : evaluates across
+ThermodynamicBlock *-- InterfaceFluxTransaction : cryptographically anchors
+ThermodynamicInvariantVerifier ..> InterfaceFluxTransaction : validates
+ThermodynamicInvariantVerifier ..> DetailedInterfaceNormalResult : verifies against
+
+note right of DetailedInterfaceNormalResult
+  RFC-067 Specification:
+  - normal: 3D unit normal vector [nx, ny, nz] on S^2
+  - arcLengthMeters: L_ij = R_earth * Delta_sigma_AB
+  - alignmentCos: dot(d_ij_hat, normal)
+  Antisymmetry invariant:
+  normal_ij = -normal_ji
+  L_ij = L_ji
+  alignmentCos_ij = alignmentCos_ji
+end note
+
+note bottom of ThermodynamicInvariantVerifier
+  First Law Finite-Volume Closure:
+  sum_j (u_ij . n_ij) * rho_ij * L_ij = - dM_i / dt
+  Second Law Non-negative Entropy:
+  S_gen = q_ij * L_ij * (1/T_j - 1/T_i) >= 0
+end note
+
+@enduml

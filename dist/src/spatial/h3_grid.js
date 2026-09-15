@@ -804,7 +804,7 @@ export class H3Grid {
     }
     static sphericalToCartesianMeters(coord) {
         const unit = H3Grid.sphericalToCartesianUnit(coord);
-        return createVec3D((unit.x ?? unit[0]) * EARTH_RADIUS_METERS, (unit.y ?? unit[1]) * EARTH_RADIUS_METERS, (unit.z ?? unit[2]) * EARTH_RADIUS_METERS);
+        return createVec3D(unit.x * EARTH_RADIUS_METERS, unit.y * EARTH_RADIUS_METERS, unit.z * EARTH_RADIUS_METERS);
     }
     static validate(index) {
         return H3GridValidator.isValidIndex(index);
