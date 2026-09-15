@@ -204,6 +204,7 @@ describe('Sprint 079 - Pentagonal Adjacency Predicate & Flux Monad Tests', () =>
       }
 
       assert.ok(Math.abs(resolved.totalDivergence.carbonMol - expectedCarbonDiv) < 1e-12);
+      assert.ok(pentCenter.stocks.carbonMol !== undefined);
       assert.strictEqual(
         resolved.updatedCenter.stocks.carbonMol,
         pentCenter.stocks.carbonMol + resolved.totalDivergence.carbonMol

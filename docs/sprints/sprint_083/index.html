@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 083: Pentagon Directional Topology</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --accent-s69: #00ffcc;
+
+  /* Sprint 078-082 Invariants */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --coordination-accent: #a855f7;
+
+  /* Sprint 083 Pentagon Directional Topology */
+  --omitted-dir: #ff3366;
+  --present-dir: #00ffcc;
+  --facet-outline: #f59e0b;
+  --flux-active: #38bdf8;
+  --flux-forbidden: #ef4444;
+  --topology-gold: #fbbf24;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+button.s83-facetbtn {
+  background: #1c2e40;
+  border-color: var(--topology-gold);
+  color: #fef08a;
+}
+
+button.s83-facetbtn:hover {
+  background: #28445e;
+  border-color: #fde047;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(780px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.73rem;
+  margin-bottom: 10px;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 20, 35, 0.6);
+  border-radius: 6px;
+  border: 1px solid #14354b;
+}
+
+.metric-item {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  font-weight: bold;
+  color: var(--accent-s69);
+}
+
+.badge-pass {
+  color: var(--type-pass);
+  border: 1px solid var(--type-pass);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 255, 162, 0.1);
+}
+
+.badge-fail {
+  color: var(--type-fail);
+  border: 1px solid var(--type-fail);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 42, 95, 0.15);
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+#inspector {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid #a855f755;
+  border-radius: 10px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  backdrop-filter: blur(12px);
+  font-size: 0.74rem;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+#inspector h3 {
+  color: var(--topology-gold);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.facet-dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.facet-dir-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 0.70rem;
+}
+
+.dir-present {
+  border-left: 3px solid var(--present-dir);
+  color: var(--text);
+}
+
+.dir-omitted {
+  border-left: 3px solid var(--omitted-dir);
+  color: #ff99aa;
+  background: rgba(255, 0, 85, 0.15);
+}
+
+#alertBanner {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 12px 24px;
+  background: #33050d;
+  border: 2px solid var(--violation-alert);
+  border-radius: 8px;
+  color: #ffccdd;
+  font-weight: bold;
+  font-size: 0.85rem;
+  box-shadow: 0 0 25px rgba(255, 0, 51, 0.7);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.02); }
+}
+
+#legend {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid #315064;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 083</h1>
+  <h2>Pentagon Directional Topology &amp; Facet Omission Invariant (Euler Disclination Coord=5)</h2>
+
+  <div class="metric-strip">
+    <div class="metric-item">
+      <span class="metric-label">Pentagons:</span>
+      <span class="metric-val" id="metricPentagons">12 / 12</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Euler &chi;:</span>
+      <span class="metric-val badge-pass" id="metricEuler">2 (V-E+F=2)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Dir Invariant:</span>
+      <span class="metric-val badge-pass" id="metricDirInvariant">100% ENFORCED</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Forbidden Flux:</span>
+      <span class="metric-val" id="metricForbiddenLeaks">0 BLOCKED</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Active Facets:</span>
+      <span class="metric-val" id="metricActiveFacets">60 / 60</span>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="btnToggleAnim" class="active">Pause Auto-Rotate</button>
+    <button id="btnCyclePentagon" class="s83-facetbtn">Inspect Next Pentagon</button>
+    <button id="btnInjectForbidden" class="s78-violate">Inject Forbidden Flux</button>
+    <button id="btnEnforceGuard" class="active">Enforce Directional Guard</button>
+    <button id="btnResetTopology">Reset Flux</button>
+    <button id="btnToggleAudio">Sound FX: OFF</button>
+  </div>
+</div>
+
+<div id="inspector">
+  <h3>
+    <span>Pentagon #<span id="inspectId">1</span> Topology</span>
+    <span class="badge-pass" id="inspectStatus">COORD 5</span>
+  </h3>
+  <div class="inspector-grid">
+    <span class="metric-label">Latitude / Longitude:</span>
+    <span class="metric-val" id="inspectLatLon">0.0&deg;, 0.0&deg;</span>
+    <span class="metric-label">Euler Disclination Charge:</span>
+    <span class="metric-val" style="color:var(--pentagon-color);">s = +1 (6 - 5)</span>
+    <span class="metric-label">Omitted Direction Index:</span>
+    <span class="metric-val" style="color:var(--omitted-dir);" id="inspectOmittedDir">Dir #3</span>
+    <span class="metric-label">Omitted Azimuth &theta;:</span>
+    <span class="metric-val" id="inspectOmittedAngle">180.0&deg;</span>
+    <span class="metric-label">Total Flux Throughput:</span>
+    <span class="metric-val" id="inspectFluxSum">14.2 kW</span>
+  </div>
+
+  <h4 style="color:var(--accent-s69); font-size:0.75rem; margin-top:8px;">Directional Facets (H3 Hex-Grid 0..5):</h4>
+  <div class="facet-dir-list" id="facetDirList">
+    <!-- Populated dynamically -->
+  </div>
+  <div style="font-size:0.67rem; color:var(--muted); line-height:1.3; margin-top:8px;">
+    * In standard H3 hexagonal topology, cells have 6 directional facets. Euler's theorem forces exactly 12 disclinations (pentagons) each omitting exactly one primary directional vector.
+  </div>
+</div>
+
+<div id="legend">
+  <div class="legend-item">
+    <div class="legend-swatch" style="background:var(--pentagon-color);"></div>
+    <span>Pentagon Disclination (Coord = 5)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-swatch" style="background:var(--present-dir);"></div>
+    <span>Active Directional Facet (Valid Flux)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-swatch" style="background:var(--omitted-dir); border:1px dashed #fff;"></div>
+    <span>Omitted Directional Facet (Forbidden)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-swatch" style="background:var(--hexagon-color);"></div>
+    <span>Hexagon Tessellation (Coord = 6)</span>
+  </div>
+</div>
+
+<div id="alertBanner">
+  DIRECTIONAL TOPOLOGY VIOLATION: FLUX ATTEMPTED ON OMITTED FACET!
+</div>
+
+<script>
+// --- AUDIO SYNTHESIS (Zero external audio files) ---
+let audioCtx = null;
+let soundEnabled = false;
+
+function playTone(freq, duration = 0.15, type = 'sine') {
+  if (!soundEnabled) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    // Ignore audio errors
+  }
+}
+
+// --- 3D GEOMETRY: ICOSAHEDRAL 12 DISCLINATIONS & DIRECTIONAL TOPOLOGY ---
+const PHI = (1 + Math.sqrt(5)) / 2;
+
+// The 12 canonical vertices of a regular icosahedron
+const RAW_ICOS_VERTICES = [
+  [-1,  PHI, 0], [ 1,  PHI, 0], [-1, -PHI, 0], [ 1, -PHI, 0],
+  [ 0, -1,  PHI], [ 0,  1,  PHI], [ 0, -1, -PHI], [ 0,  1, -PHI],
+  [ PHI, 0, -1], [ PHI, 0,  1], [-PHI, 0, -1], [-PHI, 0,  1]
+].map(v => {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  return [v[0] / len, v[1] / len, v[2] / len];
+});
+
+// Build 12 Pentagons with directional topology
+// Standard H3 directions 0..5 (at angles 0, 60, 120, 180, 240, 300 deg)
+// For each pentagon, one canonical direction d_omitted is deleted
+class PentagonTopologyNode {
+  constructor(id, x, y, z, omittedDir) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.omittedDir = omittedDir; // 0..5
+    this.activeDirs = [0, 1, 2, 3, 4, 5].filter(d => d !== omittedDir);
+    this.flux = [0, 0, 0, 0, 0, 0];
+    this.leakAttempts = 0;
+    this.recomputeFlux();
+  }
+
+  recomputeFlux() {
+    for (let i = 0; i < 6; i++) {
+      if (i === this.omittedDir) {
+        this.flux[i] = 0;
+      } else {
+        this.flux[i] = +(2.5 + Math.sin(this.id * 1.7 + i * 1.1) * 1.8).toFixed(2);
+      }
+    }
+  }
+
+  get totalFlux() {
+    return this.flux.reduce((a, b) => a + b, 0);
+  }
+
+  get lat() {
+    return (Math.asin(this.y) * 180 / Math.PI).toFixed(1);
+  }
+
+  get lon() {
+    return (Math.atan2(this.z, this.x) * 180 / Math.PI).toFixed(1);
+  }
+}
+
+// Generate the 12 pentagons with deterministic omitted directions
+const pentagons = RAW_ICOS_VERTICES.map((v, i) => {
+  const omitted = (i * 3 + 2) % 6; // Deterministic distribution 0..5
+  return new PentagonTopologyNode(i + 1, v[0], v[1], v[2], omitted);
+});
+
+// Hexagonal cells generated on sphere edges
+class HexagonNode {
+  constructor(id, x, y, z) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.flux = Array.from({ length: 6 }, (_, i) => +(1.5 + Math.sin(id + i) * 0.8).toFixed(2));
+  }
+}
+
+const hexagons = [];
+let hexId = 100;
+for (let i = 0; i < pentagons.length; i++) {
+  for (let j = i + 1; j < pentagons.length; j++) {
+    const d = Math.hypot(pentagons[i].x - pentagons[j].x, pentagons[i].y - pentagons[j].y, pentagons[i].z - pentagons[j].z);
+    if (d < 1.15) {
+      // Subdivide edge with 2 hexagonal nodes
+      for (let t of [0.33, 0.67]) {
+        let mx = pentagons[i].x * (1 - t) + pentagons[j].x * t;
+        let my = pentagons[i].y * (1 - t) + pentagons[j].y * t;
+        let mz = pentagons[i].z * (1 - t) + pentagons[j].z * t;
+        const len = Math.hypot(mx, my, mz);
+        hexagons.push(new HexagonNode(hexId++, mx / len, my / len, mz / len));
+      }
+    }
+  }
+}
+
+// Flux particles traveling along valid facets
+class FluxParticle {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.source = pentagons[Math.floor(Math.random() * pentagons.length)];
+    this.dir = this.source.activeDirs[Math.floor(Math.random() * this.source.activeDirs.length)];
+    this.progress = 0;
+    this.speed = 0.008 + Math.random() * 0.012;
+    this.forbidden = false;
+  }
+
+  update() {
+    this.progress += this.speed;
+    if (this.progress >= 1) {
+      this.reset();
+    }
+  }
+}
+
+const particles = Array.from({ length: 90 }, () => new FluxParticle());
+
+// --- SIMULATION STATE ---
+let selectedPentagonIndex = 0;
+let autoRotate = true;
+let rotX = 0.3;
+let rotY = 0.5;
+let isDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+let directionalGuardEnforced = true;
+let totalForbiddenBlocked = 0;
+let alertTimer = null;
+
+// --- CANVAS SETUP ---
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --- INTERACTION ---
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+window.addEventListener('mousemove', e => {
+  if (isDragging) {
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    rotY += dx * 0.005;
+    rotX += dy * 0.005;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  }
+});
+
+// Click selection of pentagon
+canvas.addEventListener('click', e => {
+  if (Math.abs(e.clientX - lastMouseX) > 5 || Math.abs(e.clientY - lastMouseY) > 5) return;
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const r = Math.min(canvas.width, canvas.height) * 0.35;
+
+  let bestIdx = -1;
+  let bestDist = 28;
+
+  pentagons.forEach((p, idx) => {
+    const proj = project3D(p.x, p.y, p.z, cx, cy, r);
+    if (proj.visible) {
+      const d = Math.hypot(e.clientX - proj.x, e.clientY - proj.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = idx;
+      }
+    }
+  });
+
+  if (bestIdx !== -1) {
+    selectedPentagonIndex = bestIdx;
+    playTone(520, 0.12, 'triangle');
+    updateInspector();
+  }
+});
+
+// 3D Rotation Projection
+function project3D(x, y, z, cx, cy, scale) {
+  // Rotate around Y
+  const cosY = Math.cos(rotY);
+  const sinY = Math.sin(rotY);
+  const x1 = x * cosY - z * sinY;
+  const z1 = z * cosY + x * sinY;
+
+  // Rotate around X
+  const cosX = Math.cos(rotX);
+  const sinX = Math.sin(rotX);
+  const y2 = y * cosX - z1 * sinX;
+  const z2 = z1 * cosX + y * sinX;
+
+  const k = 2.4 / (2.4 + z2);
+  return {
+    x: cx + x1 * scale * k,
+    y: cy + y2 * scale * k,
+    scale: k,
+    depth: z2,
+    visible: z2 > -1.2
+  };
+}
+
+// Direction vector on 2D plane based on facet index 0..5
+function getDirectionVector(dirIndex, radius) {
+  const angle = (dirIndex * 60) * (Math.PI / 180);
+  return {
+    dx: Math.cos(angle) * radius,
+    dy: Math.sin(angle) * radius,
+    angleDeg: dirIndex * 60
+  };
+}
+
+// --- UI UPDATE ---
+function updateInspector() {
+  const p = pentagons[selectedPentagonIndex];
+  document.getElementById('inspectId').innerText = p.id;
+  document.getElementById('inspectLatLon').innerText = `${p.lat}°, ${p.lon}°`;
+  document.getElementById('inspectOmittedDir').innerText = `Dir #${p.omittedDir}`;
+  document.getElementById('inspectOmittedAngle').innerText = `${p.omittedDir * 60}.0°`;
+  document.getElementById('inspectFluxSum').innerText = `${p.totalFlux.toFixed(1)} kW`;
+
+  const list = document.getElementById('facetDirList');
+  list.innerHTML = '';
+
+  for (let d = 0; d < 6; d++) {
+    const row = document.createElement('div');
+    const isOmitted = (d === p.omittedDir);
+    row.className = `facet-dir-row ${isOmitted ? 'dir-omitted' : 'dir-present'}`;
+
+    const dirName = ['0 (East)', '1 (South-East)', '2 (South-West)', '3 (West)', '4 (North-West)', '5 (North-East)'][d];
+    row.innerHTML = `
+      <span><strong>Facet ${d}:</strong> ${dirName}</span>
+      <span>${isOmitted ? 'OMITTED (FLUX=0)' : `${p.flux[d]} kW`}</span>
+    `;
+    list.appendChild(row);
+  }
+}
+
+// Banner alert
+function triggerViolationAlert(msg) {
+  const banner = document.getElementById('alertBanner');
+  banner.innerText = msg;
+  banner.style.display = 'block';
+  playTone(220, 0.35, 'sawtooth');
+
+  if (alertTimer) clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => {
+    banner.style.display = 'none';
+  }, 3200);
+}
+
+// --- RENDER LOOP ---
+function render() {
+  ctx.fillStyle = '#02050a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const r = Math.min(canvas.width, canvas.height) * 0.36;
+
+  if (autoRotate && !isDragging) {
+    rotY += 0.003;
+    rotX += 0.0007;
+  }
+
+  // Draw spherical grid background glow
+  const grad = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r * 1.15);
+  grad.addColorStop(0, 'rgba(0, 80, 120, 0.18)');
+  grad.addColorStop(0.8, 'rgba(0, 20, 45, 0.06)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw Hexagon Nodes (Tessellation)
+  hexagons.forEach(h => {
+    const proj = project3D(h.x, h.y, h.z, cx, cy, r);
+    if (!proj.visible || proj.depth < -0.2) return;
+
+    ctx.fillStyle = 'rgba(0, 225, 255, 0.15)';
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.4)';
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, 3 * proj.scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // Draw connecting geodesic edges between pentagons and hexagons
+  ctx.strokeStyle = 'rgba(0, 160, 220, 0.18)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < pentagons.length; i++) {
+    for (let j = i + 1; j < pentagons.length; j++) {
+      const d = Math.hypot(pentagons[i].x - pentagons[j].x, pentagons[i].y - pentagons[j].y, pentagons[i].z - pentagons[j].z);
+      if (d < 1.15) {
+        const p1 = project3D(pentagons[i].x, pentagons[i].y, pentagons[i].z, cx, cy, r);
+        const p2 = project3D(pentagons[j].x, pentagons[j].y, pentagons[j].z, cx, cy, r);
+        if (p1.visible && p2.visible && (p1.depth > -0.4 || p2.depth > -0.4)) {
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // Draw Pentagons with 5 Active Facets and 1 Omitted Direction
+  pentagons.forEach((p, idx) => {
+    const proj = project3D(p.x, p.y, p.z, cx, cy, r);
+    if (!proj.visible) return;
+
+    const isSelected = (idx === selectedPentagonIndex);
+    const radius = (isSelected ? 26 : 18) * proj.scale;
+
+    // Draw Pentagon Halo
+    ctx.save();
+    ctx.translate(proj.x, proj.y);
+
+    // Pentagon body
+    ctx.fillStyle = isSelected ? 'rgba(255, 0, 85, 0.4)' : 'rgba(255, 0, 85, 0.18)';
+    ctx.strokeStyle = isSelected ? '#ff2a6d' : 'rgba(255, 0, 85, 0.7)';
+    ctx.lineWidth = isSelected ? 2.5 : 1.5;
+
+    ctx.beginPath();
+    for (let s = 0; s < 5; s++) {
+      const a = (s * 72 - 90) * Math.PI / 180;
+      const px = Math.cos(a) * radius;
+      const py = Math.sin(a) * radius;
+      if (s === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Directional Facet Vectors (6 Directions)
+    for (let dir = 0; dir < 6; dir++) {
+      const vec = getDirectionVector(dir, radius * 1.55);
+      const isOmitted = (dir === p.omittedDir);
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(vec.dx, vec.dy);
+
+      if (isOmitted) {
+        // Red dashed line for omitted forbidden direction
+        ctx.strokeStyle = '#ff3366';
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Omission Marker (X)
+        ctx.fillStyle = '#ff3366';
+        ctx.font = `bold ${Math.max(9, 11 * proj.scale)}px monospace`;
+        ctx.fillText('✕', vec.dx * 1.15 - 4, vec.dy * 1.15 + 4);
+      } else {
+        // Cyan solid vector for active direction
+        ctx.strokeStyle = isSelected ? '#00ffcc' : 'rgba(0, 255, 204, 0.6)';
+        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.stroke();
+
+        // Facet endpoint indicator
+        ctx.fillStyle = '#00ffcc';
+        ctx.beginPath();
+        ctx.arc(vec.dx, vec.dy, 2.5 * proj.scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Label Pentagon ID
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.max(10, 12 * proj.scale)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`P${p.id}`, 0, 0);
+
+    ctx.restore();
+  });
+
+  // Animate and Draw Flux Particles
+  particles.forEach(pt => {
+    pt.update();
+    const pProj = project3D(pt.source.x, pt.source.y, pt.source.z, cx, cy, r);
+    if (!pProj.visible || pProj.depth < -0.3) return;
+
+    const vec = getDirectionVector(pt.dir, 32 * pProj.scale);
+    const px = pProj.x + vec.dx * pt.progress;
+    const py = pProj.y + vec.dy * pt.progress;
+
+    ctx.fillStyle = pt.forbidden ? 'var(--flux-forbidden)' : 'var(--flux-active)';
+    ctx.beginPath();
+    ctx.arc(px, py, (pt.forbidden ? 4 : 2.5) * pProj.scale, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  requestAnimationFrame(render);
+}
+
+// --- CONTROLS & LISTENERS ---
+document.getElementById('btnToggleAnim').addEventListener('click', function() {
+  autoRotate = !autoRotate;
+  this.classList.toggle('active', autoRotate);
+  this.innerText = autoRotate ? 'Pause Auto-Rotate' : 'Resume Auto-Rotate';
+  playTone(440, 0.08);
+});
+
+document.getElementById('btnCyclePentagon').addEventListener('click', function() {
+  selectedPentagonIndex = (selectedPentagonIndex + 1) % pentagons.length;
+  updateInspector();
+  playTone(587.33, 0.1);
+});
+
+document.getElementById('btnInjectForbidden').addEventListener('click', function() {
+  const p = pentagons[selectedPentagonIndex];
+  p.leakAttempts++;
+
+  if (directionalGuardEnforced) {
+    totalForbiddenBlocked++;
+    document.getElementById('metricForbiddenLeaks').innerText = `${totalForbiddenBlocked} BLOCKED`;
+    triggerViolationAlert(`DIRECTIONAL GUARD INTERCEPTED: Flux into Omitted Facet #${p.omittedDir} blocked!`);
+  } else {
+    triggerViolationAlert(`CRITICAL: Forbidden flux leaked into Omitted Direction #${p.omittedDir} on P${p.id}!`);
+    // Spawn forbidden red particle
+    const pt = new FluxParticle();
+    pt.source = p;
+    pt.dir = p.omittedDir;
+    pt.forbidden = true;
+    pt.speed = 0.02;
+    particles.push(pt);
+  }
+});
+
+document.getElementById('btnEnforceGuard').addEventListener('click', function() {
+  directionalGuardEnforced = !directionalGuardEnforced;
+  this.classList.toggle('active', directionalGuardEnforced);
+  const statusElem = document.getElementById('metricDirInvariant');
+  if (directionalGuardEnforced) {
+    this.innerText = 'Enforce Directional Guard: ON';
+    statusElem.innerText = '100% ENFORCED';
+    statusElem.className = 'metric-val badge-pass';
+    playTone(659.25, 0.12);
+  } else {
+    this.innerText = 'Directional Guard: BYPASS';
+    statusElem.innerText = 'BYPASSED (UNSAFE)';
+    statusElem.className = 'metric-val badge-fail';
+    playTone(330, 0.2, 'sawtooth');
+  }
+});
+
+document.getElementById('btnResetTopology').addEventListener('click', function() {
+  totalForbiddenBlocked = 0;
+  document.getElementById('metricForbiddenLeaks').innerText = '0 BLOCKED';
+  pentagons.forEach(p => p.recomputeFlux());
+  updateInspector();
+  playTone(493.88, 0.12);
+});
+
+document.getElementById('btnToggleAudio').addEventListener('click', function() {
+  soundEnabled = !soundEnabled;
+  this.classList.toggle('active', soundEnabled);
+  this.innerText = soundEnabled ? 'Sound FX: ON' : 'Sound FX: OFF';
+  if (soundEnabled) playTone(523.25, 0.15);
+});
+
+// Initial Inspector setup
+updateInspector();
+requestAnimationFrame(render);
+</script>
+
+</body>
+</html>

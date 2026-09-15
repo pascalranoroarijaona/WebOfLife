@@ -1,0 +1,184 @@
+@startuml sprint_083_schema
+!theme plain
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+title Web of Life - Sprint 083: Pentagon Directional Topology & Thermodynamic Schema Architecture
+
+package "src/spatial/h3_types.ts" {
+    enum H3Direction <<type>> {
+        DIRECTION_1 = 1
+        DIRECTION_2 = 2
+        DIRECTION_3 = 3
+        DIRECTION_4 = 4
+        DIRECTION_5 = 5
+        DIRECTION_6 = 6
+    }
+
+    enum H3CellClass {
+        HEXAGON
+        PENTAGON
+    }
+
+    interface PentagonDirectionalTopology {
+        +presentDirections: readonly H3Direction[5]
+        +omittedDirection: H3Direction
+        +isValid(): boolean
+        +assertDisjoint(): void
+    }
+
+    class PentagonTopologySpecification {
+        +omittedDirection: H3Direction
+        +presentDirections: readonly H3Direction[]
+        +validateInvariants(): boolean
+    }
+
+    PentagonDirectionalTopology <|.. PentagonTopologySpecification
+}
+
+package "src/spatial" {
+    class H3AdjacencyService {
+        +getPentagonTopology(cell: string): PentagonDirectionalTopology
+        +isPentagon(cell: string): boolean
+        +getDirectedNeighbors(cell: string): Map<H3Direction, string>
+        +getValidDirections(cell: string): readonly H3Direction[]
+    }
+
+    class SpatialFluxMonad<TStock> {
+        -cellId: string
+        -currentStock: TStock
+        +bind(fn: (stock: TStock) => SpatialFluxMonad<TStock>): SpatialFluxMonad<TStock>
+        +routePentagonFlux(topology: PentagonDirectionalTopology, stocks: TStock[]): SpatialFluxMonad<TStock>
+        +divergence(): TStock
+        +commitStep(): ThermodynamicStockVector
+    }
+
+    class ThermodynamicStockVector {
+        +carbonMol: double
+        +nitrogenMol: double
+        +phosphorusMol: double
+        +waterKg: double
+        +thermalEnergyJoules: double
+        +entropyJoulesPerKelvin: double
+        +temperatureKelvin: double
+        +assertConservation(previous: ThermodynamicStockVector): void
+    }
+
+    class DirectionalFluxTensor {
+        +direction: H3Direction
+        +massFlux: double
+        +enthalpyFlux: double
+        +entropyProductionRate: double
+        +zeroFluxAlong(direction: H3Direction): void
+    }
+
+    H3AdjacencyService --> PentagonDirectionalTopology : returns
+    SpatialFluxMonad --> H3AdjacencyService : queries topology
+    SpatialFluxMonad --> DirectionalFluxTensor : routes along facets
+    SpatialFluxMonad *-- ThermodynamicStockVector : wraps state
+}
+
+package "db/schema.sql (Relational & Thermodynamic Ledger)" {
+    class spatial_cells <<Table>> {
+        +cell_id: VARCHAR(16) [PK]
+        +resolution: SMALLINT
+        +cell_type: h3_cell_class
+        +centroid_lat: DOUBLE PRECISION
+        +centroid_lon: DOUBLE PRECISION
+        +created_at: TIMESTAMPTZ
+    }
+
+    class pentagon_directional_topologies <<Table>> {
+        +cell_id: VARCHAR(16) [PK, FK]
+        +resolution: SMALLINT
+        +omitted_direction: h3_direction
+        +present_directions: h3_direction[5]
+        +topology_hash: BYTEA
+        +is_valid: BOOLEAN
+        +created_at: TIMESTAMPTZ
+    }
+
+    class cell_thermodynamic_stocks <<Table>> {
+        +cell_id: VARCHAR(16) [PK, FK]
+        +timestamp: TIMESTAMPTZ [PK]
+        +epoch: BIGINT
+        +carbon_mol: NUMERIC(28,12)
+        +nitrogen_mol: NUMERIC(28,12)
+        +phosphorus_mol: NUMERIC(28,12)
+        +water_kg: NUMERIC(28,12)
+        +thermal_energy_joules: NUMERIC(36,12)
+        +entropy_joules_per_kelvin: NUMERIC(36,12)
+        +temperature_kelvin: NUMERIC(10,4)
+    }
+
+    class directional_flux_transactions <<Table>> {
+        +flux_id: UUID [PK]
+        +epoch: BIGINT
+        +source_cell_id: VARCHAR(16) [FK]
+        +target_cell_id: VARCHAR(16) [FK]
+        +direction: h3_direction
+        +carbon_flux_mol: NUMERIC(28,12)
+        +nitrogen_flux_mol: NUMERIC(28,12)
+        +phosphorus_flux_mol: NUMERIC(28,12)
+        +water_flux_kg: NUMERIC(28,12)
+        +enthalpy_flux_joules: NUMERIC(36,12)
+        +entropy_generation_rate: NUMERIC(28,12)
+        +created_at: TIMESTAMPTZ
+    }
+
+    class thermodynamic_blocks <<Table>> {
+        +block_height: BIGINT [PK]
+        +block_hash: BYTEA
+        +parent_hash: BYTEA
+        +epoch: BIGINT [UQ]
+        +state_root: BYTEA
+        +flux_receipts_root: BYTEA
+        +total_system_carbon_mol: NUMERIC(32,12)
+        +mass_conservation_delta: NUMERIC(28,12)
+        +total_entropy_production: NUMERIC(32,12)
+        +pentagon_invariants_verified: BOOLEAN
+        +miner_signature: BYTEA
+        +timestamp: TIMESTAMPTZ
+    }
+
+    class spatial_monad_transactions <<Table>> {
+        +tx_id: UUID [PK]
+        +block_height: BIGINT [FK]
+        +cell_id: VARCHAR(16) [FK]
+        +is_pentagon: BOOLEAN
+        +initial_stock_hash: BYTEA
+        +final_stock_hash: BYTEA
+        +omitted_direction_verified: BOOLEAN
+        +divergence_net_mass: NUMERIC(28,12)
+        +execution_gas_units: BIGINT
+        +signature: BYTEA
+    }
+
+    spatial_cells "1" *-- "0..1" pentagon_directional_topologies : defines topology
+    spatial_cells "1" *-- "0..*" cell_thermodynamic_stocks : temporal state
+    spatial_cells "1" <-- "0..*" directional_flux_transactions : source/target
+    thermodynamic_blocks "1" *-- "0..*" spatial_monad_transactions : inclusion
+    spatial_cells "1" <-- "0..*" spatial_monad_transactions : subject cell
+}
+
+' Invariant constraints & flow routing relationships
+PentagonTopologySpecification ..> pentagon_directional_topologies : maps to schema
+SpatialFluxMonad ..> spatial_monad_transactions : emits block tx
+DirectionalFluxTensor ..> directional_flux_transactions : logs flow
+
+note right of PentagonDirectionalTopology
+    First Law Invariant:
+    |presentDirections| == 5
+    omittedDirection NOT IN presentDirections
+    J_{p -> omitted} == 0
+end note
+
+note bottom of directional_flux_transactions
+    Trigger 'trg_verify_pentagon_flux':
+    Enforces J == 0 for omittedDirection
+    at database level.
+end note
+
+@enduml

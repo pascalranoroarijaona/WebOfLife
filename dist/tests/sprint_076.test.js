@@ -128,10 +128,9 @@ describe('Sprint 076: Topological Adjacency Validation & Discrete Flux Conservat
             mapComplete.set(n, neighborStock);
         const successResult = monad.evaluateDivergence(completeNeighbors, mapComplete, conductance, diffusivity, 60);
         assert.strictEqual(successResult.success, true);
-        if (successResult.success) {
-            assert.ok(typeof successResult.delta.carbonKg === 'number');
-            assert.ok(typeof successResult.delta.energyJoules === 'number');
-        }
+        assert.ok(successResult.delta !== undefined);
+        assert.ok(typeof successResult.delta.carbonKg === 'number');
+        assert.ok(typeof successResult.delta.energyJoules === 'number');
     });
     it('SpatialFluxMonad validates kernel topology correctly', () => {
         const genericMonad = new SpatialFluxMonad(validHexId, { temperature: 298.15 });

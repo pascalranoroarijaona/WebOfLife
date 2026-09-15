@@ -189,10 +189,9 @@ describe('Sprint 076: Topological Adjacency Validation & Discrete Flux Conservat
       60
     );
     assert.strictEqual(successResult.success, true);
-    if (successResult.success) {
-      assert.ok(typeof successResult.delta.carbonKg === 'number');
-      assert.ok(typeof successResult.delta.energyJoules === 'number');
-    }
+    assert.ok(successResult.delta !== undefined);
+    assert.ok(typeof successResult.delta.carbonKg === 'number');
+    assert.ok(typeof successResult.delta.energyJoules === 'number');
   });
 
   it('SpatialFluxMonad validates kernel topology correctly', () => {

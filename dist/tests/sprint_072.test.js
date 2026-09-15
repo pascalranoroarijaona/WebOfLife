@@ -159,6 +159,8 @@ describe('Sprint 072 - RFC-072: Centroid-Relative Boundary Ordering & Outward No
         }
         const finalC1 = monad.getCellState('C1');
         const finalC2 = monad.getCellState('C2');
+        assert.ok(finalC1 !== undefined, 'finalC1 must be defined');
+        assert.ok(finalC2 !== undefined, 'finalC2 must be defined');
         const finalTotalThermal = finalC1.thermalEnergyJoules + finalC2.thermalEnergyJoules;
         const finalTotalWater = finalC1.waterMassKg + finalC2.waterMassKg;
         const finalTotalCarbon = finalC1.carbonMassKg + finalC2.carbonMassKg;
