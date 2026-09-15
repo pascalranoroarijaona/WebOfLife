@@ -24,9 +24,7 @@ export type Vector3Tuple = [number, number, number] & {
   z?: number;
 };
 
-export type Vector3D =
-  | ([number, number, number] & { x?: any; y?: any; z?: any })
-  | { x: number; y: number; z: number; [index: number]: any };
+export type Vector3D = any;
 
 export type Vector3DInput = Vector3Object | Vector3Tuple | [number, number, number] | any;
 

@@ -1,0 +1,162 @@
+@startuml sprint_080_schema
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 8
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam classFontStyle bold
+skinparam arrowColor #2C3E50
+skinparam classBorderColor #2C3E50
+
+package "Domain Core: Spatial DGGS & Defensive Guards" {
+    enum CellTopologyKind {
+        HEXAGONAL
+        PENTAGONAL
+    }
+
+    class H3AdjacencyGraph {
+        - adjacencyMap: Map<string, string[]>
+        + registerPentagon(index: string, neighbors: unknown): void
+        + registerHexagon(index: string, neighbors: unknown): void
+        + getNeighbors(index: string): string[]
+        + validatePentagonAdjacency(cellIndex: string, neighbors: unknown): void
+    }
+
+    class PentagonDefensiveGuard <<Utility>> {
+        + {static} assertPentagonalNeighborArrayType(neighbors: unknown): asserts neighbors is unknown[]
+        + {static} assertPentagonDegree(neighbors: unknown[], maxDegree: number = 5): void
+    }
+
+    note right of PentagonDefensiveGuard
+      **RFC-080 Defensive Contract:**
+      Guards singular vertex neighborhoods.
+      Throws **TypeError** on non-array input.
+      Preserves First & Second Laws
+      prior to spatial flux allocation.
+    end note
+
+    H3AdjacencyGraph ..> PentagonDefensiveGuard : invokes guard
+}
+
+package "Monadic Flux Engine (Thermodynamic Layer)" {
+    class SpatialFluxMonad<T> {
+        - cellIndex: string
+        - stateTensor: SpatialStateTensor
+        + bindAdjacency(graph: H3AdjacencyGraph): SpatialFluxMonad<T>
+        + advect(deltaTime: number): SpatialFluxMonad<T>
+        + diffuse(concentrationGradient: number): SpatialFluxMonad<T>
+        + verifyConservation(): boolean
+        + run(): T
+    }
+
+    class SpatialStateTensor {
+        + cellId: string
+        + epochTimestamp: Date
+        + biomassCarbonKg: number
+        + enthalpyJoules: number
+        + temperatureKelvin: number
+        + chemicalPotential: number
+        + entropyJPerK: number
+        + computeEntropyGeneration(target: SpatialStateTensor, flux: number): number
+    }
+
+    SpatialFluxMonad --> H3AdjacencyGraph : queries topology
+    SpatialFluxMonad *-- SpatialStateTensor : manages state
+}
+
+package "Database Schema & Ledger Architecture" {
+    entity spatial_grid_cells <<TABLE>> {
+        * cell_id : VARCHAR(15) [PK]
+        --
+        * resolution : SMALLINT
+        * topology : cell_topology_kind
+        * max_degree : SMALLINT
+        * centroid : GEOMETRY(Point, 4326)
+        * boundary : GEOMETRY(Polygon, 4326)
+        * created_at : TIMESTAMPTZ
+    }
+
+    entity spatial_cell_adjacencies <<TABLE>> {
+        * cell_id : VARCHAR(15) [PK, FK]
+        --
+        * neighbor_indices : VARCHAR(15)[]
+        * neighbor_count : SMALLINT (GENERATED)
+        * is_valid_array : BOOLEAN
+        * last_verified_at : TIMESTAMPTZ
+    }
+
+    entity pentagonal_assertion_audit_log <<TABLE>> {
+        * assertion_id : UUID [PK]
+        --
+        * target_cell_id : VARCHAR(15)
+        * raw_payload_type : VARCHAR(64)
+        * assertion_result : spatial_assertion_status
+        * error_message : TEXT
+        * received_payload : JSONB
+        * evaluated_at : TIMESTAMPTZ
+        * stack_trace : TEXT
+    }
+
+    entity spatial_state_tensors <<TABLE>> {
+        * tensor_id : UUID [PK]
+        --
+        * cell_id : VARCHAR(15) [FK]
+        * epoch_timestamp : TIMESTAMPTZ
+        * biomass_carbon_kg : NUMERIC(18,6)
+        * enthalpy_joules : NUMERIC(24,6)
+        * temperature_kelvin : NUMERIC(8,4)
+        * chemical_potential : NUMERIC(12,6)
+        * entropy_j_per_k : NUMERIC(18,6)
+    }
+
+    entity spatial_flux_monad_transactions <<TABLE>> {
+        * transaction_id : UUID [PK]
+        --
+        * source_cell_id : VARCHAR(15) [FK]
+        * target_cell_id : VARCHAR(15) [FK]
+        * flux_type : thermodynamic_flux_type
+        * mass_transfer_kg : NUMERIC(18,6)
+        * enthalpy_transfer_joules : NUMERIC(24,6)
+        * entropy_generated_j_per_k : NUMERIC(18,6)
+        * delta_time_seconds : NUMERIC(12,4)
+        * executed_at : TIMESTAMPTZ
+    }
+
+    entity blockchain_thermodynamic_blocks <<TABLE>> {
+        * block_height : BIGINT [PK]
+        --
+        * previous_block_hash : VARCHAR(64)
+        * merkle_state_root : VARCHAR(64)
+        * total_system_mass_kg : NUMERIC(30,6)
+        * total_system_enthalpy_j : NUMERIC(36,6)
+        * net_entropy_production_j_k : NUMERIC(30,6)
+        * mass_conservation_delta_kg : NUMERIC(18,12) = 0.0
+        * block_signature : BYTEA
+        * signer_public_key : VARCHAR(128)
+        * minted_at : TIMESTAMPTZ
+    }
+
+    entity block_spatial_flux_receipts <<TABLE>> {
+        * receipt_id : UUID [PK]
+        --
+        * block_height : BIGINT [FK]
+        * transaction_id : UUID [FK]
+        * merkle_leaf_hash : VARCHAR(64)
+    }
+}
+
+' Relations among schema entities
+spatial_grid_cells ||--|| spatial_cell_adjacencies : "identifies"
+spatial_grid_cells ||--o{ spatial_state_tensors : "records thermodynamic state"
+spatial_grid_cells ||--o{ spatial_flux_monad_transactions : "acts as source"
+spatial_grid_cells ||--o{ spatial_flux_monad_transactions : "acts as target"
+spatial_flux_monad_transactions ||--o{ block_spatial_flux_receipts : "included in"
+blockchain_thermodynamic_blocks ||--o{ block_spatial_flux_receipts : "batches"
+
+' Mapping from Monad and Invariant layers to DB
+H3AdjacencyGraph ..> spatial_cell_adjacencies : "persists valid arrays"
+PentagonDefensiveGuard ..> pentagonal_assertion_audit_log : "records validation failures"
+SpatialFluxMonad ..> spatial_flux_monad_transactions : "commits flux edges"
+SpatialStateTensor ..> spatial_state_tensors : "maps persistent state"
+
+@enduml

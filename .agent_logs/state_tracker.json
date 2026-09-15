@@ -1,5 +1,5 @@
 {
-  "current_sprint": 80,
+  "current_sprint": 81,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -395,6 +395,11 @@
       "sprint": 79,
       "goal": "Implement isPentagonNeighborArrayLengthValid predicate returning boolean for neighbor array length of 5 in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-15T07:14:38.268061+00:00"
+    },
+    {
+      "sprint": 80,
+      "goal": "Implement assertPentagonalNeighborArrayType asserting input is an Array and throwing TypeError if non-array in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-15T07:32:36.561334+00:00"
     }
   ]
 }
