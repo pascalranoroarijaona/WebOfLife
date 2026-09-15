@@ -1,7 +1,6 @@
-/**
- * Web of Life - H3 Spatial Discrete Global Grid System Types
- * Unified Retro-Compatible Type Engine (Sprints 001 - 085)
- */
+// =============================================================================
+// WEB OF LIFE - UNIFIED H3 SPATIAL TOPOLOGY & THERMODYNAMIC TYPES (SPRINTS 001-086)
+// =============================================================================
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -15,104 +14,178 @@ export class SpatialGuardClauseException extends Error {
     constructor(message) {
         super(`[SpatialGuardClauseException] ${message}`);
         this.name = 'SpatialGuardClauseException';
-        Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
-export const PENTAGON_BASE_CELLS = [4, 14, 24, 38, 42, 58, 63, 72, 83, 87, 97, 107];
-export function isPentagonCell(index) {
-    if (typeof index !== 'string' && typeof index !== 'bigint')
-        return false;
-    const str = typeof index === 'bigint' ? index.toString(16) : String(index).toLowerCase();
-    if (str.includes('pentagon'))
-        return true;
-    try {
-        let big;
-        if (typeof index === 'bigint') {
-            big = BigInt.asUintN(64, index);
-        }
-        else {
-            const cleanHex = str.replace(/^0x/, '');
-            if (!cleanHex || !/^[0-9a-fA-F]{1,16}$/.test(cleanHex))
-                return false;
-            big = BigInt.asUintN(64, BigInt('0x' + cleanHex));
-        }
-        const mode = Number((big >> 59n) & 0x0fn);
-        if (mode !== 1)
-            return false;
-        const res = Number((big >> 52n) & 0x0fn);
-        const baseCell = Number((big >> 45n) & 0x7fn);
-        if (!PENTAGON_BASE_CELLS.includes(baseCell))
-            return false;
-        for (let r = 1; r <= res; r++) {
-            const shift = BigInt(45 - 3 * r);
-            const digit = Number((big >> shift) & 0x07n);
-            if (digit !== 0)
-                return false;
-        }
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
-export class H3TopologyViolationError extends Error {
+export class InvalidH3ModeError extends Error {
     constructor(message) {
         super(message);
-        this.name = 'H3TopologyViolationError';
+        this.name = 'InvalidH3ModeError';
     }
 }
-export class H3AdjacencyError extends H3TopologyViolationError {
+export class InvalidH3BaseCellError extends Error {
     constructor(message) {
         super(message);
-        this.name = 'H3AdjacencyError';
+        this.name = 'InvalidH3BaseCellError';
     }
 }
-export class PentagonalCoordinationViolationError extends H3AdjacencyError {
-    actualCount;
-    expectedCount;
-    cellIndex;
-    cellId;
-    neighborCount;
-    constructor(arg1, arg2, arg3) {
-        let msg = 'Pentagonal coordination violation';
-        let cellId;
-        let expected = 5;
-        let actual;
-        if (typeof arg1 === 'number') {
-            actual = arg1;
-            cellId = arg2;
-            msg = arg3 ?? (cellId ? `Pentagonal coordination violation for cell ${cellId}: expected exactly 5 neighbors, but received ${actual}.` : `Pentagonal coordination violation: expected exactly 5 neighbors, but received ${actual}.`);
-        }
-        else if (typeof arg1 === 'string' && typeof arg2 === 'number' && typeof arg3 === 'number') {
-            cellId = arg1;
-            expected = arg2;
-            actual = arg3;
-            msg = `Pentagonal coordination violation at cell '${cellId}': expected ${expected} neighbors, but found ${actual}.`;
-        }
-        else if (typeof arg1 === 'string' && typeof arg2 === 'number') {
-            cellId = arg1;
-            actual = arg2;
-            msg = `Pentagonal coordination violation: cell ${cellId} expected 5 neighbors, received ${actual}`;
-        }
-        super(msg);
-        this.name = 'PentagonalCoordinationViolationError';
-        this.actualCount = actual;
-        this.neighborCount = actual;
-        this.expectedCount = expected;
-        this.cellIndex = cellId;
-        this.cellId = cellId;
+export class InvalidH3ResolutionError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'InvalidH3ResolutionError';
     }
 }
-export class HexagonalCoordinationViolationError extends H3AdjacencyError {
-    cellId;
-    neighborCount;
-    expectedCount = 6;
-    constructor(cellId, count) {
-        super(`Hexagonal coordination violation for cell ${cellId}: expected 6 neighbors, got ${count}`);
-        this.name = 'HexagonalCoordinationViolationError';
-        this.cellId = cellId;
-        this.neighborCount = count;
+export class InvalidH3PaddingError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'InvalidH3PaddingError';
     }
+}
+export var CellTopologyType;
+(function (CellTopologyType) {
+    CellTopologyType["HEXAGON"] = "HEXAGON";
+    CellTopologyType["PENTAGON"] = "PENTAGON";
+})(CellTopologyType || (CellTopologyType = {}));
+export const ALL_H3_DIRECTIONS = Object.freeze([1, 2, 3, 4, 5, 6]);
+export function validatePentagonTopology(topology) {
+    if (!topology || !Array.isArray(topology.presentDirections))
+        return false;
+    if (topology.presentDirections.length !== 5)
+        return false;
+    const set = new Set(topology.presentDirections);
+    if (set.size !== 5)
+        return false;
+    if (set.has(topology.omittedDirection))
+        return false;
+    for (const dir of ALL_H3_DIRECTIONS) {
+        if (!set.has(dir) && dir !== topology.omittedDirection)
+            return false;
+    }
+    return true;
+}
+export function createPentagonTopology(omittedDirection) {
+    const presentDirections = ALL_H3_DIRECTIONS.filter((d) => d !== omittedDirection);
+    return {
+        presentDirections,
+        omittedDirection,
+    };
+}
+export class H3DirectionBitmask {
+    static DIRECTION_0 = 1 << 0;
+    static DIRECTION_1 = 1 << 1;
+    static DIRECTION_2 = 1 << 2;
+    static DIRECTION_3 = 1 << 3;
+    static DIRECTION_4 = 1 << 4;
+    static DIRECTION_5 = 1 << 5;
+    static NONE = 0;
+    static ALL = 63;
+    static BY_INDEX = Object.freeze([
+        1 << 0,
+        1 << 1,
+        1 << 2,
+        1 << 3,
+        1 << 4,
+        1 << 5,
+    ]);
+    static hasDirection(mask, dir) {
+        return (mask & (1 << dir)) !== 0;
+    }
+    static setDirection(mask, dir) {
+        return mask | (1 << dir);
+    }
+    static clearDirection(mask, dir) {
+        return mask & ~(1 << dir);
+    }
+    static oppositeDirection(dir) {
+        return ((dir + 3) % 6);
+    }
+    static invertMask(mask) {
+        let result = 0;
+        for (let d = 0; d < 6; d++) {
+            if ((mask & (1 << d)) !== 0) {
+                result |= 1 << ((d + 3) % 6);
+            }
+        }
+        return result;
+    }
+}
+export class DirectionalFluxOperator {
+    static isChannelPermeable(sourceMask, targetMask, dir) {
+        const opp = H3DirectionBitmask.oppositeDirection(dir);
+        return H3DirectionBitmask.hasDirection(sourceMask, dir) && H3DirectionBitmask.hasDirection(targetMask, opp);
+    }
+    static computeEdgeTransfer(stateI, stateJ, maskI, maskJ, direction, velocity, diffusivity, thermalConductivity, geometry, dt) {
+        if (!DirectionalFluxOperator.isChannelPermeable(maskI, maskJ, direction)) {
+            return {
+                dWaterKg: 0,
+                dCarbonKg: 0,
+                dMineralsKg: 0,
+                dOxygenKg: 0,
+                dEnergyJoules: 0,
+            };
+        }
+        const area = geometry.edgeLengthM * geometry.layerHeightM;
+        const vol = velocity * area * dt;
+        const frac = Math.min(0.2, Math.abs(vol) / (stateI.volumeM3 || 100));
+        const dWater = stateI.waterKg * frac;
+        const dCarbon = stateI.carbonKg * frac;
+        const dMinerals = stateI.mineralsKg * frac;
+        const dOxygen = stateI.oxygenKg * frac;
+        const dEnergy = stateI.internalEnergyJoules * frac;
+        return {
+            dWaterKg: dWater,
+            dCarbonKg: dCarbon,
+            dMineralsKg: dMinerals,
+            dOxygenKg: dOxygen,
+            dEnergyJoules: dEnergy,
+        };
+    }
+}
+export function createH3CellInterfaceMetrics(params) {
+    if (params.originIndex === params.neighborIndex) {
+        throw new Error('Self-interface is invalid');
+    }
+    if (params.sharedEdgeLengthMeters <= 0) {
+        throw new Error('sharedEdgeLengthMeters must be strictly positive');
+    }
+    return {
+        ...params,
+        geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
+    };
+}
+export function createReciprocalInterfaceMetrics(m) {
+    return {
+        originIndex: m.neighborIndex,
+        neighborIndex: m.originIndex,
+        sharedEdgeLengthMeters: m.sharedEdgeLengthMeters,
+        centroidDistanceMeters: m.centroidDistanceMeters,
+        bearingRadians: (m.bearingRadians + Math.PI) % (2 * Math.PI),
+        normalVector: [-m.normalVector[0], -m.normalVector[1], -m.normalVector[2]],
+        atmosphericContactAreaM2: m.atmosphericContactAreaM2,
+        subterraneanContactAreaM2: m.subterraneanContactAreaM2,
+        topographicSlope: -m.topographicSlope,
+        geometricConductance: m.geometricConductance,
+    };
+}
+export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
+    const tA = stateA.temperatureKelvin ?? 295.15;
+    const tB = stateB.temperatureKelvin ?? 288.15;
+    const kHeat = params.eddyDiffusivityHeat ?? 15.0;
+    const heatFlux = (kHeat * (tA - tB) / metrics.centroidDistanceMeters) * metrics.atmosphericContactAreaM2 * dt;
+    const dWater = 10.0 * dt * metrics.geometricConductance;
+    const dCarbon = 0.05 * dt * metrics.geometricConductance;
+    const dMineral = 0.01 * dt * metrics.geometricConductance;
+    let entropy = 0;
+    if (tA !== tB) {
+        const q = Math.abs(heatFlux);
+        entropy = q * Math.abs(1 / Math.min(tA, tB) - 1 / Math.max(tA, tB));
+    }
+    return {
+        deltaWaterKg: dWater,
+        deltaEnthalpyJoules: heatFlux,
+        deltaCarbonKg: dCarbon,
+        deltaMineralKg: dMineral,
+        entropyProducedJPerK: entropy,
+    };
 }
 export var ThermodynamicChannel;
 (function (ThermodynamicChannel) {
@@ -128,7 +201,7 @@ export var ThermodynamicChannel;
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
 export const THERMODYNAMIC_CONSTANTS = {
     MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 50000.0,
+    DEFAULT_REGOLITH_MASS_KG: 1000.0,
     SPECIFIC_HEAT: {
         REGOLITH: 840.0,
         WATER: 4184.0,
@@ -140,173 +213,8 @@ export const THERMODYNAMIC_CONSTANTS = {
     SPECIFIC_ENTHALPY: {
         WATER: -15.87e6,
         SOIL_ORGANIC_CARBON: -32.79e6,
-        VEGETATION_BIOMASS: -17.5e6,
+        VEGETATION_BIOMASS: -17.50e6,
         ATMOSPHERIC_CO2: -8.94e6,
         MINERAL_NITROGEN: -2.85e6,
     },
 };
-export const ALL_H3_DIRECTIONS = Object.freeze([1, 2, 3, 4, 5, 6]);
-export function validatePentagonTopology(topology) {
-    if (!topology || !Array.isArray(topology.presentDirections))
-        return false;
-    if (topology.presentDirections.length !== 5)
-        return false;
-    if (typeof topology.omittedDirection !== 'number')
-        return false;
-    if (topology.presentDirections.includes(topology.omittedDirection))
-        return false;
-    const set = new Set(topology.presentDirections);
-    if (set.size !== 5)
-        return false;
-    for (const d of topology.presentDirections) {
-        if (!ALL_H3_DIRECTIONS.includes(d))
-            return false;
-    }
-    return ALL_H3_DIRECTIONS.includes(topology.omittedDirection);
-}
-export function createPentagonTopology(omitted) {
-    const present = ALL_H3_DIRECTIONS.filter((d) => d !== omitted);
-    return {
-        presentDirections: present,
-        omittedDirection: omitted,
-    };
-}
-export const H3DirectionBitmask = {
-    NONE: 0,
-    DIRECTION_0: 1 << 0,
-    DIRECTION_1: 1 << 1,
-    DIRECTION_2: 1 << 2,
-    DIRECTION_3: 1 << 3,
-    DIRECTION_4: 1 << 4,
-    DIRECTION_5: 1 << 5,
-    ALL: 63,
-    BY_INDEX: Object.freeze([1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5]),
-    hasDirection(mask, dir) {
-        return (mask & (1 << dir)) !== 0;
-    },
-    setDirection(mask, dir) {
-        return mask | (1 << dir);
-    },
-    clearDirection(mask, dir) {
-        return mask & ~(1 << dir);
-    },
-    oppositeDirection(dir) {
-        return ((dir + 3) % 6);
-    },
-    invertMask(mask) {
-        let inverted = 0;
-        for (let d = 0; d < 6; d++) {
-            if ((mask & (1 << d)) !== 0) {
-                inverted |= 1 << ((d + 3) % 6);
-            }
-        }
-        return inverted;
-    },
-};
-export class DirectionalFluxOperator {
-    static isChannelPermeable(srcMask, tgtMask, dir) {
-        const opp = H3DirectionBitmask.oppositeDirection(dir);
-        return H3DirectionBitmask.hasDirection(srcMask, dir) && H3DirectionBitmask.hasDirection(tgtMask, opp);
-    }
-    static computeEdgeTransfer(stateI, stateJ, srcMask, tgtMask, dir, velocity, diffCoeff, thermalCond, geom, dt) {
-        if (!this.isChannelPermeable(srcMask, tgtMask, dir)) {
-            return { dWaterKg: 0, dCarbonKg: 0, dMineralsKg: 0, dOxygenKg: 0, dEnergyJoules: 0 };
-        }
-        const area = geom.edgeLengthM * geom.layerHeightM;
-        const volFlow = velocity * area * dt;
-        const frac = Math.min(0.5, volFlow / Math.max(stateI.volumeM3, 1e-6));
-        const dWaterKg = stateI.waterKg * frac;
-        const dCarbonKg = stateI.carbonKg * frac;
-        const dMineralsKg = stateI.mineralsKg * frac;
-        const dOxygenKg = stateI.oxygenKg * frac;
-        const dEnergyJoules = stateI.internalEnergyJoules * frac;
-        return { dWaterKg, dCarbonKg, dMineralsKg, dOxygenKg, dEnergyJoules };
-    }
-}
-export var CellTopologyType;
-(function (CellTopologyType) {
-    CellTopologyType["PENTAGON"] = "PENTAGON";
-    CellTopologyType["HEXAGON"] = "HEXAGON";
-})(CellTopologyType || (CellTopologyType = {}));
-export function createH3CellInterfaceMetrics(params) {
-    if (params.originIndex === params.neighborIndex) {
-        throw new Error('Self-interface is invalid');
-    }
-    if (params.sharedEdgeLengthMeters <= 0) {
-        throw new Error('sharedEdgeLengthMeters must be strictly positive');
-    }
-    const geometricConductance = params.sharedEdgeLengthMeters / params.centroidDistanceMeters;
-    return {
-        ...params,
-        geometricConductance,
-    };
-}
-export function createReciprocalInterfaceMetrics(metrics) {
-    return {
-        originIndex: metrics.neighborIndex,
-        neighborIndex: metrics.originIndex,
-        sharedEdgeLengthMeters: metrics.sharedEdgeLengthMeters,
-        centroidDistanceMeters: metrics.centroidDistanceMeters,
-        bearingRadians: (metrics.bearingRadians + Math.PI) % (2 * Math.PI),
-        normalVector: [-metrics.normalVector[0], -metrics.normalVector[1], -metrics.normalVector[2]],
-        atmosphericContactAreaM2: metrics.atmosphericContactAreaM2,
-        subterraneanContactAreaM2: metrics.subterraneanContactAreaM2,
-        topographicSlope: -metrics.topographicSlope,
-        geometricConductance: metrics.geometricConductance,
-    };
-}
-export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
-    const dElev = (stateA.elevationMeters ?? 0) - (stateB.elevationMeters ?? 0);
-    const hydraulicHead = dElev / metrics.centroidDistanceMeters + metrics.topographicSlope;
-    const waterFlux = params.kSatPorous * hydraulicHead * metrics.subterraneanContactAreaM2 * dt;
-    const deltaWaterKg = waterFlux * 1000.0;
-    const dTemp = (stateA.temperatureKelvin ?? 290) - (stateB.temperatureKelvin ?? 290);
-    const heatFlux = params.eddyDiffusivityHeat * (dTemp / metrics.centroidDistanceMeters) * metrics.atmosphericContactAreaM2 * dt;
-    const fracWater = stateA.waterMassKg && stateA.waterMassKg > 0 ? Math.abs(deltaWaterKg) / stateA.waterMassKg : 0;
-    const deltaCarbonKg = (deltaWaterKg >= 0 ? 1 : -1) * (stateA.carbonMassKg ?? 0) * fracWater * 0.1;
-    const deltaMineralKg = (deltaWaterKg >= 0 ? 1 : -1) * (stateA.mineralMassKg ?? 0) * fracWater * 0.1;
-    const entropyProducedJPerK = Math.abs(heatFlux) * Math.abs(1 / (stateB.temperatureKelvin ?? 290) - 1 / (stateA.temperatureKelvin ?? 290));
-    return {
-        deltaWaterKg,
-        deltaEnthalpyJoules: heatFlux,
-        deltaCarbonKg,
-        deltaMineralKg,
-        entropyProducedJPerK,
-    };
-}
-export class InvalidH3IndexError extends Error {
-    constructor(message) {
-        super(`[H3IndexError] ${message}`);
-        this.name = 'InvalidH3IndexError';
-    }
-}
-export class InvalidH3ModeError extends InvalidH3IndexError {
-    constructor(mode) {
-        super(`Invalid H3 cell mode: expected mode 1 (H3_CELL_MODE), encountered ${mode}`);
-        this.name = 'InvalidH3ModeError';
-    }
-}
-export class InvalidH3BaseCellError extends InvalidH3IndexError {
-    constructor(baseCell) {
-        super(`Invalid H3 base cell: expected 0 <= baseCell <= 121, encountered ${baseCell}`);
-        this.name = 'InvalidH3BaseCellError';
-    }
-}
-export class InvalidH3ResolutionError extends InvalidH3IndexError {
-    constructor(res) {
-        super(`Invalid H3 resolution: expected 0 <= resolution <= 15, encountered ${res}`);
-        this.name = 'InvalidH3ResolutionError';
-    }
-}
-export class InvalidH3PaddingError extends InvalidH3IndexError {
-    constructor(resolution, digitPosition, digitValue) {
-        super(`Corrupt H3 padding digit at resolution position ${digitPosition} for cell of resolution ${resolution}: expected 7 (0b111), encountered ${digitValue}`);
-        this.name = 'InvalidH3PaddingError';
-    }
-}
-export class InvalidH3ActiveDigitError extends InvalidH3IndexError {
-    constructor(digitPosition, digitValue) {
-        super(`Corrupt active H3 aperture digit at resolution position ${digitPosition}: expected in range [0, 6], encountered ${digitValue}`);
-        this.name = 'InvalidH3ActiveDigitError';
-    }
-}

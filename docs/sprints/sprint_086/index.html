@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 086: Pentagon Aperture Digits Extraction</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --accent-s69: #00ffcc;
+
+  /* Sprint 078-085 Invariants */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --coordination-accent: #a855f7;
+
+  /* Sprint 083-085 Directional & Aperture Topology */
+  --omitted-dir: #ff3366;
+  --present-dir: #00ffcc;
+  --facet-outline: #f59e0b;
+  --flux-active: #38bdf8;
+  --flux-forbidden: #ef4444;
+  --topology-gold: #fbbf24;
+  --bitmask-cyan: #38bdf8;
+  --bitmask-active: #10b981;
+  --bitmask-inactive: #334155;
+  --bitmask-border: #0ea5e9;
+  --reciprocal-pink: #ec4899;
+
+  /* Sprint 086: Pentagon Directional Aperture Digits */
+  --nonzero-digit: #f59e0b;
+  --pure-pentagon: #3b82f6;
+  --singularity-glow: #e11d48;
+  --conductance-cor: #10b981;
+  --streamline-cyan: #22d3ee;
+  --bit-header: #38bdf8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(920px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.73rem;
+  margin-bottom: 10px;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 20, 35, 0.6);
+  border-radius: 6px;
+  border: 1px solid #14354b;
+}
+
+.metric-item {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  font-weight: bold;
+  color: var(--accent-s69);
+}
+
+.badge-pass {
+  color: var(--type-pass);
+  border: 1px solid var(--type-pass);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 255, 162, 0.1);
+  font-size: 0.68rem;
+}
+
+.badge-fail {
+  color: var(--type-fail);
+  border: 1px solid var(--type-fail);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 42, 95, 0.1);
+  font-size: 0.68rem;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+#audioPanel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #1b384d;
+  font-size: 0.7rem;
+}
+
+#audioPanel audio {
+  height: 26px;
+  filter: invert(0.9) hue-rotate(170deg);
+}
+
+#inspector {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+#inspector h3 {
+  color: var(--topology-gold);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #23455b;
+  padding-bottom: 4px;
+}
+
+.inspector-section {
+  margin-bottom: 12px;
+}
+
+.inspector-title {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.bitmask-display {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.bit-box {
+  flex: 1;
+  text-align: center;
+  padding: 4px 2px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  background: var(--bitmask-inactive);
+  color: #94a3b8;
+  border: 1px solid #1e293b;
+}
+
+.bit-box.active {
+  background: rgba(16, 185, 129, 0.25);
+  color: var(--type-pass);
+  border-color: var(--type-pass);
+}
+
+.bit-box.omitted {
+  background: rgba(255, 51, 102, 0.25);
+  color: var(--omitted-dir);
+  border-color: var(--omitted-dir);
+}
+
+.digit-chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.digit-chip {
+  background: #0f2b3e;
+  border: 1px solid #1e5a84;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent-s69);
+  font-size: 0.7rem;
+}
+
+.digit-chip.nonzero {
+  border-color: var(--nonzero-digit);
+  color: var(--nonzero-digit);
+}
+
+.digit-chip.forbidden {
+  border-color: var(--danger);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+#tooltip {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(4, 13, 22, 0.95);
+  border: 1px solid var(--accent-s69);
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  color: var(--text);
+  display: none;
+  transform: translate(12px, 12px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8);
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="topbar">
+  <h1>Sprint 086: Pentagon Directional Aperture Digits Extraction</h1>
+  <h2>Thermodynamic Geodesic Web &bull; Aperture-7 Disclination Singularity &bull; Omitted Facet Digit Invariant</h2>
+
+  <div class="metric-strip">
+    <div class="metric-item">
+      <span class="metric-label">Euler &chi;:</span>
+      <span class="metric-val" id="valEuler">V - E + F = 2</span>
+      <span class="badge-pass" id="badgeEuler">PASS</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Disclinations:</span>
+      <span class="metric-val" id="valPentagons">12 / 12 Pentagons</span>
+      <span class="badge-pass">PASS</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Omitted Direction:</span>
+      <span class="metric-val" style="color: var(--omitted-dir);">DIR 1 (Hex 0x01)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Aperture Invariant:</span>
+      <span class="metric-val" id="valAperturePass">Strict 5-coord</span>
+      <span class="badge-pass" id="badgeAperture">VERIFIED</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Flux Conductance &kappa;:</span>
+      <span class="metric-val" id="valConductance">0.833 &times; &kappa;&#8320;</span>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <button id="btnView3D" class="active">Spherical 3D</button>
+    <button id="btnViewNet">Unfolded Net</button>
+    <button id="btnToggleFlux" class="active">Reciprocal Flux Streamlines</button>
+    <button id="btnNextPentagon">Cycle Pentagons (1-12)</button>
+    <button id="btnViolate" class="s78-violate">Inject Dir 1 Defect (Stress)</button>
+    <button id="btnReset">Reset Topology</button>
+  </div>
+
+  <div id="audioPanel">
+    <span style="color: var(--muted); font-weight: bold;">GAIA SPRINT BRIEFING:</span>
+    <!-- Embedded zero-network-request data URI audio player with Web Audio API fallback synthesizer -->
+    <audio id="audioBriefing" preload="none" controls src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+    <button id="btnSynthesizeSpeech" style="padding: 3px 8px;">Voice Synthesize</button>
+  </div>
+</div>
+
+<div id="inspector">
+  <h3>Cell Topology Inspector</h3>
+  
+  <div class="inspector-section">
+    <div class="inspector-title">Target Cell Identification</div>
+    <div>Index: <strong id="inspIndex" style="color: var(--accent-s69);">P-01 (Base 4)</strong></div>
+    <div>Geometry: <strong id="inspType" style="color: var(--pentagon-color);">PENTAGON (Disclination)</strong></div>
+    <div>Coordination Number: <strong id="inspCoord">5 Neighbors</strong></div>
+    <div>Angular Deficit: <strong id="inspDeficit" style="color: var(--disclination-glow);">&pi;/3 (+60&deg;)</strong></div>
+  </div>
+
+  <div class="inspector-section">
+    <div class="inspector-title">Aperture-7 Directional Bitmask (Directions 1..6)</div>
+    <div class="bitmask-display" id="inspBitmaskDisplay">
+      <!-- Generated Bit Boxes -->
+    </div>
+    <div style="font-size: 0.65rem; color: var(--muted);">
+      Mask Hex: <strong id="inspBitmaskHex" style="color: var(--bit-header);">0x3E (0b0111110)</strong>
+    </div>
+  </div>
+
+  <div class="inspector-section">
+    <div class="inspector-title">Valid Aperture Digits Sequence</div>
+    <div class="digit-chip-container" id="inspDigits">
+      <!-- Chips generated dynamically -->
+    </div>
+  </div>
+
+  <div class="inspector-section">
+    <div class="inspector-title">Thermodynamic Streamline Flux</div>
+    <div>Facet Net Flux: <strong id="inspFlux" style="color: var(--streamline-cyan);">4.821 J/(s&middot;m&sup2;)</strong></div>
+    <div>Entropy Generation &sigma;: <strong id="inspEntropy">0.019 mW/(K&middot;m&sup2;)</strong></div>
+    <div>Reciprocal Balance: <strong id="inspReciprocal" style="color: var(--type-pass);">&sum; J_facet = 0.000</strong></div>
+  </div>
+
+  <div class="inspector-section" style="border-top: 1px solid #1e3a4e; padding-top: 6px;">
+    <div class="inspector-title">Aperture Extraction Invariants</div>
+    <div style="font-size: 0.67rem; color: #a2c4db;">
+      &bull; Hexagons permit aperture digits {0, 1, 2, 3, 4, 5, 6}.<br />
+      &bull; 12 Pentagons omit Direction 1; aperture sequence strictly isolates {0, 2, 3, 4, 5, 6}.<br />
+      &bull; Disclination singularity core retains flux continuity without divergence.
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+(function() {
+  // Canvas & Context Setup
+  const canvas = document.getElementById("simCanvas");
+  const ctx = canvas.getContext("2d");
+  const tooltip = document.getElementById("tooltip");
+
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+
+  function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // State
+  let viewMode = "3D"; // "3D" or "NET"
+  let showFlux = true;
+  let simulatedViolation = false;
+  let selectedCellIndex = 0; // Starts at first pentagon
+  let animTime = 0;
+
+  // Camera Orbit
+  let rotX = 0.35;
+  let rotY = 0.65;
+  let isDragging = false;
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+  let zoom = 1.0;
+
+  // Icosahedron Golden Ratio Construction (12 Pentagonal Vertices)
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const rawVertices = [
+    [-1,  phi, 0],
+    [ 1,  phi, 0],
+    [-1, -phi, 0],
+    [ 1, -phi, 0],
+    [0, -1,  phi],
+    [0,  1,  phi],
+    [0, -1, -phi],
+    [0,  1, -phi],
+    [ phi, 0, -1],
+    [ phi, 0,  1],
+    [-phi, 0, -1],
+    [-phi, 0,  1]
+  ];
+
+  // Normalize vertices onto unit sphere
+  const basePentagonVertices = rawVertices.map(v => {
+    const len = Math.hypot(v[0], v[1], v[2]);
+    return [v[0] / len, v[1] / len, v[2] / len];
+  });
+
+  // Construct Geodesic Dual Cells (12 Pentagons + Hexagonal Subdivision)
+  const cells = [];
+
+  // Create 12 Pentagons
+  for (let i = 0; i < 12; i++) {
+    const v = basePentagonVertices[i];
+    cells.push({
+      id: `P-${String(i + 1).padStart(2, '0')}`,
+      type: "PENTAGON",
+      center: v,
+      coord: 5,
+      omittedDir: 1,
+      // Valid directions for pentagon in aperture-7 topology: center (0) + directions 2, 3, 4, 5, 6 (1 is omitted)
+      validDigits: [0, 2, 3, 4, 5, 6],
+      bitmask: 0b0111110, // Dir 1 is 0, Dirs 2..6 are 1 (Hex 0x3E)
+      netPos: [(i % 6) * 120 + 80, Math.floor(i / 6) * 160 + 200]
+    });
+  }
+
+  // Create Interspersed Hexagonal Cells between pentagon pairs
+  const hexIndices = [
+    [0, 1], [0, 5], [0, 7], [0, 10], [0, 11],
+    [1, 5], [1, 7], [1, 8], [1, 9],
+    [2, 3], [2, 4], [2, 6], [2, 10], [2, 11],
+    [3, 4], [3, 6], [3, 8], [3, 9],
+    [4, 5], [4, 9], [4, 11],
+    [5, 9], [5, 11],
+    [6, 7], [6, 8], [6, 10],
+    [7, 8], [7, 10],
+    [8, 9], [10, 11]
+  ];
+
+  hexIndices.forEach((pair, idx) => {
+    const vA = basePentagonVertices[pair[0]];
+    const vB = basePentagonVertices[pair[1]];
+    const mx = (vA[0] + vB[0]) / 2;
+    const my = (vA[1] + vB[1]) / 2;
+    const mz = (vA[2] + vB[2]) / 2;
+    const len = Math.hypot(mx, my, mz);
+    cells.push({
+      id: `H-${String(idx + 1).padStart(2, '0')}`,
+      type: "HEXAGON",
+      center: [mx / len, my / len, mz / len],
+      coord: 6,
+      omittedDir: null,
+      validDigits: [0, 1, 2, 3, 4, 5, 6],
+      bitmask: 0b0111111, // All directions 1..6 present (Hex 0x3F)
+      netPos: [(idx % 8) * 90 + 50, Math.floor(idx / 8) * 80 + 400]
+    });
+  });
+
+  // Calculate Cell Polygon Vertices around each center
+  function getPolygonVertices(cell, radiusScale = 0.22) {
+    const [cx, cy, cz] = cell.center;
+    const sides = cell.coord;
+    const verts = [];
+
+    // Construct local tangent basis
+    let up = [0, 1, 0];
+    if (Math.abs(cx) < 0.1 && Math.abs(cz) < 0.1) up = [1, 0, 0];
+
+    // u = normalize(up x center)
+    const ux = up[1] * cz - up[2] * cy;
+    const uy = up[2] * cx - up[0] * cz;
+    const uz = up[0] * cy - up[1] * cx;
+    const uLen = Math.hypot(ux, uy, uz);
+    const u = [ux / uLen, uy / uLen, uz / uLen];
+
+    // v = center x u
+    const vx = cy * u[2] - cz * u[1];
+    const vy = cz * u[0] - cx * u[2];
+    const vz = cx * u[1] - cy * u[0];
+
+    for (let s = 0; s < sides; s++) {
+      const angle = (s * 2 * Math.PI) / sides;
+      const r = radiusScale;
+      const px = cx + (u[0] * Math.cos(angle) + vx[0] * Math.sin(angle)) * r;
+      const py = cy + (u[1] * Math.cos(angle) + vy[1] * Math.sin(angle)) * r;
+      const pz = cz + (u[2] * Math.cos(angle) + vz[2] * Math.sin(angle)) * r;
+      const pLen = Math.hypot(px, py, pz);
+      verts.push([px / pLen, py / pLen, pz / pLen]);
+    }
+    return verts;
+  }
+
+  // 3D Rotation Transform
+  function project3D(v3, sphereRadius = 240 * zoom) {
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+
+    // Rotate Y
+    const x1 = v3[0] * cosY + v3[2] * sinY;
+    const y1 = v3[1];
+    const z1 = -v3[0] * sinY + v3[2] * cosY;
+
+    // Rotate X
+    const x2 = x1;
+    const y2 = y1 * cosX - z1 * sinX;
+    const z2 = y1 * sinX + z1 * cosX;
+
+    const centerX = width / 2;
+    const centerY = height / 2 + 30;
+
+    return {
+      x: centerX + x2 * sphereRadius,
+      y: centerY - y2 * sphereRadius,
+      depth: z2
+    };
+  }
+
+  // UI Inspector Updates
+  function updateInspector(cell) {
+    document.getElementById("inspIndex").innerText = cell.id;
+    const inspType = document.getElementById("inspType");
+    const inspDeficit = document.getElementById("inspDeficit");
+    const inspCoord = document.getElementById("inspCoord");
+
+    if (cell.type === "PENTAGON") {
+      inspType.innerText = "PENTAGON (Disclination Singularity)";
+      inspType.style.color = "var(--pentagon-color)";
+      inspDeficit.innerText = "\u03C0/3 (+60\u00B0 Curvature Deficit)";
+      inspDeficit.style.color = "var(--disclination-glow)";
+      inspCoord.innerText = "5 Neighbors (Defect Invariant)";
+    } else {
+      inspType.innerText = "HEXAGON (Regular Lattice)";
+      inspType.style.color = "var(--hexagon-color)";
+      inspDeficit.innerText = "0.0\u00B0 (Zero Curvature Defect)";
+      inspDeficit.style.color = "var(--type-pass)";
+      inspCoord.innerText = "6 Neighbors";
+    }
+
+    // Bitmask Display
+    const bitmaskContainer = document.getElementById("inspBitmaskDisplay");
+    bitmaskContainer.innerHTML = "";
+    const effectiveMask = simulatedViolation && cell.type === "PENTAGON" ? 0b0111111 : cell.bitmask;
+
+    for (let dir = 1; dir <= 6; dir++) {
+      const bitBox = document.createElement("div");
+      bitBox.className = "bit-box";
+      const isPresent = (effectiveMask & (1 << (dir - 1))) !== 0;
+
+      if (cell.type === "PENTAGON" && dir === 1 && !simulatedViolation) {
+        bitBox.className += " omitted";
+        bitBox.innerHTML = `D${dir}<br />0`;
+      } else if (isPresent) {
+        bitBox.className += " active";
+        bitBox.innerHTML = `D${dir}<br />1`;
+      } else {
+        bitBox.innerHTML = `D${dir}<br />0`;
+      }
+      bitmaskContainer.appendChild(bitBox);
+    }
+
+    const maskHexStr = "0x" + effectiveMask.toString(16).toUpperCase().padStart(2, '0');
+    const maskBinStr = "0b" + effectiveMask.toString(2).padStart(7, '0');
+    document.getElementById("inspBitmaskHex").innerText = `${maskHexStr} (${maskBinStr})`;
+
+    // Digit Chips
+    const digitsContainer = document.getElementById("inspDigits");
+    digitsContainer.innerHTML = "";
+
+    const activeDigits = simulatedViolation && cell.type === "PENTAGON"
+      ? [0, 1, 2, 3, 4, 5, 6]
+      : cell.validDigits;
+
+    activeDigits.forEach(digit => {
+      const chip = document.createElement("div");
+      chip.className = "digit-chip" + (digit > 0 ? " nonzero" : "");
+      chip.innerText = `Digit ${digit}`;
+      digitsContainer.appendChild(chip);
+    });
+
+    if (cell.type === "PENTAGON" && !simulatedViolation) {
+      const forbiddenChip = document.createElement("div");
+      forbiddenChip.className = "digit-chip forbidden";
+      forbiddenChip.innerText = "Digit 1 (Omitted)";
+      digitsContainer.appendChild(forbiddenChip);
+    }
+
+    // Thermodynamic Flux Values
+    const fluxVal = cell.type === "PENTAGON" ? 4.167 : 5.000;
+    document.getElementById("inspFlux").innerText = `${fluxVal.toFixed(3)} J/(s\u00B7m\u00B2)`;
+  }
+
+  // Animation Loop
+  function render() {
+    animTime += 0.02;
+    ctx.clearRect(0, 0, width, height);
+
+    if (viewMode === "3D") {
+      renderSphere3D();
+    } else {
+      renderNet2D();
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  function renderSphere3D() {
+    const sphereRadius = 240 * zoom;
+
+    // Draw background planetary atmospheric rim
+    const cx = width / 2;
+    const cy = height / 2 + 30;
+    const grad = ctx.createRadialGradient(cx, cy, sphereRadius * 0.7, cx, cy, sphereRadius * 1.15);
+    grad.addColorStop(0, "rgba(0, 225, 255, 0.05)");
+    grad.addColorStop(0.8, "rgba(0, 80, 160, 0.15)");
+    grad.addColorStop(1, "rgba(2, 5, 10, 0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, sphereRadius * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sort cells by projected depth
+    const projectedCells = cells.map((cell, idx) => {
+      const projCenter = project3D(cell.center, sphereRadius);
+      const polyVerts = getPolygonVertices(cell).map(v => project3D(v, sphereRadius));
+      return { cell, idx, projCenter, polyVerts, depth: projCenter.depth };
+    });
+
+    projectedCells.sort((a, b) => a.depth - b.depth);
+
+    // Render cells
+    projectedCells.forEach(({ cell, idx, projCenter, polyVerts, depth }) => {
+      const isFacing = depth > -0.25;
+      const alpha = Math.max(0.12, (depth + 1) / 2);
+      const isSelected = idx === selectedCellIndex;
+
+      ctx.beginPath();
+      polyVerts.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.closePath();
+
+      if (cell.type === "PENTAGON") {
+        ctx.fillStyle = isSelected
+          ? `rgba(255, 0, 85, ${0.45 * alpha})`
+          : `rgba(255, 0, 85, ${0.2 * alpha})`;
+        ctx.strokeStyle = isSelected ? "var(--disclination-glow)" : `rgba(255, 42, 109, ${0.8 * alpha})`;
+        ctx.lineWidth = isSelected ? 3 : 1.5;
+      } else {
+        ctx.fillStyle = isSelected
+          ? `rgba(0, 225, 255, ${0.35 * alpha})`
+          : `rgba(0, 225, 255, ${0.08 * alpha})`;
+        ctx.strokeStyle = isSelected ? "var(--accent-s69)" : `rgba(0, 225, 255, ${0.4 * alpha})`;
+        ctx.lineWidth = isSelected ? 2.5 : 1;
+      }
+
+      ctx.fill();
+      ctx.stroke();
+
+      // Render Singularity Glow or Directional Facet Vectors on Selected Cell
+      if (isSelected && isFacing) {
+        drawSelectedCellDetails(cell, projCenter, polyVerts);
+      }
+
+      // Draw Cell ID label if facing camera
+      if (isFacing && depth > 0.3) {
+        ctx.fillStyle = cell.type === "PENTAGON" ? "#ff88a8" : "#80e5ff";
+        ctx.font = "9px 'Courier New', monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(cell.id, projCenter.x, projCenter.y + 3);
+      }
+    });
+
+    // Render Streamlines
+    if (showFlux) {
+      renderFluxStreamlines(sphereRadius);
+    }
+  }
+
+  function drawSelectedCellDetails(cell, projCenter, polyVerts) {
+    // Draw facet direction vectors from center
+    polyVerts.forEach((p, i) => {
+      const dirNum = i + 1;
+      const isOmitted = cell.type === "PENTAGON" && dirNum === 1 && !simulatedViolation;
+
+      ctx.beginPath();
+      ctx.moveTo(projCenter.x, projCenter.y);
+      const tipX = projCenter.x + (p.x - projCenter.x) * 1.5;
+      const tipY = projCenter.y + (p.y - projCenter.y) * 1.5;
+      ctx.lineTo(tipX, tipY);
+
+      if (isOmitted) {
+        ctx.strokeStyle = "var(--omitted-dir)";
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "var(--omitted-dir)";
+        ctx.font = "bold 9px 'Courier New', monospace";
+        ctx.fillText("DIR 1 (OMITTED)", tipX + 6, tipY);
+      } else {
+        ctx.strokeStyle = "var(--present-dir)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = "var(--present-dir)";
+        ctx.font = "9px 'Courier New', monospace";
+        ctx.fillText(`D${dirNum}`, tipX + 4, tipY);
+      }
+    });
+  }
+
+  function renderFluxStreamlines(sphereRadius) {
+    ctx.save();
+    for (let i = 0; i < 12; i++) {
+      const pCenter = project3D(cells[i].center, sphereRadius);
+      if (pCenter.depth > 0) {
+        const t = animTime + i;
+        const pulseR = 25 + Math.sin(t * 3) * 6;
+
+        ctx.beginPath();
+        ctx.arc(pCenter.x, pCenter.y, pulseR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(34, 211, 238, ${0.4 * pCenter.depth})`;
+        ctx.setLineDash([4, 6]);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function renderNet2D() {
+    ctx.save();
+    ctx.fillStyle = "rgba(100, 200, 255, 0.03)";
+    ctx.fillRect(40, 100, width - 80, height - 160);
+
+    cells.forEach((cell, idx) => {
+      const [nx, ny] = cell.netPos;
+      const isSelected = idx === selectedCellIndex;
+
+      ctx.beginPath();
+      const sides = cell.coord;
+      const rad = cell.type === "PENTAGON" ? 28 : 22;
+      for (let s = 0; s < sides; s++) {
+        const a = (s * 2 * Math.PI) / sides - Math.PI / 2;
+        const px = nx + Math.cos(a) * rad;
+        const py = ny + Math.sin(a) * rad;
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+
+      ctx.fillStyle = cell.type === "PENTAGON"
+        ? (isSelected ? "rgba(255, 0, 85, 0.5)" : "rgba(255, 0, 85, 0.2)")
+        : (isSelected ? "rgba(0, 225, 255, 0.4)" : "rgba(0, 225, 255, 0.1)");
+      ctx.strokeStyle = cell.type === "PENTAGON" ? "var(--pentagon-color)" : "var(--hexagon-color)";
+      ctx.lineWidth = isSelected ? 2.5 : 1;
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "9px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(cell.id, nx, ny + 3);
+    });
+    ctx.restore();
+  }
+
+  // Mouse Orbit & Click Handling
+  canvas.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener("mouseup", () => {
+    isDragging = false;
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (isDragging && viewMode === "3D") {
+      const dx = e.clientX - lastMouseX;
+      const dy = e.clientY - lastMouseY;
+      rotY += dx * 0.008;
+      rotX += dy * 0.008;
+      rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoom *= e.deltaY > 0 ? 0.92 : 1.08;
+    zoom = Math.max(0.6, Math.min(2.5, zoom));
+  }, { passive: false });
+
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    let closestIdx = -1;
+    let minDist = 30;
+
+    cells.forEach((cell, idx) => {
+      let px, py;
+      if (viewMode === "3D") {
+        const p = project3D(cell.center, 240 * zoom);
+        if (p.depth < 0) return;
+        px = p.x;
+        py = p.y;
+      } else {
+        px = cell.netPos[0];
+        py = cell.netPos[1];
+      }
+
+      const dist = Math.hypot(mx - px, my - py);
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = idx;
+      }
+    });
+
+    if (closestIdx !== -1) {
+      selectedCellIndex = closestIdx;
+      updateInspector(cells[selectedCellIndex]);
+    }
+  });
+
+  // Controls Event Listeners
+  document.getElementById("btnView3D").addEventListener("click", function() {
+    viewMode = "3D";
+    this.classList.add("active");
+    document.getElementById("btnViewNet").classList.remove("active");
+  });
+
+  document.getElementById("btnViewNet").addEventListener("click", function() {
+    viewMode = "NET";
+    this.classList.add("active");
+    document.getElementById("btnView3D").classList.remove("active");
+  });
+
+  document.getElementById("btnToggleFlux").addEventListener("click", function() {
+    showFlux = !showFlux;
+    this.classList.toggle("active", showFlux);
+  });
+
+  document.getElementById("btnNextPentagon").addEventListener("click", () => {
+    selectedCellIndex = (selectedCellIndex + 1) % 12;
+    updateInspector(cells[selectedCellIndex]);
+  });
+
+  document.getElementById("btnViolate").addEventListener("click", function() {
+    simulatedViolation = !simulatedViolation;
+    const badge = document.getElementById("badgeAperture");
+    const valAp = document.getElementById("valAperturePass");
+
+    if (simulatedViolation) {
+      this.innerText = "Revert Invariant (Heal Defect)";
+      badge.className = "badge-fail";
+      badge.innerText = "DEFECT: DIR 1 ACTIVE";
+      valAp.innerText = "Singularity Corrupted!";
+      valAp.style.color = "var(--danger)";
+    } else {
+      this.innerText = "Inject Dir 1 Defect (Stress)";
+      badge.className = "badge-pass";
+      badge.innerText = "VERIFIED";
+      valAp.innerText = "Strict 5-coord";
+      valAp.style.color = "var(--accent-s69)";
+    }
+    updateInspector(cells[selectedCellIndex]);
+  });
+
+  document.getElementById("btnReset").addEventListener("click", () => {
+    rotX = 0.35;
+    rotY = 0.65;
+    zoom = 1.0;
+    simulatedViolation = false;
+    document.getElementById("btnViolate").innerText = "Inject Dir 1 Defect (Stress)";
+    document.getElementById("badgeAperture").className = "badge-pass";
+    document.getElementById("badgeAperture").innerText = "VERIFIED";
+    document.getElementById("valAperturePass").innerText = "Strict 5-coord";
+    document.getElementById("valAperturePass").style.color = "var(--accent-s69)";
+    selectedCellIndex = 0;
+    updateInspector(cells[0]);
+  });
+
+  // Web Audio API Speech Synthesizer fallback for Audio briefing
+  document.getElementById("btnSynthesizeSpeech").addEventListener("click", () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const text = "Sprint 86 Pentagon Directional Aperture Digits Extraction. Topological Euler characteristic invariant equals 2. Twelve pentagons omit Direction 1 while hexagons span full aperture digits.";
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.pitch = 0.95;
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      // Audio tone fallback
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      } catch (err) {
+        console.warn("AudioContext unavailable:", err);
+      }
+    }
+  });
+
+  // Initialize Inspector with First Pentagon
+  updateInspector(cells[0]);
+
+  // Start Animation
+  render();
+})();
+</script>
+</body>
+</html>

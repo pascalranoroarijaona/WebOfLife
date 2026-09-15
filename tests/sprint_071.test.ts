@@ -52,7 +52,7 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
   });
 
   it('2. Adjacent regular hexagons on z=0 plane and 3D unit sphere return exactly 2 vertex pairs', () => {
-    // Regular hexagon tiling: hex A at (0,0), hex B at (1.5, sqrt(3)/2)
+    // Regular hexagon tiling: hex A at (0,0), hex B at (1.5, Math.sqrt(3)/2)
     const hexA = createHexagon2D(0, 0, 1.0);
     const hexB = createHexagon2D(1.5, Math.sqrt(3) / 2, 1.0);
 
@@ -208,7 +208,7 @@ describe('RFC-071: findSharedBoundaryVertexPairs3D & Boundary Edge Interface', (
 
     // Test monadic integration
     const stateTensor = {
-      cells: new Map([
+      cells: new Map<string, CellThermodynamicState>([
         ['cellA', stateA],
         ['cellB', stateB],
       ]),

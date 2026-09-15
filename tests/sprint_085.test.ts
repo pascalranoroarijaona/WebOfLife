@@ -14,7 +14,6 @@ import {
 import {
   InvalidH3ModeError,
   InvalidH3BaseCellError,
-  InvalidH3ResolutionError,
   InvalidH3PaddingError,
   BiophysicalStockVector,
 } from '../src/spatial/h3_types.js';
@@ -36,7 +35,7 @@ describe('Sprint 085: extractH3IndexApertureDigits & H3 Adjacency', () => {
     assert.strictEqual(decomp.mode, 1);
     assert.strictEqual(decomp.activeDigits.length, 0);
     assert.strictEqual(decomp.allDigits.length, 15);
-    assert.ok(decomp.allDigits.every((d) => d === 7));
+    assert.ok(decomp.allDigits.every((d: number) => d === 7));
     assert.strictEqual(decomp.isValid, true);
   });
 
@@ -58,7 +57,7 @@ describe('Sprint 085: extractH3IndexApertureDigits & H3 Adjacency', () => {
 
     // First 7 digits match activeDigits, remaining 8 digits must be 7
     assert.deepStrictEqual(decomp.allDigits.slice(0, 7), [1, 2, 0, 4, 6, 3, 5]);
-    assert.ok(decomp.allDigits.slice(7).every((d) => d === 7));
+    assert.ok(decomp.allDigits.slice(7).every((d: number) => d === 7));
     assert.strictEqual(decomp.isValid, true);
   });
 
@@ -75,7 +74,7 @@ describe('Sprint 085: extractH3IndexApertureDigits & H3 Adjacency', () => {
     assert.strictEqual(decomp.baseCell, 12);
     assert.strictEqual(decomp.activeDigits.length, 15);
     assert.deepStrictEqual(decomp.activeDigits, fullDigits);
-    assert.ok(decomp.allDigits.every((d) => d <= 6));
+    assert.ok(decomp.allDigits.every((d: number) => d <= 6));
     assert.strictEqual(decomp.isValid, true);
   });
 
@@ -213,7 +212,7 @@ describe('Sprint 085: SpatialFluxMonad & Thermodynamic Invariants', () => {
     const monad = SpatialFluxMonad.of(index, sampleStocks);
 
     const partitions = monad.partitionStocksToChildren(weights);
-    const sumCarbon = partitions.reduce((acc, p) => acc + p.childStocks.carbonKg, 0);
+    const sumCarbon = partitions.reduce((acc: number, p: any) => acc + p.childStocks.carbonKg, 0);
 
     assert.ok(Math.abs(sumCarbon - sampleStocks.carbonKg) < 1e-11);
     assert.strictEqual(partitions[0].childStocks.carbonKg, sampleStocks.carbonKg * 0.25);

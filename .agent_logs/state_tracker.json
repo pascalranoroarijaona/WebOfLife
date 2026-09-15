@@ -1,5 +1,5 @@
 {
-  "current_sprint": 86,
+  "current_sprint": 87,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -425,6 +425,11 @@
       "sprint": 85,
       "goal": "Implement extractH3IndexApertureDigits parsing resolution directional digits from 64-bit H3 index in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-15T09:17:25.966538+00:00"
+    },
+    {
+      "sprint": 86,
+      "goal": "Implement extractPentagonApertureDigits parsing non-zero directional digits for pentagonal cells in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-15T09:37:23.440422+00:00"
     }
   ]
 }

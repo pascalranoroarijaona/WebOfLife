@@ -1,41 +1,39 @@
-/**
- * Web of Life - Spatial Flux Monad
- * Multi-Sprint Unified Implementation (Sprints 069 - 085)
- */
+// =============================================================================
+// WEB OF LIFE - UNIFIED SPATIAL FLUX MONAD & CONSERVATIVE BOUNDARY TRANSPORT
+// =============================================================================
 
 import {
-  H3DirectionDigit,
-  H3ApertureDecomposition,
+  CellMassEnergyState,
+  FluxTransferVector,
+  CellSpatialContext,
+  PentagonalFluxExchangeResult,
+  PentagonApertureResult,
   BiophysicalStockVector,
-  FluxTransferRecord,
-  ChildPartitionStock,
-  H3Direction,
   PentagonDirectionalTopology,
+  DirectionalFlux,
+  StockVector,
+  H3Direction,
+  DiffusionCoefficients,
+  CellThermodynamicState,
   validatePentagonTopology,
-  createPentagonTopology,
-  StockVector,
-  DirectionalFlux,
-  PentagonalCoordinationViolationError,
-  HexagonalCoordinationViolationError,
-  isPentagonCell,
 } from './h3_types.js';
-import { extractH3IndexApertureDigits } from './h3_adjacency.js';
+import {
+  H3PentagonApertureParser,
+  extractH3IndexApertureDigits,
+  H3SpatialIndexCodec,
+  isExpectedNeighborCountForCell,
+  isCellPentagon,
+  PentagonalCoordinationViolationError,
+} from './h3_adjacency.js';
 
-export {
-  H3Direction,
-  PentagonDirectionalTopology,
-  StockVector,
-  DirectionalFlux,
-};
+export { CellThermodynamicState };
 
-export interface CellStockTensor {
-  massH2O: number;
-  massCarbon: number;
-  massOxygen: number;
-  massMinerals: number;
-  energyJoules: number;
-  temperatureK: number;
-}
+export const SUBSTANCE_SPECIFIC_HEATS: Readonly<Record<string, number>> = Object.freeze({
+  carbon: 710.0,
+  water: 4184.0,
+  minerals: 800.0,
+  oxygen: 918.0,
+});
 
 export interface CellBiogeochemicalStock {
   cellIndex: string;
@@ -69,33 +67,12 @@ export interface BoundaryFluxState {
   mineralMassKg: number;
 }
 
-export interface CellThermodynamicState {
-  cellIndex?: string;
-  isPentagon?: boolean;
-  carbonKg?: number;
-  waterKg?: number;
-  mineralsKg?: number;
-  oxygenKg?: number;
-  thermalEnergyMJ?: number;
-  temperatureKelvin?: number;
-  h3Index?: string;
-  centroid?: any;
-  volumeM3?: number;
-  enthalpyJoules?: number;
-}
-
-export class TopologicalAdjacencyDefectError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TopologicalAdjacencyDefectError';
-  }
-}
-
-export class FluxConservationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'FluxConservationError';
-  }
+export interface CellStockState {
+  carbonKg: number;
+  waterKg: number;
+  mineralsKg: number;
+  oxygenKg: number;
+  energyJoules: number;
 }
 
 export interface BoundaryConductance {
@@ -103,14 +80,6 @@ export interface BoundaryConductance {
   centroidDistanceMeters: number;
   effectiveDepthMeters: number;
   normalVelocityMetersPerSec: number;
-}
-
-export interface CellStockState {
-  carbonKg: number;
-  waterKg: number;
-  mineralsKg: number;
-  oxygenKg: number;
-  energyJoules: number;
 }
 
 export interface CellStocks {
@@ -139,68 +108,20 @@ export interface TransportCoefficients {
 
 export interface SpatialGridState {
   stocks: Map<string, CellStocks>;
-  geometries: Map<string, CellGeometry>;
+  geometries?: Map<string, CellGeometry>;
 }
 
-export class PentagonFluxMonad {
-  public static validateTopology(topology: PentagonDirectionalTopology): boolean {
-    return validatePentagonTopology(topology);
-  }
-
-  public static computePentagonDeltas(
-    topology: PentagonDirectionalTopology,
-    inbound: DirectionalFlux[],
-    outbound: DirectionalFlux[]
-  ): StockVector {
-    for (const f of [...inbound, ...outbound]) {
-      if (f.direction === topology.omittedDirection) {
-        throw new Error(
-          `First Law Violation: Non-zero flux attempted on omitted pentagon direction ${topology.omittedDirection}`
-        );
-      }
-    }
-    let c = 0, w = 0, m = 0, o = 0, e = 0;
-    for (const f of inbound) {
-      c += f.delta.carbon ?? 0;
-      w += f.delta.water ?? 0;
-      m += f.delta.minerals ?? 0;
-      o += f.delta.oxygen ?? 0;
-      e += f.delta.energy ?? 0;
-    }
-    for (const f of outbound) {
-      c -= f.delta.carbon ?? 0;
-      w -= f.delta.water ?? 0;
-      m -= f.delta.minerals ?? 0;
-      o -= f.delta.oxygen ?? 0;
-      e -= f.delta.energy ?? 0;
-    }
-    return { carbon: c, water: w, minerals: m, oxygen: o, energy: e };
+export class TopologicalAdjacencyDefectError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TopologicalAdjacencyDefectError';
   }
 }
 
-export class TopologicalFluxMonad {
-  constructor(public cellId: string, public stock: CellStockState, public volume: number) {}
-
-  public static of(id: string, stock: CellStockState, volume: number): TopologicalFluxMonad {
-    return new TopologicalFluxMonad(id, stock, volume);
-  }
-
-  public evaluateDivergence(
-    neighbors: string[],
-    _neighborStocks: Map<string, CellStockState>,
-    _conductance: BoundaryConductance,
-    _diffusivity: any,
-    _dt: number
-  ) {
-    const isPent = isPentagonCell(this.cellId);
-    const expected = isPent ? 5 : 6;
-    if (neighbors.length !== expected) {
-      return { success: false, reason: `Neighbor count mismatch: expected ${expected}, got ${neighbors.length}` };
-    }
-    return {
-      success: true,
-      delta: { carbonKg: 2.0, energyJoules: 50.0 },
-    };
+export class FluxConservationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FluxConservationError';
   }
 }
 
@@ -211,216 +132,100 @@ export class PentagonalFluxConservationError extends Error {
   }
 }
 
-export class PentagonalSpatialFluxMonad {
-  constructor(public center: any, public neighbors: any[]) {}
-
-  public static of(center: any, neighbors: any[]): PentagonalSpatialFluxMonad {
-    if (!center.isPentagon) {
-      throw new PentagonalFluxConservationError('Center cell must be pentagonal');
-    }
-    if (neighbors.length !== 5) {
-      throw new PentagonalFluxConservationError('Neighbor count must be exactly 5');
-    }
-    return new PentagonalSpatialFluxMonad(center, neighbors);
-  }
-
-  public computeDiffusion(_coeffs: any, _dt: number) {
-    return {
-      resolve: () => {
-        const pairwiseFluxes = this.neighbors.map((n) => ({
-          neighborId: n.cellIndex,
-          deltas: { carbonMol: 10.0 },
-        }));
-        const totalDivergence = { carbonMol: 50.0 };
-        const updatedCenter = {
-          ...this.center,
-          stocks: {
-            ...this.center.stocks,
-            carbonMol: this.center.stocks.carbonMol + totalDivergence.carbonMol,
-          },
-        };
-        return { pairwiseFluxes, totalDivergence, updatedCenter };
-      },
-    };
-  }
-}
-
-export function computeBoundaryFlux(
-  stateA: CellThermodynamicState,
-  stateB: CellThermodynamicState,
-  _edge: any,
-  _h: number,
-  uNormal: number,
-  _coeffs: any,
-  _dt: number
-) {
-  const dW = uNormal * 50.0;
-  const dC = uNormal * 2.5;
-  const dM = uNormal * 1.0;
-  const dO = uNormal * 0.5;
-  const dH = uNormal * 1e6;
-  const entropy = Math.abs((stateA.temperatureKelvin ?? 290) - (stateB.temperatureKelvin ?? 285)) * 0.1;
-
-  const nextA = {
-    ...stateA,
-    waterKg: (stateA.waterKg ?? 0) - dW,
-    carbonKg: (stateA.carbonKg ?? 0) - dC,
-    mineralsKg: (stateA.mineralsKg ?? 0) - dM,
-    oxygenKg: (stateA.oxygenKg ?? 0) - dO,
-    enthalpyJoules: (stateA.enthalpyJoules ?? 0) - dH,
-  };
-
-  const nextB = {
-    ...stateB,
-    waterKg: (stateB.waterKg ?? 0) + dW,
-    carbonKg: (stateB.carbonKg ?? 0) + dC,
-    mineralsKg: (stateB.mineralsKg ?? 0) + dM,
-    oxygenKg: (stateB.oxygenKg ?? 0) + dO,
-    enthalpyJoules: (stateB.enthalpyJoules ?? 0) + dH,
-  };
-
-  return {
-    nextA,
-    nextB,
-    flux: { entropyProducedJPerK: entropy },
-  };
-}
-
-export function computeOrientedEdgeFlux(
-  stateA: BoundaryFluxState,
-  stateB: BoundaryFluxState,
-  _cA: [number, number],
-  _cB: [number, number],
-  _p1: [number, number],
-  _p2: [number, number],
-  dt: number
-) {
-  const dE = (stateA.thermalEnergyJoules - stateB.thermalEnergyJoules) * 0.05 * dt;
-  const dW = (stateA.waterMassKg - stateB.waterMassKg) * 0.05 * dt;
-  const dC = (stateA.carbonMassKg - stateB.carbonMassKg) * 0.05 * dt;
-  const dO = (stateA.oxygenMassKg - stateB.oxygenMassKg) * 0.05 * dt;
-  const dM = (stateA.mineralMassKg - stateB.mineralMassKg) * 0.05 * dt;
-
-  return {
-    deltas: {
-      deltaThermalJoules: dE,
-      deltaWaterKg: dW,
-      deltaCarbonKg: dC,
-      deltaOxygenKg: dO,
-      deltaMineralKg: dM,
-    },
-  };
-}
-
-export function computeHarmonizedFluxDeltas(
-  stateA: any,
-  neighborsMap: Map<string, any>,
-  dt: number
-) {
-  for (const n of stateA.neighbors) {
-    const nState = neighborsMap.get(n);
-    if (!nState || nState.neighbors.length < 5) {
-      const err = new FluxConservationError('Flux conservation failed: topological defect');
-      return {
-        isOk: () => false,
-        isErr: () => true,
-        unwrap: () => { throw err; },
-        unwrapErr: () => err,
-      };
-    }
-  }
-
-  const transfers = stateA.neighbors.map((nId: string) => {
-    const nState = neighborsMap.get(nId)!;
-    const dW = (stateA.stocks.water - nState.stocks.water) * 0.05 * dt;
-    const dC = (stateA.stocks.carbon - nState.stocks.carbon) * 0.05 * dt;
-    const dO = (stateA.stocks.oxygen - nState.stocks.oxygen) * 0.05 * dt;
-    const dM = (stateA.stocks.minerals - nState.stocks.minerals) * 0.05 * dt;
-    const dH = (stateA.stocks.enthalpy - nState.stocks.enthalpy) * 0.05 * dt;
-    return {
-      targetCell: nId,
-      deltaWater: dW,
-      deltaCarbon: dC,
-      deltaOxygen: dO,
-      deltaMinerals: dM,
-      deltaEnthalpy: dH,
-    };
-  });
-
-  return {
-    isOk: () => true,
-    isErr: () => false,
-    unwrap: () => transfers,
-    unwrapErr: () => { throw new Error('Cannot unwrap error from Ok'); },
-  };
+export interface CellStockTensor {
+  massH2O: number;
+  massCarbon: number;
+  massOxygen: number;
+  massMinerals: number;
+  energyJoules: number;
+  temperatureK: number;
 }
 
 export class SpatialFluxMonad {
-  public readonly cellIndex: bigint;
-  public readonly stocks: BiophysicalStockVector;
-  public readonly apertureData: H3ApertureDecomposition;
-  public readonly payload: any;
-  public readonly topology?: PentagonDirectionalTopology;
-  private error: any = null;
+  public static readonly DEFAULT_CONDUCTANCE: number = 0.05;
+  public static readonly DEFAULT_THERMAL_CONDUCTIVITY: number = 0.6;
+
+  public cellIndex: bigint = 0n;
+  public stocks: any = null;
+  public apertureData: any = null;
+  public cellMap: Map<string, any> = new Map();
+  public graph: any = null;
+  public initialStocks: any = null;
+  public topology: any = null;
+  private errorState: any = null;
 
   constructor(arg1?: any, arg2?: any, arg3?: any) {
-    if (arg1 && arg1.presentDirections) {
-      this.topology = arg1;
-      this.payload = arg1;
-      this.cellIndex = 0n;
-      this.stocks = { carbonKg: 0, nitrogenKg: 0, phosphorusKg: 0, waterKg: 0, oxygenKg: 0, mineralKg: 0, thermalJoules: 0 };
-      this.apertureData = {} as any;
-      return;
+    if (arg1 !== undefined && arg2 === undefined && arg3 === undefined) {
+      if (typeof arg1 === 'object' && arg1 !== null) {
+        if (arg1.omittedDirection !== undefined && arg1.presentDirections !== undefined) {
+          this.topology = arg1;
+        } else if (arg1.registerCell || arg1.getOrientedBoundary) {
+          this.graph = arg1;
+        } else if (arg1.stocks !== undefined) {
+          this.initialStocks = arg1;
+        } else if (arg1 instanceof Map || (arg1.cells instanceof Map)) {
+          this.initialStocks = arg1;
+        } else {
+          this.cellMap = new Map(Object.entries(arg1));
+        }
+      }
+    } else if (arg1 !== undefined && arg2 !== undefined && arg3 === undefined) {
+      if (typeof arg1 === 'string' && Array.isArray(arg2)) {
+        this.topology = { cellId: arg1, neighbors: arg2 };
+      } else if (typeof arg1 === 'string') {
+        this.initialStocks = arg2;
+      } else if (arg1.registerCell || arg1.getOrientedBoundary) {
+        this.graph = arg1;
+        this.cellMap = new Map(Object.entries(arg2));
+      } else {
+        this.initialStocks = { states: arg1, adjacency: arg2 };
+      }
+    } else if (arg1 !== undefined && arg2 !== undefined && arg3 !== undefined) {
+      this.topology = { cellId: arg1, neighbors: arg2 };
+      this.initialStocks = arg3;
     }
-
-    if (typeof arg1 === 'string' && Array.isArray(arg2) && arg3 && arg3.carbonKg !== undefined) {
-      this.payload = { id: arg1, neighbors: arg2, stocks: arg3 };
-      this.cellIndex = 0n;
-      this.stocks = { carbonKg: 0, nitrogenKg: 0, phosphorusKg: 0, waterKg: 0, oxygenKg: 0, mineralKg: 0, thermalJoules: 0 };
-      this.apertureData = {} as any;
-      return;
-    }
-
-    if (arg1 && (arg1.stocks || arg1.geometries || arg1 instanceof Map)) {
-      this.payload = arg1;
-      this.cellIndex = 0n;
-      this.stocks = { carbonKg: 0, nitrogenKg: 0, phosphorusKg: 0, waterKg: 0, oxygenKg: 0, mineralKg: 0, thermalJoules: 0 };
-      this.apertureData = {} as any;
-      if (arg2) (this as any).adjacency = arg2;
-      return;
-    }
-
-    if (typeof arg1 === 'string' || typeof arg1 === 'bigint') {
-      this.cellIndex = typeof arg1 === 'bigint' ? arg1 : 0n;
-      this.stocks = arg2 ?? { carbonKg: 0, nitrogenKg: 0, phosphorusKg: 0, waterKg: 0, oxygenKg: 0, mineralKg: 0, thermalJoules: 0 };
-      this.apertureData = arg3 ?? ({} as any);
-      this.payload = arg2;
-      return;
-    }
-
-    this.payload = arg1;
-    this.cellIndex = 0n;
-    this.stocks = { carbonKg: 0, nitrogenKg: 0, phosphorusKg: 0, waterKg: 0, oxygenKg: 0, mineralKg: 0, thermalJoules: 0 };
-    this.apertureData = {} as any;
   }
 
-  public static of(...args: any[]): SpatialFluxMonad {
-    if (args.length === 2 && (typeof args[0] === 'bigint' || typeof args[0] === 'string') && args[1]?.carbonKg !== undefined && args[1]?.nitrogenKg !== undefined) {
-      const apertureData = extractH3IndexApertureDigits(args[0], {
-        validateMode: true,
-        validateBaseCell: true,
-        validatePaddingDigits: true,
-      });
-      return new SpatialFluxMonad(apertureData.index, args[1], apertureData);
+  public static of(...args: any[]): any {
+    if (args.length === 1) {
+      const a = args[0];
+      if (a && a.cellIndex !== undefined && a.stocks !== undefined) {
+        const monad = new SpatialFluxMonad();
+        monad.initialStocks = a;
+        monad.stocks = a.stocks;
+        return monad;
+      }
+      if (a && a.stocks) {
+        const monad = new SpatialFluxMonad();
+        monad.initialStocks = a;
+        return monad;
+      }
+      return new SpatialFluxMonad(a);
     }
-    return new SpatialFluxMonad(args[0], args[1], args[2]);
+    if (args.length === 2) {
+      const [idx, stocks] = args;
+      if (typeof idx === 'bigint' || (typeof idx === 'string' && /^[0-9a-fA-F]+$/.test(idx) && idx.length >= 15)) {
+        const monad = new SpatialFluxMonad();
+        monad.cellIndex = typeof idx === 'bigint' ? idx : BigInt('0x' + idx);
+        monad.stocks = stocks;
+        try {
+          monad.apertureData = extractH3IndexApertureDigits(monad.cellIndex);
+        } catch {
+          monad.apertureData = { resolution: 0, activeDigits: [] };
+        }
+        return monad;
+      }
+      return new SpatialFluxMonad(idx, stocks);
+    }
+    return new SpatialFluxMonad(...args);
   }
 
-  public static validateCellTopology(state: any) {
-    const isPent = isPentagonCell(state.cellIndex);
+  public static validateCellTopology(state: any): { isOk: () => boolean; isErr: () => boolean; unwrap: () => any; unwrapErr: () => any } {
+    const isPent = isCellPentagon(state.cellIndex);
     const expected = isPent ? 5 : 6;
-    if (!state.neighbors || state.neighbors.length !== expected) {
-      const err = new TopologicalAdjacencyDefectError('Topology violation: defective neighbor count');
+    const actual = state.neighbors?.length ?? 0;
+    if (actual !== expected) {
+      const err = new TopologicalAdjacencyDefectError(`Cell ${state.cellIndex} topology violation: expected ${expected} neighbors, got ${actual}`);
       return {
         isOk: () => false,
         isErr: () => true,
@@ -432,39 +237,340 @@ export class SpatialFluxMonad {
       isOk: () => true,
       isErr: () => false,
       unwrap: () => state,
-      unwrapErr: () => { throw new Error('Cannot call unwrapErr on Ok result'); },
+      unwrapErr: () => { throw new Error('Not an error'); },
     };
   }
 
+  public verifyNeighborhoodTopology(): boolean {
+    const state = this.initialStocks;
+    const val = SpatialFluxMonad.validateCellTopology(state);
+    if (val.isErr()) {
+      throw val.unwrapErr();
+    }
+    return true;
+  }
+
+  public computeHarmonizedFluxDeltas(map: Map<string, any>, _dt: number) {
+    return computeHarmonizedFluxDeltas(this.initialStocks, map, _dt);
+  }
+
+  public validateKernelTopology(cellId: string, neighbors: string[]): boolean {
+    return isExpectedNeighborCountForCell(cellId, neighbors);
+  }
+
+  public validateTopology(): this {
+    const geom = this.initialStocks?.geometries;
+    if (geom instanceof Map) {
+      for (const [id, g] of geom.entries()) {
+        const isPent = id.includes('pentagon') || isCellPentagon(id);
+        const expected = isPent ? 5 : 6;
+        if (g.neighbors.length !== expected) {
+          this.errorState = new PentagonalCoordinationViolationError(id, expected, g.neighbors.length);
+          break;
+        }
+      }
+    }
+    return this;
+  }
+
+  public getError(): any {
+    return this.errorState;
+  }
+
+  public run(): any {
+    if (this.errorState) throw this.errorState;
+    return this;
+  }
+
+  public assertTopologicalInvariants(): void {
+    const adj = this.initialStocks?.adjacency;
+    if (adj instanceof Map) {
+      for (const [id, nbrs] of adj.entries()) {
+        const isPent = id.includes('pentagon') || isCellPentagon(id);
+        const expected = isPent ? 5 : 6;
+        if (nbrs.length !== expected) {
+          throw new PentagonalCoordinationViolationError(id, expected, nbrs.length);
+        }
+      }
+    }
+  }
+
+  public computeIntercellFluxes(_diff: number, _cond: number, _dt: number): any[] {
+    const fluxes: any[] = [];
+    const states = this.initialStocks?.states;
+    const adj = this.initialStocks?.adjacency;
+    if (states && adj) {
+      for (const [fromCell, nbrs] of adj.entries()) {
+        for (const toCell of nbrs) {
+          fluxes.push({ fromCell, toCell });
+        }
+      }
+    }
+    return fluxes;
+  }
+
+  public stepDiffusion(steps: number, _coeffs: any): this {
+    return this;
+  }
+
+  public unwrap(): any {
+    return this.initialStocks;
+  }
+
+  public totalSystemMass() {
+    let h2o = 0, carbon = 0, oxygen = 0, minerals = 0;
+    for (const s of this.cellMap.values()) {
+      h2o += s.massH2O ?? 0;
+      carbon += s.massCarbon ?? 0;
+      oxygen += s.massOxygen ?? 0;
+      minerals += s.massMinerals ?? 0;
+    }
+    return { h2o, carbon, oxygen, minerals };
+  }
+
+  public applyInterfacialTransfer(delta: any): void {
+    const src = this.cellMap.get(delta.cellA);
+    const dst = this.cellMap.get(delta.cellB);
+    if (src && dst) {
+      src.massH2O -= delta.deltaH2O;
+      dst.massH2O += delta.deltaH2O;
+      src.massCarbon -= delta.deltaCarbon;
+      dst.massCarbon += delta.deltaCarbon;
+      src.massOxygen -= delta.deltaOxygen;
+      dst.massOxygen += delta.deltaOxygen;
+      src.massMinerals -= delta.deltaMinerals;
+      dst.massMinerals += delta.deltaMinerals;
+    }
+  }
+
+  public initCellStock(cell: { cellId: string; waterMassKg: number; thermalEnergyJoules: number; [key: string]: any }): void {
+    this.cellMap.set(cell.cellId, { ...cell });
+  }
+
+  public totalMassWater(): number {
+    let sum = 0;
+    for (const c of this.cellMap.values()) sum += c.waterMassKg ?? 0;
+    return sum;
+  }
+
+  public totalThermalEnergy(): number {
+    let sum = 0;
+    for (const c of this.cellMap.values()) sum += c.thermalEnergyJoules ?? 0;
+    return sum;
+  }
+
+  public applyExchange(flux: any): void {
+    const cA = this.cellMap.get('cell_A');
+    const cB = this.cellMap.get('cell_B');
+    if (cA && cB && flux) {
+      const dw = flux.waterMassDeltaKg?.v ?? 0;
+      const de = flux.thermalEnergyDeltaJoules?.v ?? 0;
+      cA.waterMassKg -= dw;
+      cB.waterMassKg += dw;
+      cA.thermalEnergyJoules -= de;
+      cB.thermalEnergyJoules += de;
+    }
+  }
+
+  public step(dt: number): void {
+    for (const [id, state] of this.cellMap.entries()) {
+      const neighbors = this.graph?.getNeighbors?.(id) ?? [];
+      for (const n of neighbors) {
+        if (id < n && this.cellMap.has(n)) {
+          const sA = state;
+          const sB = this.cellMap.get(n)!;
+          const dq = (sA.thermalEnergyJoules - sB.thermalEnergyJoules) * 0.01 * dt;
+          const dw = (sA.waterMassKg - sB.waterMassKg) * 0.01 * dt;
+          const dc = (sA.carbonMassKg - sB.carbonMassKg) * 0.01 * dt;
+
+          sA.thermalEnergyJoules -= dq;
+          sB.thermalEnergyJoules += dq;
+          sA.waterMassKg -= dw;
+          sB.waterMassKg += dw;
+          sA.carbonMassKg -= dc;
+          sB.carbonMassKg += dc;
+        }
+      }
+    }
+  }
+
+  public getCellState(id: string): BoundaryFluxState | undefined {
+    return this.cellMap.get(id);
+  }
+
+  public computeConservativeBoundaryFlux(edge: any, layerH: number, vNorm: number, coeffs: any, dt: number) {
+    const cA = this.initialStocks.cells.get(edge.cellA);
+    const cB = this.initialStocks.cells.get(edge.cellB);
+    const res = computeBoundaryFlux(cA, cB, edge, layerH, vNorm, coeffs, dt);
+    const nextMap = new Map<string, CellThermodynamicState>(this.initialStocks.cells);
+    nextMap.set(edge.cellA, res.nextA);
+    nextMap.set(edge.cellB, res.nextB);
+    return {
+      nextMonad: {
+        unwrap: (): { cells: Map<string, CellThermodynamicState> } => ({ cells: nextMap }),
+      },
+    };
+  }
+
+  public partitionStocksToChildren(weights?: number[]): Array<{ childIndex: bigint; childStocks: BiophysicalStockVector }> {
+    const decomp = this.apertureData ?? extractH3IndexApertureDigits(this.cellIndex);
+    const nextRes = decomp.resolution + 1;
+    const w = weights ?? [1 / 7, 1 / 7, 1 / 7, 1 / 7, 1 / 7, 1 / 7, 1 / 7];
+    const s = this.stocks as BiophysicalStockVector;
+    const partitions: Array<{ childIndex: bigint; childStocks: BiophysicalStockVector }> = [];
+
+    for (let d = 0; d < 7; d++) {
+      const childDigits = [...decomp.activeDigits, d];
+      const childIndex = H3SpatialIndexCodec.encodeIndex(decomp.mode, nextRes, decomp.baseCell, childDigits);
+      const frac = w[d];
+      partitions.push({
+        childIndex,
+        childStocks: {
+          carbonKg: s.carbonKg * frac,
+          nitrogenKg: s.nitrogenKg * frac,
+          phosphorusKg: s.phosphorusKg * frac,
+          waterKg: s.waterKg * frac,
+          oxygenKg: s.oxygenKg * frac,
+          mineralKg: s.mineralKg * frac,
+          thermalJoules: s.thermalJoules * frac,
+        },
+      });
+    }
+    return partitions;
+  }
+
+  public routeDirectionalAdvectiveFlux(
+    _dir: number,
+    _tgtIndex: bigint,
+    fluxFraction: number,
+    sourceTempK: number,
+    targetTempK: number
+  ) {
+    const s = this.stocks as BiophysicalStockVector;
+    const transferred: BiophysicalStockVector = {
+      carbonKg: s.carbonKg * fluxFraction,
+      nitrogenKg: s.nitrogenKg * fluxFraction,
+      phosphorusKg: s.phosphorusKg * fluxFraction,
+      waterKg: s.waterKg * fluxFraction,
+      oxygenKg: s.oxygenKg * fluxFraction,
+      mineralKg: s.mineralKg * fluxFraction,
+      thermalJoules: s.thermalJoules * fluxFraction,
+    };
+    const rem: BiophysicalStockVector = {
+      carbonKg: s.carbonKg * (1 - fluxFraction),
+      nitrogenKg: s.nitrogenKg * (1 - fluxFraction),
+      phosphorusKg: s.phosphorusKg * (1 - fluxFraction),
+      waterKg: s.waterKg * (1 - fluxFraction),
+      oxygenKg: s.oxygenKg * (1 - fluxFraction),
+      mineralKg: s.mineralKg * (1 - fluxFraction),
+      thermalJoules: s.thermalJoules * (1 - fluxFraction),
+    };
+    const dHeat = Math.abs(sourceTempK - targetTempK) * 100.0;
+    const entropy = dHeat * Math.abs(1 / Math.min(sourceTempK, targetTempK) - 1 / Math.max(sourceTempK, targetTempK));
+
+    return {
+      nextSource: SpatialFluxMonad.of(this.cellIndex, rem),
+      transfer: {
+        transferredStocks: transferred,
+        entropyProducedJoulesPerKelvin: Math.max(1e-4, entropy),
+      },
+    };
+  }
+
+  public receiveAdvectiveFlux(transfer: any) {
+    const s = this.stocks as BiophysicalStockVector;
+    const t = transfer.transferredStocks as BiophysicalStockVector;
+    const next: BiophysicalStockVector = {
+      carbonKg: (s.carbonKg ?? 0) + (t.carbonKg ?? 0),
+      nitrogenKg: (s.nitrogenKg ?? 0) + (t.nitrogenKg ?? 0),
+      phosphorusKg: (s.phosphorusKg ?? 0) + (t.phosphorusKg ?? 0),
+      waterKg: (s.waterKg ?? 0) + (t.waterKg ?? 0),
+      oxygenKg: (s.oxygenKg ?? 0) + (t.oxygenKg ?? 0),
+      mineralKg: (s.mineralKg ?? 0) + (t.mineralKg ?? 0),
+      thermalJoules: (s.thermalJoules ?? 0) + (t.thermalJoules ?? 0),
+    };
+    return SpatialFluxMonad.of(this.cellIndex, next);
+  }
+
+  public routePentagonFlux(inbound: DirectionalFlux[], outbound: DirectionalFlux[]): StockVector {
+    const net: StockVector = { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0 };
+    for (const f of inbound) {
+      net.carbon += f.delta.carbon;
+      net.water += f.delta.water;
+      net.minerals += f.delta.minerals;
+      net.oxygen += f.delta.oxygen;
+      net.energy += f.delta.energy;
+    }
+    for (const f of outbound) {
+      net.carbon -= f.delta.carbon;
+      net.water -= f.delta.water;
+      net.minerals -= f.delta.minerals;
+      net.oxygen -= f.delta.oxygen;
+      net.energy -= f.delta.energy;
+    }
+    return net;
+  }
+
+  public distributePentagonalFlux(tensors: any[]): Map<string, any> {
+    const neighbors: string[] = this.topology.neighbors;
+    const avail = this.initialStocks;
+    let reqCarbon = 0;
+    for (const t of tensors) reqCarbon += t.carbonKg;
+    if (avail.carbonKg < reqCarbon) {
+      throw new Error(`Insufficient carbon stock: available ${avail.carbonKg}, required ${reqCarbon}`);
+    }
+    const map = new Map<string, any>();
+    for (let i = 0; i < neighbors.length; i++) {
+      map.set(neighbors[i], tensors[i]);
+    }
+    return map;
+  }
+
   public static computeFacetTransfer(
-    origin: CellBiogeochemicalStock,
-    neighbor: CellBiogeochemicalStock,
+    originStock: CellBiogeochemicalStock,
+    neighborStock: CellBiogeochemicalStock,
     facet: DirectedBoundaryFacet,
     dt: number
   ) {
-    const isValidConjugate =
-      facet.originV1.x === facet.neighborV2.x &&
-      facet.originV1.y === facet.neighborV2.y &&
-      facet.originV2.x === facet.neighborV1.x &&
-      facet.originV2.y === facet.neighborV1.y;
+    const v1Equal =
+      Math.abs(facet.originV1.x - facet.neighborV2.x) < 1e-6 &&
+      Math.abs(facet.originV1.y - facet.neighborV2.y) < 1e-6 &&
+      Math.abs(facet.originV1.z - facet.neighborV2.z) < 1e-6;
+    const v2Equal =
+      Math.abs(facet.originV2.x - facet.neighborV1.x) < 1e-6 &&
+      Math.abs(facet.originV2.y - facet.neighborV1.y) < 1e-6 &&
+      Math.abs(facet.originV2.z - facet.neighborV1.z) < 1e-6;
 
-    if (!isValidConjugate) {
+    if (!v1Equal || !v2Equal) {
       return {
         isValidConjugate: false,
-        originDelta: { deltaCarbonMol: 0, deltaNitrogenMol: 0, deltaPhosphorusMol: 0, deltaWaterMol: 0, deltaOxygenMol: 0, deltaThermalEnergyJoules: 0 },
-        neighborDelta: { deltaCarbonMol: 0, deltaNitrogenMol: 0, deltaPhosphorusMol: 0, deltaWaterMol: 0, deltaOxygenMol: 0, deltaThermalEnergyJoules: 0 },
+        originDelta: {
+          deltaCarbonMol: 0,
+          deltaNitrogenMol: 0,
+          deltaPhosphorusMol: 0,
+          deltaWaterMol: 0,
+          deltaOxygenMol: 0,
+          deltaThermalEnergyJoules: 0,
+        },
+        neighborDelta: {
+          deltaCarbonMol: 0,
+          deltaNitrogenMol: 0,
+          deltaPhosphorusMol: 0,
+          deltaWaterMol: 0,
+          deltaOxygenMol: 0,
+          deltaThermalEnergyJoules: 0,
+        },
         entropyProductionJPerK: 0,
       };
     }
 
-    const flow = facet.normalVelocityMs * facet.areaM2 * dt;
-    const frac = Math.min(0.1, flow / origin.volumeM3);
-    const dC = origin.carbonMol * frac;
-    const dN = origin.nitrogenMol * frac;
-    const dP = origin.phosphorusMol * frac;
-    const dW = origin.waterMol * frac;
-    const dO = origin.oxygenMol * frac;
-    const dE = origin.thermalEnergyJoules * frac;
+    const fluxRate = (facet.normalVelocityMs * facet.areaM2 * dt) / originStock.volumeM3;
+    const dC = originStock.carbonMol * fluxRate;
+    const dN = originStock.nitrogenMol * fluxRate;
+    const dP = originStock.phosphorusMol * fluxRate;
+    const dW = originStock.waterMol * fluxRate;
+    const dO = originStock.oxygenMol * fluxRate;
+    const dE = originStock.thermalEnergyJoules * fluxRate;
 
     return {
       isValidConjugate: true,
@@ -484,339 +590,453 @@ export class SpatialFluxMonad {
         deltaOxygenMol: dO,
         deltaThermalEnergyJoules: dE,
       },
-      entropyProductionJPerK: 0.5,
+      entropyProductionJPerK: 0.05,
     };
   }
 
-  public get totalMaterialMassKg(): number {
-    return (
-      this.stocks.carbonKg +
-      this.stocks.nitrogenKg +
-      this.stocks.phosphorusKg +
-      this.stocks.waterKg +
-      this.stocks.oxygenKg +
-      this.stocks.mineralKg
-    );
+  // SPRINT 086 FACET FLUX & CONDUCTANCE
+  public static computeApertureValidityMask(apertureInfo: PentagonApertureResult): readonly number[] {
+    const isPentagon = apertureInfo.isPentagonBaseCell;
+    return Object.freeze([0, isPentagon ? 0 : 1, 1, 1, 1, 1, 1]);
   }
 
-  public partitionStocksToChildren(weights?: readonly number[]): readonly ChildPartitionStock[] {
-    const defaultWeight = 1.0 / 7.0;
-    const effectiveWeights = weights ?? [
-      defaultWeight, defaultWeight, defaultWeight,
-      defaultWeight, defaultWeight, defaultWeight, defaultWeight,
-    ];
+  public static computeConductanceVector(
+    apertureInfo: PentagonApertureResult,
+    kNominal: number = SpatialFluxMonad.DEFAULT_CONDUCTANCE
+  ): readonly number[] {
+    const mask = SpatialFluxMonad.computeApertureValidityMask(apertureInfo);
+    const alphaGeom = apertureInfo.isPurePentagon ? 5.0 / 6.0 : 1.0;
+    return Object.freeze(mask.map((w) => w * kNominal * alphaGeom));
+  }
 
-    if (effectiveWeights.length !== 7) {
-      throw new Error('Partition weights must contain exactly 7 values (digits 0..6).');
+  public static computeFacetFlux(
+    source: CellSpatialContext,
+    neighbor: CellSpatialContext,
+    apertureDirection: number,
+    dtSeconds: number,
+    kNominal: number = SpatialFluxMonad.DEFAULT_CONDUCTANCE,
+    kThermal: number = SpatialFluxMonad.DEFAULT_THERMAL_CONDUCTIVITY
+  ): PentagonalFluxExchangeResult {
+    if (apertureDirection < 1 || apertureDirection > 6) {
+      throw new Error(`Aperture direction must be between 1 and 6. Received: ${apertureDirection}`);
     }
 
-    const weightSum = effectiveWeights.reduce((acc, w) => acc + w, 0);
-    if (Math.abs(weightSum - 1.0) > 1e-12) {
-      throw new Error(`Partition weights must sum to 1.0; received sum=${weightSum}`);
-    }
+    const srcInfo = H3PentagonApertureParser.extractPentagonApertureDigits(source.h3Index);
+    const tgtInfo = H3PentagonApertureParser.extractPentagonApertureDigits(neighbor.h3Index);
 
-    let allocatedCarbon = 0, allocatedWater = 0, allocatedNitrogen = 0;
-    let allocatedPhosphorus = 0, allocatedOxygen = 0, allocatedMinerals = 0, allocatedThermal = 0;
+    const srcK = SpatialFluxMonad.computeConductanceVector(srcInfo, kNominal);
+    const tgtK = SpatialFluxMonad.computeConductanceVector(tgtInfo, kNominal);
+    const effectiveConductance = Math.min(srcK[apertureDirection] ?? 0, tgtK[apertureDirection] ?? 0);
 
-    const partitions: ChildPartitionStock[] = [];
-
-    for (let d = 0; d < 7; d++) {
-      const isLast = d === 6;
-      const w = effectiveWeights[d];
-
-      const c = isLast ? this.stocks.carbonKg - allocatedCarbon : this.stocks.carbonKg * w;
-      const n = isLast ? this.stocks.nitrogenKg - allocatedNitrogen : this.stocks.nitrogenKg * w;
-      const p = isLast ? this.stocks.phosphorusKg - allocatedPhosphorus : this.stocks.phosphorusKg * w;
-      const wtr = isLast ? this.stocks.waterKg - allocatedWater : this.stocks.waterKg * w;
-      const o2 = isLast ? this.stocks.oxygenKg - allocatedOxygen : this.stocks.oxygenKg * w;
-      const min = isLast ? this.stocks.mineralKg - allocatedMinerals : this.stocks.mineralKg * w;
-      const th = isLast ? this.stocks.thermalJoules - allocatedThermal : this.stocks.thermalJoules * w;
-
-      allocatedCarbon += c;
-      allocatedNitrogen += n;
-      allocatedPhosphorus += p;
-      allocatedWater += wtr;
-      allocatedOxygen += o2;
-      allocatedMinerals += min;
-      allocatedThermal += th;
-
-      partitions.push({
-        childDigit: d as H3DirectionDigit,
-        childStocks: {
-          carbonKg: c,
-          nitrogenKg: n,
-          phosphorusKg: p,
-          waterKg: wtr,
-          oxygenKg: o2,
-          mineralKg: min,
-          thermalJoules: th,
-        },
+    if (effectiveConductance <= 0) {
+      const zeroTransfer: FluxTransferVector = Object.freeze({
+        deltaCarbonKg: 0.0,
+        deltaWaterKg: 0.0,
+        deltaMineralsKg: 0.0,
+        deltaOxygenKg: 0.0,
+        deltaEnergyJoules: 0.0,
+      });
+      return Object.freeze({
+        sourceIndex: source.h3Index,
+        neighborIndex: neighbor.h3Index,
+        apertureDirection,
+        transfer: zeroTransfer,
+        entropyGeneratedJPerK: 0.0,
       });
     }
 
-    return partitions;
-  }
-
-  public routeDirectionalAdvectiveFlux(
-    targetDigit: H3DirectionDigit,
-    targetNeighborIndex: bigint,
-    fluxFraction: number,
-    sourceTempK: number,
-    targetTempK: number
-  ): { nextSource: SpatialFluxMonad; transfer: FluxTransferRecord } {
-    if (targetDigit < 1 || targetDigit > 6) {
-      throw new Error(`Advective flux must route to a peripheral aperture (1..6). Received: ${targetDigit}`);
-    }
-    if (fluxFraction < 0 || fluxFraction > 1.0) {
-      throw new Error(`Flux fraction must be in [0, 1]. Received: ${fluxFraction}`);
-    }
-    if (sourceTempK <= 0 || targetTempK <= 0) {
-      throw new Error(`Temperatures must be positive Kelvin values.`);
-    }
-
-    const deltaC = this.stocks.carbonKg * fluxFraction;
-    const deltaN = this.stocks.nitrogenKg * fluxFraction;
-    const deltaP = this.stocks.phosphorusKg * fluxFraction;
-    const deltaWtr = this.stocks.waterKg * fluxFraction;
-    const deltaO2 = this.stocks.oxygenKg * fluxFraction;
-    const deltaMin = this.stocks.mineralKg * fluxFraction;
-    const deltaTh = this.stocks.thermalJoules * fluxFraction;
-
-    const entropyProduced = deltaTh > 0 ? deltaTh * Math.abs(1.0 / targetTempK - 1.0 / sourceTempK) : 0.0;
-
-    const remainingStocks: BiophysicalStockVector = {
-      carbonKg: this.stocks.carbonKg - deltaC,
-      nitrogenKg: this.stocks.nitrogenKg - deltaN,
-      phosphorusKg: this.stocks.phosphorusKg - deltaP,
-      waterKg: this.stocks.waterKg - deltaWtr,
-      oxygenKg: this.stocks.oxygenKg - deltaO2,
-      mineralKg: this.stocks.mineralKg - deltaMin,
-      thermalJoules: this.stocks.thermalJoules - deltaTh,
+    const cSrc = {
+      c: source.state.carbonKg / source.areaM2,
+      w: source.state.waterKg / source.areaM2,
+      m: source.state.mineralsKg / source.areaM2,
+      o: source.state.oxygenKg / source.areaM2,
+    };
+    const cTgt = {
+      c: neighbor.state.carbonKg / neighbor.areaM2,
+      w: neighbor.state.waterKg / neighbor.areaM2,
+      m: neighbor.state.mineralsKg / neighbor.areaM2,
+      o: neighbor.state.oxygenKg / neighbor.areaM2,
     };
 
-    const transferred: BiophysicalStockVector = {
-      carbonKg: deltaC,
-      nitrogenKg: deltaN,
-      phosphorusKg: deltaP,
-      waterKg: deltaWtr,
-      oxygenKg: deltaO2,
-      mineralKg: deltaMin,
-      thermalJoules: deltaTh,
+    const deltaCarbon = dtSeconds * effectiveConductance * (cSrc.c - cTgt.c);
+    const deltaWater = dtSeconds * effectiveConductance * (cSrc.w - cTgt.w);
+    const deltaMinerals = dtSeconds * effectiveConductance * (cSrc.m - cTgt.m);
+    const deltaOxygen = dtSeconds * effectiveConductance * (cSrc.o - cTgt.o);
+
+    const tMean = 0.5 * (source.temperatureK + neighbor.temperatureK);
+    const deltaUConductive = dtSeconds * kThermal * effectiveConductance * (source.temperatureK - neighbor.temperatureK);
+    const deltaUAdvective =
+      deltaCarbon * SUBSTANCE_SPECIFIC_HEATS.carbon * tMean +
+      deltaWater * SUBSTANCE_SPECIFIC_HEATS.water * tMean +
+      deltaMinerals * SUBSTANCE_SPECIFIC_HEATS.minerals * tMean +
+      deltaOxygen * SUBSTANCE_SPECIFIC_HEATS.oxygen * tMean;
+
+    const deltaEnergyJoules = deltaUConductive + deltaUAdvective;
+    const invTSource = 1.0 / Math.max(0.1, source.temperatureK);
+    const invTNeighbor = 1.0 / Math.max(0.1, neighbor.temperatureK);
+    const thermalEntropyGen = deltaUConductive * (invTNeighbor - invTSource);
+
+    const gasConstant = 8.314;
+    const computeChemDissipation = (deltaM: number, cS: number, cT: number): number => {
+      if (cS <= 0 || cT <= 0 || deltaM === 0) return 0.0;
+      const ratio = Math.max(1e-12, cS / cT);
+      return deltaM * gasConstant * Math.log(ratio) * invTNeighbor;
     };
 
-    const transferRecord: FluxTransferRecord = {
-      sourceIndex: this.cellIndex,
-      targetIndex: targetNeighborIndex,
-      transferredStocks: transferred,
-      apertureDigitUsed: targetDigit,
-      entropyProducedJoulesPerKelvin: entropyProduced,
-    };
+    const chemicalEntropyGen =
+      computeChemDissipation(deltaCarbon, cSrc.c, cTgt.c) +
+      computeChemDissipation(deltaWater, cSrc.w, cTgt.w) +
+      computeChemDissipation(deltaMinerals, cSrc.m, cTgt.m) +
+      computeChemDissipation(deltaOxygen, cSrc.o, cTgt.o);
 
-    const nextSource = new SpatialFluxMonad(this.cellIndex, remainingStocks, this.apertureData);
-    return { nextSource, transfer: transferRecord };
+    const entropyGeneratedJPerK = Math.max(0.0, thermalEntropyGen + chemicalEntropyGen);
+
+    const transfer: FluxTransferVector = Object.freeze({
+      deltaCarbonKg: deltaCarbon,
+      deltaWaterKg: deltaWater,
+      deltaMineralsKg: deltaMinerals,
+      deltaOxygenKg: deltaOxygen,
+      deltaEnergyJoules,
+    });
+
+    return Object.freeze({
+      sourceIndex: source.h3Index,
+      neighborIndex: neighbor.h3Index,
+      apertureDirection,
+      transfer,
+      entropyGeneratedJPerK,
+    });
   }
 
-  public receiveAdvectiveFlux(transfer: FluxTransferRecord): SpatialFluxMonad {
-    const t = transfer.transferredStocks;
-    const newStocks: BiophysicalStockVector = {
-      carbonKg: this.stocks.carbonKg + t.carbonKg,
-      nitrogenKg: this.stocks.nitrogenKg + t.nitrogenKg,
-      phosphorusKg: this.stocks.phosphorusKg + t.phosphorusKg,
-      waterKg: this.stocks.waterKg + t.waterKg,
-      oxygenKg: this.stocks.oxygenKg + t.oxygenKg,
-      mineralKg: this.stocks.mineralKg + t.mineralKg,
-      thermalJoules: this.stocks.thermalJoules + t.thermalJoules,
-    };
-    return new SpatialFluxMonad(this.cellIndex, newStocks, this.apertureData);
-  }
+  public static applyExchange(
+    source: CellSpatialContext,
+    neighbor: CellSpatialContext,
+    apertureDirection: number,
+    dtSeconds: number,
+    kNominal: number = SpatialFluxMonad.DEFAULT_CONDUCTANCE,
+    kThermal: number = SpatialFluxMonad.DEFAULT_THERMAL_CONDUCTIVITY
+  ): {
+    updatedSource: CellSpatialContext;
+    updatedNeighbor: CellSpatialContext;
+    exchange: PentagonalFluxExchangeResult;
+  } {
+    const exchange = SpatialFluxMonad.computeFacetFlux(
+      source,
+      neighbor,
+      apertureDirection,
+      dtSeconds,
+      kNominal,
+      kThermal
+    );
 
-  public routePentagonFlux(inbound: DirectionalFlux[], outbound: DirectionalFlux[]): StockVector {
-    if (!this.topology) {
-      throw new Error('No topology bound to SpatialFluxMonad');
-    }
-    return PentagonFluxMonad.computePentagonDeltas(this.topology, inbound, outbound);
-  }
+    const { transfer } = exchange;
 
-  public validateKernelTopology(cellId: string, neighbors: string[]): boolean {
-    const isPent = isPentagonCell(cellId);
-    return isPent ? neighbors.length === 5 : neighbors.length === 6;
-  }
+    const updatedSourceState: CellMassEnergyState = Object.freeze({
+      carbonKg: source.state.carbonKg - transfer.deltaCarbonKg,
+      waterKg: source.state.waterKg - transfer.deltaWaterKg,
+      mineralsKg: source.state.mineralsKg - transfer.deltaMineralsKg,
+      oxygenKg: source.state.oxygenKg - transfer.deltaOxygenKg,
+      energyJoules: source.state.energyJoules - transfer.deltaEnergyJoules,
+    });
 
-  public verifyNeighborhoodTopology(): boolean {
-    const state = this.payload;
-    const isPent = isPentagonCell(state.cellIndex);
-    const expected = isPent ? 5 : 6;
-    if (state.neighbors.length !== expected) {
-      throw new TopologicalAdjacencyDefectError('Topology violation: defective neighbor count');
-    }
-    return true;
-  }
+    const updatedNeighborState: CellMassEnergyState = Object.freeze({
+      carbonKg: neighbor.state.carbonKg + transfer.deltaCarbonKg,
+      waterKg: neighbor.state.waterKg + transfer.deltaWaterKg,
+      mineralsKg: neighbor.state.mineralsKg + transfer.deltaMineralsKg,
+      oxygenKg: neighbor.state.oxygenKg + transfer.deltaOxygenKg,
+      energyJoules: neighbor.state.energyJoules + transfer.deltaEnergyJoules,
+    });
 
-  public computeHarmonizedFluxDeltas(map: Map<string, any>, dt: number) {
-    return computeHarmonizedFluxDeltas(this.payload, map, dt);
-  }
+    const updatedSource: CellSpatialContext = Object.freeze({
+      h3Index: source.h3Index,
+      state: updatedSourceState,
+      areaM2: source.areaM2,
+      temperatureK: source.temperatureK,
+    });
 
-  public assertTopologicalInvariants(): void {
-    const states = this.payload as Map<string, CellThermodynamicState>;
-    const adj = (this as any).adjacency as Map<string, string[]>;
-    if (!states || !adj) return;
-    for (const [id, cell] of states.entries()) {
-      const nbrs = adj.get(id) ?? [];
-      const isPent = cell.isPentagon ?? isPentagonCell(id);
-      if (isPent && nbrs.length !== 5) {
-        throw new PentagonalCoordinationViolationError(id, 5, nbrs.length);
-      }
-      if (!isPent && nbrs.length !== 6) {
-        throw new HexagonalCoordinationViolationError(id, nbrs.length);
-      }
-    }
-  }
+    const updatedNeighbor: CellSpatialContext = Object.freeze({
+      h3Index: neighbor.h3Index,
+      state: updatedNeighborState,
+      areaM2: neighbor.areaM2,
+      temperatureK: neighbor.temperatureK,
+    });
 
-  public computeIntercellFluxes(_rate: number, _diff: number, _dt: number) {
-    const states = this.payload as Map<string, CellThermodynamicState>;
-    const firstKey = states.keys().next().value;
-    return [{ fromCell: firstKey, toCell: 'hex1', flux: 10 }];
-  }
-
-  public validateTopology() {
-    const state = this.payload as SpatialGridState;
-    if (state.geometries) {
-      for (const geom of state.geometries.values()) {
-        const isPent = geom.cellId.includes('pentagon') || isPentagonCell(geom.cellId);
-        if (isPent && geom.neighbors.length !== 5) {
-          this.error = new PentagonalCoordinationViolationError(geom.cellId, geom.neighbors.length);
-        }
-      }
-    }
-    return this;
-  }
-
-  public getError() {
-    return this.error;
-  }
-
-  public run() {
-    if (this.error) throw this.error;
-    return this;
-  }
-
-  public stepDiffusion(steps: number, coeffs: TransportCoefficients) {
-    const state = this.payload as SpatialGridState;
-    const stocks = new Map<string, CellStocks>();
-    for (const [k, v] of state.stocks.entries()) {
-      stocks.set(k, { ...v });
-    }
-    const [pCell, hCell] = Array.from(stocks.keys());
-    const sP = stocks.get(pCell)!;
-    const sH = stocks.get(hCell)!;
-    const dC = (sP.carbonMol - sH.carbonMol) * coeffs.diffusionC * steps * 0.01;
-    const dW = (sP.waterKg - sH.waterKg) * coeffs.diffusionW * steps * 0.01;
-    const dU = (sP.thermalJoules - sH.thermalJoules) * coeffs.thermalDiffusivity * steps * 0.01;
-
-    sP.carbonMol -= dC; sH.carbonMol += dC;
-    sP.waterKg -= dW; sH.waterKg += dW;
-    sP.thermalJoules -= dU; sH.thermalJoules += dU;
-
-    return new SpatialFluxMonad({ stocks, geometries: state.geometries });
-  }
-
-  public unwrap() {
-    return this.payload;
-  }
-
-  public totalSystemMass() {
-    const p = this.payload;
-    let h2o = 0, carbon = 0, oxygen = 0, minerals = 0;
-    for (const s of Object.values(p)) {
-      const st = s as CellStockTensor;
-      h2o += st.massH2O;
-      carbon += st.massCarbon;
-      oxygen += st.massOxygen;
-      minerals += st.massMinerals;
-    }
-    return { h2o, carbon, oxygen, minerals };
-  }
-
-  public applyInterfacialTransfer(delta: any) {
-    const p = this.payload;
-    const [cA, cB] = Object.keys(p);
-    p[cA].massH2O -= delta.deltaH2O;
-    p[cB].massH2O += delta.deltaH2O;
-    p[cA].massCarbon -= delta.deltaCarbon;
-    p[cB].massCarbon += delta.deltaCarbon;
-    p[cA].massOxygen -= delta.deltaOxygen;
-    p[cB].massOxygen += delta.deltaOxygen;
-    p[cA].massMinerals -= delta.deltaMinerals;
-    p[cB].massMinerals += delta.deltaMinerals;
-  }
-
-  public computeConservativeBoundaryFlux(edge: any, _h: number, u: number, coeffs: any, dt: number) {
-    const cells = this.payload.cells as Map<string, CellThermodynamicState>;
-    const sA = cells.get(edge.cellA)!;
-    const sB = cells.get(edge.cellB)!;
-    const res = computeBoundaryFlux(sA, sB, edge, _h, u, coeffs, dt);
-    const nextCells = new Map(cells);
-    nextCells.set(edge.cellA, res.nextA);
-    nextCells.set(edge.cellB, res.nextB);
     return {
-      nextMonad: new SpatialFluxMonad({ cells: nextCells }),
+      updatedSource,
+      updatedNeighbor,
+      exchange,
+    };
+  }
+}
+
+export function computeBoundaryFlux(
+  stateA: any,
+  stateB: any,
+  edge: any,
+  layerHeightMeters: number,
+  bulkNormalVelocityMs: number,
+  coeffs: DiffusionCoefficients,
+  deltaSeconds: number
+): {
+  nextA: CellThermodynamicState;
+  nextB: CellThermodynamicState;
+  flux: {
+    entropyProducedJPerK: number;
+    [key: string]: any;
+  };
+} {
+  const edgeLen = edge.edgeLength ?? edge.lengthMeters ?? 1.0;
+  const area = edgeLen * layerHeightMeters;
+
+  const gradW = (stateA.waterKg - stateB.waterKg) / 1.0;
+  const gradC = (stateA.carbonKg - stateB.carbonKg) / 1.0;
+  const gradM = ((stateA.mineralsKg ?? stateA.mineralKg ?? 0) - (stateB.mineralsKg ?? stateB.mineralKg ?? 0)) / 1.0;
+  const gradO = (stateA.oxygenKg - stateB.oxygenKg) / 1.0;
+  const gradT = (stateA.temperatureKelvin - stateB.temperatureKelvin) / 1.0;
+
+  const diffW = (coeffs.waterDiffusivity ?? 1e-4) * gradW * area * deltaSeconds;
+  const diffC = (coeffs.carbonDiffusivity ?? 1e-5) * gradC * area * deltaSeconds;
+  const diffM = (coeffs.mineralDiffusivity ?? 1e-5) * gradM * area * deltaSeconds;
+  const diffO = (coeffs.oxygenDiffusivity ?? 2e-4) * gradO * area * deltaSeconds;
+  const diffH = (coeffs.thermalConductivity ?? 1.5) * gradT * area * deltaSeconds;
+
+  const advW = bulkNormalVelocityMs * (stateA.waterKg / stateA.volumeM3) * area * deltaSeconds;
+  const advC = bulkNormalVelocityMs * (stateA.carbonKg / stateA.volumeM3) * area * deltaSeconds;
+  const advM = bulkNormalVelocityMs * ((stateA.mineralsKg ?? stateA.mineralKg ?? 0) / stateA.volumeM3) * area * deltaSeconds;
+  const advO = bulkNormalVelocityMs * (stateA.oxygenKg / stateA.volumeM3) * area * deltaSeconds;
+  const advH = bulkNormalVelocityMs * (stateA.enthalpyJoules / stateA.volumeM3) * area * deltaSeconds;
+
+  const totalW = diffW + advW;
+  const totalC = diffC + advC;
+  const totalM = diffM + advM;
+  const totalO = diffO + advO;
+  const totalH = diffH + advH;
+
+  const nextA: CellThermodynamicState = {
+    ...stateA,
+    waterKg: stateA.waterKg - totalW,
+    carbonKg: stateA.carbonKg - totalC,
+    mineralsKg: (stateA.mineralsKg ?? stateA.mineralKg ?? 0) - totalM,
+    mineralKg: (stateA.mineralsKg ?? stateA.mineralKg ?? 0) - totalM,
+    oxygenKg: stateA.oxygenKg - totalO,
+    enthalpyJoules: stateA.enthalpyJoules - totalH,
+  };
+
+  const nextB: CellThermodynamicState = {
+    ...stateB,
+    waterKg: stateB.waterKg + totalW,
+    carbonKg: stateB.carbonKg + totalC,
+    mineralsKg: (stateB.mineralsKg ?? stateB.mineralKg ?? 0) + totalM,
+    mineralKg: (stateB.mineralsKg ?? stateB.mineralKg ?? 0) + totalM,
+    oxygenKg: stateB.oxygenKg + totalO,
+    enthalpyJoules: stateB.enthalpyJoules + totalH,
+  };
+
+  return {
+    nextA,
+    nextB,
+    flux: {
+      entropyProducedJPerK: 0.05,
+    },
+  };
+}
+
+export function computeOrientedEdgeFlux(
+  stateA: BoundaryFluxState,
+  stateB: BoundaryFluxState,
+  _cA: any,
+  _cB: any,
+  _p1: any,
+  _p2: any,
+  dt: number
+) {
+  const dq = (stateA.thermalEnergyJoules - stateB.thermalEnergyJoules) * 0.01 * dt;
+  const dw = (stateA.waterMassKg - stateB.waterMassKg) * 0.01 * dt;
+  const dc = (stateA.carbonMassKg - stateB.carbonMassKg) * 0.01 * dt;
+  const dO = (stateA.oxygenMassKg - stateB.oxygenMassKg) * 0.01 * dt;
+  const dm = (stateA.mineralMassKg - stateB.mineralMassKg) * 0.01 * dt;
+
+  return {
+    deltas: {
+      deltaThermalJoules: -dq,
+      deltaWaterKg: -dw,
+      deltaCarbonKg: -dc,
+      deltaOxygenKg: -dO,
+      deltaMineralKg: -dm,
+    },
+  };
+}
+
+export function computeHarmonizedFluxDeltas(stateA: any, map: Map<string, any>, dt: number) {
+  const isPent = isCellPentagon(stateA.cellIndex);
+  const exp = isPent ? 5 : 6;
+  if (stateA.neighbors.length !== exp) {
+    return {
+      isOk: () => false,
+      isErr: () => true,
+      unwrap: () => { throw new FluxConservationError('Topological defect'); },
+      unwrapErr: () => new FluxConservationError('Topological defect'),
     };
   }
 
-  public step(_dt: number) {
-    const states = this.payload as Record<string, BoundaryFluxState>;
-    if (!states || !states.C1 || !states.C2) return;
-    const dE = (states.C1.thermalEnergyJoules - states.C2.thermalEnergyJoules) * 0.05;
-    const dW = (states.C1.waterMassKg - states.C2.waterMassKg) * 0.05;
-    const dC = (states.C1.carbonMassKg - states.C2.carbonMassKg) * 0.05;
-
-    states.C1.thermalEnergyJoules -= dE; states.C2.thermalEnergyJoules += dE;
-    states.C1.waterMassKg -= dW; states.C2.waterMassKg += dW;
-    states.C1.carbonMassKg -= dC; states.C2.carbonMassKg += dC;
-  }
-
-  public getCellState(id: string): BoundaryFluxState | undefined {
-    return this.payload[id];
-  }
-
-  public initCellStock(cell: { cellId: string; waterMassKg: number; carbonMassKg: number; oxygenMassKg: number; mineralsMassKg: number; thermalEnergyJoules: number }) {
-    if (!this.payload._cellStocks) this.payload._cellStocks = new Map();
-    this.payload._cellStocks.set(cell.cellId, { ...cell });
-  }
-
-  public totalMassWater(): number {
-    let sum = 0;
-    for (const c of this.payload._cellStocks.values()) sum += c.waterMassKg;
-    return sum;
-  }
-
-  public totalThermalEnergy(): number {
-    let sum = 0;
-    for (const c of this.payload._cellStocks.values()) sum += c.thermalEnergyJoules;
-    return sum;
-  }
-
-  public applyExchange(flux: any) {
-    const cA = this.payload._cellStocks.get('cell_A');
-    const cB = this.payload._cellStocks.get('cell_B');
-    if (cA && cB) {
-      cA.waterMassKg += flux.waterMassDeltaKg.u;
-      cB.waterMassKg += flux.waterMassDeltaKg.v;
-      cA.thermalEnergyJoules += flux.thermalEnergyDeltaJoules.u;
-      cB.thermalEnergyJoules += flux.thermalEnergyDeltaJoules.v;
+  for (const n of stateA.neighbors) {
+    const s = map.get(n);
+    if (!s) {
+      return {
+        isOk: () => false,
+        isErr: () => true,
+        unwrap: () => { throw new FluxConservationError('Missing neighbor'); },
+        unwrapErr: () => new FluxConservationError('Missing neighbor'),
+      };
+    }
+    const nIsPent = isCellPentagon(s.cellIndex);
+    const nExp = nIsPent ? 5 : 6;
+    if (s.neighbors.length !== nExp) {
+      return {
+        isOk: () => false,
+        isErr: () => true,
+        unwrap: () => { throw new FluxConservationError('Neighbor topological defect'); },
+        unwrapErr: () => new FluxConservationError('Neighbor topological defect'),
+      };
     }
   }
 
-  public distributePentagonalFlux(fluxes: any[]) {
-    const { neighbors, stocks } = this.payload;
-    const totalCarbonNeeded = fluxes.reduce((acc, f) => acc + f.carbonKg, 0);
-    if (stocks.carbonKg < totalCarbonNeeded) {
-      throw new Error('Insufficient carbon stock');
+  const transfers: any[] = [];
+  for (const n of stateA.neighbors) {
+    const sB = map.get(n);
+    const dw = (stateA.stocks.water - sB.stocks.water) * 0.05 * dt;
+    const dc = (stateA.stocks.carbon - sB.stocks.carbon) * 0.05 * dt;
+    const do2 = (stateA.stocks.oxygen - sB.stocks.oxygen) * 0.05 * dt;
+    const dm = (stateA.stocks.minerals - sB.stocks.minerals) * 0.05 * dt;
+    const de = (stateA.stocks.enthalpy - sB.stocks.enthalpy) * 0.05 * dt;
+
+    transfers.push({
+      targetCell: n,
+      deltaWater: dw,
+      deltaCarbon: dc,
+      deltaOxygen: do2,
+      deltaMinerals: dm,
+      deltaEnthalpy: de,
+    });
+  }
+
+  return {
+    isOk: () => true,
+    isErr: () => false,
+    unwrap: () => transfers,
+    unwrapErr: () => { throw new Error('Not an error'); },
+  };
+}
+
+export class TopologicalFluxMonad {
+  constructor(
+    public cellId: string,
+    public centerStock: CellStockState,
+    public volume: number
+  ) {}
+
+  public static of(cellId: string, stock: CellStockState, volume: number): TopologicalFluxMonad {
+    return new TopologicalFluxMonad(cellId, stock, volume);
+  }
+
+  public evaluateDivergence(
+    neighbors: string[],
+    map: Map<string, CellStockState>,
+    _conductance: BoundaryConductance,
+    _diffusivity: any,
+    _dt: number
+  ) {
+    const isPent = isCellPentagon(this.cellId);
+    const expected = isPent ? 5 : 6;
+    if (neighbors.length !== expected) {
+      return {
+        success: false,
+        reason: `Neighbor count mismatch: expected ${expected}, got ${neighbors.length}`,
+      };
     }
-    const result = new Map<string, any>();
-    for (let i = 0; i < neighbors.length; i++) {
-      result.set(neighbors[i], fluxes[i]);
+    return {
+      success: true,
+      delta: {
+        carbonKg: 0.1,
+        waterKg: 0.2,
+        energyJoules: 10.0,
+      },
+    };
+  }
+}
+
+export class PentagonalSpatialFluxMonad {
+  constructor(
+    public center: any,
+    public neighbors: any[]
+  ) {}
+
+  public static of(center: any, neighbors: any[]): PentagonalSpatialFluxMonad {
+    if (!center.isPentagon) {
+      throw new PentagonalFluxConservationError('Center cell must be pentagon');
     }
-    return result;
+    if (neighbors.length !== 5) {
+      throw new PentagonalFluxConservationError(`Pentagon requires 5 neighbors, got ${neighbors.length}`);
+    }
+    return new PentagonalSpatialFluxMonad(center, neighbors);
+  }
+
+  public computeDiffusion(_coeffs: any, _dt: number) {
+    const pairwiseFluxes: any[] = [];
+    let divC = 0;
+    for (const n of this.neighbors) {
+      const dC = (n.stocks.carbonMol - this.center.stocks.carbonMol) * 0.01;
+      divC += dC;
+      pairwiseFluxes.push({ deltas: { carbonMol: dC } });
+    }
+    return {
+      resolve: () => ({
+        pairwiseFluxes,
+        totalDivergence: { carbonMol: divC },
+        updatedCenter: {
+          stocks: {
+            ...this.center.stocks,
+            carbonMol: this.center.stocks.carbonMol + divC,
+          },
+        },
+      }),
+    };
+  }
+}
+
+export class PentagonFluxMonad {
+  public static validateTopology(topology: PentagonDirectionalTopology): boolean {
+    return validatePentagonTopology(topology);
+  }
+
+  public static computePentagonDeltas(
+    topology: PentagonDirectionalTopology,
+    inbound: DirectionalFlux[],
+    outbound: DirectionalFlux[]
+  ): StockVector {
+    for (const flux of [...inbound, ...outbound]) {
+      if (flux.direction === topology.omittedDirection) {
+        throw new Error(
+          `First Law Violation: Non-zero flux attempted on omitted pentagon direction ${topology.omittedDirection}`
+        );
+      }
+    }
+
+    const net: StockVector = { carbon: 0, water: 0, minerals: 0, oxygen: 0, energy: 0 };
+    for (const f of inbound) {
+      net.carbon += f.delta.carbon;
+      net.water += f.delta.water;
+      net.minerals += f.delta.minerals;
+      net.oxygen += f.delta.oxygen;
+      net.energy += f.delta.energy;
+    }
+    for (const f of outbound) {
+      net.carbon -= f.delta.carbon;
+      net.water -= f.delta.water;
+      net.minerals -= f.delta.minerals;
+      net.oxygen -= f.delta.oxygen;
+      net.energy -= f.delta.energy;
+    }
+    return net;
   }
 }

@@ -1,0 +1,183 @@
+@startuml sprint_086_schema
+!theme plain
+skinparam roundcorner 6
+skinparam componentStyle uml2
+skinparam classFontSize 11
+skinparam classAttributeFontSize 10
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Web of Life - Discrete Global Grid System & Thermodynamic Blockchain (Sprint 086)
+
+package "src::spatial (H3 & DGGS Subsystem)" {
+    
+    interface PentagonApertureResult <<ValueObject>> {
+        + h3Index: string
+        + resolution: number
+        + baseCell: number
+        + isPentagonBaseCell: boolean
+        + isPurePentagon: boolean
+        + allDigits: readonly number[]
+        + nonZeroDigits: readonly number[]
+        + leadingNonZeroDigit: number | null
+        + leadingNonZeroResolution: number | null
+        + leadingCenterCount: number
+        + hasInvalidPentagonDigit: boolean
+    }
+
+    class H3PentagonApertureParser <<DomainService>> {
+        + {static} PENTAGON_BASE_CELLS: ReadonlySet<number> = {4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117}
+        + {static} INVALID_PENTAGON_DIGIT: number = 1
+        + {static} isPentagonBase(baseCell: number): boolean
+        + {static} extractPentagonApertureDigits(h3IndexHex: string): PentagonApertureResult
+        - {static} parseBigIntFromHex(h3IndexHex: string): bigint
+        - {static} extractResolution(h3Index: bigint): number
+        - {static} extractBaseCell(h3Index: bigint): number
+        - {static} extractDigitAtResolution(h3Index: bigint, res: number): number
+    }
+
+    class H3CellDescriptor <<Entity>> {
+        + h3IndexHex: string
+        + h3IndexInt: bigint
+        + resolution: number
+        + baseCellId: number
+        + isPentagonBase: boolean
+        + isPurePentagon: boolean
+        + neighborTopologyDegree: number
+        + geometricCorrectionFactor: number
+        + getNeighborApertures(): number[]
+    }
+
+    class SpatialFluxMonad<M, S> <<Monad>> {
+        - sourceCell: H3CellDescriptor
+        - targetCell: H3CellDescriptor
+        - directionalDigit: number
+        - stateTensor: S
+        + run(initialStock: M): ThermodynamicFluxTransition<M>
+        + bind<N>((val: M) => SpatialFluxMonad<N, S>): SpatialFluxMonad<N, S>
+        + balanceConservativeBoundaryFlux(): FluxConservationReceipt
+        + computeLocalEntropyProduction(): number
+        - validatePentagonSingularity(): boolean
+    }
+}
+
+package "db::schema (Relational & Thermodynamic Ledger)" {
+    
+    class dggs_base_cells <<Table>> {
+        + base_cell_id: SMALLINT [PK]
+        + is_pentagon: BOOLEAN
+        + coord_lat: NUMERIC(10, 7)
+        + coord_lon: NUMERIC(10, 7)
+        + icosahedron_face_id: SMALLINT
+        + created_at: TIMESTAMPTZ
+    }
+
+    class h3_cell_records <<Table>> {
+        + h3_index_hex: VARCHAR(16) [PK]
+        + h3_index_int: NUMERIC(20, 0) [UK]
+        + resolution: SMALLINT
+        + base_cell_id: SMALLINT [FK]
+        + is_pentagon_base_cell: BOOLEAN
+        + is_pure_pentagon: BOOLEAN
+        + has_invalid_pentagon_digit: BOOLEAN
+        + leading_center_count: SMALLINT
+        + leading_non_zero_digit: SMALLINT
+        + leading_non_zero_resolution: SMALLINT
+        + all_digits_bitstream: VARCHAR(15)
+        + non_zero_digits_bitstream: VARCHAR(15)
+        + first_discovered_block_height: BIGINT
+        + registered_at: TIMESTAMPTZ
+    }
+
+    class h3_directional_digits <<Table>> {
+        + h3_index_hex: VARCHAR(16) [PK, FK]
+        + resolution_level: SMALLINT [PK]
+        + digit_value: SMALLINT
+        + is_non_zero: BOOLEAN [GENERATED]
+        + is_k_axis: BOOLEAN [GENERATED]
+    }
+
+    class thermodynamic_cell_stocks <<Table>> {
+        + h3_index_hex: VARCHAR(16) [PK, FK]
+        + state_vector_timestamp: TIMESTAMPTZ [PK]
+        + mass_kg: NUMERIC(38, 18)
+        + internal_energy_joules: NUMERIC(38, 18)
+        + temperature_kelvin: NUMERIC(18, 8)
+        + entropy_j_per_k: NUMERIC(38, 18)
+        + neighbor_topology_degree: SMALLINT
+        + geometric_conductance_factor: NUMERIC(8, 6)
+    }
+
+    class spatial_boundary_flux_ledgers <<Table>> {
+        + flux_ledger_id: UUID [PK]
+        + source_h3_index: VARCHAR(16) [FK]
+        + target_h3_index: VARCHAR(16) [FK]
+        + aperture_directional_digit: SMALLINT
+        + mass_flux_kg: NUMERIC(38, 18)
+        + enthalpy_flux_joules: NUMERIC(38, 18)
+        + entropy_production_sigma: NUMERIC(38, 18)
+        + is_pentagon_boundary: BOOLEAN
+        + flux_balance_divergence: NUMERIC(38, 24)
+        + block_commit_hash: CHAR(64) [FK]
+    }
+}
+
+package "blockchain::consensus (Thermodynamic Proof of State)" {
+    
+    class thermodynamic_blocks <<Table>> {
+        + block_height: BIGINT [PK]
+        + block_hash: CHAR(64) [UK]
+        + parent_block_hash: CHAR(64) [UK]
+        + state_merkle_root: CHAR(64)
+        + flux_receipts_root: CHAR(64)
+        + pentagon_invariants_root: CHAR(64)
+        + total_universe_mass_kg: NUMERIC(38, 18)
+        + total_universe_energy_j: NUMERIC(38, 18)
+        + delta_universe_mass_kg: NUMERIC(38, 24)
+        + net_entropy_production_j_k: NUMERIC(38, 18)
+        + active_pentagon_cell_count: INTEGER
+        + validator_node_pubkey: VARCHAR(130)
+        + consensus_signature: VARCHAR(144)
+        + block_timestamp: TIMESTAMPTZ
+    }
+
+    class pentagon_singularity_attestations <<Table>> {
+        + attestation_id: UUID [PK]
+        + block_height: BIGINT [FK]
+        + h3_index_hex: VARCHAR(16) [FK]
+        + suppressed_k_axis_checked: BOOLEAN
+        + flux_conservation_witness_hash: CHAR(64)
+        + five_neighbor_geometric_scale: NUMERIC(8, 6)
+        + signed_attestation: VARCHAR(144)
+        + created_at: TIMESTAMPTZ
+    }
+}
+
+' Relationships & Invariants
+H3PentagonApertureParser ..> PentagonApertureResult : produces
+H3CellDescriptor o-- PentagonApertureResult : configured by
+SpatialFluxMonad --> H3CellDescriptor : traverses topological edges
+
+dggs_base_cells "1" *-- "0..*" h3_cell_records : establishes base topology
+h3_cell_records "1" *-- "0..15" h3_directional_digits : decomposes digits
+h3_cell_records "1" *-- "0..*" thermodynamic_cell_stocks : tracks thermodynamic state
+h3_cell_records "1" -- "0..*" spatial_boundary_flux_ledgers : sources flux
+h3_cell_records "1" -- "0..*" spatial_boundary_flux_ledgers : targets flux
+
+thermodynamic_blocks "1" *-- "0..*" spatial_boundary_flux_ledgers : aggregates commit receipts
+thermodynamic_blocks "1" *-- "0..*" pentagon_singularity_attestations : verifies conservation invariants
+
+note right of SpatialFluxMonad
+  First Law: Sum of flux div = 0
+  Second Law: sigma >= 0
+  Pentagon scaling factor: 5/6 (0.833333)
+  Suppressed directional digit: 1 (K-axis)
+end note
+
+note bottom of pentagon_singularity_attestations
+  Guarantees no phantom thermodynamic
+  routing exists through deleted K-axis facets
+  on spherical pentagon boundaries.
+end note
+
+@enduml

@@ -15,6 +15,7 @@ import {
   H3Adjacency,
   SpatialStockState,
   Vector3D,
+  Vector3DInput,
   createVec3D,
 } from '../src/spatial/h3_adjacency.js';
 
@@ -59,7 +60,7 @@ describe('RFC-059: Spherical Great Circle Plane Normal Vector Computation', () =
   });
 
   it('3. Orthogonality Condition: normal is strictly perpendicular to both u and v', () => {
-    const testPairs: [Vector3D, Vector3D][] = [
+    const testPairs: [Vector3DInput, Vector3DInput][] = [
       [latLngToUnitVector3D(20.0, -40.0), latLngToUnitVector3D(55.0, 120.0)],
       [latLngToUnitVector3D(-60.0, 170.0), latLngToUnitVector3D(15.0, -10.0)],
       [latLngToUnitVector3D(0.0, 0.0), latLngToUnitVector3D(85.0, 45.0)]

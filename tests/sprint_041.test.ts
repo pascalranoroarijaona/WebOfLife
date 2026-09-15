@@ -122,7 +122,7 @@ describe('Sprint 041: Canonical H3 Token Extraction Helper', () => {
     const result = SpatialTelemetryIngestor.ingestSafely(
       state,
       telemetryLog,
-      (token, currentState) => {
+      (token: string, currentState: { massStockTotal: number; activeCells: Set<string> }) => {
         currentState.activeCells.add(token);
         // Mass is conserved (zero transmutation)
         return currentState;

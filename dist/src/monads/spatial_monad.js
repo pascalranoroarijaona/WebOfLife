@@ -39,6 +39,7 @@ export class SpatialMonad {
     stocks = null;
     state = 'UNVERIFIED';
     energyJoules = 0;
+    trophicEnergyStockJoules = 0;
     verified = false;
     rightState = true;
     history = [];
@@ -54,6 +55,7 @@ export class SpatialMonad {
             this.id = arg1;
             this.h3Index = arg1;
             this.energyJoules = arg2;
+            this.trophicEnergyStockJoules = arg2;
             this.state = arg3;
             this.value = arg1;
             return;
@@ -74,6 +76,7 @@ export class SpatialMonad {
             this.id = arg1;
             this.h3Index = arg1;
             this.energyJoules = arg2;
+            this.trophicEnergyStockJoules = arg2;
             this.verified = false;
             this.value = arg1;
             return;
@@ -122,10 +125,15 @@ export class SpatialMonad {
                 m.h3Index = a2;
                 m.stock = a1;
                 m.stocks = a1;
+                if (typeof a1 === 'number') {
+                    m.energyJoules = a1;
+                    m.trophicEnergyStockJoules = a1;
+                }
                 return m;
             }
             if (typeof a1 === 'string') {
-                if (!matchesCanonicalH3Pattern(a1) && a1 !== 'cell_A' && a1 !== 'cell_B') {
+                const normalized = a1.toLowerCase();
+                if (!matchesCanonicalH3Pattern(normalized) && a1 !== 'cell_A' && a1 !== 'cell_B') {
                     throw new Error(`Invalid canonical H3 pattern: ${a1}`);
                 }
                 const m = new SpatialMonad(a2);
@@ -133,6 +141,10 @@ export class SpatialMonad {
                 m.h3Index = a1;
                 m.stock = a2;
                 m.stocks = a2;
+                if (typeof a2 === 'number') {
+                    m.energyJoules = a2;
+                    m.trophicEnergyStockJoules = a2;
+                }
                 return m;
             }
             return new SpatialMonad(a1);
@@ -205,6 +217,8 @@ export class SpatialMonad {
         m.resolution = this.resolution;
         m.stock = this.stock;
         m.stocks = this.stocks;
+        m.energyJoules = this.energyJoules;
+        m.trophicEnergyStockJoules = this.trophicEnergyStockJoules;
         m.overrideLedger = [...this.overrideLedger];
         return m;
     }

@@ -4,6 +4,7 @@ import {
   orderSharedBoundaryEndpointsByCentroid,
   orderSharedBoundaryEndpointsByCentroid3D,
   H3AdjacencyGraph,
+  createVec3D,
 } from '../src/spatial/h3_adjacency.js';
 import {
   computeOrientedEdgeFlux,
@@ -88,23 +89,23 @@ describe('Sprint 072 - RFC-072: Centroid-Relative Boundary Ordering & Outward No
     // Cell A at lon 0 deg (x=1, y=0, z=0)
     // Cell B at lon 90 deg (x=0, y=1, z=0)
     // Shared boundary arc at lon 45 deg from lat -30 deg to lat +30 deg
-    const centroidA: Vector3D = [1, 0, 0];
-    const centroidB: Vector3D = [0, 1, 0];
+    const centroidA: Vector3D = createVec3D(1, 0, 0);
+    const centroidB: Vector3D = createVec3D(0, 1, 0);
 
     const rad45 = Math.PI / 4;
     const rad30 = Math.PI / 6;
     const cos30 = Math.cos(rad30);
     const sin30 = Math.sin(rad30);
 
-    const p1: Vector3D = [cos30 * Math.cos(rad45), cos30 * Math.sin(rad45), -sin30];
-    const p2: Vector3D = [cos30 * Math.cos(rad45), cos30 * Math.sin(rad45), sin30];
+    const p1: Vector3D = createVec3D(cos30 * Math.cos(rad45), cos30 * Math.sin(rad45), -sin30);
+    const p2: Vector3D = createVec3D(cos30 * Math.cos(rad45), cos30 * Math.sin(rad45), sin30);
 
     const result = orderSharedBoundaryEndpointsByCentroid3D(p1, p2, centroidA, centroidB);
 
     // Normal dot displacement
-    const dx = centroidB[0] - centroidA[0];
-    const dy = centroidB[1] - centroidA[1];
-    const dz = centroidB[2] - centroidA[2];
+    const dx = centroidB.x - centroidA.x;
+    const dy = centroidB.y - centroidA.y;
+    const dz = centroidB.z - centroidA.z;
     const dot = result.outwardNormal[0] * dx + result.outwardNormal[1] * dy + result.outwardNormal[2] * dz;
 
     assert.ok(dot > 0, `3D outward normal dot product must be positive, got ${dot}`);

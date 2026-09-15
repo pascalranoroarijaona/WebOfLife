@@ -2,8 +2,9 @@
  * Web of Life - H3 Grid Facade & Comprehensive Validation Subsystem
  * Unified Multi-Sprint Implementation (Sprints 003 - 085)
  */
-import { H3SpatialIndexCodec, extractH3IndexApertureDigits } from './h3_adjacency.js';
+import { H3SpatialIndexCodec, extractH3IndexApertureDigits, assertValidLatitudeDegrees, latLngToCartesian3D, cartesian3DToLatLng, computeFacetNormalTangentBasis, dotProduct, toVec3D, projectVectorOntoSphereTangentSpace, } from './h3_adjacency.js';
 import { H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
+import { SpatialMonad, } from '../monads/spatial_monad.js';
 export { H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
 export { SpatialMonad, transitionSpatialMonad, } from '../monads/spatial_monad.js';
 export const MIN_H3_RESOLUTION = 0;
@@ -585,21 +586,33 @@ export function processSpatialMonad(payload) {
     return { isValid: true, payload, error: undefined };
 }
 export function createSpatialMonad(index, stocks) {
-    if (!matchesCanonicalH3Pattern(index.toLowerCase())) {
-        throw new H3ValidationError(index);
+    const normalized = typeof index === 'string' ? index.toLowerCase() : '';
+    if (!matchesCanonicalH3Pattern(normalized) && !isValidH3Index(index)) {
+        throw new H3ValidationError(index, `ThermodynamicViolation: Invalid H3 index '${index}'. Must be exactly 15 hex characters.`);
     }
     if (stocks && typeof stocks === 'object') {
         for (const v of Object.values(stocks)) {
-            if (typeof v === 'number' && v < 0) {
-                throw new SpatialGridError('Non-physical negative stock detected');
+            if (typeof v === 'number' && (v < 0 || Number.isNaN(v))) {
+                throw new Error('Thermodynamic invariant violation: stocks cannot be negative or NaN');
             }
         }
     }
+    const m = SpatialMonad.of(index, stocks);
+    if (typeof stocks === 'number') {
+        m.trophicEnergyStockJoules = stocks;
+        m.energyJoules = stocks;
+    }
+    return m;
+}
+// SPRINT 020 INTEGRATION
+export function executeSpatialValidationMonad(token) {
+    const isVal = isValidH3Index(token);
     return {
-        h3Index: index.toLowerCase(),
-        resolution: parseInt(index[1], 16),
-        stocks,
-        trophicEnergyStockJoules: typeof stocks === 'number' ? stocks : (stocks?.energy ?? 0),
+        token,
+        isValids: isVal,
+        isValid: isVal,
+        massDeltaKg: 0.0,
+        energyDeltaJoules: 0.0,
     };
 }
 export class SpatialTransferMonad {
@@ -607,32 +620,44 @@ export class SpatialTransferMonad {
     constructor(grid) {
         this.grid = grid;
     }
-    transferFlux(srcKey, dstKey, flux) {
-        if (!matchesCanonicalH3Pattern(srcKey) || !matchesCanonicalH3Pattern(dstKey)) {
+    transferFlux(srcCellKey, dstCellKey, flux) {
+        if (!matchesCanonicalH3Pattern(srcCellKey) || !matchesCanonicalH3Pattern(dstCellKey)) {
             return { transferred: false, nextGrid: this.grid };
         }
-        const src = this.grid.get(srcKey);
-        const dst = this.grid.get(dstKey);
-        if (!src || !dst)
-            return { transferred: false, nextGrid: this.grid };
-        if ((src.carbonMol ?? 0) < (flux.deltaCarbonMol ?? 0)) {
+        const src = this.grid.get(srcCellKey);
+        const dst = this.grid.get(dstCellKey);
+        if (!src || !dst) {
             return { transferred: false, nextGrid: this.grid };
         }
-        const nextGrid = new Map(this.grid);
+        if ((flux.deltaCarbonMol && (src.carbonMol ?? 0) < flux.deltaCarbonMol) ||
+            (flux.deltaWaterMol && (src.waterMol ?? 0) < flux.deltaWaterMol) ||
+            (flux.deltaNitrogenMol && (src.nitrogenMol ?? 0) < flux.deltaNitrogenMol) ||
+            (flux.deltaPhosphorusMol && (src.phosphorusMol ?? 0) < flux.deltaPhosphorusMol) ||
+            (flux.deltaOxygenMol && (src.oxygenMol ?? 0) < flux.deltaOxygenMol) ||
+            (flux.deltaEnthalpyJoules && (src.enthalpyJoules ?? 0) < flux.deltaEnthalpyJoules)) {
+            return { transferred: false, nextGrid: this.grid };
+        }
         const nextSrc = {
             ...src,
             carbonMol: (src.carbonMol ?? 0) - (flux.deltaCarbonMol ?? 0),
             waterMol: (src.waterMol ?? 0) - (flux.deltaWaterMol ?? 0),
+            nitrogenMol: (src.nitrogenMol ?? 0) - (flux.deltaNitrogenMol ?? 0),
+            phosphorusMol: (src.phosphorusMol ?? 0) - (flux.deltaPhosphorusMol ?? 0),
+            oxygenMol: (src.oxygenMol ?? 0) - (flux.deltaOxygenMol ?? 0),
             enthalpyJoules: (src.enthalpyJoules ?? 0) - (flux.deltaEnthalpyJoules ?? 0),
         };
         const nextDst = {
             ...dst,
             carbonMol: (dst.carbonMol ?? 0) + (flux.deltaCarbonMol ?? 0),
             waterMol: (dst.waterMol ?? 0) + (flux.deltaWaterMol ?? 0),
+            nitrogenMol: (dst.nitrogenMol ?? 0) + (flux.deltaNitrogenMol ?? 0),
+            phosphorusMol: (dst.phosphorusMol ?? 0) + (flux.deltaPhosphorusMol ?? 0),
+            oxygenMol: (dst.oxygenMol ?? 0) + (flux.deltaOxygenMol ?? 0),
             enthalpyJoules: (dst.enthalpyJoules ?? 0) + (flux.deltaEnthalpyJoules ?? 0),
         };
-        nextGrid.set(srcKey, nextSrc);
-        nextGrid.set(dstKey, nextDst);
+        const nextGrid = new Map(this.grid);
+        nextGrid.set(srcCellKey, nextSrc);
+        nextGrid.set(dstCellKey, nextDst);
         return { transferred: true, nextGrid };
     }
 }
@@ -648,15 +673,17 @@ export class SpatialPartitionMonad {
     bindPayloadSpatialIndices(payload) {
         const tokens = extractCanonicalH3Tokens(payload);
         const nextCells = new Set(this.cells);
-        for (const t of tokens)
+        for (const t of tokens) {
             nextCells.add(t);
-        const work = payload.length * 1e-6;
-        const nextThermo = {
-            ...this.thermo,
-            energyJoules: this.thermo.energyJoules - work,
-            entropyJoulesPerKelvin: this.thermo.entropyJoulesPerKelvin + work / this.thermo.ambientTemperatureKelvin,
-        };
-        return new SpatialPartitionMonad({ ...this.stocks }, nextThermo, nextCells);
+        }
+        const workJoules = Math.min(100.0, payload.length * 1e-4);
+        const nextEnergy = Math.max(0, this.thermo.energyJoules - workJoules);
+        const nextEntropy = this.thermo.entropyJoulesPerKelvin + workJoules / this.thermo.ambientTemperatureKelvin;
+        return new SpatialPartitionMonad({ ...this.stocks }, {
+            energyJoules: nextEnergy,
+            entropyJoulesPerKelvin: nextEntropy,
+            ambientTemperatureKelvin: this.thermo.ambientTemperatureKelvin,
+        }, nextCells);
     }
     getStocks() {
         return { ...this.stocks };
@@ -668,124 +695,104 @@ export class SpatialPartitionMonad {
         return Array.from(this.cells);
     }
 }
+// SPRINT 041 INTEGRATION
 export class SpatialTelemetryIngestor {
-    static ingestSafely(state, telemetry, callback) {
-        const tokens = extractUniqueCanonicalH3Tokens(telemetry);
-        let curr = state;
-        for (const t of tokens) {
-            curr = callback(t, curr);
+    static ingestSafely(state, telemetryLog, callback) {
+        const tokens = extractUniqueCanonicalH3Tokens(telemetryLog);
+        let nextState = state;
+        for (const tok of tokens) {
+            nextState = callback(tok, nextState);
         }
         return {
-            deltaMass: 0,
-            nextState: curr,
+            deltaMass: nextState.massStockTotal - state.massStockTotal,
+            nextState,
             extractedTokens: tokens,
         };
     }
 }
-export function createGeodesicCoordinate(lat, lon) {
-    return { latDeg: lat, lonDeg: lon };
+// SPRINT 053 INTEGRATION
+export function createGeodesicCoordinate(latDeg, lonDeg) {
+    assertValidLatitudeDegrees(latDeg);
+    return { latDeg, lonDeg };
 }
 export function degreesToRadians(coord) {
+    assertValidLatitudeDegrees(coord.latDeg);
     return {
         phiRad: (coord.latDeg * Math.PI) / 180,
         lambdaRad: (coord.lonDeg * Math.PI) / 180,
     };
 }
-export function syntheticH3Index(res, lat, _lon) {
-    if (lat > 90 || lat < -90) {
-        throw new RangeError('Invalid latitude');
-    }
-    return `8${res.toString(16)}000000000000`;
+export function syntheticH3Index(res, lat, lon) {
+    assertValidLatitudeDegrees(lat);
+    return `8${res.toString(16)}00${Math.floor(Math.abs(lat)).toString(16).padStart(2, '0')}${Math.floor(Math.abs(lon)).toString(16).padStart(2, '0')}ffffff`.slice(0, 15);
 }
-export function geoToCartesian3D(coord) {
-    const phi = (coord.lat * Math.PI) / 180;
-    const lam = (coord.lng * Math.PI) / 180;
+export function createCellStocks(partial) {
     return {
-        x: Math.cos(phi) * Math.cos(lam),
-        y: Math.cos(phi) * Math.sin(lam),
-        z: Math.sin(phi),
+        carbon: partial.carbon ?? 0,
+        water: partial.water ?? 0,
+        nitrogen: partial.nitrogen ?? 0,
+        phosphorus: partial.phosphorus ?? 0,
+        oxygen: partial.oxygen ?? 0,
+        thermalEnergy: partial.thermalEnergy ?? 0,
     };
 }
-export function cartesian3DToGeo(v) {
-    const hyp = Math.hypot(v.x, v.y);
-    return {
-        lat: (Math.atan2(v.z, hyp) * 180) / Math.PI,
-        lng: (Math.atan2(v.y, v.x) * 180) / Math.PI,
-    };
-}
-export function createCellStocks(data) {
-    return {
-        carbon: data.carbon ?? 0,
-        water: data.water ?? 0,
-        nitrogen: data.nitrogen ?? 0,
-        phosphorus: data.phosphorus ?? 0,
-        oxygen: data.oxygen ?? 0,
-        thermalEnergy: data.thermalEnergy ?? 0,
-    };
-}
-export function computeInterfaceAdvectiveTransfer(cellA, cellB, edgeLengthMeters, dt) {
-    const vA = Array.isArray(cellA.velocity)
-        ? cellA.velocity
-        : [cellA.velocity.x ?? 0, cellA.velocity.y ?? 0, cellA.velocity.z ?? 0];
-    const vB = Array.isArray(cellB.velocity)
-        ? cellB.velocity
-        : [cellB.velocity.x ?? 0, cellB.velocity.y ?? 0, cellB.velocity.z ?? 0];
-    const normalVelocity = (vA[1] + vB[1]) * 0.5;
-    const volFlow = normalVelocity * edgeLengthMeters * dt;
-    const frac = Math.min(0.1, Math.abs(volFlow) / cellA.area);
+export function computeInterfaceAdvectiveTransfer(cellA, cellB, edgeLength, dt) {
+    const vTanA = projectVectorOntoSphereTangentSpace(toVec3D(cellA.velocity), toVec3D(cellA.centroid));
+    const vTanB = projectVectorOntoSphereTangentSpace(toVec3D(cellB.velocity), toVec3D(cellB.centroid));
+    const basis = computeFacetNormalTangentBasis(cellA.centroid, cellB.centroid);
+    const midVel = [
+        (vTanA[0] + vTanB[0]) * 0.5,
+        (vTanA[1] + vTanB[1]) * 0.5,
+        (vTanA[2] + vTanB[2]) * 0.5,
+    ];
+    const normalVelocity = dotProduct(midVel, basis.tangentNormal);
+    const volFlow = normalVelocity * edgeLength * dt;
+    const src = normalVelocity >= 0 ? cellA : cellB;
+    const frac = Math.min(0.2, Math.abs(volFlow) / src.area);
     const fluxAtoB = {
-        carbon: cellA.stocks.carbon * frac,
-        water: cellA.stocks.water * frac,
-        nitrogen: cellA.stocks.nitrogen * frac,
-        phosphorus: cellA.stocks.phosphorus * frac,
-        oxygen: cellA.stocks.oxygen * frac,
-        thermalEnergy: cellA.stocks.thermalEnergy * frac,
+        carbon: (normalVelocity >= 0 ? cellA.stocks.carbon : -cellB.stocks.carbon) * frac,
+        water: (normalVelocity >= 0 ? cellA.stocks.water : -cellB.stocks.water) * frac,
+        nitrogen: (normalVelocity >= 0 ? cellA.stocks.nitrogen : -cellB.stocks.nitrogen) * frac,
+        phosphorus: (normalVelocity >= 0 ? cellA.stocks.phosphorus : -cellB.stocks.phosphorus) * frac,
+        oxygen: (normalVelocity >= 0 ? cellA.stocks.oxygen : -cellB.stocks.oxygen) * frac,
+        thermalEnergy: (normalVelocity >= 0 ? cellA.stocks.thermalEnergy : -cellB.stocks.thermalEnergy) * frac,
     };
     return { fluxAtoB, normalVelocity };
 }
+// SPRINT 070 INTEGRATION
+export function geoToCartesian3D(coord, radius = 1.0) {
+    return latLngToCartesian3D(coord, radius);
+}
+export function cartesian3DToGeo(v) {
+    return cartesian3DToLatLng(v);
+}
+// SPRINT 085 INTEGRATION
 export class H3GridUtils {
+    static cellToParent(index) {
+        const decomp = extractH3IndexApertureDigits(index);
+        if (decomp.resolution === 0)
+            return typeof index === 'bigint' ? index : BigInt('0x' + index);
+        const parentRes = decomp.resolution - 1;
+        const parentDigits = decomp.activeDigits.slice(0, parentRes);
+        return H3SpatialIndexCodec.encodeIndex(decomp.mode, parentRes, decomp.baseCell, parentDigits);
+    }
+    static cellToChildren(index) {
+        const decomp = extractH3IndexApertureDigits(index);
+        const childRes = decomp.resolution + 1;
+        const children = [];
+        for (let d = 0; d < 7; d++) {
+            const childDigits = [...decomp.activeDigits, d];
+            children.push(H3SpatialIndexCodec.encodeIndex(decomp.mode, childRes, decomp.baseCell, childDigits));
+        }
+        return children;
+    }
     static isValidCell(index) {
         try {
-            const decomp = extractH3IndexApertureDigits(index, {
-                validateMode: true,
-                validateBaseCell: true,
-                validatePaddingDigits: true,
-            });
+            const decomp = extractH3IndexApertureDigits(index, { validateMode: true, validateBaseCell: true });
             return decomp.isValid;
         }
         catch {
             return false;
         }
     }
-    static cellToParent(index, parentResolution) {
-        const decomp = extractH3IndexApertureDigits(index);
-        const targetRes = parentResolution ?? (decomp.resolution - 1);
-        if (targetRes < 0 || targetRes >= decomp.resolution) {
-            throw new Error(`Target parent resolution ${targetRes} must be in [0, ${decomp.resolution - 1}]`);
-        }
-        const truncatedDigits = decomp.activeDigits.slice(0, targetRes);
-        return H3SpatialIndexCodec.encodeIndex(decomp.mode, targetRes, decomp.baseCell, truncatedDigits);
-    }
-    static cellToChildren(index) {
-        const decomp = extractH3IndexApertureDigits(index);
-        if (decomp.resolution >= 15) {
-            throw new Error(`Cannot get children of max resolution 15 index: ${index}`);
-        }
-        const nextRes = decomp.resolution + 1;
-        const children = [];
-        for (let d = 0; d < 7; d++) {
-            const childDigits = [...decomp.activeDigits, d];
-            children.push(H3SpatialIndexCodec.encodeIndex(decomp.mode, nextRes, decomp.baseCell, childDigits));
-        }
-        return children;
-    }
-}
-export function executeSpatialValidationMonad(h3Index) {
-    const isValid = validateH3Length(h3Index);
-    return {
-        token: h3Index,
-        isValids: isValid,
-        massDeltaKg: 0.0,
-        energyDeltaJoules: 0.0,
-    };
 }
