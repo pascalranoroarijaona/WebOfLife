@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 084: H3 Direction Bitmask &amp; Flux Channels</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --accent-s69: #00ffcc;
+
+  /* Sprint 078-083 Invariants */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --coordination-accent: #a855f7;
+
+  /* Sprint 083 Pentagon Directional Topology */
+  --omitted-dir: #ff3366;
+  --present-dir: #00ffcc;
+  --facet-outline: #f59e0b;
+  --flux-active: #38bdf8;
+  --flux-forbidden: #ef4444;
+  --topology-gold: #fbbf24;
+
+  /* Sprint 084 H3 Direction Bitmask Specifics */
+  --bitmask-cyan: #38bdf8;
+  --bitmask-active: #10b981;
+  --bitmask-inactive: #334155;
+  --bitmask-border: #0ea5e9;
+  --reciprocal-pink: #ec4899;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(780px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.73rem;
+  margin-bottom: 10px;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 20, 35, 0.6);
+  border-radius: 6px;
+  border: 1px solid #14354b;
+}
+
+.metric-item {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  font-weight: bold;
+  color: var(--accent-s69);
+}
+
+.badge-pass {
+  color: var(--type-pass);
+  border: 1px solid var(--type-pass);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 255, 162, 0.1);
+  font-size: 0.68rem;
+}
+
+.badge-fail {
+  color: var(--type-fail);
+  border: 1px solid var(--type-fail);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 42, 95, 0.1);
+  font-size: 0.68rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+#inspector {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  font-size: 0.74rem;
+}
+
+#inspector h3 {
+  color: var(--accent-s69);
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #14354b;
+  padding-bottom: 4px;
+}
+
+.panel-sec {
+  margin-bottom: 12px;
+}
+
+.panel-sec-title {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  letter-spacing: 0.6px;
+}
+
+.bitmask-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.bit-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  border-radius: 4px;
+  border: 1px solid #234255;
+  background: #091723;
+  font-size: 0.65rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+.bit-box.active {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: var(--bitmask-active);
+  color: #34d399;
+}
+
+.bit-box.inactive {
+  background: rgba(51, 65, 85, 0.3);
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+.bit-box.forbidden {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--flux-forbidden);
+  color: #f87171;
+  cursor: not-allowed;
+}
+
+.bit-idx {
+  font-size: 0.58rem;
+  color: var(--muted);
+}
+
+.bit-val {
+  font-weight: bold;
+}
+
+.reciprocal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.68rem;
+  margin-top: 6px;
+}
+
+.reciprocal-table th,
+.reciprocal-table td {
+  padding: 4px 6px;
+  border: 1px solid #14354b;
+  text-align: center;
+}
+
+.reciprocal-table th {
+  background: rgba(0, 30, 50, 0.5);
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.68rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<header id="topbar">
+  <h1>H3 Direction Bitmask &amp; Flux Channels</h1>
+  <h2>Sprint 084: Discrete 6-Bit Encoding, Pair Reciprocity (1↔4, 2↔5, 3↔6) &amp; Disclination Invariants</h2>
+
+  <div class="metric-strip">
+    <div class="metric-item">
+      <span class="metric-label">Cell:</span>
+      <span class="metric-val" id="valCellId">P0 (Pentagon)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Coord:</span>
+      <span class="metric-val" id="valCoord">z = 5</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Bitmask:</span>
+      <span class="metric-val" id="valBitmask">0b01111100 (0x7C)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Reciprocity:</span>
+      <span class="metric-val badge-pass" id="valReciprocity">VALID</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Net Flux:</span>
+      <span class="metric-val" id="valNetFlux">0.0000 J/s</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Euler:</span>
+      <span class="metric-val badge-pass" id="valEuler">χ = 2 (PASS)</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btnPlayPause" class="active">Pause</button>
+    <button id="btnStep">Step</button>
+    <button id="btnPentagonFocus">Select Pentagon</button>
+    <button id="btnHexagonFocus">Select Hexagon</button>
+    <button id="btnEnforceReciprocal">Enforce Reciprocity</button>
+    <button id="btnToggleFluxAnim">Toggle Flux Flow</button>
+    <button id="btnReset">Reset Grid</button>
+  </div>
+</header>
+
+<aside id="inspector">
+  <h3>Direction Bitmask Inspector</h3>
+
+  <div class="panel-sec">
+    <div class="panel-sec-title">Discrete Direction Bit Register (b1..b6)</div>
+    <div class="bitmask-row" id="bitmaskRow">
+      <!-- Generated via JS -->
+    </div>
+    <div style="font-size:0.62rem; color:var(--muted); line-height:1.3;">
+      Bit 1..6 represent discrete H3 directions radiating outwardly. Hexagons have all 6 bits present (<code style="color:#00ffcc">0x7E</code>). Pentagons feature 1 omitted direction bit (<code style="color:#ff3366">FORBIDDEN</code>).
+    </div>
+  </div>
+
+  <div class="panel-sec">
+    <div class="panel-sec-title">Reciprocal Pair Matching Matrix</div>
+    <table class="reciprocal-table">
+      <thead>
+        <tr>
+          <th>Dir</th>
+          <th>Opp</th>
+          <th>Bit</th>
+          <th>Recip. Bit</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="reciprocalBody">
+        <!-- Generated via JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel-sec">
+    <div class="panel-sec-title">Thermodynamic Channel Summary</div>
+    <div style="display:flex; flex-direction:column; gap:4px; font-size:0.68rem;">
+      <div style="display:flex; justify-content:space-between;">
+        <span class="metric-label">Total Channel Count:</span>
+        <span class="metric-val" id="valChannelCount">110</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span class="metric-label">Active Transports:</span>
+        <span class="metric-val" id="valActiveCount">98</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span class="metric-label">Forbidden Passages:</span>
+        <span class="metric-val" style="color:var(--flux-forbidden)" id="valForbiddenCount">12</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span class="metric-label">System Internal Energy:</span>
+        <span class="metric-val" id="valEnergyTotal">1240.0 kJ</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-sec">
+    <div class="panel-sec-title">Visual Map Legend</div>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:var(--pentagon-color);"></div>
+        <span>Pentagonal Disclination (Coord = 5)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:var(--hexagon-color);"></div>
+        <span>Hexagonal Lattice Cell (Coord = 6)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:var(--bitmask-active);"></div>
+        <span>Active Flux Channel (Reciprocal Synced)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:var(--flux-forbidden);"></div>
+        <span>Omitted Direction (Flux Forbidden)</span>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Constants & Pair Definitions ---
+  // In H3 hexagonal directional space, directions 1..6 have reciprocal opposite directions:
+  // 1 (K) <-> 4 (I), 2 (J) <-> 5 (IK), 3 (JK) <-> 6 (IJ)
+  const RECIPROCAL_MAP = { 1: 4, 2: 5, 3: 6, 4: 1, 5: 2, 6: 3 };
+  const DIR_NAMES = {
+    1: 'K (1)',
+    2: 'J (2)',
+    3: 'JK (3)',
+    4: 'I (4)',
+    5: 'IK (5)',
+    6: 'IJ (6)'
+  };
+
+  // 12 icosahedral vertices on sphere (golden ratio phi)
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const ICO_VERTS = [
+    [-1,  PHI, 0], [ 1,  PHI, 0], [-1, -PHI, 0], [ 1, -PHI, 0],
+    [ 0, -1,  PHI], [ 0,  1,  PHI], [ 0, -1, -PHI], [ 0,  1, -PHI],
+    [ PHI, 0, -1], [ PHI, 0,  1], [-PHI, 0, -1], [-PHI, 0,  1]
+  ].map(v => {
+    const len = Math.hypot(v[0], v[1], v[2]);
+    return [v[0] / len, v[1] / len, v[2] / len];
+  });
+
+  // Construct Geodesic cells: 12 Pentagons + 30 Hexagons (subdivided edge midpoints projected)
+  const cells = [];
+  
+  // 12 Pentagons
+  ICO_VERTS.forEach((pos, idx) => {
+    cells.push({
+      id: `P${idx}`,
+      type: 'pentagon',
+      pos: pos,
+      coordination: 5,
+      omittedDir: (idx % 6) + 1, // Pentagon disclination omits one direction
+      bitmask: 0,                // Calculated below
+      channels: {},              // Direction 1..6 -> { active: boolean, flux: number, target: number }
+      energy: 50.0 + (idx % 5) * 10
+    });
+  });
+
+  // Generate 30 Hexagons at intermediate points between connected icosahedron vertices
+  let hexIdx = 0;
+  for (let i = 0; i < ICO_VERTS.length; i++) {
+    for (let j = i + 1; j < ICO_VERTS.length; j++) {
+      const dist = Math.hypot(
+        ICO_VERTS[i][0] - ICO_VERTS[j][0],
+        ICO_VERTS[i][1] - ICO_VERTS[j][1],
+        ICO_VERTS[i][2] - ICO_VERTS[j][2]
+      );
+      // Standard edge distance in normalized icosahedron is ~1.051
+      if (dist < 1.15) {
+        const mid = [
+          (ICO_VERTS[i][0] + ICO_VERTS[j][0]) * 0.5,
+          (ICO_VERTS[i][1] + ICO_VERTS[j][1]) * 0.5,
+          (ICO_VERTS[i][2] + ICO_VERTS[j][2]) * 0.5
+        ];
+        const len = Math.hypot(mid[0], mid[1], mid[2]);
+        cells.push({
+          id: `H${hexIdx++}`,
+          type: 'hexagon',
+          pos: [mid[0] / len, mid[1] / len, mid[2] / len],
+          coordination: 6,
+          omittedDir: null,
+          bitmask: 0x7E, // All bits 1..6 active (0b01111110 = 126)
+          channels: {},
+          energy: 30.0 + (hexIdx % 6) * 5
+        });
+      }
+    }
+  }
+
+  // Initialize Bitmasks & Channels
+  cells.forEach(cell => {
+    let mask = 0;
+    for (let d = 1; d <= 6; d++) {
+      if (cell.type === 'pentagon' && d === cell.omittedDir) {
+        cell.channels[d] = { active: false, forbidden: true, flux: 0, target: null };
+      } else {
+        mask |= (1 << d);
+        cell.channels[d] = { active: true, forbidden: false, flux: (Math.random() * 2 - 1).toFixed(2) * 1, target: null };
+      }
+    }
+    cell.bitmask = mask;
+  });
+
+  // Find neighbor connectivity based on closest angular distances
+  cells.forEach((cellA, idxA) => {
+    const distances = [];
+    cells.forEach((cellB, idxB) => {
+      if (idxA !== idxB) {
+        const dot = cellA.pos[0] * cellB.pos[0] + cellA.pos[1] * cellB.pos[1] + cellA.pos[2] * cellB.pos[2];
+        distances.push({ idx: idxB, dot });
+      }
+    });
+    // Sort descending by dot product (closest angle)
+    distances.sort((a, b) => b.dot - a.dot);
+
+    let neighborSlot = 0;
+    for (let d = 1; d <= 6; d++) {
+      if (!cellA.channels[d].forbidden) {
+        if (distances[neighborSlot]) {
+          cellA.channels[d].target = distances[neighborSlot].idx;
+          neighborSlot++;
+        }
+      }
+    }
+  });
+
+  // Selected cell state
+  let selectedCellIndex = 0;
+  let isPlaying = true;
+  let animateFlux = true;
+  let fluxPhase = 0;
+
+  // Canvas Setup & Rotation
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  let rotX = 0.4;
+  let rotY = 0.6;
+  let isDragging = false;
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // Mouse Interaction
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      const dx = e.clientX - lastMouseX;
+      const dy = e.clientY - lastMouseY;
+      rotY += dx * 0.007;
+      rotX += dy * 0.007;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  // Cell click picking
+  canvas.addEventListener('click', (e) => {
+    if (Math.abs(e.clientX - lastMouseX) > 4 || Math.abs(e.clientY - lastMouseY) > 4) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    let closestIdx = -1;
+    let closestDist = 28; // Click threshold px
+
+    cells.forEach((cell, idx) => {
+      const p = project(cell.pos);
+      if (p.z > 0) { // front facing
+        const dist = Math.hypot(p.x - mx, p.y - my);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIdx = idx;
+        }
+      }
+    });
+
+    if (closestIdx !== -1) {
+      selectedCellIndex = closestIdx;
+      updateUI();
+    }
+  });
+
+  // 3D Projection
+  function project(pos3d) {
+    // Rotation Y
+    const cosY = Math.cos(rotY);
+    const sinY = Math.sin(rotY);
+    let x1 = pos3d[0] * cosY - pos3d[2] * sinY;
+    let z1 = pos3d[0] * sinY + pos3d[2] * cosY;
+
+    // Rotation X
+    const cosX = Math.cos(rotX);
+    const sinX = Math.sin(rotX);
+    let y2 = pos3d[1] * cosX - z1 * sinX;
+    let z2 = pos3d[1] * sinX + z1 * cosX;
+
+    const scale = Math.min(canvas.width, canvas.height) * 0.38;
+    const cx = canvas.width * 0.5;
+    const cy = canvas.height * 0.52;
+
+    return {
+      x: cx + x1 * scale,
+      y: cy - y2 * scale,
+      z: z2
+    };
+  }
+
+  // UI Updates
+  function updateUI() {
+    const cell = cells[selectedCellIndex];
+    document.getElementById('valCellId').textContent = `${cell.id} (${cell.type.toUpperCase()})`;
+    document.getElementById('valCoord').textContent = `z = ${cell.coordination}`;
+    
+    // Hex string & Binary bitmask
+    const binStr = '0b' + (cell.bitmask & 0x7E).toString(2).padStart(8, '0');
+    const hexStr = '0x' + (cell.bitmask & 0x7E).toString(16).toUpperCase().padStart(2, '0');
+    document.getElementById('valBitmask').textContent = `${binStr} (${hexStr})`;
+
+    // Verify Reciprocity
+    let reciprocityPass = true;
+    let netFlux = 0;
+    for (let d = 1; d <= 6; d++) {
+      const ch = cell.channels[d];
+      netFlux += ch.flux;
+      if (ch.active && ch.target !== null) {
+        const neighbor = cells[ch.target];
+        const oppDir = RECIPROCAL_MAP[d];
+        const neighborOppCh = neighbor.channels[oppDir];
+        if (!neighborOppCh || !neighborOppCh.active) {
+          reciprocityPass = false;
+        }
+      }
+    }
+
+    const recipEl = document.getElementById('valReciprocity');
+    if (reciprocityPass) {
+      recipEl.className = 'metric-val badge-pass';
+      recipEl.textContent = 'VALID';
+    } else {
+      recipEl.className = 'metric-val badge-fail';
+      recipEl.textContent = 'ASYMMETRIC';
+    }
+
+    document.getElementById('valNetFlux').textContent = `${netFlux >= 0 ? '+' : ''}${netFlux.toFixed(4)} J/s`;
+
+    // Render Inspector Bit Box Elements
+    const bitRow = document.getElementById('bitmaskRow');
+    bitRow.innerHTML = '';
+    for (let d = 1; d <= 6; d++) {
+      const ch = cell.channels[d];
+      const box = document.createElement('div');
+      let statusClass = 'inactive';
+      let bitVal = '0';
+
+      if (ch.forbidden) {
+        statusClass = 'forbidden';
+        bitVal = 'X';
+      } else if (ch.active) {
+        statusClass = 'active';
+        bitVal = '1';
+      }
+
+      box.className = `bit-box ${statusClass}`;
+      box.innerHTML = `<span class="bit-idx">b${d}</span><span class="bit-val">${bitVal}</span>`;
+      box.title = `Direction ${d}: ${DIR_NAMES[d]} - ${statusClass.toUpperCase()}`;
+
+      box.addEventListener('click', () => {
+        if (!ch.forbidden) {
+          ch.active = !ch.active;
+          if (ch.active) {
+            cell.bitmask |= (1 << d);
+          } else {
+            cell.bitmask &= ~(1 << d);
+          }
+          updateUI();
+        }
+      });
+      bitRow.appendChild(box);
+    }
+
+    // Render Reciprocal Table
+    const tbody = document.getElementById('reciprocalBody');
+    tbody.innerHTML = '';
+    for (let d = 1; d <= 6; d++) {
+      const ch = cell.channels[d];
+      const oppD = RECIPROCAL_MAP[d];
+      let neighborBit = '-';
+      let statusText = 'CLOSED';
+      let statusColor = '#94a3b8';
+
+      if (ch.forbidden) {
+        statusText = 'FORBIDDEN';
+        statusColor = 'var(--flux-forbidden)';
+      } else if (ch.active) {
+        if (ch.target !== null) {
+          const nCell = cells[ch.target];
+          const nCh = nCell.channels[oppD];
+          neighborBit = nCh && nCh.active ? '1' : '0';
+          if (nCh && nCh.active) {
+            statusText = 'PAIRED';
+            statusColor = 'var(--bitmask-active)';
+          } else {
+            statusText = 'DEFECT';
+            statusColor = 'var(--type-fail)';
+          }
+        }
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="color:var(--present-dir); font-weight:bold;">${DIR_NAMES[d]}</td>
+        <td style="color:var(--reciprocal-pink);">${DIR_NAMES[oppD]}</td>
+        <td>${ch.forbidden ? 'X' : (ch.active ? '1' : '0')}</td>
+        <td>${neighborBit}</td>
+        <td style="color:${statusColor}; font-weight:bold;">${statusText}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    // Recalculate totals
+    let activeChannels = 0;
+    let forbiddenChannels = 0;
+    let totalE = 0;
+
+    cells.forEach(c => {
+      totalE += c.energy;
+      for (let d = 1; d <= 6; d++) {
+        if (c.channels[d].forbidden) forbiddenChannels++;
+        else if (c.channels[d].active) activeChannels++;
+      }
+    });
+
+    document.getElementById('valActiveCount').textContent = activeChannels;
+    document.getElementById('valForbiddenCount').textContent = forbiddenChannels;
+    document.getElementById('valEnergyTotal').textContent = totalE.toFixed(1) + ' kJ';
+  }
+
+  // Enforce Reciprocity
+  function enforceReciprocity() {
+    cells.forEach(cell => {
+      for (let d = 1; d <= 6; d++) {
+        const ch = cell.channels[d];
+        if (ch.active && ch.target !== null) {
+          const neighbor = cells[ch.target];
+          const oppDir = RECIPROCAL_MAP[d];
+          if (neighbor.channels[oppDir] && !neighbor.channels[oppDir].forbidden) {
+            neighbor.channels[oppDir].active = true;
+            neighbor.bitmask |= (1 << oppDir);
+            // Equal and opposite flux
+            neighbor.channels[oppDir].flux = -ch.flux;
+          }
+        }
+      }
+    });
+    updateUI();
+  }
+
+  // Simulation Step
+  function stepSimulation() {
+    fluxPhase += 0.05;
+    cells.forEach(cell => {
+      for (let d = 1; d <= 6; d++) {
+        const ch = cell.channels[d];
+        if (ch.active && ch.target !== null) {
+          const neighbor = cells[ch.target];
+          const grad = (cell.energy - neighbor.energy) * 0.01;
+          ch.flux = Number(grad.toFixed(4));
+          cell.energy -= grad * 0.2;
+          neighbor.energy += grad * 0.2;
+        }
+      }
+    });
+    updateUI();
+  }
+
+  // Render Loop
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Sort cells for back-to-front rendering
+    const projectedCells = cells.map((cell, idx) => {
+      const proj = project(cell.pos);
+      return { cell, idx, proj };
+    });
+    projectedCells.sort((a, b) => a.proj.z - b.proj.z);
+
+    // Draw Flux Channels & Edges
+    projectedCells.forEach(({ cell, idx, proj }) => {
+      for (let d = 1; d <= 6; d++) {
+        const ch = cell.channels[d];
+        if (ch.target !== null) {
+          const targetProj = project(cells[ch.target].pos);
+
+          // Only draw if front-ish or connected
+          if (proj.z > -0.4 || targetProj.z > -0.4) {
+            ctx.beginPath();
+            ctx.moveTo(proj.x, proj.y);
+            ctx.lineTo(targetProj.x, targetProj.y);
+
+            if (ch.forbidden) {
+              ctx.strokeStyle = 'rgba(239, 68, 68, 0.2)';
+              ctx.lineWidth = 1;
+              ctx.setLineDash([3, 3]);
+            } else if (ch.active) {
+              ctx.strokeStyle = (idx === selectedCellIndex) ? '#00ffff' : 'rgba(56, 189, 248, 0.35)';
+              ctx.lineWidth = (idx === selectedCellIndex) ? 2 : 1;
+              ctx.setLineDash([]);
+            } else {
+              ctx.strokeStyle = 'rgba(51, 65, 85, 0.2)';
+              ctx.lineWidth = 1;
+              ctx.setLineDash([2, 4]);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Animated flux packets along active reciprocal links
+            if (animateFlux && ch.active && proj.z > -0.1 && targetProj.z > -0.1) {
+              const t = (fluxPhase + (idx * 0.17)) % 1.0;
+              const px = proj.x + (targetProj.x - proj.x) * t;
+              const py = proj.y + (targetProj.y - proj.y) * t;
+
+              ctx.beginPath();
+              ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = idx === selectedCellIndex ? '#ffe600' : '#38bdf8';
+              ctx.shadowColor = '#00e1ff';
+              ctx.shadowBlur = 6;
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            }
+          }
+        }
+      }
+    });
+
+    // Draw Cell Nodes & Direction Spoke Glyphs
+    projectedCells.forEach(({ cell, idx, proj }) => {
+      const isSelected = idx === selectedCellIndex;
+      const radius = cell.type === 'pentagon' ? 10 : 8;
+      const depthAlpha = Math.max(0.2, (proj.z + 1.0) / 2.0);
+
+      // Outer glow for selected or pentagons
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, radius + 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 255, 204, 0.2)';
+        ctx.fill();
+        ctx.strokeStyle = '#00ffcc';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Cell Base Shape
+      ctx.beginPath();
+      const sides = cell.type === 'pentagon' ? 5 : 6;
+      for (let s = 0; s < sides; s++) {
+        const angle = (s * 2 * Math.PI / sides) - (Math.PI / 2);
+        const vx = proj.x + Math.cos(angle) * radius;
+        const vy = proj.y + Math.sin(angle) * radius;
+        if (s === 0) ctx.moveTo(vx, vy);
+        else ctx.lineTo(vx, vy);
+      }
+      ctx.closePath();
+
+      if (cell.type === 'pentagon') {
+        ctx.fillStyle = `rgba(255, 0, 85, ${depthAlpha * 0.8})`;
+        ctx.strokeStyle = `rgba(255, 80, 130, ${depthAlpha})`;
+      } else {
+        ctx.fillStyle = `rgba(0, 225, 255, ${depthAlpha * 0.4})`;
+        ctx.strokeStyle = `rgba(0, 225, 255, ${depthAlpha * 0.8})`;
+      }
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+
+      // Direction Bitmask Indicators radiating from selected cell
+      if (isSelected) {
+        for (let d = 1; d <= 6; d++) {
+          const ch = cell.channels[d];
+          const angle = ((d - 1) * 2 * Math.PI / 6) - (Math.PI / 2);
+          const spokeLen = 22;
+          const sx = proj.x + Math.cos(angle) * spokeLen;
+          const sy = proj.y + Math.sin(angle) * spokeLen;
+
+          ctx.beginPath();
+          ctx.moveTo(proj.x, proj.y);
+          ctx.lineTo(sx, sy);
+
+          if (ch.forbidden) {
+            ctx.strokeStyle = 'var(--flux-forbidden)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw "X" for forbidden omitted direction
+            ctx.beginPath();
+            ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444';
+            ctx.fill();
+          } else {
+            ctx.strokeStyle = ch.active ? 'var(--bitmask-active)' : 'var(--bitmask-inactive)';
+            ctx.lineWidth = ch.active ? 2 : 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = ch.active ? '#10b981' : '#475569';
+            ctx.fill();
+          }
+        }
+      }
+
+      // Label
+      if (proj.z > 0.2 || isSelected) {
+        ctx.fillStyle = isSelected ? '#ffffff' : (cell.type === 'pentagon' ? '#ff80a0' : '#80e5ff');
+        ctx.font = isSelected ? 'bold 11px monospace' : '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(cell.id, proj.x, proj.y + radius + 12);
+      }
+    });
+
+    if (isPlaying) {
+      fluxPhase += 0.015;
+      rotY += 0.0015;
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  // Event Listeners
+  document.getElementById('btnPlayPause').addEventListener('click', function () {
+    isPlaying = !isPlaying;
+    this.textContent = isPlaying ? 'Pause' : 'Resume';
+    this.classList.toggle('active', isPlaying);
+  });
+
+  document.getElementById('btnStep').addEventListener('click', () => {
+    stepSimulation();
+  });
+
+  document.getElementById('btnPentagonFocus').addEventListener('click', () => {
+    // Pick next pentagon
+    let nextIdx = (selectedCellIndex + 1) % cells.length;
+    while (cells[nextIdx].type !== 'pentagon') {
+      nextIdx = (nextIdx + 1) % cells.length;
+    }
+    selectedCellIndex = nextIdx;
+    updateUI();
+  });
+
+  document.getElementById('btnHexagonFocus').addEventListener('click', () => {
+    // Pick next hexagon
+    let nextIdx = (selectedCellIndex + 1) % cells.length;
+    while (cells[nextIdx].type !== 'hexagon') {
+      nextIdx = (nextIdx + 1) % cells.length;
+    }
+    selectedCellIndex = nextIdx;
+    updateUI();
+  });
+
+  document.getElementById('btnEnforceReciprocal').addEventListener('click', () => {
+    enforceReciprocity();
+  });
+
+  document.getElementById('btnToggleFluxAnim').addEventListener('click', function () {
+    animateFlux = !animateFlux;
+    this.classList.toggle('active', animateFlux);
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    cells.forEach(cell => {
+      let mask = 0;
+      for (let d = 1; d <= 6; d++) {
+        if (cell.type === 'pentagon' && d === cell.omittedDir) {
+          cell.channels[d] = { active: false, forbidden: true, flux: 0, target: cell.channels[d].target };
+        } else {
+          mask |= (1 << d);
+          cell.channels[d] = { active: true, forbidden: false, flux: (Math.random() * 2 - 1).toFixed(2) * 1, target: cell.channels[d].target };
+        }
+      }
+      cell.bitmask = mask;
+      cell.energy = cell.type === 'pentagon' ? 60.0 : 35.0;
+    });
+    enforceReciprocity();
+    updateUI();
+  });
+
+  // Initial Sync
+  enforceReciprocity();
+  updateUI();
+  render();
+})();
+</script>
+</body>
+</html>

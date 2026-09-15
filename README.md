@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 41%
-SPRINT_GOAL: Define PentagonDirectionalTopology interface with presentDirections and omittedDirection in src/spatial/h3_types.ts.
+Roadmap Completion: 42%
+SPRINT_GOAL: Define H3DirectionBitmask constant map and DirectionBitmask type in src/spatial/h3_types.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -269,7 +269,8 @@ SPRINT_GOAL: Define PentagonDirectionalTopology interface with presentDirections
 - [x] Implement `assertPentagonalNeighborArrayType` asserting input is an Array and throwing TypeError if non-array in `src/spatial/h3_adjacency.ts`
 - [x] Implement `assertPentagonalNeighborStringElements` validating every element of pentagonal neighbor array is a non-empty string in `src/spatial/h3_adjacency.ts`
 - [x] Implement `validatePentagonalNeighborCount` checking neighbor array length equals 5 and throwing `PentagonalCoordinationViolationError` in `src/spatial/h3_adjacency.ts`
-- [ ] Define `PentagonDirectionalTopology` interface with `presentDirections` and `omittedDirection` in `src/spatial/h3_types.ts`
+- [x] Define `PentagonDirectionalTopology` interface with `presentDirections` and `omittedDirection` in `src/spatial/h3_types.ts`
+- [ ] Define H3DirectionBitmask constant map and DirectionBitmask type in `src/spatial/h3_types.ts`
 - [ ] Implement `extractPentagonApertureDigits` parsing non-zero directional digits from 64-bit H3 index in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`

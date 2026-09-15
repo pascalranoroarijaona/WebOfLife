@@ -1,171 +1,186 @@
 -- ============================================================================
--- Web of Life: Thermodynamic Blockchain & Discrete Spatial Substrate Schema
--- Sprint 083: Pentagon Directional Topology & Flux Invariant Accounting
+-- Web of Life: Thermodynamic Blockchain & Spatial DGGS Ledger Schema
+-- Sprint 084: H3 Directional Bitmask & Directional Flux Channel Topology
 -- ============================================================================
 
--- Extensions for spatial computations, UUID generation, and cryptographic hashing
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
--- 1. SPATIAL TOPOLOGY & H3 CELL REGISTRY
+-- DOMAINS & CUSTOM TYPES
 -- ============================================================================
 
-CREATE TYPE h3_cell_class AS ENUM ('HEXAGON', 'PENTAGON');
+-- Directional Bitmask: 6-bit unsigned integer (0x00 to 0x3F, 0 to 63)
+-- Encoding orthogonal adjacency channels along canonical H3 axes [0..5]
+CREATE DOMAIN h3_direction_bitmask AS SMALLINT
+    CHECK (VALUE >= 0 AND VALUE <= 63);
 
--- Domain constraint for canonical H3 discrete neighbor offset directions
-CREATE DOMAIN h3_direction AS SMALLINT
-    CHECK (VALUE BETWEEN 1 AND 6);
+-- Discrete H3 Direction Index [0..5]
+CREATE DOMAIN h3_direction_index AS SMALLINT
+    CHECK (VALUE >= 0 AND VALUE <= 5);
 
--- Registry of discrete geodesic cells across all active H3 resolutions
-CREATE TABLE IF NOT EXISTS spatial_cells (
-    cell_id VARCHAR(16) PRIMARY KEY, -- H3Index in hexadecimal representation
-    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    cell_type h3_cell_class NOT NULL,
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lon DOUBLE PRECISION NOT NULL CHECK (centroid_lon BETWEEN -180.0 AND 180.0),
+-- H3 Index string representation (64-bit hex)
+CREATE DOMAIN h3_index AS VARCHAR(15)
+    CHECK (VALUE ~ '^[0-9a-fA-F]{15}$');
+
+-- Thermodynamic Stock Type Classification
+CREATE TYPE thermodynamic_stock_type AS ENUM (
+    'ENTHALPY_JOULES',
+    'MASS_CARBON_KG',
+    'MASS_WATER_KG',
+    'BIOMASS_KG',
+    'ENTROPY_JOULES_PER_KELVIN'
+);
+
+-- ============================================================================
+-- BLOCKCHAIN & CONSENSUS LEDGER
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    block_height BIGINT PRIMARY KEY,
+    block_hash BYTEA NOT NULL UNIQUE,
+    parent_hash BYTEA NOT NULL,
+    state_merkle_root BYTEA NOT NULL,
+    flux_merkle_root BYTEA NOT NULL,
+    entropy_production_total NUMERIC(28, 10) NOT NULL CHECK (entropy_production_total >= 0),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    validator_signature BYTEA NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS blockchain_transactions (
+    tx_hash BYTEA PRIMARY KEY,
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    tx_type VARCHAR(64) NOT NULL,
+    sender_account BYTEA NOT NULL,
+    signature BYTEA NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_cells_res_type 
-    ON spatial_cells(resolution, cell_type);
+-- ============================================================================
+-- SPATIAL DGGS CELL REGISTRATION & DIRECTIONAL TOPOLOGY
+-- ============================================================================
 
--- Explicit topological configurations for the 12 pentagonal cells per resolution
-CREATE TABLE IF NOT EXISTS pentagon_directional_topologies (
-    cell_id VARCHAR(16) PRIMARY KEY REFERENCES spatial_cells(cell_id) ON DELETE RESTRICT,
-    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    omitted_direction h3_direction NOT NULL,
-    present_directions h3_direction[] NOT NULL,
-    topology_hash BYTEA NOT NULL,
-    is_valid BOOLEAN GENERATED ALWAYS AS (
-        array_length(present_directions, 1) = 5 AND
-        NOT (omitted_direction = ANY(present_directions))
+CREATE TABLE IF NOT EXISTS h3_cells (
+    cell_id h3_index PRIMARY KEY,
+    resolution SMALLINT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    base_cell SMALLINT NOT NULL CHECK (base_cell >= 0 AND base_cell <= 121),
+    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    centroid_lat DOUBLE PRECISION NOT NULL,
+    centroid_lon DOUBLE PRECISION NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Directional channel permeability barrier state per cell epoch
+CREATE TABLE IF NOT EXISTS h3_cell_flux_barriers (
+    cell_id h3_index NOT NULL REFERENCES h3_cells(cell_id) ON DELETE CASCADE,
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    channel_bitmask h3_direction_bitmask NOT NULL DEFAULT 63, -- Default 0x3F (ALL open)
+    topographic_barrier_height_m NUMERIC(10, 2) DEFAULT 0.0,
+    permeability_factor NUMERIC(5, 4) NOT NULL DEFAULT 1.0 CHECK (permeability_factor >= 0.0 AND permeability_factor <= 1.0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (cell_id, block_height)
+);
+
+-- Explicit bidirectional edge registry with topological parity verification
+CREATE TABLE IF NOT EXISTS h3_directional_channels (
+    source_cell_id h3_index NOT NULL REFERENCES h3_cells(cell_id),
+    target_cell_id h3_index NOT NULL REFERENCES h3_cells(cell_id),
+    source_direction h3_direction_index NOT NULL,
+    target_direction h3_direction_index NOT NULL,
+    is_reciprocally_open BOOLEAN GENERATED ALWAYS AS (
+        target_direction = ((source_direction + 3) % 6)
     ) STORED,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_pentagon_present_directions_cardinality 
-        CHECK (array_length(present_directions, 1) = 5),
-    CONSTRAINT chk_pentagon_omitted_disjoint 
-        CHECK (NOT (omitted_direction = ANY(present_directions)))
+    conductivity_coefficient NUMERIC(14, 6) NOT NULL DEFAULT 1.0 CHECK (conductivity_coefficient >= 0),
+    PRIMARY KEY (source_cell_id, source_direction),
+    CONSTRAINT chk_opposite_symmetry CHECK (target_direction = ((source_direction + 3) % 6)),
+    CONSTRAINT chk_distinct_cells CHECK (source_cell_id <> target_cell_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_pentagon_topologies_res 
-    ON pentagon_directional_topologies(resolution);
-
 -- ============================================================================
--- 2. THERMODYNAMIC STOCKS & TIME-SERIES CONTINUUM
+-- THERMODYNAMIC STOCK STATE TENSORS & FLUX LEDGERS
 -- ============================================================================
 
--- Conserved thermodynamic stock vector per H3 cell: Carbon, Nitrogen, Phosphorus, Water, Energy
-CREATE TABLE IF NOT EXISTS cell_thermodynamic_stocks (
-    cell_id VARCHAR(16) NOT NULL REFERENCES spatial_cells(cell_id) ON DELETE RESTRICT,
-    timestamp TIMESTAMPTZ NOT NULL,
-    epoch BIGINT NOT NULL,
-    carbon_mol NUMERIC(28, 12) NOT NULL CHECK (carbon_mol >= 0),
-    nitrogen_mol NUMERIC(28, 12) NOT NULL CHECK (nitrogen_mol >= 0),
-    phosphorus_mol NUMERIC(28, 12) NOT NULL CHECK (phosphorus_mol >= 0),
-    water_kg NUMERIC(28, 12) NOT NULL CHECK (water_kg >= 0),
-    thermal_energy_joules NUMERIC(36, 12) NOT NULL CHECK (thermal_energy_joules >= 0),
-    entropy_joules_per_kelvin NUMERIC(36, 12) NOT NULL,
-    chemical_potential_c NUMERIC(20, 8) NOT NULL,
-    chemical_potential_n NUMERIC(20, 8) NOT NULL,
-    chemical_potential_p NUMERIC(20, 8) NOT NULL,
+-- Conserved thermodynamic state per spatial cell at block checkpoints
+CREATE TABLE IF NOT EXISTS h3_cell_thermodynamic_state (
+    cell_id h3_index NOT NULL REFERENCES h3_cells(cell_id),
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
+    enthalpy_joules NUMERIC(28, 6) NOT NULL CHECK (enthalpy_joules >= 0),
     temperature_kelvin NUMERIC(10, 4) NOT NULL CHECK (temperature_kelvin > 0),
-    PRIMARY KEY (cell_id, timestamp)
+    mass_carbon_kg NUMERIC(24, 6) NOT NULL CHECK (mass_carbon_kg >= 0),
+    mass_water_kg NUMERIC(24, 6) NOT NULL CHECK (mass_water_kg >= 0),
+    biomass_kg NUMERIC(24, 6) NOT NULL CHECK (biomass_kg >= 0),
+    cumulative_entropy_joules_per_k NUMERIC(28, 6) NOT NULL,
+    PRIMARY KEY (cell_id, block_height)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cell_thermo_stocks_epoch 
-    ON cell_thermodynamic_stocks(epoch, cell_id);
-
--- ============================================================================
--- 3. SPATIAL DIRECTIONAL FLUX LEDGER (FIRST & SECOND LAW GOVERNANCE)
--- ============================================================================
-
--- Ledger of directional advective and diffusive fluxes across cell facets
+-- Conserved directional stock fluxes routed via DirectionBitmask gating
 CREATE TABLE IF NOT EXISTS directional_flux_transactions (
-    flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    epoch BIGINT NOT NULL,
-    source_cell_id VARCHAR(16) NOT NULL REFERENCES spatial_cells(cell_id),
-    target_cell_id VARCHAR(16) NOT NULL REFERENCES spatial_cells(cell_id),
-    direction h3_direction NOT NULL,
-    carbon_flux_mol NUMERIC(28, 12) NOT NULL,
-    nitrogen_flux_mol NUMERIC(28, 12) NOT NULL,
-    phosphorus_flux_mol NUMERIC(28, 12) NOT NULL,
-    water_flux_kg NUMERIC(28, 12) NOT NULL,
-    enthalpy_flux_joules NUMERIC(36, 12) NOT NULL,
-    entropy_generation_rate NUMERIC(28, 12) NOT NULL CHECK (entropy_generation_rate >= 0), -- Second Law: σ >= 0
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    tx_hash BYTEA NOT NULL REFERENCES blockchain_transactions(tx_hash) ON DELETE CASCADE,
+    source_cell_id h3_index NOT NULL,
+    target_cell_id h3_index NOT NULL,
+    direction h3_direction_index NOT NULL,
+    stock_type thermodynamic_stock_type NOT NULL,
+    stock_flux_quantity NUMERIC(28, 8) NOT NULL,
+    source_active_bitmask h3_direction_bitmask NOT NULL,
+    target_active_bitmask h3_direction_bitmask NOT NULL,
+    channel_active BOOLEAN GENERATED ALWAYS AS (
+        ((source_active_bitmask & (1 << direction)) <> 0) AND
+        ((target_active_bitmask & (1 << ((direction + 3) % 6))) <> 0)
+    ) STORED,
+    entropy_generated_joules_per_k NUMERIC(24, 8) NOT NULL CHECK (entropy_generated_joules_per_k >= 0),
+    PRIMARY KEY (tx_hash, source_cell_id, direction, stock_type),
+    CONSTRAINT chk_flux_channel_permeability CHECK (
+        (channel_active = TRUE) OR (stock_flux_quantity = 0.0)
+    ),
+    FOREIGN KEY (source_cell_id, direction) REFERENCES h3_directional_channels(source_cell_id, source_direction)
 );
 
-CREATE INDEX IF NOT EXISTS idx_flux_tx_epoch_cells 
-    ON directional_flux_transactions(epoch, source_cell_id, target_cell_id);
+-- ============================================================================
+-- AUDIT TRIGGERS: FIRST & SECOND LAW ENFORCEMENT
+-- ============================================================================
 
--- Strict constraint trigger enforcing zero flux along omitted pentagon directions
-CREATE OR REPLACE FUNCTION verify_pentagon_omitted_flux()
+-- Trigger verifying mass & energy closure across directional channels
+CREATE OR REPLACE FUNCTION fn_verify_directional_flux_conservation()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_omitted h3_direction;
+    v_opposite_dir SMALLINT;
+    v_reciprocal_flux NUMERIC(28, 8);
 BEGIN
-    SELECT omitted_direction INTO v_omitted
-    FROM pentagon_directional_topologies
-    WHERE cell_id = NEW.source_cell_id;
+    v_opposite_dir := (NEW.direction + 3) % 6;
 
-    IF FOUND THEN
-        IF NEW.direction = v_omitted THEN
-            RAISE EXCEPTION 'First Law Violation: Directed flux % attempted through omitted pentagonal direction % on cell %',
-                NEW.flux_id, NEW.direction, NEW.source_cell_id;
-        END IF;
+    -- If the channel is blocked by either source or target bitmask, flux must be zero
+    IF NEW.channel_active = FALSE AND NEW.stock_flux_quantity <> 0.0 THEN
+        RAISE EXCEPTION 'First Law Violation: Flux % attempted across impermeable directional channel % -> % (dir: %)',
+            NEW.stock_flux_quantity, NEW.source_cell_id, NEW.target_cell_id, NEW.direction;
+    END IF;
+
+    -- Verify non-negative irreversible entropy dissipation (Second Law)
+    IF NEW.entropy_generated_joules_per_k < 0.0 THEN
+        RAISE EXCEPTION 'Second Law Violation: Negative irreversible entropy generated (%).',
+            NEW.entropy_generated_joules_per_k;
     END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trg_verify_pentagon_flux
-BEFORE INSERT ON directional_flux_transactions
-FOR EACH ROW
-EXECUTE FUNCTION verify_pentagon_omitted_flux();
+CREATE OR REPLACE TRIGGER trg_directional_flux_conservation
+    BEFORE INSERT OR UPDATE ON directional_flux_transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_verify_directional_flux_conservation();
 
 -- ============================================================================
--- 4. THERMODYNAMIC BLOCKCHAIN LEDGER & CONSENSUS TRANSACTIONS
+-- INDEXES & PERFORMANCE OPTIMIZATIONS
 -- ============================================================================
 
--- State block committed to the thermodynamic blockchain verifying mass-energy conservation
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_height BIGINT PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_hash BYTEA NOT NULL,
-    epoch BIGINT NOT NULL UNIQUE,
-    state_root BYTEA NOT NULL,
-    flux_receipts_root BYTEA NOT NULL,
-    total_system_carbon_mol NUMERIC(32, 12) NOT NULL,
-    total_system_nitrogen_mol NUMERIC(32, 12) NOT NULL,
-    total_system_phosphorus_mol NUMERIC(32, 12) NOT NULL,
-    total_system_water_kg NUMERIC(32, 12) NOT NULL,
-    total_system_energy_joules NUMERIC(40, 12) NOT NULL,
-    mass_conservation_delta NUMERIC(28, 12) NOT NULL CHECK (ABS(mass_conservation_delta) < 1e-9), -- Strict mass conservation
-    total_entropy_production NUMERIC(32, 12) NOT NULL CHECK (total_entropy_production >= 0),     -- Strict irreversibility
-    pentagon_invariants_verified BOOLEAN NOT NULL DEFAULT TRUE,
-    miner_signature BYTEA NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE INDEX IF NOT EXISTS idx_flux_barriers_bitmask 
+    ON h3_cell_flux_barriers(cell_id, channel_bitmask);
 
--- Transaction proofs encapsulating atomic monad steps per batch
-CREATE TABLE IF NOT EXISTS spatial_monad_transactions (
-    tx_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height),
-    cell_id VARCHAR(16) NOT NULL REFERENCES spatial_cells(cell_id),
-    is_pentagon BOOLEAN NOT NULL,
-    initial_stock_hash BYTEA NOT NULL,
-    final_stock_hash BYTEA NOT NULL,
-    omitted_direction_verified BOOLEAN NOT NULL,
-    divergence_net_mass NUMERIC(28, 12) NOT NULL,
-    execution_gas_units BIGINT NOT NULL,
-    signature BYTEA NOT NULL,
-    CONSTRAINT chk_monad_pentagon_proof CHECK (
-        (is_pentagon = FALSE) OR 
-        (is_pentagon = TRUE AND omitted_direction_verified = TRUE)
-    )
-);
+CREATE INDEX IF NOT EXISTS idx_directional_channels_lookup 
+    ON h3_directional_channels(source_cell_id, source_direction, target_cell_id);
 
-CREATE INDEX IF NOT EXISTS idx_monad_tx_block_cell 
-    ON spatial_monad_transactions(block_height, cell_id);
+CREATE INDEX IF NOT EXISTS idx_flux_tx_source_target 
+    ON directional_flux_transactions(source_cell_id, target_cell_id, direction);
+
+CREATE INDEX IF NOT EXISTS idx_thermo_state_block 
+    ON h3_cell_thermodynamic_state(block_height, cell_id);

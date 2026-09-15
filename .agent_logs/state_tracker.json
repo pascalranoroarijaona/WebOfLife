@@ -1,5 +1,5 @@
 {
-  "current_sprint": 84,
+  "current_sprint": 85,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -415,6 +415,11 @@
       "sprint": 83,
       "goal": "Define PentagonDirectionalTopology interface with presentDirections and omittedDirection in src/spatial/h3_types.ts.",
       "timestamp": "2026-09-15T08:39:18.406129+00:00"
+    },
+    {
+      "sprint": 84,
+      "goal": "Define H3DirectionBitmask constant map and DirectionBitmask type in src/spatial/h3_types.ts.",
+      "timestamp": "2026-09-15T08:49:55.047777+00:00"
     }
   ]
 }

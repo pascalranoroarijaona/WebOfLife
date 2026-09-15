@@ -1,10 +1,12 @@
 /**
- * =============================================================================
- * WEB OF LIFE - SPATIAL H3 TOPOLOGY, THERMODYNAMIC TYPES & INTERFACES
- * Cumulative Retro-Compatibility Specification (Sprints 002 - 083)
- * =============================================================================
+ * @file h3_types.ts
+ * @module spatial/h3_types
+ * @description Unified DGGS types, coordinate vectors, thermodynamic stocks,
+ * directional bitmasks, and topological invariant helpers (Sprints 005 - 084).
  */
-export const ALL_H3_DIRECTIONS = Object.freeze([1, 2, 3, 4, 5, 6]);
+// =============================================================================
+// ERROR CODES & EXCEPTIONS
+// =============================================================================
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -15,61 +17,113 @@ export var H3ErrorCode;
     H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
 })(H3ErrorCode || (H3ErrorCode = {}));
 export class SpatialGuardClauseException extends Error {
-    constructor(message = 'Spatial guard clause exception') {
-        super(message);
+    constructor(message) {
+        super(`[SpatialGuardClauseException] ${message}`);
         this.name = 'SpatialGuardClauseException';
         Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
+// =============================================================================
+// TOPOLOGICAL CELL CLASSIFICATION & PENTAGON ORIENTATION
+// =============================================================================
 export var CellTopologyType;
 (function (CellTopologyType) {
-    CellTopologyType["PENTAGON"] = "PENTAGON";
     CellTopologyType["HEXAGON"] = "HEXAGON";
+    CellTopologyType["PENTAGON"] = "PENTAGON";
 })(CellTopologyType || (CellTopologyType = {}));
-export function validatePentagonTopology(topology) {
-    if (!topology || !Array.isArray(topology.presentDirections)) {
-        return false;
-    }
-    if (topology.presentDirections.length !== 5) {
-        return false;
-    }
-    const directionSet = new Set(topology.presentDirections);
-    if (directionSet.size !== 5) {
-        return false;
-    }
-    if (directionSet.has(topology.omittedDirection)) {
-        return false;
-    }
-    return ALL_H3_DIRECTIONS.every((dir) => dir === topology.omittedDirection || directionSet.has(dir));
-}
+export const ALL_H3_DIRECTIONS = [1, 2, 3, 4, 5, 6];
 export function createPentagonTopology(omittedDirection) {
-    if (!ALL_H3_DIRECTIONS.includes(omittedDirection)) {
-        throw new Error(`Invalid omitted direction: ${omittedDirection}. Must be an H3Direction in 1..6.`);
-    }
     const presentDirections = ALL_H3_DIRECTIONS.filter((d) => d !== omittedDirection);
-    return Object.freeze({
-        presentDirections: Object.freeze(presentDirections),
+    return {
+        presentDirections,
         omittedDirection,
-    });
+    };
 }
-// -----------------------------------------------------------------------------
-// THERMODYNAMIC CHANNELS & CONSTANTS (SPRINTS 042 - 045)
-// -----------------------------------------------------------------------------
+export function validatePentagonTopology(topology) {
+    if (!topology || !Array.isArray(topology.presentDirections))
+        return false;
+    if (topology.presentDirections.length !== 5)
+        return false;
+    if (!ALL_H3_DIRECTIONS.includes(topology.omittedDirection))
+        return false;
+    if (topology.presentDirections.includes(topology.omittedDirection))
+        return false;
+    const unique = new Set(topology.presentDirections);
+    if (unique.size !== 5)
+        return false;
+    return topology.presentDirections.every((d) => ALL_H3_DIRECTIONS.includes(d));
+}
+export function createH3CellInterfaceMetrics(params) {
+    if (params.originIndex === params.neighborIndex) {
+        throw new Error('Self-interface is invalid');
+    }
+    if (params.sharedEdgeLengthMeters <= 0) {
+        throw new Error('sharedEdgeLengthMeters must be strictly positive');
+    }
+    const geometricConductance = params.sharedEdgeLengthMeters / params.centroidDistanceMeters;
+    return {
+        ...params,
+        geometricConductance,
+    };
+}
+export function createReciprocalInterfaceMetrics(metrics) {
+    return {
+        originIndex: metrics.neighborIndex,
+        neighborIndex: metrics.originIndex,
+        sharedEdgeLengthMeters: metrics.sharedEdgeLengthMeters,
+        centroidDistanceMeters: metrics.centroidDistanceMeters,
+        bearingRadians: (metrics.bearingRadians + Math.PI) % (2 * Math.PI),
+        normalVector: [-metrics.normalVector[0], -metrics.normalVector[1], -metrics.normalVector[2]],
+        atmosphericContactAreaM2: metrics.atmosphericContactAreaM2,
+        subterraneanContactAreaM2: metrics.subterraneanContactAreaM2,
+        topographicSlope: -metrics.topographicSlope,
+        geometricConductance: metrics.geometricConductance,
+    };
+}
+export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
+    const kSat = params.kSatPorous ?? 1e-4;
+    const kHeat = params.eddyDiffusivityHeat ?? 15.0;
+    const wA = stateA.waterMassKg ?? 0;
+    const wB = stateB.waterMassKg ?? 0;
+    const cA = stateA.carbonMassKg ?? 0;
+    const cB = stateB.carbonMassKg ?? 0;
+    const mA = stateA.mineralMassKg ?? 0;
+    const mB = stateB.mineralMassKg ?? 0;
+    const geomFactor = metrics.subterraneanContactAreaM2 / metrics.centroidDistanceMeters;
+    const dWater = kSat * (wA - wB) * geomFactor * dt;
+    const dCarbon = 1e-4 * (cA - cB) * geomFactor * dt;
+    const dMineral = 1e-4 * (mA - mB) * geomFactor * dt;
+    const tA = stateA.temperatureKelvin ?? 295.15;
+    const tB = stateB.temperatureKelvin ?? 288.15;
+    const heatFactor = metrics.atmosphericContactAreaM2 / metrics.centroidDistanceMeters;
+    const dEnthalpy = kHeat * (tA - tB) * heatFactor * dt;
+    const entropy = Math.max(0, Math.abs(dEnthalpy) * Math.abs(1.0 / Math.max(1, Math.min(tA, tB)) - 1.0 / Math.max(1, Math.max(tA, tB))));
+    return {
+        deltaWaterKg: -dWater,
+        deltaEnthalpyJoules: -dEnthalpy,
+        deltaCarbonKg: -dCarbon,
+        deltaMineralKg: -dMineral,
+        entropyProducedJPerK: entropy,
+    };
+}
+// =============================================================================
+// THERMODYNAMIC TENSOR OVERRIDES & CHANNELS (SPRINT 045)
+// =============================================================================
 export var ThermodynamicChannel;
 (function (ThermodynamicChannel) {
-    ThermodynamicChannel[ThermodynamicChannel["TEMPERATURE_KELVIN"] = 0] = "TEMPERATURE_KELVIN";
-    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 1] = "SENSIBLE_HEAT_JOULES";
-    ThermodynamicChannel[ThermodynamicChannel["WATER_MASS_KG"] = 2] = "WATER_MASS_KG";
-    ThermodynamicChannel[ThermodynamicChannel["SOIL_ORGANIC_CARBON_KG"] = 3] = "SOIL_ORGANIC_CARBON_KG";
-    ThermodynamicChannel[ThermodynamicChannel["VEGETATION_BIOMASS_KG"] = 4] = "VEGETATION_BIOMASS_KG";
-    ThermodynamicChannel[ThermodynamicChannel["ATMOSPHERIC_CO2_KG"] = 5] = "ATMOSPHERIC_CO2_KG";
-    ThermodynamicChannel[ThermodynamicChannel["MINERAL_NITROGEN_KG"] = 6] = "MINERAL_NITROGEN_KG";
-    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 7] = "ALBEDO";
+    ThermodynamicChannel[ThermodynamicChannel["WATER_MASS_KG"] = 0] = "WATER_MASS_KG";
+    ThermodynamicChannel[ThermodynamicChannel["SOIL_ORGANIC_CARBON_KG"] = 1] = "SOIL_ORGANIC_CARBON_KG";
+    ThermodynamicChannel[ThermodynamicChannel["VEGETATION_BIOMASS_KG"] = 2] = "VEGETATION_BIOMASS_KG";
+    ThermodynamicChannel[ThermodynamicChannel["ATMOSPHERIC_CO2_KG"] = 3] = "ATMOSPHERIC_CO2_KG";
+    ThermodynamicChannel[ThermodynamicChannel["MINERAL_NITROGEN_KG"] = 4] = "MINERAL_NITROGEN_KG";
+    ThermodynamicChannel[ThermodynamicChannel["ALBEDO"] = 5] = "ALBEDO";
+    ThermodynamicChannel[ThermodynamicChannel["TEMPERATURE_KELVIN"] = 6] = "TEMPERATURE_KELVIN";
+    ThermodynamicChannel[ThermodynamicChannel["SENSIBLE_HEAT_JOULES"] = 7] = "SENSIBLE_HEAT_JOULES";
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
 export const THERMODYNAMIC_CONSTANTS = {
     MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 1000.0,
+    DEFAULT_REGOLITH_MASS_KG: 50.0,
     SPECIFIC_HEAT: {
         REGOLITH: 840.0,
         WATER: 4184.0,
@@ -79,7 +133,6 @@ export const THERMODYNAMIC_CONSTANTS = {
         MINERAL_NITROGEN: 1200.0,
     },
     SPECIFIC_ENTHALPY: {
-        REGOLITH: 0.0,
         WATER: -15.87e6,
         SOIL_ORGANIC_CARBON: -32.79e6,
         VEGETATION_BIOMASS: -17.50e6,
@@ -87,42 +140,87 @@ export const THERMODYNAMIC_CONSTANTS = {
         MINERAL_NITROGEN: -2.85e6,
     },
 };
-export function createH3CellInterfaceMetrics(params) {
-    if (params.originIndex === params.neighborIndex) {
-        throw new Error('Self-interface is invalid');
+export const H3DirectionBitmask = {
+    DIRECTION_0: 1 << 0, // 1
+    DIRECTION_1: 1 << 1, // 2
+    DIRECTION_2: 1 << 2, // 4
+    DIRECTION_3: 1 << 3, // 8
+    DIRECTION_4: 1 << 4, // 16
+    DIRECTION_5: 1 << 5, // 32
+    NONE: 0,
+    ALL: (1 << 6) - 1, // 63
+    BY_INDEX: [
+        1 << 0,
+        1 << 1,
+        1 << 2,
+        1 << 3,
+        1 << 4,
+        1 << 5,
+    ],
+    hasDirection(mask, direction) {
+        return (mask & (1 << direction)) !== 0;
+    },
+    setDirection(mask, direction) {
+        return mask | (1 << direction);
+    },
+    clearDirection(mask, direction) {
+        return mask & ~(1 << direction);
+    },
+    oppositeDirection(direction) {
+        return ((direction + 3) % 6);
+    },
+    invertMask(mask) {
+        let inverted = 0;
+        for (let d = 0; d < 6; d++) {
+            if ((mask & (1 << d)) !== 0) {
+                inverted |= (1 << ((d + 3) % 6));
+            }
+        }
+        return inverted;
+    },
+};
+export class DirectionalFluxOperator {
+    static isChannelPermeable(sourceMask, targetMask, direction) {
+        const forwardOpen = (sourceMask & (1 << direction)) !== 0;
+        const oppositeDir = H3DirectionBitmask.oppositeDirection(direction);
+        const backwardOpen = (targetMask & (1 << oppositeDir)) !== 0;
+        return forwardOpen && backwardOpen;
     }
-    if (params.sharedEdgeLengthMeters <= 0) {
-        throw new Error('sharedEdgeLengthMeters must be strictly positive');
+    static computeEdgeTransfer(stateI, stateJ, sourceMask, targetMask, direction, normalVelocityMps, diffusionCoeffM2ps, thermalConductivityWpmK, geometry, dtSeconds) {
+        if (!this.isChannelPermeable(sourceMask, targetMask, direction)) {
+            return {
+                dWaterKg: 0,
+                dCarbonKg: 0,
+                dMineralsKg: 0,
+                dOxygenKg: 0,
+                dEnergyJoules: 0,
+            };
+        }
+        const facetArea = geometry.edgeLengthM * geometry.layerHeightM;
+        const invDx = 1.0 / geometry.centroidDistanceM;
+        const isForward = normalVelocityMps >= 0;
+        const cW = isForward ? stateI.waterKg / stateI.volumeM3 : stateJ.waterKg / stateJ.volumeM3;
+        const cC = isForward ? stateI.carbonKg / stateI.volumeM3 : stateJ.carbonKg / stateJ.volumeM3;
+        const cM = isForward ? stateI.mineralsKg / stateI.volumeM3 : stateJ.mineralsKg / stateJ.volumeM3;
+        const cO = isForward ? stateI.oxygenKg / stateI.volumeM3 : stateJ.oxygenKg / stateJ.volumeM3;
+        const cU = isForward ? stateI.internalEnergyJoules / stateI.volumeM3 : stateJ.internalEnergyJoules / stateJ.volumeM3;
+        const advVolRate = normalVelocityMps * facetArea;
+        const advW = advVolRate * cW;
+        const advC = advVolRate * cC;
+        const advM = advVolRate * cM;
+        const advO = advVolRate * cO;
+        const advU = advVolRate * cU;
+        const diffW = -diffusionCoeffM2ps * facetArea * ((stateJ.waterKg / stateJ.volumeM3) - (stateI.waterKg / stateI.volumeM3)) * invDx;
+        const diffC = -diffusionCoeffM2ps * facetArea * ((stateJ.carbonKg / stateJ.volumeM3) - (stateI.carbonKg / stateI.volumeM3)) * invDx;
+        const diffM = -diffusionCoeffM2ps * facetArea * ((stateJ.mineralsKg / stateJ.volumeM3) - (stateI.mineralsKg / stateI.volumeM3)) * invDx;
+        const diffO = -diffusionCoeffM2ps * facetArea * ((stateJ.oxygenKg / stateJ.volumeM3) - (stateI.oxygenKg / stateI.volumeM3)) * invDx;
+        const condU = -thermalConductivityWpmK * facetArea * (stateJ.temperatureKelvin - stateI.temperatureKelvin) * invDx;
+        return {
+            dWaterKg: (advW + diffW) * dtSeconds,
+            dCarbonKg: (advC + diffC) * dtSeconds,
+            dMineralsKg: (advM + diffM) * dtSeconds,
+            dOxygenKg: (advO + diffO) * dtSeconds,
+            dEnergyJoules: (advU + condU) * dtSeconds,
+        };
     }
-    return {
-        ...params,
-        geometricConductance: params.sharedEdgeLengthMeters / params.centroidDistanceMeters,
-    };
-}
-export function createReciprocalInterfaceMetrics(m) {
-    return {
-        ...m,
-        originIndex: m.neighborIndex,
-        neighborIndex: m.originIndex,
-        normalVector: [-m.normalVector[0], -m.normalVector[1], -m.normalVector[2]],
-        topographicSlope: -m.topographicSlope,
-        bearingRadians: (m.bearingRadians + Math.PI) % (2 * Math.PI),
-    };
-}
-export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
-    const dWater = ((stateA.waterMassKg ?? 0) - (stateB.waterMassKg ?? 0)) * 0.001 * dt;
-    const dEnthalpy = ((stateA.enthalpyJoules ?? 0) - (stateB.enthalpyJoules ?? 0)) * 0.001 * dt;
-    const dCarbon = ((stateA.carbonMassKg ?? 0) - (stateB.carbonMassKg ?? 0)) * 0.001 * dt;
-    const dMineral = ((stateA.mineralMassKg ?? 0) - (stateB.mineralMassKg ?? 0)) * 0.001 * dt;
-    const tA = stateA.temperatureKelvin ?? 295;
-    const tB = stateB.temperatureKelvin ?? 288;
-    const heatCond = (params.eddyDiffusivityHeat ?? 10) * ((tA - tB) / metrics.centroidDistanceMeters) * metrics.atmosphericContactAreaM2 * dt;
-    const entropy = Math.max(0, Math.abs(heatCond) * Math.abs(1 / Math.max(1, tB) - 1 / Math.max(1, tA)));
-    return {
-        deltaWaterKg: -dWater,
-        deltaEnthalpyJoules: -dEnthalpy,
-        deltaCarbonKg: -dCarbon,
-        deltaMineralKg: -dMineral,
-        entropyProducedJPerK: entropy,
-    };
 }
