@@ -85,7 +85,7 @@ describe('Sprint 077: Cell Neighbor Count Assertion Specification', () => {
 
       for (const nonArray of nonArrays) {
         assert.throws(
-          () => assertValidNeighborCountForCell(mockHexagonId, nonArray),
+          () => assertValidNeighborCountForCell(mockHexagonId, nonArray as any),
           (err: unknown) => {
             assert.ok(err instanceof TypeError);
             assert.ok((err as Error).message.includes('Expected neighbors to be an array'));

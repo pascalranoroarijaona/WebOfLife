@@ -2069,7 +2069,7 @@ def generate_docs_dashboard():
         if s_cost == 0.0:
             s_cost = avg_cost
 
-        html_content.append(f"<details class='sprint-group'{open_attr}><summary>{s_dir.name.upper()} <span style='font-weight:normal; font-size:0.8rem; color:#00ffe1;'>(${s_cost:.4f})</span></summary><div class='sprint-content'>")
+        html_content.append(f"<details class='sprint-group'{open_attr}><summary>{s_dir.name.upper()} <span style='font-weight:normal; font-size:0.8rem; color:#00ffe1;'>(AI cost:${s_cost:.4f})</span></summary><div class='sprint-content'>")
 
         md_files = sorted([f for f in s_dir.glob("*.md") if f.name != "05_ACADEMIC_PREPRINT.md" or not (s_dir / "05_ACADEMIC_PREPRINT.pdf").exists()])
         for md_file in sorted(md_files, key=lambda x: x.name):

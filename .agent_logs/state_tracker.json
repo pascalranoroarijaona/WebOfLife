@@ -1,5 +1,5 @@
 {
-  "current_sprint": 78,
+  "current_sprint": 79,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -385,6 +385,11 @@
       "sprint": 77,
       "goal": "Implement assertValidNeighborCountForCell taking cellId and neighbors array, asserting array type and calling isExpectedNeighborCountForCell in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-15T05:01:20.012570+00:00"
+    },
+    {
+      "sprint": 78,
+      "goal": "Refactor assertValidNeighborCountForCell to throw PentagonalCoordinationViolationError when isPentagonCell(cellId) is true and neighbor count !== 5 in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-15T05:22:24.671017+00:00"
     }
   ]
 }

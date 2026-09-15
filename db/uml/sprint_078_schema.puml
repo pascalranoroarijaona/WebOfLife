@@ -1,0 +1,150 @@
+```Code snippet
+@startuml sprint_078_schema
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageFontSize 13
+skinparam roundcorner 4
+skinparam linetype ortho
+
+package "ECMAScript Core & Error Hierarchy" {
+    class Error {
+        +name: string
+        +message: string
+        +stack?: string
+    }
+
+    class H3TopologyViolationError {
+        +cellId: string
+        +constructor(message: string, cellId: string)
+    }
+
+    class H3AdjacencyError {
+        +neighborCount: number
+        +constructor(message: string, cellId: string, neighborCount: number)
+    }
+
+    class PentagonalCoordinationViolationError {
+        +readonly expectedCount: number = 5
+        +constructor(cellId: string, actualCount: number)
+    }
+
+    class HexagonalCoordinationViolationError {
+        +readonly expectedCount: number = 6
+        +constructor(cellId: string, actualCount: number)
+    }
+
+    Error <|-- H3TopologyViolationError
+    H3TopologyViolationError <|-- H3AdjacencyError
+    H3AdjacencyError <|-- PentagonalCoordinationViolationError
+    H3AdjacencyError <|-- HexagonalCoordinationViolationError
+}
+
+package "Spatial DGGS Adjacency Domain" {
+    enum H3CellTopologyType {
+        HEXAGONAL
+        PENTAGONAL_DISCLINATION
+    }
+
+    class H3Cell {
+        +cellId: string
+        +resolution: number
+        +topologyType: H3CellTopologyType
+        +isPentagon(): boolean
+        +getExpectedCoordinationNumber(): number
+    }
+
+    class H3AdjacencyCoordinator {
+        +isPentagonCell(cellId: string): boolean
+        +assertValidNeighborCountForCell(cellId: string, neighbors: readonly string[] | number): void
+        +computeDualGraphAdjacency(cellId: string): string[]
+    }
+
+    class SpatialDualGraphEdge {
+        +edgeId: UUID
+        +originCellId: string
+        +neighborCellId: string
+        +boundaryLengthM: number
+        +normalVector: Vector3D
+        +isActive: boolean
+    }
+
+    H3Cell "1" *-- "5..6" SpatialDualGraphEdge : coordinates
+    H3AdjacencyCoordinator ..> H3Cell : validates
+    H3AdjacencyCoordinator ..> PentagonalCoordinationViolationError : throws on |N(p)| != 5
+    H3AdjacencyCoordinator ..> HexagonalCoordinationViolationError : throws on |N(h)| != 6
+}
+
+package "Thermodynamic State & Spatial Flux Monad" {
+    enum CarrierType {
+        BIOMASS_CARBON_MOLES
+        THERMAL_ENERGY_JOULES
+        ENTROPY_JOULES_PER_KELVIN
+        WATER_MASS_KG
+        EXERGY_JOULES
+    }
+
+    class ThermodynamicStockVector {
+        +cellId: string
+        +blockHeight: bigint
+        +carrier: CarrierType
+        +stockValue: number
+        +temperatureKelvin: number
+        +entropyProductionRate: number
+    }
+
+    class SpatialFluxMonad<S> {
+        -state: S
+        +static of(value: S): SpatialFluxMonad<S>
+        +bind<U>(transform: (val: S) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        +applyInterCellFlux(edges: SpatialDualGraphEdge[], rateTensor: Matrix): SpatialFluxMonad<S>
+        +verifyConservativeClosure(threshold: number): boolean
+        +extract(): S
+    }
+
+    class DirectionalFluxTransaction {
+        +fluxId: UUID
+        +originCellId: string
+        +neighborCellId: string
+        +carrier: CarrierType
+        +fluxDensity: number
+        +totalFluxRate: number
+        +entropyGenerationRate: number
+        +conservativeClosureValid: boolean
+    }
+
+    SpatialFluxMonad ..> ThermodynamicStockVector : wraps & computes
+    SpatialFluxMonad ..> DirectionalFluxTransaction : generates conservative flows
+    SpatialFluxMonad ..> H3AdjacencyCoordinator : asserts neighbor invariants
+}
+
+package "Blockchain Invariance Ledger" {
+    class DGGSBlockchainBlock {
+        +blockHeight: bigint
+        +blockHash: bytea
+        +previousBlockHash: bytea
+        +thermodynamicStockMerkleRoot: bytea
+        +topologyInvariantMerkleRoot: bytea
+        +pentagonalDisclinationCount: number = 12
+        +totalEntropyProductionRate: number
+        +conservativeMassDivergenceError: number
+        +minedAt: timestamp
+    }
+
+    class H3CoordinationAuditEntry {
+        +auditId: UUID
+        +blockHeight: bigint
+        +cellId: string
+        +isPentagon: boolean
+        +observedNeighborCount: number
+        +expectedNeighborCount: number
+        +isValid: boolean
+        +violationType?: string
+    }
+
+    DGGSBlockchainBlock "1" o-- "*" H3CoordinationAuditEntry : commits verification
+    DGGSBlockchainBlock "1" o-- "*" DirectionalFluxTransaction : anchors validated fluxes
+}
+
+@enduml
