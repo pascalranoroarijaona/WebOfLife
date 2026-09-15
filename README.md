@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 37%
-SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angular tolerance between shared endpoints in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 38%
+SPRINT_GOAL: Implement validatePentagonalNeighborCount verifying neighbor collection length matches coordination number (5 for pentagons, 6 for hexagons) in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -259,7 +259,9 @@ SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angu
 - [x] Implement `areCartesianUnitVectorsEqual3D` testing angular tolerance epsilon between two Cartesian vectors in `src/spatial/h3_adjacency.ts`
 - [x] Implement `findSharedBoundaryVertexPairs3D` matching coincident boundary vertices between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [x] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
+- [x] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `validatePentagonalNeighborCount` verifying neighbor collection length matches coordination number (5 for pentagons, 6 for hexagons) in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`

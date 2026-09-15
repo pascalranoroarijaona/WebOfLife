@@ -1968,7 +1968,7 @@ def generate_docs_dashboard():
         ".tooltip-container { position: relative; display: inline-block; cursor: pointer; background: #203846; color: #00ffe1; border-radius: 50%; width: 16px; height: 16px; font-size: 11px; line-height: 16px; text-align: center; border: 1px solid #00ffe1; }",
         ".tooltip-container .tooltip-text { visibility: hidden; width: 200px; background-color: #070d14; color: #c8f5f2; text-align: center; border-radius: 6px; padding: 6px; position: absolute; z-index: 1; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; border: 1px solid #315064; font-size: 0.75rem; font-weight: normal; }",
         ".tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }",
-        ".wallet-qr { width: 120px; height: 120px; border-radius: 4px; border: 1px solid #315064; background: #fff; padding: 4px; margin-bottom: 8px; object-fit: cover; }",
+        ".wallet-qr { width: 120px; height: 120px; border-radius: 4px; border: 1px solid #315064; background: #fff; padding: 4px; margin-bottom: 8px; object-fit: cover; display: block; margin-left: auto; margin-right: auto; }",
         ".wallet-balance { font-size: 0.9rem; color: #00ff66; font-weight: bold; }",
         ".wallet-usd { font-size: 0.75rem; color: #9fc7d8; margin-top: 2px; }",
         "/* Carbon Footprint Widget Styles */",
@@ -2008,10 +2008,10 @@ def generate_docs_dashboard():
         "  <div class='wallet-header'>",
         "    ⚡ Community API Fund",
         "    <div class='tooltip-container'>?",
-        "      <span class='tooltip-text'>The agent will fund API token directly with the community money.</span>",
+        "      <span class='tooltip-text'>Scan this QR code in your Bitcoin Wallet to participate. The agent will fund API token directly with the community money.</span>",
         "    </div>",
         "  </div>",
-        "  <img src='wallet_qr.jpg' alt='LNbits Wallet QR Code' class='wallet-qr' onerror=\"this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"120\"><rect width=\"100%\" height=\"100%\" fill=\"%23ddd\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23666\" font-size=\"12\">wallet_qr.jpg</text></svg>'\">",
+        "  <img src='wallet_qr.jpg' alt='LNbits Wallet QR Code' class='wallet-qr' onerror=\"this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'120\\' height=\\'120\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23ddd\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'%23666\\' font-size=\\'12\\'>wallet_qr.jpg</text></svg>'\">",
         "  <div id='wallet-sats' class='wallet-balance'>Fetching sats...</div>",
         "  <div id='wallet-usd' class='wallet-usd'>Fetching USD...</div>",
         "</div>",
@@ -2058,6 +2058,7 @@ def generate_docs_dashboard():
         "<div id='markdown-viewer'>",
         "<h2>Welcome to the Planetary Engine</h2>",
         "<p>Select a document or the backlog from the sidebar to inspect specifications, architecture, and mathematical preprints.</p>",
+        "<a href='../index.html' class='back-anim-btn'>← Back to Main Animation</a>",
         "</div>",
         "</div>",
         "<script>",
@@ -2094,7 +2095,7 @@ def generate_docs_dashboard():
         "    mdViewer.innerHTML = '<p style=\"color:#ff5370\">Error: Could not load document. Ensure you are running via local HTTP server.</p>';",
         "  }",
         "}",
-        "/* Real-time LNbits Wallet Balance via Cloudflare Worker Proxy */",
+        "/* Real-time LNbits Wallet Balance via Cloudflare Worker Proxy (Refreshed every 10s) */",
         "async function updateLnbitsWallet() {",
         "  const WORKER_WALLET_ENDPOINT = 'https://empty-surf-077c.sunstandard-ap.workers.dev/wallet';",
         "",
@@ -2117,12 +2118,12 @@ def generate_docs_dashboard():
         "  }",
         "}",
         "updateLnbitsWallet();",
-        "setInterval(updateLnbitsWallet, 60000);",
+        "setInterval(updateLnbitsWallet, 10000); /* Refresh balance every 10 seconds */",
         "</script></body></html>"
     ])
     
     docs_index.write_text("\n".join(html_content), encoding="utf-8")
-    print("   🌐 Generated dynamic docs/index.html explorer dashboard with secure Worker LNbits proxy & Carbon tracker.")
+    print("   🌐 Generated dynamic docs/index.html explorer dashboard with fixed QR layout, Worker LNbits proxy & 10s live refresh.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Execution Main Loop
@@ -2190,7 +2191,7 @@ def main():
         """
         script_intro = call_agent("GAIA_VOICE", prompt_intro)
         generate_gaia_audio_summary(script_intro, readme_audio_path)
-
+    generate_docs_dashboard()
     ensure_tsconfig()
     ensure_main_ts_imports()
     ensure_baseline_html()

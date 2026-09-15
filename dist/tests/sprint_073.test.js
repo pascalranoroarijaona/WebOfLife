@@ -76,12 +76,13 @@ describe('Sprint 073: Spherical Angular Tolerance & Boundary Assertions', () => 
                 assertBoundaryEndpointTolerance(p1, p2, epsilon, { context: 'Unit test boundary check' });
             }, (err) => {
                 assert.ok(err instanceof BoundaryEndpointToleranceExceededError);
-                assert.strictEqual(err.name, 'BoundaryEndpointToleranceExceededError');
-                assert.deepStrictEqual(err.endpointA, p1);
-                assert.deepStrictEqual(err.endpointB, p2);
-                assert.ok(err.angularDistanceRad > epsilon);
-                assert.strictEqual(err.toleranceRad, epsilon);
-                assert.ok(err.message.includes('Unit test boundary check'));
+                const errTyped = err;
+                assert.strictEqual(errTyped.name, 'BoundaryEndpointToleranceExceededError');
+                assert.deepStrictEqual(errTyped.endpointA, p1);
+                assert.deepStrictEqual(errTyped.endpointB, p2);
+                assert.ok(errTyped.angularDistanceRad > epsilon);
+                assert.strictEqual(errTyped.toleranceRad, epsilon);
+                assert.ok(errTyped.message.includes('Unit test boundary check'));
                 return true;
             });
         });
