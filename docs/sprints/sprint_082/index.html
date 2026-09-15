@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 082: Pentagonal Neighbor Count Validation & Coordination Violation Error</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --human: #00e1ff;
+  --material: #d8c28f;
+  --water: #389cff;
+  --carbon: #aaaaaa;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --normal: #ff7700;
+  --accent-s69: #00ffcc;
+  --poly-outline: #22d3ee;
+
+  /* Sprint 078, 080, 081 & 082 Pentagonal Invariants & Coordination Variables */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --steady-accent: #05ffa1;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --type-cyan: #38bdf8;
+  --type-amber: #f59e0b;
+  --coordination-accent: #a855f7;
+  --flux-particle: #f43f5e;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.73rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+button.s81-stringguard {
+  background: #0f3938;
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+button.s81-stringguard:hover {
+  background: #115e59;
+  border-color: #2dd4bf;
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.4);
+}
+
+button.s81-ambertest {
+  background: #3d2b09;
+  border-color: var(--type-amber);
+  color: #fde68a;
+}
+
+button.s81-ambertest:hover {
+  background: #5e410b;
+  border-color: #fbbf24;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+button.s82-coordguard {
+  background: #2b1055;
+  border-color: var(--coordination-accent);
+  color: #e9d5ff;
+}
+
+button.s82-coordguard:hover {
+  background: #44187f;
+  border-color: #c084fc;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(780px, calc(100vw - 32px));
+  padding: 15px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.02rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.75rem;
+  margin-bottom: 7px;
+  font-weight: normal;
+}
+
+#topbar p {
+  color: #9fc7d8;
+  font-size: 0.71rem;
+  line-height: 1.45;
+}
+
+.highlight {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.code-badge {
+  background: rgba(0, 225, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #00f0ff;
+}
+
+.code-typeguard {
+  background: rgba(0, 255, 162, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--type-pass);
+}
+
+#controls {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-section {
+  background: rgba(8, 24, 38, 0.7);
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 225, 255, 0.12);
+}
+
+.panel-section h3 {
+  font-size: 0.78rem;
+  color: var(--accent-s69);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.badge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #122838;
+  border: 1px solid #234d6b;
+}
+
+.badge.success {
+  background: rgba(5, 255, 161, 0.15);
+  border-color: var(--steady-accent);
+  color: var(--steady-accent);
+}
+
+.badge.violation {
+  background: rgba(255, 0, 51, 0.2);
+  border-color: var(--violation-alert);
+  color: #ff6688;
+}
+
+.button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+#statsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.69rem;
+  margin-top: 4px;
+}
+
+#statsTable td {
+  padding: 3px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+#statsTable td:last-child {
+  text-align: right;
+  font-weight: bold;
+}
+
+#logConsole {
+  font-family: monospace;
+  font-size: 0.65rem;
+  background: #03080e;
+  border: 1px solid #143144;
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+  color: #8be9fd;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+#violationBanner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 0, 51, 0.9);
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 30px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 25px rgba(255, 0, 51, 0.8);
+  z-index: 100;
+  display: none;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.05); }
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>Sprint 082: Pentagonal Neighbor Count & Coordination Violation Guard</h1>
+  <h2>Discrete Global Grid System (DGGS) Icosahedral Invariants: Euler Characteristic χ=2</h2>
+  <p>
+    In any hexagonal spherical tessellation, topological closure requires exactly 
+    <span class="highlight">12 pentagonal cells</span> with coordination number <span class="highlight">k = 5</span>.
+    Hexagonal cells strictly enforce <span class="highlight">k = 6</span>.
+    Any deviation throws an immediate <span class="code-badge">CoordinationViolationError</span>.
+  </p>
+</div>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="controls">
+  <div class="panel-section">
+    <h3>DGGS Topological State <span id="eulerState" class="badge success">χ = 2 (Valid)</span></h3>
+    <table id="statsTable">
+      <tr><td>Pentagons (k=5):</td><td id="statPentagons">12 / 12</td></tr>
+      <tr><td>Hexagons (k=6):</td><td id="statHexagons">30 / 30</td></tr>
+      <tr><td>Total Cells:</td><td id="statTotal">42</td></tr>
+      <tr><td>Disclination Deficit:</td><td id="statDeficit">4π (720°)</td></tr>
+      <tr><td>Coordination Violations:</td><td id="statViolations">0</td></tr>
+    </table>
+  </div>
+
+  <div class="panel-section">
+    <h3>Invariant Controls</h3>
+    <div class="button-grid">
+      <button id="btnReset" class="active">Reset Invariant Grid</button>
+      <button id="btnAutoRotate" class="active">Toggle Auto-Spin</button>
+    </div>
+    <div class="button-grid" style="margin-top:6px;">
+      <button id="btnInjectDefect" class="s78-violate">Inject Neighbor Defect (k=7)</button>
+      <button id="btnRemovePentagon" class="s78-violate">Delete Pentagonal Cell</button>
+    </div>
+    <div class="button-grid" style="margin-top:6px;">
+      <button id="btnRunValidator" class="s82-coordguard">Run Type & Coord Guard</button>
+      <button id="btnClearLogs">Clear Log Console</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Topological Diagnostic Log</h3>
+    <div id="logConsole">[System initialized]: DGGS Spherical Topology χ=2 verified.</div>
+  </div>
+</div>
+
+<div id="violationBanner">⚠️ TOPOLOGICAL COORDINATION VIOLATION DETECTED</div>
+
+<script>
+(() => {
+  // Error class matching repository architecture
+  class CoordinationViolationError extends Error {
+    constructor(cellIndex, expectedCoordination, actualCoordination, cellType) {
+      super(`CoordinationViolationError on cell "${cellIndex}" (${cellType}): Expected coordination k=${expectedCoordination}, got k=${actualCoordination}.`);
+      this.name = 'CoordinationViolationError';
+      this.cellIndex = cellIndex;
+      this.expectedCoordination = expectedCoordination;
+      this.actualCoordination = actualCoordination;
+      this.cellType = cellType;
+    }
+  }
+
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const logConsole = document.getElementById('logConsole');
+  const violationBanner = document.getElementById('violationBanner');
+  const eulerBadge = document.getElementById('eulerState');
+  const statPentagons = document.getElementById('statPentagons');
+  const statHexagons = document.getElementById('statHexagons');
+  const statViolations = document.getElementById('statViolations');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  function log(msg) {
+    const timestamp = new Date().toISOString().substring(11, 19);
+    logConsole.textContent = `[${timestamp}] ${msg}\n` + logConsole.textContent.slice(0, 1000);
+  }
+
+  // Golden ratio vertices for regular icosahedron
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const rawIcoVerts = [
+    [-1,  phi, 0], [ 1,  phi, 0], [-1, -phi, 0], [ 1, -phi, 0],
+    [ 0, -1,  phi], [ 0,  1,  phi], [ 0, -1, -phi], [ 0,  1, -phi],
+    [ phi, 0, -1], [ phi, 0,  1], [-phi, 0, -1], [-phi, 0,  1]
+  ];
+
+  function normalize(v) {
+    const d = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / d, v[1] / d, v[2] / d];
+  }
+
+  const icoVerts = rawIcoVerts.map(normalize);
+
+  // Generate 12 pentagonal base cells and 30 hexagon mid-edge cells (subdivision level 1)
+  function buildGrid() {
+    const cells = [];
+    // 12 pentagons
+    icoVerts.forEach((v, idx) => {
+      cells.push({
+        id: `82_pent_${idx}`,
+        pos: v,
+        isPentagon: true,
+        expectedCoordination: 5,
+        neighbors: []
+      });
+    });
+
+    // 30 hexagons on the edges
+    const hexMap = new Map();
+    for (let i = 0; i < icoVerts.length; i++) {
+      for (let j = i + 1; j < icoVerts.length; j++) {
+        const dist = Math.hypot(
+          icoVerts[i][0] - icoVerts[j][0],
+          icoVerts[i][1] - icoVerts[j][1],
+          icoVerts[i][2] - icoVerts[j][2]
+        );
+        // Adjacent icosahedral vertices have distance ~1.051
+        if (dist < 1.2) {
+          const mid = normalize([
+            (icoVerts[i][0] + icoVerts[j][0]) / 2,
+            (icoVerts[i][1] + icoVerts[j][1]) / 2,
+            (icoVerts[i][2] + icoVerts[j][2]) / 2
+          ]);
+          const hId = `82_hex_${i}_${j}`;
+          const hexCell = {
+            id: hId,
+            pos: mid,
+            isPentagon: false,
+            expectedCoordination: 6,
+            neighbors: []
+          };
+          cells.push(hexCell);
+          hexMap.set(`${i}_${j}`, hexCell);
+        }
+      }
+    }
+
+    // Determine neighbor adjacency based on angular distance threshold
+    for (let i = 0; i < cells.length; i++) {
+      for (let j = i + 1; j < cells.length; j++) {
+        const dot = cells[i].pos[0]*cells[j].pos[0] + cells[i].pos[1]*cells[j].pos[1] + cells[i].pos[2]*cells[j].pos[2];
+        // Nearest neighbor distance in this subdivision has dot product > 0.72
+        if (dot > 0.72 && dot < 0.999) {
+          cells[i].neighbors.push(cells[j].id);
+          cells[j].neighbors.push(cells[i].id);
+        }
+      }
+    }
+
+    // Cap/ensure initial exact 5 for pentagons and 6 for hexagons
+    cells.forEach(c => {
+      if (c.isPentagon) {
+        c.neighbors = c.neighbors.slice(0, 5);
+      } else {
+        c.neighbors = c.neighbors.slice(0, 6);
+      }
+    });
+
+    return cells;
+  }
+
+  let cells = buildGrid();
+  let rotX = 0.3;
+  let rotY = 0.4;
+  let autoRotate = true;
+  let isDragging = false;
+  let lastMouse = { x: 0, y: 0 };
+  let violationCount = 0;
+
+  function validateCoordination() {
+    let violations = 0;
+    const errors = [];
+
+    cells.forEach(cell => {
+      const actual = cell.neighbors.length;
+      const expected = cell.isPentagon ? 5 : 6;
+      if (actual !== expected) {
+        violations++;
+        errors.push(new CoordinationViolationError(
+          cell.id,
+          expected,
+          actual,
+          cell.isPentagon ? 'Pentagon' : 'Hexagon'
+        ));
+      }
+    });
+
+    violationCount = violations;
+    statViolations.textContent = violationCount;
+
+    const pentCount = cells.filter(c => c.isPentagon).length;
+    const hexCount = cells.filter(c => !c.isPentagon).length;
+    statPentagons.textContent = `${pentCount} / 12`;
+    statHexagons.textContent = `${hexCount} / 30`;
+
+    if (violations === 0 && pentCount === 12) {
+      violationBanner.style.display = 'none';
+      eulerBadge.className = 'badge success';
+      eulerBadge.textContent = 'χ = 2 (Valid)';
+    } else {
+      violationBanner.style.display = 'block';
+      eulerBadge.className = 'badge violation';
+      eulerBadge.textContent = `Violated (${violations} errors)`;
+    }
+
+    return { violations, errors };
+  }
+
+  // Interactivity
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastMouse = { x: e.clientX, y: e.clientY };
+  });
+
+  window.addEventListener('mouseup', () => { isDragging = false; });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    rotY += dx * 0.006;
+    rotX += dy * 0.006;
+    lastMouse = { x: e.clientX, y: e.clientY };
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    cells = buildGrid();
+    validateCoordination();
+    log('Topological grid reset to perfect invariant DGGS state.');
+  });
+
+  document.getElementById('btnAutoRotate').addEventListener('click', (e) => {
+    autoRotate = !autoRotate;
+    e.target.classList.toggle('active', autoRotate);
+    log(`Auto-spin ${autoRotate ? 'enabled' : 'paused'}.`);
+  });
+
+  document.getElementById('btnInjectDefect').addEventListener('click', () => {
+    if (cells.length === 0) return;
+    const target = cells.find(c => c.isPentagon) || cells[0];
+    target.neighbors.push('ghost_neighbor_defect_idx');
+    log(`[FAULT INJECTION]: Appended anomalous neighbor to ${target.id}. Coordination k=${target.neighbors.length}`);
+    validateCoordination();
+  });
+
+  document.getElementById('btnRemovePentagon').addEventListener('click', () => {
+    const idx = cells.findIndex(c => c.isPentagon);
+    if (idx !== -1) {
+      const removed = cells.splice(idx, 1)[0];
+      log(`[FAULT INJECTION]: Pentagonal cell removed (${removed.id}). Euler invariant χ violates closure.`);
+      validateCoordination();
+    }
+  });
+
+  document.getElementById('btnRunValidator').addEventListener('click', () => {
+    const { violations, errors } = validateCoordination();
+    if (violations === 0) {
+      log('Validation PASS: All 12 pentagons k=5, all hexagons k=6. Invariant verified.');
+    } else {
+      errors.slice(0, 3).forEach(err => log(`FAILED: ${err.message}`));
+    }
+  });
+
+  document.getElementById('btnClearLogs').addEventListener('click', () => {
+    logConsole.textContent = '';
+  });
+
+  // Render loop
+  function project(p, radius) {
+    // 3D rotation
+    let cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+    let cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+
+    // Rotate Y
+    let x1 = p[0] * cosY + p[2] * sinY;
+    let y1 = p[1];
+    let z1 = -p[0] * sinY + p[2] * cosY;
+
+    // Rotate X
+    let x2 = x1;
+    let y2 = y1 * cosX - z1 * sinX;
+    let z2 = y1 * sinX + z1 * cosX;
+
+    const scale = 2.4 / (2.4 - z2 * 0.4);
+    return {
+      x: width / 2 + x2 * radius * scale,
+      y: height / 2 + y2 * radius * scale,
+      z: z2,
+      visible: z2 > -0.3
+    };
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, width, height);
+
+    if (autoRotate && !isDragging) {
+      rotY += 0.004;
+    }
+
+    const radius = Math.min(width, height) * 0.32;
+
+    // Background sphere outline
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.08)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const cellPosMap = new Map();
+    const projectedCells = cells.map(c => {
+      const proj = project(c.pos, radius);
+      cellPosMap.set(c.id, proj);
+      return { cell: c, proj };
+    });
+
+    // Draw neighbor graph edges
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0, 225, 255, 0.22)';
+    cells.forEach(c => {
+      const p1 = cellPosMap.get(c.id);
+      if (!p1 || !p1.visible) return;
+      c.neighbors.forEach(nId => {
+        const p2 = cellPosMap.get(nId);
+        if (p2 && p2.visible) {
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      });
+    });
+
+    // Draw cell nodes
+    projectedCells.sort((a, b) => a.proj.z - b.proj.z);
+    projectedCells.forEach(({ cell, proj }) => {
+      if (!proj.visible) return;
+
+      const isViolated = (cell.isPentagon && cell.neighbors.length !== 5) ||
+                         (!cell.isPentagon && cell.neighbors.length !== 6);
+
+      const r = cell.isPentagon ? 10 : 7;
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, r, 0, Math.PI * 2);
+
+      if (isViolated) {
+        ctx.fillStyle = '#ff0033';
+        ctx.shadowColor = '#ff0033';
+        ctx.shadowBlur = 15;
+      } else if (cell.isPentagon) {
+        ctx.fillStyle = '#ff0055';
+        ctx.shadowColor = '#ff0055';
+        ctx.shadowBlur = 12;
+      } else {
+        ctx.fillStyle = '#00e1ff';
+        ctx.shadowColor = '#00e1ff';
+        ctx.shadowBlur = 6;
+      }
+
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Label coordination number
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cell.neighbors.length, proj.x, proj.y);
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  validateCoordination();
+  render();
+})();
+</script>
+</body>
+</html>

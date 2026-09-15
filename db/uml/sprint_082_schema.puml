@@ -1,0 +1,139 @@
+@startuml sprint_082_schema
+!theme cerulean-outline
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+
+package "Spatial Topology Subsystem (src/spatial)" #F4F9FF {
+    class PentagonalCoordinationViolationError << (E,#FF4444) Error >> {
+        + cellIndex: string?
+        + actualCount: number
+        + expectedCount: number = 5
+        + message: string
+        --
+        + constructor(actualCount: number, cellIndex?: string, customMessage?: string)
+    }
+
+    interface H3AdjacencyValidator {
+        + validatePentagonalNeighborCount(neighbors: readonly unknown[], cellIndex?: string): void
+    }
+
+    class H3Cell {
+        + cellIndex: string
+        + resolution: number
+        + isPentagon: boolean
+        + expectedCoordination: number
+        + centroid: GeoCoordinates
+        + surfaceAreaM2: number
+        --
+        + getExpectedNeighbors(): number
+    }
+
+    class H3AdjacencyService {
+        - cellRegistry: Map<string, H3Cell>
+        - adjacencyGraph: Map<string, string[]>
+        --
+        + getNeighbors(cellIndex: string): string[]
+        + validateAdjacency(cellIndex: string): void
+    }
+
+    H3AdjacencyService ..|> H3AdjacencyValidator
+    H3AdjacencyValidator ..> PentagonalCoordinationViolationError : throws when len != 5
+    H3AdjacencyService "1" o-- "*" H3Cell : tracks
+}
+
+package "Thermodynamic Operators & Monads" #F9FFF4 {
+    class SpatialFluxMonad<TStock> {
+        - sourceStock: TStock
+        - targetStocks: Map<string, TStock>
+        - fluxes: Map<string, FluxVector>
+        --
+        + bind(operator: DiscreteLaplacianOperator): SpatialFluxMonad<TStock>
+        + evaluateConservativeFlux(): StockTransitionResult
+        + verifyEntropyProduction(): boolean
+    }
+
+    class DiscreteLaplacianOperator {
+        + diffusionCoefficient: number
+        --
+        + computeDivergence(source: H3Cell, neighbors: H3Cell[]): VectorFieldDivergence
+        + computeFluxGradients(stocks: Map<string, BiogeochemicalStock>): FluxVector
+    }
+
+    class BiogeochemicalStock {
+        + stockId: UUID
+        + cellIndex: string
+        + carbonMassKg: Decimal
+        + nitrogenMassKg: Decimal
+        + phosphorusMassKg: Decimal
+        + waterMassKg: Decimal
+        + internalEntropyJK: Decimal
+        + temperatureKelvin: Decimal
+        --
+        + applyFlux(inflow: FluxVector, outflow: FluxVector): BiogeochemicalStock
+        + isMassConserved(delta: FluxVector): boolean
+    }
+
+    SpatialFluxMonad --> DiscreteLaplacianOperator : executes
+    SpatialFluxMonad "1" *-- "*" BiogeochemicalStock : transforms
+    DiscreteLaplacianOperator ..> H3AdjacencyService : queries validated neighbors
+}
+
+package "Thermodynamic Blockchain Ledger" #FFF8F4 {
+    class BlockchainBlock {
+        + blockHeight: int64
+        + blockHash: Hash256
+        + previousBlockHash: Hash256
+        + stateMerkleRoot: Hash256
+        + fluxMerkleRoot: Hash256
+        + topologicalInvarianceProof: Hash256
+        + totalEntropyProductionJK: Decimal
+        + timestamp: DateTime
+        + blockSignature: Signature
+        --
+        + verifyEulerCharacteristic(): boolean
+        + verifyFirstLawConservation(): boolean
+        + verifySecondLawEntropy(): boolean
+    }
+
+    class SpatialFluxTransaction {
+        + txId: UUID
+        + blockHeight: int64
+        + sourceCell: string
+        + targetCell: string
+        + carbonFluxKg: Decimal
+        + nitrogenFluxKg: Decimal
+        + phosphorusFluxKg: Decimal
+        + waterFluxKg: Decimal
+        + entropyProductionJK: Decimal
+        + txSignature: Signature
+        --
+        + verifySignatures(): boolean
+    }
+
+    BlockchainBlock "1" *-- "*" SpatialFluxTransaction : includes
+    SpatialFluxTransaction ..> BiogeochemicalStock : records state transition
+}
+
+' Topological Invariant & Guard Connections
+SpatialFluxMonad ..> H3AdjacencyValidator : strictly guards before flux computation
+BlockchainBlock ..> PentagonalCoordinationViolationError : rejects invalid topological blocks
+
+note top of PentagonalCoordinationViolationError
+  **Euler Invariant Guarantee:**
+  V - E + F = 2 on spherical manifold
+  Exactly 12 pentagons exist per H3 resolution.
+  Every pentagon strictly mandates coordination z = 5.
+  Non-5 neighbor lengths throw immediately to prevent
+  phantom stock generation (First Law violation) and
+  entropy reduction (Second Law violation).
+end note
+
+note bottom of BlockchainBlock
+  **Thermodynamic Ledger Proofs:**
+  1. First Law: ∑ ΔM_in - ∑ ΔM_out = 0
+  2. Second Law: dS_internal / dt >= 0
+  3. Topological Proof: 12 pentagons with deg(v) = 5
+end note
+
+@enduml
