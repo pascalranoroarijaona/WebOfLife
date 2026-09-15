@@ -158,7 +158,7 @@ current_iteration_backups: Dict[str, Optional[str]] = {}
 # ─────────────────────────────────────────────────────────────────────────────
 
 COST_TRACKER_FILE = LOGS_DIR / "cost_tracker.json"
-
+INITIAL_AI_STUDIO_CREDITS = 15.00  # Valeur de référence initiale en USD
 # Tarifs approximatifs par million de tokens (USD) - Ajustables selon les grilles tarifaires officielles Gemini
 GEMINI_PRICING = {
     "gemini-3.8-flash": {"input": 0.075, "output": 0.30},
@@ -194,6 +194,12 @@ def get_average_sprint_cost() -> float:
         return 0.005 # Valeur par défaut indicative si aucun historique
     total = sum(s.get("cost", 0.0) for s in sprints.values())
     return total / len(sprints)
+
+def get_remaining_ai_studio_credits() -> float:
+    cost_data = load_json_file(COST_TRACKER_FILE, lambda: {"sprints": {}, "total_cost": 0.0})
+    total_spent = cost_data.get("total_cost", 0.0)
+    remaining = INITIAL_AI_STUDIO_CREDITS - total_spent
+    return max(0.0, remaining)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dynamic File & Backup Safety Engine
@@ -1337,6 +1343,11 @@ def generate_gaia_audio_summary(text_content: str, output_path: Path) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def execute_sprint_cycle() -> bool:
+    remaining_credits = get_remaining_ai_studio_credits()
+    if remaining_credits <= 0:
+        print("⛔ AI Studio Project credits exhausted ($0.00). Please top up the Google Studio Project with Crowd Funded Money!")
+        sys.exit(0)
+
     sprint_num = get_current_sprint_num()
     sprint_folder_rel = f"docs/sprints/sprint_{sprint_num:03d}"
     sprint_dir = REPO_ROOT / sprint_folder_rel
@@ -1933,8 +1944,9 @@ def get_historical_specs_context() -> str:
 
     return "\n".join(context_blocks)
 
+
 def generate_docs_dashboard():
-    """Generates a dynamic HTML dashboard in docs/index.html with Markdown & LaTeX support, secure worker LNbits widget, and Carbon tracker."""
+    """Generates a dynamic HTML dashboard in docs/index.html with Markdown & LaTeX support, LNbits widget, dynamic AI Studio credit balance tracker, and Carbon tracker."""
     sprints_parent = REPO_ROOT / "docs" / "sprints"
     docs_index = REPO_ROOT / "docs" / "index.html"
     
@@ -1943,6 +1955,9 @@ def generate_docs_dashboard():
         
     sprint_dirs = sorted([d for d in sprints_parent.iterdir() if d.is_dir() and d.name.startswith("sprint_")], reverse=True)
     
+    # Calcul dynamique des crédits restants (Base $15.00 - Coût total des sprints)
+    remaining_credits = get_remaining_ai_studio_credits()
+
     cost_data = load_json_file(LOGS_DIR / "cost_tracker.json", lambda: {"sprints": {}, "total_cost": 0.0})
     total_tokens = sum(s.get("input_tokens", 0) + s.get("output_tokens", 0) for s in cost_data.get("sprints", {}).values())
     estimated_co2_grams = total_tokens * 0.00025
@@ -1953,16 +1968,16 @@ def generate_docs_dashboard():
         "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>",
         "<title>Web of Life - Sprint Explorer</title>",
         "<!-- Markdown & LaTeX rendering libraries -->",
-        "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>",
+        "<script src='[https://cdn.jsdelivr.net/npm/marked/marked.min.js](https://cdn.jsdelivr.net/npm/marked/marked.min.js)'></script>",
         "<script>window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] } };</script>",
-        "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
+        "<script id='MathJax-script' async src='[https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js](https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js)'></script>",
         "<style>",
         "body { background: #02050a; color: #c8f5f2; font-family: 'Courier New', monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }",
         "#sidebar { width: 360px; background: rgba(5, 14, 24, 0.95); border-right: 1px solid #315064; padding: 20px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.5); z-index: 10; box-sizing: border-box; }",
         "#sidebar h1 { color: #00ffe1; font-size: 1.2rem; border-bottom: 1px solid #315064; padding-bottom: 10px; margin-top: 0; }",
         ".backlog-btn { display: block; width: 100%; text-align: center; background: #102331; border: 1px solid #ffaa00; color: #ffaa00; padding: 8px 10px; border-radius: 5px; text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; cursor: pointer; transition: all 0.2s; box-sizing: border-box; }",
         ".backlog-btn:hover { background: #ffaa00; color: #02050a; }",
-        "/* Community Wallet Widget Styles */",
+        "/* Community Wallet & AI Studio Widget Styles */",
         ".wallet-widget { background: rgba(16, 35, 49, 0.6); border: 1px solid #315064; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: center; }",
         ".wallet-header { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px; font-size: 0.85rem; color: #ffaa00; font-weight: bold; }",
         ".tooltip-container { position: relative; display: inline-block; cursor: pointer; background: #203846; color: #00ffe1; border-radius: 50%; width: 16px; height: 16px; font-size: 11px; line-height: 16px; text-align: center; border: 1px solid #00ffe1; }",
@@ -1971,9 +1986,18 @@ def generate_docs_dashboard():
         ".wallet-qr { width: 120px; height: 120px; border-radius: 4px; border: 1px solid #315064; background: #fff; padding: 4px; margin-bottom: 8px; object-fit: cover; display: block; margin-left: auto; margin-right: auto; }",
         ".wallet-balance { font-size: 0.9rem; color: #00ff66; font-weight: bold; }",
         ".wallet-usd { font-size: 0.75rem; color: #9fc7d8; margin-top: 2px; }",
-        "/* Carbon Footprint Widget Styles */",
+        "/* AI Studio Quota Widget Styles */",
+        ".ai-quota-widget { background: rgba(17, 35, 48, 0.6); border: 1px solid #00ffe1; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 0.8rem; color: #c8f5f2; }",
+        ".ai-quota-header { font-weight: bold; color: #00ffe1; margin-bottom: 6px; font-size: 0.85rem; }",
+        f".ai-quota-value {{ color: {'#00ff66' if remaining_credits > 1.0 else '#ff5370'}; font-weight: bold; font-size: 0.9rem; }}",
+        ".ai-quota-link { color: #ffaa00; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 6px; transition: color 0.2s; font-size: 0.75rem; }",
+        ".ai-quota-link:hover { color: #00ffe1; text-decoration: underline; }",
+        "/* Carbon Footprint Tracker Widget Styles */",
         ".carbon-widget { background: rgba(17, 35, 48, 0.5); border: 1px solid #203846; border-radius: 8px; padding: 10px; margin-bottom: 20px; text-align: center; font-size: 0.8rem; color: #9fc7d8; }",
         ".carbon-value { color: #00ffe1; font-weight: bold; font-size: 0.9rem; }",
+        "/* Main Animation Back Button Style */",
+        ".back-anim-btn { display: inline-block; background: #102331; border: 1px solid #00ffe1; color: #00ffe1; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 20px; transition: all 0.2s; }",
+        ".back-anim-btn:hover { background: #00ffe1; color: #02050a; box-shadow: 0 0 15px rgba(0, 255, 225, 0.4); }",
         "/* Sprint Explorer Styles */",
         ".sprint-group { margin-bottom: 15px; border: 1px solid #203846; border-radius: 6px; background: rgba(17, 35, 48, 0.5); overflow: hidden; }",
         ".sprint-group summary { color: #ffaa00; font-size: 0.95rem; font-weight: bold; padding: 10px 14px; cursor: pointer; background: rgba(16, 35, 49, 0.8); user-select: none; outline: none; }",
@@ -2011,9 +2035,16 @@ def generate_docs_dashboard():
         "      <span class='tooltip-text'>Scan this QR code in your Bitcoin Wallet to participate. The agent will fund API token directly with the community money.</span>",
         "    </div>",
         "  </div>",
-        "  <img src='wallet_qr.jpg' alt='LNbits Wallet QR Code' class='wallet-qr' onerror=\"this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'120\\' height=\\'120\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23ddd\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'%23666\\' font-size=\\'12\\'>wallet_qr.jpg</text></svg>'\">",
+        "  <img src='wallet_qr.jpg' alt='LNbits Wallet QR Code' class='wallet-qr' onerror=\"this.src='data:image/svg+xml;utf8,<svg xmlns=\\'[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)\\' width=\\'120\\' height=\\'120\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23ddd\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'%23666\\' font-size=\\'12\\'>wallet_qr.jpg</text></svg>'\">",
         "  <div id='wallet-sats' class='wallet-balance'>Fetching sats...</div>",
         "  <div id='wallet-usd' class='wallet-usd'>Fetching USD...</div>",
+        "</div>",
+
+        "<!-- Google AI Studio Project Quota Widget (Interactive Decrementing Balance) -->",
+        "<div class='ai-quota-widget'>",
+        "  <div class='ai-quota-header'>🧠 AI Studio Project</div>",
+        f"  <div style='margin-bottom: 4px;'>Available Credits: <span class='ai-quota-value'>${remaining_credits:.2f} USD</span></div>",
+        "  <a href='[https://aistudio.google.com/billing?billing=019923-A320B9-18E474](https://aistudio.google.com/billing?billing=019923-A320B9-18E474)' target='_blank' class='ai-quota-link'>💳 Manage Billing ↗</a>",
         "</div>",
 
         f"<!-- Carbon Footprint Tracker Widget -->",
@@ -2097,7 +2128,7 @@ def generate_docs_dashboard():
         "}",
         "/* Real-time LNbits Wallet Balance via Cloudflare Worker Proxy (Refreshed every 10s) */",
         "async function updateLnbitsWallet() {",
-        "  const WORKER_WALLET_ENDPOINT = 'https://empty-surf-077c.sunstandard-ap.workers.dev/wallet';",
+        "  const WORKER_WALLET_ENDPOINT = '[https://empty-surf-077c.sunstandard-ap.workers.dev/wallet](https://empty-surf-077c.sunstandard-ap.workers.dev/wallet)';",
         "",
         "  try {",
         "    const walletRes = await fetch(WORKER_WALLET_ENDPOINT);",
@@ -2105,12 +2136,12 @@ def generate_docs_dashboard():
         "    const balanceMsat = walletData.balance || 0;",
         "    const satoshis = Math.floor(balanceMsat / 1000);",
         "",
-        "    const priceRes = await fetch('https://mempool.space/api/v1/prices');",
+        "    const priceRes = await fetch('[https://mempool.space/api/v1/prices](https://mempool.space/api/v1/prices)');",
         "    const priceData = await priceRes.json();",
         "    const usdPerBtc = priceData.USD || 60000;",
         "",
         "    const usdValue = (satoshis / 100000000) * usdPerBtc;",
-        "    document.getElementById('wallet-sats').innerText = satoshis.toLocaleString() + ' sats';",
+        "    document.getElementById('wallet-sats').innerText = satoshis.toLocaleString() + ' sats available';",
         "    document.getElementById('wallet-usd').innerText = '≈ $' + usdValue.toFixed(2) + ' USD';",
         "  } catch (err) {",
         "    document.getElementById('wallet-sats').innerText = 'Wallet sync error';",
@@ -2123,7 +2154,7 @@ def generate_docs_dashboard():
     ])
     
     docs_index.write_text("\n".join(html_content), encoding="utf-8")
-    print("   🌐 Generated dynamic docs/index.html explorer dashboard with fixed QR layout, Worker LNbits proxy & 10s live refresh.")
+    print("   🌐 Generated dynamic docs/index.html explorer dashboard with interactive decrementing AI Studio credits.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Execution Main Loop

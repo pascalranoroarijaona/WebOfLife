@@ -1,0 +1,168 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  language=bash,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  frame=single,
+  breaklines=true
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{definition}{Definition}
+
+\title{\textbf{Topological Invariant Enforcement and Non-Conservative Flux Prevention on Icosahedral Discrete Global Grid Systems}}
+
+\author{
+  \textbf{Chief Systems Architect} \\
+  \textit{Web of Life Planetary Simulation Engine} \\
+  \href{https://github.com/pascalranoroarijaona/WebOfLife}{https://github.com/pascalranoroarijaona/WebOfLife}
+}
+
+\date{March 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Discrete Global Grid Systems (DGGS) defined over the Riemannian 2-sphere $\mathbb{S}^2$ via geodesic icosahedral aperture-3 hexagonal subdivisions are fundamentally constrained by the Gauss-Bonnet theorem and Euler's polyhedral formula to exhibit exactly twelve pentagonal singularities across all multiresolution tiers ($r \ge 0$). While standard hexagonal cells possess valence $k=6$, pentagonal cells possess valence $k=5$. In discrete spatial flux algorithms and finite-volume ecological transport monads, cell divergence calculations demand exact boundary skew-symmetry to preserve extensive thermodynamic stock invariants (mass and enthalpy conservation). Unaccounted or malformed pentagonal coordination counts induce spurious unclosed flux loops, resulting in non-physical creation or dissipation of matter. Here, we formalize the topological conditions governing spherical DGGS flux closure and introduce the typed domain error \texttt{PentagonalCoordinationViolationError} in \texttt{src/spatial/h3\_adjacency.ts} within the open-source Web of Life planetary engine.
+\end{abstract}
+
+\section{Introduction and Topological Foundations}
+
+Discrete Global Grid Systems (DGGS) discretize planetary surfaces into localized cells to support multiscale ecological and biogeochemical simulation. Hexagonal partitions are mathematically preferred due to uniform centroid-to-centroid adjacency distances, reduced directional anisotropy, and optimal spatial sampling efficiency.
+
+Nevertheless, by topological necessity, a compact spherical surface cannot be tiled entirely by regular hexagons.
+
+\begin{theorem}[Euler-Poincaré Singularity Constraint]
+Any 3-regular spherical polyhedral tessellation consisting exclusively of pentagonal faces ($F_5$) and hexagonal faces ($F_6$) contains precisely twelve pentagons:
+\begin{equation}
+F_5 = 12, \quad \forall F_6 \ge 0.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Let $V$, $E$, and $F$ denote the number of vertices, edges, and faces of the spherical graph $\mathcal{G} \subset \mathbb{S}^2$. Euler's polyhedral formula guarantees:
+\begin{equation}
+V - E + F = \chi(\mathbb{S}^2) = 2.
+\end{equation}
+In a 3-regular graph, each vertex is incident to 3 edges, and each edge is shared by 2 vertices:
+\begin{equation}
+3V = 2E \implies V = \frac{2}{3}E.
+\end{equation}
+The total number of faces is $F = F_5 + F_6$. Summing boundary edges face-wise gives:
+\begin{equation}
+2E = 5F_5 + 6F_6 \implies E = \frac{5}{2}F_5 + 3F_6.
+\end{equation}
+Substituting $V = \frac{1}{3}(5F_5 + 6F_6)$ and $E$ into Euler's formula:
+\begin{align}
+\left(\frac{5}{3}F_5 + 2F_6\right) - \left(\frac{5}{2}F_5 + 3F_6\right) + (F_5 + F_6) &= 2 \\
+\left(\frac{5}{3} - \frac{5}{2} + 1\right) F_5 + (2 - 3 + 1) F_6 &= 2 \\
+\frac{10 - 15 + 6}{6} F_5 + 0 \cdot F_6 &= 2 \\
+\frac{1}{6} F_5 &= 2 \implies F_5 = 12.
+\end{align}
+The result holds independently of the hexagonal count $F_6$ and resolution scale $r$.
+\end{proof}
+
+Consequently, for any H3-based aperture-3 planetary tessellation, exactly 12 cells have topological coordination degree $k = |N(c)| = 5$, while all remaining cells maintain $k = 6$.
+
+\section{Thermodynamic Flux Conservation}
+
+Let each discrete cell $c_i \in \mathcal{G}$ hold an extensive state vector of conserved stocks:
+\begin{equation}
+\mathbf{S}_i = \begin{bmatrix} M_{\text{C}} & M_{\text{H}_2\text{O}} & M_{\text{min}} & M_{\text{O}_2} & E_{\text{th}} \end{bmatrix}_i^T \in \mathbb{R}^5_+.
+\end{equation}
+
+For finite-volume cell $c_i$ with metric dual boundary segments $\{e_{ij}\}_{j \in N(c_i)}$ of lengths $l_{ij}$, the finite-volume conservation balance over discrete step $\Delta t$ is:
+\begin{equation}
+\mathbf{S}_i(t + \Delta t) = \mathbf{S}_i(t) - \sum_{j \in N(c_i)} \mathbf{J}_{ij} \cdot \mathbf{n}_{ij} \, l_{ij} \Delta t + \mathbf{\dot{\Omega}}_i \Delta t,
+\end{equation}
+where $\mathbf{J}_{ij}$ is the interfacial flux tensor, $\mathbf{n}_{ij}$ is the outward normal vector, and $\mathbf{\dot{\Omega}}_i$ represents local metabolic reactions.
+
+\begin{definition}[Conservative Dual Skew-Symmetry]
+An interfacial transport stencil is strictly conservative under the First Law of Thermodynamics if and only if:
+\begin{equation}
+\mathbf{J}_{ij} \cdot \mathbf{n}_{ij} \, l_{ij} = - \mathbf{J}_{ji} \cdot \mathbf{n}_{ji} \, l_{ji}, \quad \forall (i, j) \in \mathcal{E}.
+\end{equation}
+\end{definition}
+
+Summing across all cells on the closed manifold $\mathbb{S}^2$:
+\begin{equation}
+\sum_{i \in \mathcal{G}} \sum_{j \in N(c_i)} \mathbf{J}_{ij} \cdot \mathbf{n}_{ij} \, l_{ij} \equiv \mathbf{0}.
+\end{equation}
+
+\subsection{Pathology of Coordination Corruption}
+If an algorithm traversing cell $c_p$ (where $c_p$ is one of the 12 pentagonal singularities) incorrectly assumes a hexagonal 6-stencil ($k_{\text{actual}} = 6$), an artificial directed edge $e_{p, \text{spurious}}$ is generated without a dual reciprocal on any adjacent cell:
+\begin{equation}
+\sum_{i \in \mathcal{G}} \Delta \mathbf{S}_i = \mathbf{J}_{p, \text{spurious}} \, l_{p, \text{spurious}} \Delta t \neq \mathbf{0}.
+\end{equation}
+This unclosed boundary loop constitutes an unphysical mass-energy leak or source, directly violating First-Law conservation.
+
+\section{System Architecture \& Implementation}
+
+To eliminate silent topological degradation, Sprint 074 defines the domain error class \texttt{PentagonalCoordinationViolationError} in \texttt{src/spatial/h3\_adjacency.ts}:
+
+\begin{lstlisting}[language=TeX]
+export class PentagonalCoordinationViolationError extends Error {
+  public readonly cellIndex: string;
+  public readonly expectedCount: number;
+  public readonly actualCount: number;
+
+  constructor(cellIndex: string, expectedCount: number, actualCount: number) {
+    super(`Pentagonal coordination violation at cell '${cellIndex}': ` +
+          `expected ${expectedCount} neighbors, but found ${actualCount}.`);
+    this.name = 'PentagonalCoordinationViolationError';
+    this.cellIndex = cellIndex;
+    this.expectedCount = expectedCount;
+    this.actualCount = actualCount;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+\end{lstlisting}
+
+\subsection{Fail-Fast Invariant Integration}
+Before flux divergence kernels or monad transformations execute, the spatial adjacency graph evaluates cell degree invariants:
+\begin{equation}
+k(c) = \begin{cases}
+5, & \text{if } c \in \mathcal{P}_{\text{singularity}}, \\
+6, & \text{if } c \in \mathcal{H}_{\text{hexagonal}}.
+\end{cases}
+\end{equation}
+If $c \in \mathcal{P}$ and $k(c) \neq 5$, \texttt{PentagonalCoordinationViolationError} is raised synchronously, halting non-conservative state divergence prior to numerical propagation.
+
+\section{Verification and Methodology}
+
+The implementation was validated using the Node.js TypeScript execution harness:
+\begin{lstlisting}
+npm install
+npx tsx tests/sprint_074.test.ts
+\end{lstlisting}
+
+Test suites establish:
+\begin{enumerate}
+    \item Preservation of the ECMAScript prototype chain (\texttt{instanceof Error} and \texttt{instanceof PentagonalCoordinationViolationError} both evaluate to \texttt{true}).
+    \item Immutable binding of diagnostic properties: \texttt{cellIndex}, \texttt{expectedCount}, and \texttt{actualCount}.
+    \item Rejection of over-coordinated ($k=6$) and truncated ($k<5$) pentagonal neighborhood structures.
+\end{enumerate}
+
+\section{Conclusion}
+
+Discrete Global Grid Systems require explicit enforcement of topological singularities to maintain physical and thermodynamic validity. By formalizing the 12 pentagonal invariants of spherical geodesic grids into strongly-typed runtime assertions, the Web of Life engine guarantees mass-energy conservation across multiresolution spatial flux computations.
+
+\section*{Availability}
+The complete source code and test vectors are openly available at:\\
+\url{https://github.com/pascalranoroarijaona/WebOfLife}.
+
+\end{document}

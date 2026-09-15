@@ -1,0 +1,146 @@
+@startuml sprint_074_schema
+!theme plain
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam classFontStyle bold
+skinparam packageFontSize 13
+
+package "JavaScript / ECMAScript Runtime Core" {
+    class Error {
+        +name: string
+        +message: string
+        +stack?: string
+    }
+}
+
+package "Web of Life :: Spatial Subsystem" {
+    abstract class SpatialTopologicalError {
+        +cellIndex: string
+        #constructor(message: string, cellIndex: string)
+    }
+
+    class PentagonalCoordinationViolationError <<(E, #FF5555) error>> {
+        +cellIndex: string
+        +expectedCount: number
+        +actualCount: number
+        +name: string = "PentagonalCoordinationViolationError"
+        +constructor(cellIndex: string, expectedCount: number, actualCount: number)
+    }
+
+    class H3CellDescriptor <<(V, #00CCEE) value object>> {
+        +cellIndex: string
+        +resolution: number
+        +isPentagon: boolean
+        +expectedCoordination: number
+        +actualCoordination: number
+        +validateInvariants(): void
+    }
+
+    class H3AdjacencyGraph {
+        -cells: Map<string, H3CellDescriptor>
+        -adjacencyList: Map<string, string[]>
+        -metricLengths: Map<string, number>
+        +addCell(descriptor: H3CellDescriptor): void
+        +registerDirectedEdge(origin: string, dest: string, length: number): void
+        +getNeighbors(cellIndex: string): string[]
+        +validatePentagonalCoordination(cellIndex: string): void
+        +assertEulerPoincareInvariants(): boolean
+    }
+}
+
+package "Web of Life :: Thermodynamic State Monad" {
+    enum ConservedStockType {
+        BIOMASS_CARBON_KG
+        SOIL_NITROGEN_KG
+        SENSIBLE_HEAT_JOULES
+        HYDROLOGIC_WATER_KG
+    }
+
+    class ConservedStockVector <<(V, #00CCEE) value object>> {
+        +stockType: ConservedStockType
+        +quantity: number
+        +temperatureKelvin: number
+        +chemicalPotentialMu: number
+        +entropyJoulesPerKelvin: number
+    }
+
+    class SpatialFluxMonad<T> <<(M, #99FF99) monad>> {
+        -state: Map<string, ConservedStockVector>
+        -graph: H3AdjacencyGraph
+        +unit(graph: H3AdjacencyGraph, initial: Map<string, ConservedStockVector>): SpatialFluxMonad<T>
+        +bind<U>(transform: (state: Map<string, ConservedStockVector>) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        +computeDivergence(cellIndex: string): number
+        +advect(dt: number): SpatialFluxMonad<T>
+        +enforceConservation(): Either<PentagonalCoordinationViolationError, SpatialFluxMonad<T>>
+    }
+
+    class DirectedEdgeFlux <<(V, #00CCEE) value object>> {
+        +originCellIndex: string
+        +destinationCellIndex: string
+        +stockType: ConservedStockType
+        +fluxDensityJ: number
+        +boundaryLength: number
+        +entropyProductionRate: number
+        +computeNetTransfer(): number
+    }
+}
+
+package "Web of Life :: Blockchain Consensus & Persistence" {
+    class BlockchainBlock <<(E, #FFAA00) entity>> {
+        +height: number
+        +blockHash: Uint8Array
+        +previousBlockHash: Uint8Array
+        +merkleRoot: Uint8Array
+        +stateRoot: Uint8Array
+        +firstLawResidual: number = 0.0
+        +entropyProductionRate: number
+        +validatorSignature: Uint8Array
+        +timestamp: Date
+        +verifyBlockProof(): boolean
+    }
+
+    class TopologicalCoordinationViolationRecord <<(E, #FFAA00) entity>> {
+        +violationId: UUID
+        +blockHeight: number
+        +cellIndex: string
+        +errorName: string
+        +expectedCount: number = 5
+        +actualCount: number
+        +errorMessage: string
+        +stateVectorDump: JSON
+        +detectedAt: Date
+    }
+
+    class SpatialFluxTransaction <<(E, #FFAA00) entity>> {
+        +txId: Uint8Array
+        +blockHeight: number
+        +originCellIndex: string
+        +destinationCellIndex: string
+        +stockType: ConservedStockType
+        +integratedTransfer: number
+        +entropyProduction: number
+        +signature: Uint8Array
+    }
+}
+
+' Inheritance and Type Realization
+Error <|-- SpatialTopologicalError
+SpatialTopologicalError <|-- PentagonalCoordinationViolationError
+
+' Structural Associations
+H3AdjacencyGraph "1" *-- "many" H3CellDescriptor : indexes
+H3AdjacencyGraph ..> PentagonalCoordinationViolationError : throws on k != 5
+
+SpatialFluxMonad "1" o-- "1" H3AdjacencyGraph : uses topology
+SpatialFluxMonad "1" *-- "many" ConservedStockVector : maintains
+SpatialFluxMonad "1" ..> DirectedEdgeFlux : evaluates divergence across
+SpatialFluxMonad ..> PentagonalCoordinationViolationError : halts state transfer on
+
+BlockchainBlock "1" *-- "many" SpatialFluxTransaction : bundles
+BlockchainBlock "1" *-- "many" TopologicalCoordinationViolationRecord : audits violations
+
+TopologicalCoordinationViolationRecord ..> PentagonalCoordinationViolationError : persists telemetry
+
+@enduml

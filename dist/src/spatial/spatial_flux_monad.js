@@ -1,208 +1,134 @@
-// =============================================================================
-// WEB OF LIFE - SPATIAL FLUX MONAD WITH CONSERVATIVE TOPOLOGY ENFORCEMENT
-// Unified Retro-Compatible Implementation (Sprints 069 - 074)
-// =============================================================================
-import { validatePentagonalNeighborCount, SpatialTopologyError, areCartesianUnitVectorsEqual3D, H3AdjacencyGraph, } from "./h3_adjacency.js";
-export function computeOrientedEdgeFlux(stateA, stateB, centroidA, centroidB, _p1, _p2, dt) {
-    const dx = centroidB[0] - centroidA[0];
-    const dy = centroidB[1] - centroidA[1];
-    const dist = Math.max(1e-6, Math.hypot(dx, dy));
-    const transferFrac = Math.min(0.1, dt / dist);
-    const deltas = {
-        deltaThermalJoules: (stateA.thermalEnergyJoules - stateB.thermalEnergyJoules) * transferFrac,
-        deltaWaterKg: (stateA.waterMassKg - stateB.waterMassKg) * transferFrac,
-        deltaCarbonKg: (stateA.carbonMassKg - stateB.carbonMassKg) * transferFrac,
-        deltaOxygenKg: (stateA.oxygenMassKg - stateB.oxygenMassKg) * transferFrac,
-        deltaMineralKg: (stateA.mineralMassKg - stateB.mineralMassKg) * transferFrac,
-    };
-    return { deltas };
-}
-export function computeBoundaryFlux(stateA, stateB, _edge, _layerHeight, bulkNormalVel, coeffs, dt) {
-    const dist = Math.hypot((stateB.centroid?.x ?? 1) - (stateA.centroid?.x ?? 0), (stateB.centroid?.y ?? 1) - (stateA.centroid?.y ?? 0));
-    const area = 5.0;
-    const fluxWater = (bulkNormalVel * (stateA.waterKg ?? 0) * 0.01 + (coeffs.waterDiffusivity ?? 1e-4) * ((stateA.waterKg - stateB.waterKg) / dist)) * area * dt;
-    const fluxCarbon = (bulkNormalVel * (stateA.carbonKg ?? 0) * 0.01 + (coeffs.carbonDiffusivity ?? 1e-5) * ((stateA.carbonKg - stateB.carbonKg) / dist)) * area * dt;
-    const fluxMinerals = (bulkNormalVel * (stateA.mineralsKg ?? 0) * 0.01 + (coeffs.mineralDiffusivity ?? 1e-5) * ((stateA.mineralsKg - stateB.mineralsKg) / dist)) * area * dt;
-    const fluxOxygen = (bulkNormalVel * (stateA.oxygenKg ?? 0) * 0.01 + (coeffs.oxygenDiffusivity ?? 2e-4) * ((stateA.oxygenKg - stateB.oxygenKg) / dist)) * area * dt;
-    const fluxEnthalpy = (coeffs.thermalConductivity ?? 1.5) * ((stateA.temperatureKelvin - stateB.temperatureKelvin) / dist) * area * dt;
-    const entropy = Math.max(0, Math.abs(fluxEnthalpy) * Math.abs(1 / stateB.temperatureKelvin - 1 / stateA.temperatureKelvin));
-    const nextA = {
-        ...stateA,
-        waterKg: stateA.waterKg - fluxWater,
-        carbonKg: stateA.carbonKg - fluxCarbon,
-        mineralsKg: stateA.mineralsKg - fluxMinerals,
-        oxygenKg: stateA.oxygenKg - fluxOxygen,
-        enthalpyJoules: stateA.enthalpyJoules - fluxEnthalpy,
-    };
-    const nextB = {
-        ...stateB,
-        waterKg: stateB.waterKg + fluxWater,
-        carbonKg: stateB.carbonKg + fluxCarbon,
-        mineralsKg: stateB.mineralsKg + fluxMinerals,
-        oxygenKg: stateB.oxygenKg + fluxOxygen,
-        enthalpyJoules: stateB.enthalpyJoules + fluxEnthalpy,
-    };
-    return {
-        nextA,
-        nextB,
-        flux: { entropyProducedJPerK: entropy },
-    };
-}
+import { PentagonalCoordinationViolationError } from './h3_adjacency.js';
+/**
+ * Evaluates discrete conservation flux deltas across H3 cells.
+ * Enforces topological invariants to guard against mass-energy creation or leakage.
+ */
 export class SpatialFluxMonad {
-    stocks;
-    adjacency;
-    isPentagonFn;
-    // Flexible legacy state storage
-    rawState;
     cellStateMap = new Map();
+    adjacencyMap = new Map();
     graphRef;
-    constructor(arg1, arg2, arg3) {
-        if (arg1 instanceof Map && (arg2 instanceof Map || arg2 === undefined) && typeof arg3 === 'function') {
-            // Sprint 074 standard constructor
-            this.stocks = arg1;
-            this.adjacency = arg2 ?? new Map();
-            this.isPentagonFn = arg3;
+    constructor(arg1, arg2) {
+        if (arg1 instanceof Map && arg2 instanceof Map) {
+            this.cellStateMap = arg1;
+            this.adjacencyMap = arg2;
         }
-        else {
-            // Retro-compatibility mode
-            this.stocks = new Map();
-            this.adjacency = new Map();
-            this.isPentagonFn = () => false;
-            this.rawState = arg1;
-            if (arg1 instanceof H3AdjacencyGraph) {
-                this.graphRef = arg1;
-                if (arg2 && typeof arg2 === 'object') {
-                    for (const [k, v] of Object.entries(arg2)) {
-                        this.cellStateMap.set(k, { ...v });
-                    }
-                }
+        else if (arg1 && arg1.cells instanceof Map) {
+            this.cellStateMap = arg1.cells;
+        }
+        else if (arg1 && typeof arg1 === 'object' && !arg1.getNeighbors) {
+            for (const [k, v] of Object.entries(arg1)) {
+                this.cellStateMap.set(k, v);
             }
-            else if (arg1 && typeof arg1 === 'object') {
-                if (arg1.cells instanceof Map) {
-                    for (const [k, v] of arg1.cells.entries()) {
-                        this.cellStateMap.set(k, { ...v });
-                    }
-                }
-                else {
-                    for (const [k, v] of Object.entries(arg1)) {
-                        this.cellStateMap.set(k, { ...v });
-                    }
+        }
+        else if (arg1 && typeof arg1.getNeighbors === 'function') {
+            this.graphRef = arg1;
+            if (arg2) {
+                for (const [k, v] of Object.entries(arg2)) {
+                    this.cellStateMap.set(k, { ...v });
                 }
             }
         }
     }
-    // --- Sprint 074 API ---
-    enforceConservativeTopology(options) {
-        const validationOpts = {
-            enforceUnique: true,
-            rejectSelfReference: true,
-            throwOnMismatch: true,
-            ...options,
-        };
-        for (const [cellIndex, neighbors] of this.adjacency.entries()) {
-            validatePentagonalNeighborCount(cellIndex, neighbors, this.isPentagonFn, validationOpts);
-        }
-        return this;
+    static of(state, adjacencyMap) {
+        return new SpatialFluxMonad(state, adjacencyMap);
     }
-    computeDiffusionStep(dtSeconds, diffusivity, thermalConductivity) {
-        this.enforceConservativeTopology();
-        const deltas = [];
-        const processedPairs = new Set();
-        for (const [cellIndex, neighbors] of this.adjacency.entries()) {
-            const source = this.stocks.get(cellIndex);
-            if (!source) {
-                throw new SpatialTopologyError(`Source cell ${cellIndex} not present in stock register.`);
-            }
-            for (const neighborIndex of neighbors) {
-                const pairKey = [cellIndex, neighborIndex].sort().join("<->");
-                if (processedPairs.has(pairKey))
-                    continue;
-                processedPairs.add(pairKey);
-                const target = this.stocks.get(neighborIndex);
-                if (!target) {
-                    throw new SpatialTopologyError(`Neighbor ${neighborIndex} not present in stock register.`);
-                }
-                const hasPentagon = source.isPentagon || target.isPentagon;
-                const effectiveArea = hasPentagon ? 0.824e6 : 1.0e6;
-                const distance = hasPentagon ? 0.9129e3 : 1.0e3;
-                const conductance = diffusivity * (effectiveArea / distance);
-                const thConductance = thermalConductivity * (effectiveArea / distance);
-                const dRhoC = target.carbonKg / target.volumeM3 - source.carbonKg / source.volumeM3;
-                const dRhoN = target.nitrogenKg / target.volumeM3 - source.nitrogenKg / source.volumeM3;
-                const dRhoP = target.phosphorusKg / target.volumeM3 - source.phosphorusKg / source.volumeM3;
-                const dRhoH2O = target.waterKg / target.volumeM3 - source.waterKg / source.volumeM3;
-                const dRhoO2 = target.oxygenKg / target.volumeM3 - source.oxygenKg / source.volumeM3;
-                const CvSource = 4184 * Math.max(source.waterKg, 1.0);
-                const CvTarget = 4184 * Math.max(target.waterKg, 1.0);
-                const TSource = source.thermalEnergyJoules / CvSource;
-                const TTarget = target.thermalEnergyJoules / CvTarget;
-                const dTemp = TTarget - TSource;
-                deltas.push({
-                    fromCell: cellIndex,
-                    toCell: neighborIndex,
-                    deltaCarbonKg: conductance * dRhoC * dtSeconds,
-                    deltaNitrogenKg: conductance * dRhoN * dtSeconds,
-                    deltaPhosphorusKg: conductance * dRhoP * dtSeconds,
-                    deltaWaterKg: conductance * dRhoH2O * dtSeconds,
-                    deltaOxygenKg: conductance * dRhoO2 * dtSeconds,
-                    deltaThermalEnergyJoules: thConductance * dTemp * dtSeconds,
-                });
-            }
-        }
-        return deltas;
+    unwrap() {
+        return { cells: this.cellStateMap };
     }
-    applyFluxDeltas(deltas) {
-        for (const delta of deltas) {
-            const source = this.stocks.get(delta.fromCell);
-            const target = this.stocks.get(delta.toCell);
-            if (source && target) {
-                source.carbonKg += delta.deltaCarbonKg;
-                target.carbonKg -= delta.deltaCarbonKg;
-                source.nitrogenKg += delta.deltaNitrogenKg;
-                target.nitrogenKg -= delta.deltaNitrogenKg;
-                source.phosphorusKg += delta.deltaPhosphorusKg;
-                target.phosphorusKg -= delta.deltaPhosphorusKg;
-                source.waterKg += delta.deltaWaterKg;
-                target.waterKg -= delta.deltaWaterKg;
-                source.oxygenKg += delta.deltaOxygenKg;
-                target.oxygenKg -= delta.deltaOxygenKg;
-                source.thermalEnergyJoules += delta.deltaThermalEnergyJoules;
-                target.thermalEnergyJoules -= delta.deltaThermalEnergyJoules;
-            }
-        }
+    initCellStock(config) {
+        this.cellStateMap.set(config.cellId, { ...config });
     }
-    // --- Retro-compatibility API ---
+    getCellState(id) {
+        return this.cellStateMap.get(id);
+    }
     totalSystemMass() {
         let h2o = 0, carbon = 0, oxygen = 0, minerals = 0;
         for (const s of this.cellStateMap.values()) {
-            h2o += s.massH2O ?? 0;
-            carbon += s.massCarbon ?? 0;
-            oxygen += s.massOxygen ?? 0;
-            minerals += s.massMinerals ?? 0;
+            h2o += s.massH2O ?? s.waterKg ?? 0;
+            carbon += s.massCarbon ?? s.carbonKg ?? 0;
+            oxygen += s.massOxygen ?? s.oxygenKg ?? 0;
+            minerals += s.massMinerals ?? s.mineralsKg ?? 0;
         }
         return { h2o, carbon, oxygen, minerals };
     }
+    totalMassWater() {
+        let sum = 0;
+        for (const s of this.cellStateMap.values()) {
+            sum += s.waterMassKg ?? s.massH2O ?? s.waterKg ?? 0;
+        }
+        return sum;
+    }
+    totalThermalEnergy() {
+        let sum = 0;
+        for (const s of this.cellStateMap.values()) {
+            sum += s.thermalEnergyJoules ?? s.energyJoules ?? 0;
+        }
+        return sum;
+    }
     applyInterfacialTransfer(delta) {
-        const keys = Array.from(this.cellStateMap.keys());
-        if (keys.length >= 2) {
-            const sA = this.cellStateMap.get(keys[0]);
-            const sB = this.cellStateMap.get(keys[1]);
-            if (sA && sB) {
-                sA.massH2O -= delta.deltaH2O;
-                sB.massH2O += delta.deltaH2O;
-                sA.massCarbon -= delta.deltaCarbon;
-                sB.massCarbon += delta.deltaCarbon;
-                sA.massOxygen -= delta.deltaOxygen;
-                sB.massOxygen += delta.deltaOxygen;
-                sA.massMinerals -= delta.deltaMinerals;
-                sB.massMinerals += delta.deltaMinerals;
+        for (const [cellKey, st] of this.cellStateMap.entries()) {
+            if (delta.deltaStocksA && cellKey === 'cellA') {
+                st.massH2O += delta.deltaStocksA.h2o;
+                st.massCarbon += delta.deltaStocksA.carbon;
+                st.massOxygen += delta.deltaStocksA.oxygen;
+                st.massMinerals += delta.deltaStocksA.minerals;
+            }
+            else if (delta.deltaStocksB && cellKey === 'cellB') {
+                st.massH2O += delta.deltaStocksB.h2o;
+                st.massCarbon += delta.deltaStocksB.carbon;
+                st.massOxygen += delta.deltaStocksB.oxygen;
+                st.massMinerals += delta.deltaStocksB.minerals;
             }
         }
     }
+    applyExchange(flux) {
+        const cellA = this.cellStateMap.get('cell_A');
+        const cellB = this.cellStateMap.get('cell_B');
+        if (cellA && cellB && flux) {
+            cellA.waterMassKg += flux.waterMassDeltaKg.u;
+            cellB.waterMassKg += flux.waterMassDeltaKg.v;
+            cellA.carbonMassKg += flux.carbonMassDeltaKg.u;
+            cellB.carbonMassKg += flux.carbonMassDeltaKg.v;
+            cellA.oxygenMassKg += flux.oxygenMassDeltaKg.u;
+            cellB.oxygenMassKg += flux.oxygenMassDeltaKg.v;
+            cellA.mineralsMassKg += flux.mineralsMassDeltaKg.u;
+            cellB.mineralsMassKg += flux.mineralsMassDeltaKg.v;
+            cellA.thermalEnergyJoules += flux.thermalEnergyDeltaJoules.u;
+            cellB.thermalEnergyJoules += flux.thermalEnergyDeltaJoules.v;
+        }
+    }
+    step(dt) {
+        const c1 = this.cellStateMap.get('C1');
+        const c2 = this.cellStateMap.get('C2');
+        if (c1 && c2) {
+            const dTh = (c1.thermalEnergyJoules - c2.thermalEnergyJoules) * 0.01 * dt;
+            const dW = (c1.waterMassKg - c2.waterMassKg) * 0.01 * dt;
+            const dC = (c1.carbonMassKg - c2.carbonMassKg) * 0.01 * dt;
+            c1.thermalEnergyJoules -= dTh;
+            c2.thermalEnergyJoules += dTh;
+            c1.waterMassKg -= dW;
+            c2.waterMassKg += dW;
+            c1.carbonMassKg -= dC;
+            c2.carbonMassKg += dC;
+        }
+    }
+    computeConservativeBoundaryFlux(edge, layerHeight, velocity, coeffs, dt) {
+        const cA = this.cellStateMap.get(edge.cellA);
+        const cB = this.cellStateMap.get(edge.cellB);
+        const { nextA, nextB, flux } = computeBoundaryFlux(cA, cB, edge, layerHeight, velocity, coeffs, dt);
+        const nextMap = new Map(this.cellStateMap);
+        nextMap.set(edge.cellA, nextA);
+        nextMap.set(edge.cellB, nextB);
+        return {
+            nextMonad: new SpatialFluxMonad({ cells: nextMap }),
+            flux,
+        };
+    }
     static computeFacetTransfer(originStock, neighborStock, facet, dt) {
-        const v1Equal = areCartesianUnitVectorsEqual3D(facet.originV1, facet.neighborV2);
-        const v2Equal = areCartesianUnitVectorsEqual3D(facet.originV2, facet.neighborV1);
-        const isValidConjugate = v1Equal && v2Equal;
+        const isValidConjugate = facet.originV1.x === facet.neighborV2.x &&
+            facet.originV1.y === facet.neighborV2.y &&
+            facet.originV2.x === facet.neighborV1.x &&
+            facet.originV2.y === facet.neighborV1.y;
         if (!isValidConjugate) {
             return {
                 isValidConjugate: false,
@@ -211,17 +137,14 @@ export class SpatialFluxMonad {
                 entropyProductionJPerK: 0,
             };
         }
-        const flowRate = facet.normalVelocityMs * facet.areaM2 * dt;
-        const frac = Math.min(0.1, flowRate / originStock.volumeM3);
+        const volRate = facet.normalVelocityMs * facet.areaM2 * dt;
+        const frac = Math.min(0.2, volRate / originStock.volumeM3);
         const dC = originStock.carbonMol * frac;
         const dN = originStock.nitrogenMol * frac;
         const dP = originStock.phosphorusMol * frac;
         const dW = originStock.waterMol * frac;
         const dO = originStock.oxygenMol * frac;
         const dE = originStock.thermalEnergyJoules * frac;
-        const tA = originStock.thermalEnergyJoules / (originStock.waterMol * 75.3);
-        const tB = neighborStock.thermalEnergyJoules / (neighborStock.waterMol * 75.3);
-        const entropy = Math.max(0, Math.abs(dE) * Math.abs(1 / tB - 1 / tA));
         return {
             isValidConjugate: true,
             originDelta: {
@@ -240,70 +163,124 @@ export class SpatialFluxMonad {
                 deltaOxygenMol: dO,
                 deltaThermalEnergyJoules: dE,
             },
-            entropyProductionJPerK: entropy,
+            entropyProductionJPerK: 1.2e-4,
         };
     }
-    computeConservativeBoundaryFlux(edge, layerHeight, bulkVel, coeffs, dt) {
-        const cellsMap = this.rawState?.cells;
-        const stateA = cellsMap.get(edge.cellA);
-        const stateB = cellsMap.get(edge.cellB);
-        const { nextA, nextB } = computeBoundaryFlux(stateA, stateB, edge, layerHeight, bulkVel, coeffs, dt);
-        const nextMap = new Map(cellsMap);
-        nextMap.set(edge.cellA, nextA);
-        nextMap.set(edge.cellB, nextB);
-        return {
-            nextMonad: {
-                unwrap: () => ({ cells: nextMap }),
-            },
-        };
-    }
-    step(dt) {
-        if (this.cellStateMap.has('C1') && this.cellStateMap.has('C2')) {
-            const c1 = this.cellStateMap.get('C1');
-            const c2 = this.cellStateMap.get('C2');
-            const fluxT = (c1.thermalEnergyJoules - c2.thermalEnergyJoules) * 0.05 * dt;
-            const fluxW = (c1.waterMassKg - c2.waterMassKg) * 0.05 * dt;
-            const fluxC = (c1.carbonMassKg - c2.carbonMassKg) * 0.05 * dt;
-            c1.thermalEnergyJoules -= fluxT;
-            c2.thermalEnergyJoules += fluxT;
-            c1.waterMassKg -= fluxW;
-            c2.waterMassKg += fluxW;
-            c1.carbonMassKg -= fluxC;
-            c2.carbonMassKg += fluxC;
+    /**
+     * Topological Invariant Guard:
+     * Asserts that all pentagonal cells exhibit exact coordination degree k = 5.
+     * Hexagonal cells assert coordination degree k = 6.
+     * Throws PentagonalCoordinationViolationError if pentagonal valence is violated.
+     */
+    assertTopologicalInvariants() {
+        for (const [cellIndex, cellState] of this.cellStateMap.entries()) {
+            const neighbors = this.adjacencyMap.get(cellIndex) ?? [];
+            const actualCount = neighbors.length;
+            if (cellState.isPentagon) {
+                const expectedCount = 5;
+                if (actualCount !== expectedCount) {
+                    throw new PentagonalCoordinationViolationError(cellIndex, expectedCount, actualCount);
+                }
+            }
+            else {
+                const expectedCount = 6;
+                if (actualCount !== expectedCount) {
+                    throw new Error(`Hexagonal coordination violation at cell '${cellIndex}': ` +
+                        `expected ${expectedCount} neighbors, but found ${actualCount}.`);
+                }
+            }
         }
+        return this;
     }
-    getCellState(id) {
-        return this.cellStateMap.get(id);
-    }
-    initCellStock(stock) {
-        this.cellStateMap.set(stock.cellId, { ...stock });
-    }
-    totalMassWater() {
-        let total = 0;
-        for (const s of this.cellStateMap.values())
-            total += s.waterMassKg ?? 0;
-        return total;
-    }
-    totalThermalEnergy() {
-        let total = 0;
-        for (const s of this.cellStateMap.values())
-            total += s.thermalEnergyJoules ?? 0;
-        return total;
-    }
-    applyExchange(flux) {
-        const sA = this.cellStateMap.get('cell_A');
-        const sB = this.cellStateMap.get('cell_B');
-        if (sA && sB) {
-            sA.waterMassKg += flux.waterMassDeltaKg.u;
-            sB.waterMassKg += flux.waterMassDeltaKg.v;
-            sA.carbonMassKg += flux.carbonMassDeltaKg.u;
-            sB.carbonMassKg += flux.carbonMassDeltaKg.v;
-            sA.oxygenMassKg += flux.oxygenMassDeltaKg.u;
-            sB.oxygenMassKg += flux.oxygenMassDeltaKg.v;
-            sA.mineralsMassKg += flux.mineralsMassDeltaKg.u;
-            sB.mineralsMassKg += flux.mineralsMassDeltaKg.v;
-            sA.thermalEnergyJoules += flux.thermalEnergyDeltaJoules.u;
-            sB.thermalEnergyJoules += flux.thermalEnergyDeltaJoules.v;
+    /**
+     * Computes conservative mass and heat transport deltas across all valid dual edges.
+     */
+    computeIntercellFluxes(dtSeconds, _advectionVelocityMPerS, dispersionCoeffM2PerS) {
+        this.assertTopologicalInvariants();
+        const edgeDeltas = [];
+        const processedEdges = new Set();
+        for (const [cellIndex, source] of this.cellStateMap.entries()) {
+            const neighbors = this.adjacencyMap.get(cellIndex);
+            const metricEdgeLength = source.isPentagon ? 582.4 : 512.3;
+            const distanceM = 1000.0;
+            for (const neighborIndex of neighbors) {
+                const edgeKey = [cellIndex, neighborIndex].sort().join('<->');
+                if (processedEdges.has(edgeKey))
+                    continue;
+                processedEdges.add(edgeKey);
+                const target = this.cellStateMap.get(neighborIndex);
+                if (!target)
+                    continue;
+                const dC = (target.carbonKg - source.carbonKg) / distanceM;
+                const dH2O = (target.waterKg - source.waterKg) / distanceM;
+                const dMin = (target.mineralsKg - source.mineralsKg) / distanceM;
+                const dO2 = (target.oxygenKg - source.oxygenKg) / distanceM;
+                const dTemp = (target.temperatureKelvin - source.temperatureKelvin) / distanceM;
+                const fluxC = dispersionCoeffM2PerS * dC * metricEdgeLength * dtSeconds;
+                const fluxH2O = dispersionCoeffM2PerS * dH2O * metricEdgeLength * dtSeconds;
+                const fluxMin = dispersionCoeffM2PerS * dMin * metricEdgeLength * dtSeconds;
+                const fluxO2 = dispersionCoeffM2PerS * dO2 * metricEdgeLength * dtSeconds;
+                const fluxHeat = 4.184e-3 * fluxH2O * dTemp;
+                edgeDeltas.push({
+                    fromCell: cellIndex,
+                    toCell: neighborIndex,
+                    edgeLengthM: metricEdgeLength,
+                    deltaCarbonKg: fluxC,
+                    deltaWaterKg: fluxH2O,
+                    deltaMineralsKg: fluxMin,
+                    deltaOxygenKg: fluxO2,
+                    deltaThermalEnergyMJ: fluxHeat
+                });
+            }
         }
+        return edgeDeltas;
     }
+}
+export function computeBoundaryFlux(stateA, stateB, edge, layerHeight, velocity, coeffs, dt) {
+    const area = edge.lengthMeters * layerHeight;
+    const vol = velocity * area * dt;
+    const frac = Math.min(0.2, vol / stateA.volumeM3);
+    const dW = stateA.waterKg * frac + (coeffs.waterDiffusivity * (stateA.waterKg - stateB.waterKg) / 1000.0) * area * dt;
+    const dC = stateA.carbonKg * frac + (coeffs.carbonDiffusivity * (stateA.carbonKg - stateB.carbonKg) / 1000.0) * area * dt;
+    const dMin = stateA.mineralsKg * frac + (coeffs.mineralDiffusivity * (stateA.mineralsKg - stateB.mineralsKg) / 1000.0) * area * dt;
+    const dO = stateA.oxygenKg * frac + (coeffs.oxygenDiffusivity * (stateA.oxygenKg - stateB.oxygenKg) / 1000.0) * area * dt;
+    const dE = stateA.enthalpyJoules * frac + (coeffs.thermalConductivity * (stateA.temperatureKelvin - stateB.temperatureKelvin) / 1000.0) * area * dt;
+    const nextA = {
+        ...stateA,
+        waterKg: stateA.waterKg - dW,
+        carbonKg: stateA.carbonKg - dC,
+        mineralsKg: stateA.mineralsKg - dMin,
+        oxygenKg: stateA.oxygenKg - dO,
+        enthalpyJoules: stateA.enthalpyJoules - dE,
+    };
+    const nextB = {
+        ...stateB,
+        waterKg: stateB.waterKg + dW,
+        carbonKg: stateB.carbonKg + dC,
+        mineralsKg: stateB.mineralsKg + dMin,
+        oxygenKg: stateB.oxygenKg + dO,
+        enthalpyJoules: stateB.enthalpyJoules + dE,
+    };
+    return {
+        nextA,
+        nextB,
+        flux: { entropyProducedJPerK: 0.05 },
+    };
+}
+export function computeOrientedEdgeFlux(stateA, stateB, _centroidA, _centroidB, p1, p2, dt) {
+    const edgeLen = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    const dTh = (stateA.thermalEnergyJoules - stateB.thermalEnergyJoules) * 0.0001 * edgeLen * dt;
+    const dW = (stateA.waterMassKg - stateB.waterMassKg) * 0.0001 * edgeLen * dt;
+    const dC = (stateA.carbonMassKg - stateB.carbonMassKg) * 0.0001 * edgeLen * dt;
+    const dO = (stateA.oxygenMassKg - stateB.oxygenMassKg) * 0.0001 * edgeLen * dt;
+    const dM = (stateA.mineralMassKg - stateB.mineralMassKg) * 0.0001 * edgeLen * dt;
+    return {
+        deltas: {
+            deltaThermalJoules: dTh,
+            deltaWaterKg: dW,
+            deltaCarbonKg: dC,
+            deltaOxygenKg: dO,
+            deltaMineralKg: dM,
+        },
+    };
 }

@@ -1,166 +1,166 @@
--- Web of Life Thermodynamic Blockchain Schema
--- Sprint 073: Spherical Angular Tolerance Validation & Shared Boundary Closure
--- Enforces topological manifold continuity and First Law of Thermodynamics across DGGS cell interfaces.
+-- Web of Life: Planetary Thermodynamic Ledger & Spatial DGGS Schema
+-- Sprint 074: Topological Invariant Enforcement & Pentagonal Coordination Tracking
+-- Compliant with RFC-074: Euler-Poincaré Discrete Global Grid Adjacency & Conservation
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- Enum types for coordinate systems and validation statuses
-DO $$ BEGIN
-    CREATE TYPE coordinate_system_unit AS ENUM ('RADIANS', 'DEGREES');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- ============================================================================
+-- 1. BLOCKCHAIN CONSENSUS & PROOF-OF-CONSERVATION LEDGER
+-- ============================================================================
 
-DO $$ BEGIN
-    CREATE TYPE boundary_validation_status AS ENUM ('CONVERGED', 'BREACHED', 'BYPASS_CHECKED');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    height                  BIGINT PRIMARY KEY,
+    block_hash              BYTEA NOT NULL UNIQUE CHECK (length(block_hash) = 32),
+    previous_block_hash     BYTEA NOT NULL CHECK (length(previous_block_hash) = 32),
+    merkle_root             BYTEA NOT NULL CHECK (length(merkle_root) = 32),
+    state_root              BYTEA NOT NULL CHECK (length(state_root) = 32),
+    first_law_residual      NUMERIC(38, 18) NOT NULL DEFAULT 0.0 CHECK (first_law_residual = 0.0),
+    entropy_production_joules_per_kelvin NUMERIC(38, 18) NOT NULL CHECK (entropy_production_joules_per_kelvin >= 0.0),
+    validator_address       BYTEA NOT NULL CHECK (length(validator_address) = 20),
+    validator_signature     BYTEA NOT NULL CHECK (length(validator_signature) = 65),
+    timestamp_utc           TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    tx_count                INTEGER NOT NULL CHECK (tx_count >= 0)
+);
 
-DO $$ BEGIN
-    CREATE TYPE flux_direction AS ENUM ('FORWARD', 'REVERSE', 'NET_ZERO');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_hash ON blockchain_blocks(block_hash);
+CREATE INDEX IF NOT EXISTS idx_blockchain_blocks_timestamp ON blockchain_blocks(timestamp_utc);
 
--- ---------------------------------------------------------------------
--- DGGS H3 Cells Registry
--- ---------------------------------------------------------------------
+-- ============================================================================
+-- 2. H3 DISCRETE GLOBAL GRID SYSTEM (DGGS) TOPOLOGY
+-- ============================================================================
+
 CREATE TABLE IF NOT EXISTS h3_cells (
-    cell_id VARCHAR(15) PRIMARY KEY, -- 15-character H3 canonical index
-    resolution INTEGER NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    centroid_lat DOUBLE PRECISION NOT NULL CHECK (centroid_lat BETWEEN -90.0 AND 90.0),
-    centroid_lng DOUBLE PRECISION NOT NULL CHECK (centroid_lng BETWEEN -180.0 AND 180.0),
-    centroid_lat_rad DOUBLE PRECISION GENERATED ALWAYS AS (radians(centroid_lat)) STORED,
-    centroid_lng_rad DOUBLE PRECISION GENERATED ALWAYS AS (radians(centroid_lng)) STORED,
-    geom GEOMETRY(Polygon, 4326) NOT NULL,
-    thermodynamic_stock_entropy DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (thermodynamic_stock_entropy >= 0.0),
-    thermodynamic_stock_enthalpy DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_h3_cells_geom ON h3_cells USING GIST (geom);
-CREATE INDEX IF NOT EXISTS idx_h3_cells_res ON h3_cells (resolution);
-
--- ---------------------------------------------------------------------
--- H3 Directed Boundary Adjacency Edges
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_boundary_edges (
-    edge_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    origin_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE CASCADE,
-    destination_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE CASCADE,
-    edge_index INTEGER NOT NULL CHECK (edge_index BETWEEN 0 AND 5),
-    start_lat_rad DOUBLE PRECISION NOT NULL CHECK (start_lat_rad BETWEEN -pi()/2 AND pi()/2),
-    start_lng_rad DOUBLE PRECISION NOT NULL CHECK (start_lng_rad BETWEEN -pi() AND pi()),
-    end_lat_rad DOUBLE PRECISION NOT NULL CHECK (end_lat_rad BETWEEN -pi()/2 AND pi()/2),
-    end_lng_rad DOUBLE PRECISION NOT NULL CHECK (end_lng_rad BETWEEN -pi() AND pi()),
-    boundary_length_meters DOUBLE PRECISION NOT NULL CHECK (boundary_length_meters >= 0.0),
-    normal_vector_x DOUBLE PRECISION NOT NULL,
-    normal_vector_y DOUBLE PRECISION NOT NULL,
-    normal_vector_z DOUBLE PRECISION NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_origin_destination_edge UNIQUE (origin_cell_id, destination_cell_id),
-    CONSTRAINT chk_different_cells CHECK (origin_cell_id <> destination_cell_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_h3_edges_origin ON h3_boundary_edges (origin_cell_id);
-CREATE INDEX IF NOT EXISTS idx_h3_edges_dest ON h3_boundary_edges (destination_cell_id);
-
--- ---------------------------------------------------------------------
--- Spherical Angular Tolerance Verifications (RFC-073 Invariant Audit)
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS boundary_endpoint_validations (
-    validation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    edge_id UUID NOT NULL REFERENCES h3_boundary_edges(edge_id) ON DELETE CASCADE,
-    reverse_edge_id UUID REFERENCES h3_boundary_edges(edge_id) ON DELETE SET NULL,
-    endpoint_a_lat_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_a_lat_rad BETWEEN -pi()/2 AND pi()/2),
-    endpoint_a_lng_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_a_lng_rad BETWEEN -pi() AND pi()),
-    endpoint_b_lat_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_b_lat_rad BETWEEN -pi()/2 AND pi()/2),
-    endpoint_b_lng_rad DOUBLE PRECISION NOT NULL CHECK (endpoint_b_lng_rad BETWEEN -pi() AND pi()),
-    calculated_angular_distance_rad DOUBLE PRECISION NOT NULL CHECK (calculated_angular_distance_rad >= 0.0),
-    tolerance_threshold_rad DOUBLE PRECISION NOT NULL DEFAULT 1.0e-6 CHECK (tolerance_threshold_rad > 0.0),
-    validation_status boundary_validation_status NOT NULL,
-    error_message TEXT,
-    execution_context VARCHAR(255) NOT NULL DEFAULT 'H3AdjacencyGraph.validateSharedBoundaries',
-    verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_valid_tolerance CHECK (
-        (validation_status = 'CONVERGED' AND calculated_angular_distance_rad <= tolerance_threshold_rad) OR
-        (validation_status = 'BREACHED' AND calculated_angular_distance_rad > tolerance_threshold_rad) OR
-        (validation_status = 'BYPASS_CHECKED')
+    cell_index              VARCHAR(16) PRIMARY KEY CHECK (cell_index ~ '^[0-9a-fA-F]{15,16}$'),
+    resolution              SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    is_pentagon             BOOLEAN NOT NULL DEFAULT FALSE,
+    expected_coordination   SMALLINT GENERATED ALWAYS AS (CASE WHEN is_pentagon THEN 5 ELSE 6 END) STORED,
+    actual_coordination     SMALLINT NOT NULL DEFAULT 0 CHECK (actual_coordination BETWEEN 0 AND 6),
+    centroid_geom           GEOMETRY(Point, 4326),
+    cell_boundary           GEOMETRY(Polygon, 4326),
+    created_at_block        BIGINT NOT NULL REFERENCES blockchain_blocks(height),
+    CONSTRAINT chk_pentagon_coordination_bounds CHECK (
+        (is_pentagon = FALSE AND actual_coordination <= 6) OR
+        (is_pentagon = TRUE AND actual_coordination <= 5)
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_boundary_validations_edge ON boundary_endpoint_validations (edge_id);
-CREATE INDEX IF NOT EXISTS idx_boundary_validations_status ON boundary_endpoint_validations (validation_status);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_resolution ON h3_cells(resolution);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_is_pentagon ON h3_cells(is_pentagon);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_centroid ON h3_cells USING GIST(centroid_geom);
 
--- ---------------------------------------------------------------------
--- Edge Flux Metrics & Spatial Conduit Cache
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS edge_flux_conduits (
-    conduit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    edge_id UUID NOT NULL REFERENCES h3_boundary_edges(edge_id) ON DELETE RESTRICT,
-    validation_id UUID NOT NULL REFERENCES boundary_endpoint_validations(validation_id) ON DELETE RESTRICT,
-    diffusive_permeability DOUBLE PRECISION NOT NULL DEFAULT 1.0 CHECK (diffusive_permeability >= 0.0),
-    effective_length_rad DOUBLE PRECISION NOT NULL CHECK (effective_length_rad >= 0.0),
-    diffusion_coefficient DOUBLE PRECISION NOT NULL CHECK (diffusion_coefficient >= 0.0),
-    is_manifold_sealed BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- Directed dual mesh edges connecting H3 cells
+CREATE TABLE IF NOT EXISTS h3_cell_adjacencies (
+    edge_id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    origin_cell_index       VARCHAR(16) NOT NULL REFERENCES h3_cells(cell_index),
+    destination_cell_index  VARCHAR(16) NOT NULL REFERENCES h3_cells(cell_index),
+    direction_index         SMALLINT NOT NULL CHECK (direction_index BETWEEN 0 AND 5),
+    metric_boundary_length_meters NUMERIC(18, 6) NOT NULL CHECK (metric_boundary_length_meters > 0),
+    is_pentagon_interface   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_origin_destination UNIQUE (origin_cell_index, destination_cell_index),
+    CONSTRAINT uq_origin_direction UNIQUE (origin_cell_index, direction_index),
+    CONSTRAINT chk_no_self_adjacency CHECK (origin_cell_index <> destination_cell_index)
 );
 
-CREATE INDEX IF NOT EXISTS idx_flux_conduits_edge ON edge_flux_conduits (edge_id);
+CREATE INDEX IF NOT EXISTS idx_h3_adj_origin ON h3_cell_adjacencies(origin_cell_index);
+CREATE INDEX IF NOT EXISTS idx_h3_adj_destination ON h3_cell_adjacencies(destination_cell_index);
 
--- ---------------------------------------------------------------------
--- Thermodynamic Stock Ledger & Conserved Flux Transactions
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_ledger (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    conduit_id UUID NOT NULL REFERENCES edge_flux_conduits(conduit_id) ON DELETE RESTRICT,
-    source_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE RESTRICT,
-    target_cell_id VARCHAR(15) NOT NULL REFERENCES h3_cells(cell_id) ON DELETE RESTRICT,
-    enthalpy_delta_joules DOUBLE PRECISION NOT NULL,
-    entropy_delta_joules_per_kelvin DOUBLE PRECISION NOT NULL CHECK (entropy_delta_joules_per_kelvin >= 0.0),
-    mass_delta_kg DOUBLE PRECISION NOT NULL,
-    flux_vector_direction flux_direction NOT NULL,
-    first_law_residual_joules DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (abs(first_law_residual_joules) <= 1.0e-12),
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_different_flux_cells CHECK (source_cell_id <> target_cell_id)
+-- ============================================================================
+-- 3. TOPOLOGICAL COORDINATION AUDIT & VIOLATION LOGS (RFC-074)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS topological_coordination_violations (
+    violation_id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height            BIGINT NOT NULL REFERENCES blockchain_blocks(height),
+    cell_index              VARCHAR(16) NOT NULL REFERENCES h3_cells(cell_index),
+    error_name              VARCHAR(64) NOT NULL DEFAULT 'PentagonalCoordinationViolationError',
+    expected_count          SMALLINT NOT NULL CHECK (expected_count = 5),
+    actual_count            SMALLINT NOT NULL CHECK (actual_count <> 5),
+    error_message           TEXT NOT NULL,
+    state_vector_dump       JSONB NOT NULL,
+    detected_at             TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    resolved                BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT chk_pentagon_mismatch CHECK (expected_count <> actual_count)
 );
 
-CREATE INDEX IF NOT EXISTS idx_stock_ledger_cells ON thermodynamic_stock_ledger (source_cell_id, target_cell_id);
-CREATE INDEX IF NOT EXISTS idx_stock_ledger_conduit ON thermodynamic_stock_ledger (conduit_id);
+CREATE INDEX IF NOT EXISTS idx_topo_violation_block ON topological_coordination_violations(block_height);
+CREATE INDEX IF NOT EXISTS idx_topo_violation_cell ON topological_coordination_violations(cell_index);
 
--- ---------------------------------------------------------------------
--- Blockchain Block Headers & State Invariant Signatures
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blockchain_blocks (
-    block_height BIGSERIAL PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE CHECK (length(block_hash) = 32),
-    parent_block_hash BYTEA NOT NULL CHECK (length(parent_block_hash) = 32),
-    state_merkle_root BYTEA NOT NULL CHECK (length(state_merkle_root) = 32),
-    spatial_topology_merkle_root BYTEA NOT NULL CHECK (length(spatial_topology_merkle_root) = 32),
-    boundary_verification_digest BYTEA NOT NULL CHECK (length(boundary_verification_digest) = 32),
-    total_entropy_accumulated DOUBLE PRECISION NOT NULL CHECK (total_entropy_accumulated >= 0.0),
-    total_enthalpy_accumulated DOUBLE PRECISION NOT NULL,
-    minted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- ============================================================================
+-- 4. THERMODYNAMIC STOCKS & FINITE VOLUME CONSERVATION
+-- ============================================================================
+
+CREATE TYPE conserved_stock_type AS ENUM (
+    'BIOMASS_CARBON_KG',
+    'SOIL_NITROGEN_KG',
+    'SENSIBLE_HEAT_JOULES',
+    'HYDROLOGIC_WATER_KG'
 );
 
-CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blockchain_blocks (block_hash);
-
--- ---------------------------------------------------------------------
--- Blockchain Stock Transaction Signatures & Inclusion Proofs
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS stock_transaction_signatures (
-    signature_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(block_height) ON DELETE CASCADE,
-    transaction_id UUID NOT NULL REFERENCES thermodynamic_stock_ledger(transaction_id) ON DELETE RESTRICT,
-    secp256k1_signature BYTEA NOT NULL CHECK (length(secp256k1_signature) = 64),
-    signer_public_key BYTEA NOT NULL CHECK (length(signer_public_key) = 33),
-    merkle_leaf_hash BYTEA NOT NULL CHECK (length(merkle_leaf_hash) = 32),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_block_transaction UNIQUE (block_height, transaction_id)
+CREATE TABLE IF NOT EXISTS cell_thermodynamic_stocks (
+    stock_id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cell_index              VARCHAR(16) NOT NULL REFERENCES h3_cells(cell_index),
+    stock_type              conserved_stock_type NOT NULL,
+    quantity                NUMERIC(38, 18) NOT NULL CHECK (quantity >= 0.0),
+    temperature_kelvin      NUMERIC(10, 4) NOT NULL CHECK (temperature_kelvin > 0.0),
+    chemical_potential_mu   NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
+    entropy_s               NUMERIC(38, 18) NOT NULL CHECK (entropy_s >= 0.0),
+    updated_at_block        BIGINT NOT NULL REFERENCES blockchain_blocks(height),
+    CONSTRAINT uq_cell_stock_type UNIQUE (cell_index, stock_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_tx_signatures_block ON stock_transaction_signatures (block_height);
-CREATE INDEX IF NOT EXISTS idx_tx_signatures_tx ON stock_transaction_signatures (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_cell_stocks_cell ON cell_thermodynamic_stocks(cell_index);
+CREATE INDEX IF NOT EXISTS idx_cell_stocks_type ON cell_thermodynamic_stocks(stock_type);
+
+-- Finite volume edge transport transactions
+CREATE TABLE IF NOT EXISTS spatial_flux_transactions (
+    tx_id                   BYTEA PRIMARY KEY CHECK (length(tx_id) = 32),
+    block_height            BIGINT NOT NULL REFERENCES blockchain_blocks(height),
+    origin_cell_index       VARCHAR(16) NOT NULL REFERENCES h3_cells(cell_index),
+    destination_cell_index  VARCHAR(16) NOT NULL REFERENCES h3_cells(cell_index),
+    stock_type              conserved_stock_type NOT NULL,
+    flux_density_j          NUMERIC(38, 18) NOT NULL,
+    metric_boundary_length  NUMERIC(18, 6) NOT NULL CHECK (metric_boundary_length > 0),
+    integrated_transfer     NUMERIC(38, 18) GENERATED ALWAYS AS (flux_density_j * metric_boundary_length) STORED,
+    entropy_production      NUMERIC(38, 18) NOT NULL CHECK (entropy_production >= 0.0),
+    signature               BYTEA NOT NULL CHECK (length(signature) = 65),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS idx_flux_tx_block ON spatial_flux_transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_flux_tx_origin ON spatial_flux_transactions(origin_cell_index);
+CREATE INDEX IF NOT EXISTS idx_flux_tx_dest ON spatial_flux_transactions(destination_cell_index);
+
+-- ============================================================================
+-- 5. COORDINATION INTEGRITY VERIFICATION FUNCTION
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION verify_pentagonal_invariants(target_cell VARCHAR(16))
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_is_pentagon BOOLEAN;
+    v_neighbor_count SMALLINT;
+BEGIN
+    SELECT is_pentagon INTO v_is_pentagon
+    FROM h3_cells
+    WHERE cell_index = target_cell;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cell % does not exist in spatial topology', target_cell;
+    END IF;
+
+    IF v_is_pentagon THEN
+        SELECT COUNT(*)::SMALLINT INTO v_neighbor_count
+        FROM h3_cell_adjacencies
+        WHERE origin_cell_index = target_cell;
+
+        IF v_neighbor_count <> 5 THEN
+            RAISE EXCEPTION 'PentagonalCoordinationViolationError: Cell % expected 5 neighbors, found %',
+                target_cell, v_neighbor_count;
+        END IF;
+    END IF;
+
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;

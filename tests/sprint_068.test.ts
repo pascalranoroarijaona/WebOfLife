@@ -22,7 +22,7 @@ describe('Sprint 068: Shared Boundary Vertex Extraction in 3D Spherical Manifold
   // Test cell indices at resolution 7
   const cellCenter = h3LatLngToCell(37.7749, -122.4194, 7);
   const disk = h3GridDisk(cellCenter, 1);
-  const neighborCell = disk.find((c) => c !== cellCenter)!;
+  const neighborCell = disk.find((c: string) => c !== cellCenter)!;
   const nonNeighborCell = h3LatLngToCell(48.8566, 2.3522, 7); // Paris, France
 
   it('TC-068-01: Shared vertices for adjacent hexagonal cells', () => {
@@ -86,7 +86,7 @@ describe('Sprint 068: Shared Boundary Vertex Extraction in 3D Spherical Manifold
     const pentagons = h3GetPentagons(3);
     if (pentagons.length > 0) {
       const pentagon = pentagons[0];
-      const pentagonNeighbors = h3GridDisk(pentagon, 1).filter((c) => c !== pentagon);
+      const pentagonNeighbors = h3GridDisk(pentagon, 1).filter((c: string) => c !== pentagon);
       assert.ok(pentagonNeighbors.length > 0, 'Pentagon should have neighbors');
       const hexNeighbor = pentagonNeighbors[0];
 

@@ -74,6 +74,62 @@ export interface ICellState {
   };
 }
 
+export interface CellStockState {
+  index?: string;
+  h3Index?: string;
+  carbonMass?: number;
+  waterMass?: number;
+  mineralNutrients?: number;
+  thermalEnergy?: number;
+  waterKg?: number;
+  carbonKg?: number;
+  mineralKg?: number;
+  mineralsKg?: number;
+  oxygenKg?: number;
+  energyJoules?: number;
+  thermalEnergyJoules?: number;
+  volumeM3?: number;
+  temperatureK?: number;
+  temperatureKelvin?: number;
+  [key: string]: any;
+}
+
+export interface InterfaceFluxState {
+  massAirKg?: number;
+  massWaterKg?: number;
+  massCarbonKg?: number;
+  massOxygenKg?: number;
+  massMineralsKg?: number;
+  thermalEnergyJoules?: number;
+  deltaOrigin?: {
+    massAirKg: number;
+    massWaterKg: number;
+    massCarbonKg: number;
+    massOxygenKg: number;
+    massMineralsKg: number;
+    thermalEnergyJoules: number;
+    [key: string]: any;
+  };
+  deltaDestination?: {
+    massAirKg: number;
+    massWaterKg: number;
+    massCarbonKg: number;
+    massOxygenKg: number;
+    massMineralsKg: number;
+    thermalEnergyJoules: number;
+    [key: string]: any;
+  };
+  entropyGeneratedJPerK?: number;
+  [key: string]: any;
+}
+
+export interface CellGeometryState {
+  columnHeightM?: number;
+  volumeM3: number;
+  stocks: InterfaceFluxState;
+  [key: string]: any;
+}
+
 export interface CellThermodynamicStocks {
   carbonMol?: number;
   waterMol?: number;

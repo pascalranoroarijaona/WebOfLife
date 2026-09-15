@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 37%
-SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angular tolerance between shared endpoints in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 38%
+SPRINT_GOAL: Define PentagonalCoordinationViolationError class with cellIndex, expectedCount, and actualCount in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -53,7 +53,12 @@ SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angu
 - [x] Implement `areCartesianUnitVectorsEqual3D` testing angular tolerance epsilon between two Cartesian vectors in `src/spatial/h3_adjacency.ts`
 - [x] Implement `findSharedBoundaryVertexPairs3D` matching coincident boundary vertices between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [x] Implement `orderSharedBoundaryEndpointsByCentroid` orienting shared endpoints with outward normal in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
+- [x] Implement `assertBoundaryEndpointTolerance` validating spherical angular tolerance between shared endpoints in `src/spatial/h3_adjacency.ts`
+- [ ] Define `PentagonalCoordinationViolationError` class with cellIndex, expectedCount, and actualCount in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `isExpectedNeighborCountForCell` checking neighbor array length against getCoordinationNumber in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `assertValidNeighborCountForCell` throwing PentagonalCoordinationViolationError on count mismatch in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `validatePentagonalNeighborCount` verifying neighbor collection length matches coordination number (5 for pentagons, 6 for hexagons) in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `assertBoundaryContinuity` topological adjacency and shared boundary validator between adjacent H3 cells in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateInterCellInterfaceMetrics` geometric coupling function assembling interface metrics in `src/spatial/h3_adjacency.ts`
@@ -81,12 +86,12 @@ SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angu
 
 ### Phase 2: Biosphere & Ecological Dynamics
 - [x] Directed Acyclic Trophic Graphs and Lindeman's Efficiency energy transfer matrices (`src/biosphere/trophic.ts`)
-- [ ] Define `ElementalMassPool` interface & immutable ratio helpers in `src/biosphere/stoichiometry_types.ts`
+- [ ] Define `ElementalMassVector` interface & Redfield ratio constants in `src/biosphere/stoichiometry_types.ts`
 - [ ] Define `BiomassStoichiometryVector` interface with Redfield canonical ratios in `src/biosphere/stoichiometry_types.ts`
 - [ ] Implement `assertValidStoichiometryVector` validator enforcing non-negative elemental ratios in `src/biosphere/stoichiometry_types.ts`
-- [ ] Implement `evaluateLiebigMinimumFactor` across discrete elemental availability pools in `src/biosphere/stoichiometric_limitation.ts`
-- [ ] Implement Droop cell quota regulation `computeDroopGrowthMultiplier` in `src/biosphere/cell_quota.ts`
-- [ ] Implement Sterner-Elser dynamic overflow respiration `computeOverflowRespiration` in `src/biosphere/homeostatic_regulation.ts`
+- [ ] Implement `calculateLiebigLimitationRatio` across discrete elemental availability pools in `src/biosphere/stoichiometric_limitation.ts`
+- [ ] Implement `calculateDroopCellQuotaModifier` for nutrient quota growth regulation in `src/biosphere/cell_quota.ts`
+- [ ] Implement `calculateSternerElserOverflowRespiration` in `src/biosphere/homeostatic_regulation.ts`
 - [ ] Biomass Specific Enthalpy & Exergy combustion conversion mapper in `src/biosphere/biomass_energy.ts`
 - [ ] Define `CanopyLayerStratum` and Leaf Angle Distribution (LAD) tensors in `src/biosphere/canopy_types.ts`
 - [ ] Plant Functional Type (PFT) enum and `CanopyTraitProfile` interface in `src/biosphere/traits.ts`
@@ -97,18 +102,19 @@ SPRINT_GOAL: Implement assertBoundaryEndpointTolerance validating spherical angu
 - [ ] Farquhar-von Caemmerer-Berry (FvCB) $C_3$/$C_4$ assimilation monad in `src/biosphere/photosynthesis_fvcb.ts`
 - [ ] Ball-Berry-Woodward and Medlyn stomatal conductance coupling in `src/biosphere/stomatal_conductance.ts`
 - [ ] Allometric metabolic scaling and Kleiber's Law basal respiration calculator in `src/biosphere/allometry.ts`
-- [ ] Holling Type II predator ingestion rate function with handling time parameters in `src/biosphere/holling_kinetics.ts`
-- [ ] Holling Type III sigmoidal consumption function with prey-switching refuge thresholds in `src/biosphere/holling_kinetics.ts`
+- [ ] Evaluate Holling Type II predator ingestion rate function with handling time parameters in `src/biosphere/holling_kinetics.ts`
+- [ ] Evaluate Holling Type III sigmoidal consumption function with prey-switching refuge thresholds in `src/biosphere/holling_kinetics.ts`
 - [ ] Specific Dynamic Action and Gouy-Stodola trophic exergy dissipation accounting in `src/biosphere/trophic_thermodynamics.ts`
 - [ ] Compressed Sparse Row `CSRMatrix` interface and vector multiplication in `src/biosphere/trophic_matrix.ts`
 - [ ] Gauss-Seidel steady-state biomass solver updating node biomass stocks in `src/biosphere/trophic_solver.ts`
 - [ ] Spectral radius and relative residual convergence checks in `src/biosphere/trophic_solver.ts`
-- [ ] Define `MycorrhizalGuild` enum, `HyphalNode`, and directed `HyphalEdge` graph structure in `src/biosphere/mycorrhizal_types.ts`
-- [ ] Mutualistic carbon-for-nutrient exchange and fungal sink strength calculation in `src/biosphere/mycorrhizal_network.ts`
+- [ ] Define `MycorrhizalType` enum, `HyphalNode`, and directed `HyphalEdge` graph structure in `src/biosphere/mycorrhizal_types.ts`
+- [ ] Mutualistic carbon-for-nutrient exchange and fungal sink strength calculation in `src/biosphere/mycorrhizal_trading.ts`
 - [ ] Spatial hyphal network conductivity matrix mapping carbon translocation efficiency in `src/biosphere/hyphal_transport.ts`
 - [ ] Fungal necromass decomposition rate and turnover calculator in `src/biosphere/mycorrhizal_decay.ts`
 - [ ] Dual-pool soil organic matter tracking distinguishing MAOM vs POM in `src/geobiome/soil_organic_matter.ts`
 - [ ] Microbial Carbon Use Efficiency (CUE) and decomposition kinetics in `src/geobiome/microbial_kinetics.ts`
+- [ ] Compute relative abundance distribution vectors in `src/biosphere/diversity_metrics.ts`
 - [ ] Hill numbers multidimensional diversity evaluation ($^qD$) across spatial H3 node communities in `src/biosphere/diversity_metrics.ts`
 - [ ] Rao's quadratic entropy functional diversity metric calculator in `src/biosphere/diversity_metrics.ts`
 - [ ] Allee effect population growth modifier and stochastic demographic extinction engine in `src/biosphere/population_viability.ts`
