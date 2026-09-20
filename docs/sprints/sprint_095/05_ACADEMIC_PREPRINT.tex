@@ -1,0 +1,225 @@
+\documentclass[10pt,journal,compsoc]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=cyan
+}
+
+\begin{document}
+
+\title{Hierarchical Aperture-7 Class III Coordinate Rotation Angle Computation in Discrete Global Grid Thermodynamic Systems}
+
+\author{Pascal~Ranoroarijaona%
+\thanks{P. Ranoroarijaona is Chief Systems Architect of the Web of Life Project. E-mail: pascal@weboflife.net, Repository: \url{https://github.com/pascalranoroarijaona/WebOfLife}.}}
+
+\markboth{Web of Life Technical Report, Sprint 095, February 2025}%
+{Ranoroarijaona: Aperture-7 Class III Coordinate Rotation Angle Computation}
+
+\IEEEtitleabstractindextext{%
+\begin{abstract}
+Discrete Global Grid Systems (DGGS) parameterized over Aperture-7 hexagonal hierarchies, such as the Uber H3 spatial index, exhibit discrete rotational shifts between hierarchical resolution tiers. Odd resolution transitions (Class III) introduce an irrational angular displacement $\theta_{\text{ap7}} = \arcsin(\sqrt{3} / (2\sqrt{7})) \approx 0.333473172$ radians ($\approx 19.106605^\circ$) relative to principal icosahedral coordinate axes. In planetary multi-scale thermodynamic simulations, advective and diffusive spatial fluxes of mass, heat, and nutrients traversing heterogeneous resolution interfaces must undergo coordinate transformation to prevent spurious numerical divergence and ensure strict adherence to the First and Second Laws of Thermodynamics. In this paper, we formalize the signed discrete transition function $\text{countClassIIIApertureSteps}(r_1, r_2)$ and cumulative rotation calculation $\text{computeClassIIIRotationAngleRadians}(r_1, r_2)$. We prove that the resulting $\mathrm{SO}(2)$ orthogonal coordinate rotation preserves the vector $L_2$ norm, scalar divergence fields, and guarantees non-negative entropy generation across multi-resolution discrete global manifolds.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Discrete Global Grid Systems (DGGS), Aperture-7 Hexagonal Tessellation, Uber H3, Thermodynamic Invariants, Coordinate Transformation, $\mathrm{SO}(2)$ Rotations.
+\end{IEEEkeywords}}
+
+\maketitle
+\IEEEdisplaynontitleabstractindextext
+\IEEEpeerreviewmaketitle
+
+\section{Introduction}
+\IEEEPARstart{P}{lanetary} thermodynamic modeling requires discretization of the spherical continuum into uniform, equal-area control volumes while supporting Adaptive Mesh Refinement (AMR). Hexagonal Discrete Global Grid Systems (DGGS) using an Aperture-7 hierarchy offer optimal spatial packing and uniform neighbor topologies.
+
+However, Aperture-7 hierarchies alternate between two distinct geometric classes across resolutions $r \in [0, 15]$:
+\begin{itemize}
+    \item \textbf{Class II (Even Resolutions):} Hexagonal vertices align symmetrically with the base icosahedral triangle edges ($\theta \equiv 0$).
+    \item \textbf{Class III (Odd Resolutions):} The coordinate axes undergo an irrational rotational offset $\theta_{\text{ap7}}$ relative to the parent centroidal frame:
+    \begin{equation}
+        \theta_{\text{ap7}} = \arcsin\left(\frac{\sqrt{3}}{2\sqrt{7}}\right) \approx 0.3334731722918321 \text{ rad}
+    \end{equation}
+\end{itemize}
+
+When spatial flux vectors $\mathbf{J} \in \mathbb{R}^2$ representing lateral energy, water, or nutrient transfer cross inter-resolution interfaces, neglecting this rotation generates non-physical coordinate skew, violating conservation laws. This work formalizes and verifies the authoritative coordinate rotation primitives integrated into \texttt{src/spatial/h3\_adjacency.ts} within the \textbf{Web of Life} simulation engine.
+
+\section{Mathematical Formulation}
+
+\subsection{Aperture-7 Step Geometry}
+In an Aperture-7 partition, each hexagon at resolution $r$ decomposes into seven sub-hexagons at resolution $r+1$. The geometric displacement vector between adjacent cell centroids induces a coordinate axis counter-rotation governed by:
+\begin{equation}
+    \theta_{\text{ap7}} = \arctan\left(\frac{\sqrt{3}}{5}\right) = \arcsin\left(\frac{\sqrt{3}}{2\sqrt{7}}\right)
+\end{equation}
+
+\subsection{Discrete Class III Step Counting}
+\begin{definition}[Class III Step Counter]
+Let $r_1, r_2 \in \{0, \dots, 15\}$ be the source and target H3 resolutions. The signed Class III aperture step count $n_{\text{III}}(r_1, r_2)$ is defined as:
+\begin{equation}
+    n_{\text{III}}(r_1, r_2) = \operatorname{sgn}(r_2 - r_1) \sum_{k=\min(r_1, r_2)}^{\max(r_1, r_2) - 1} w(k)
+\end{equation}
+where the indicator weight $w(k)$ for an increment $k \to k+1$ evaluates to:
+\begin{equation}
+    w(k) = \begin{cases}
+    1, & \text{if } (k+1) \equiv 1 \pmod 2 \quad (\text{Class III}) \\
+    0, & \text{if } (k+1) \equiv 0 \pmod 2 \quad (\text{Class II})
+    \end{cases}
+\end{equation}
+\end{definition}
+
+\begin{lemma}[Antisymmetry and Additivity]
+For all resolutions $r_1, r_2, r_3 \in [0, 15]$:
+\begin{align}
+    n_{\text{III}}(r_1, r_2) &= -n_{\text{III}}(r_2, r_1) \\
+    n_{\text{III}}(r_1, r_2) + n_{\text{III}}(r_2, r_3) &= n_{\text{III}}(r_1, r_3)
+\end{align}
+\end{lemma}
+
+\subsection{Cumulative Rotation and Modular Normalization}
+The cumulative rotation angle $\Theta(r_1, r_2)$ is:
+\begin{equation}
+    \Theta(r_1, r_2) = n_{\text{III}}(r_1, r_2) \cdot \theta_{\text{ap7}}
+\end{equation}
+Normalizing $\Theta$ to the principal symmetric interval $[-\pi, \pi)$ yields:
+\begin{equation}
+    \Theta_{\text{norm}} = \Theta - 2\pi \left\lfloor \frac{\Theta + \pi}{2\pi} \right\rfloor
+\end{equation}
+
+\section{Thermodynamic Invariant Proofs}
+
+\begin{theorem}[First Law: Vector Norm Invariance]
+Let $\mathbf{J} = [J_x, J_y]^T \in \mathbb{R}^2$ denote a spatial flux density vector. The transformation $\mathbf{J}' = \mathbf{R}(\Theta)\mathbf{J}$ via $\mathbf{R}(\Theta) \in \mathrm{SO}(2)$ preserves the $L_2$ Euclidean norm:
+\begin{equation}
+    \|\mathbf{J}'\|_2 = \|\mathbf{J}\|_2
+\end{equation}
+\end{theorem}
+\begin{proof}
+By definition of $\mathrm{SO}(2)$:
+\begin{equation}
+    \mathbf{R}(\Theta) = \begin{bmatrix} \cos\Theta & -\sin\Theta \\ \sin\Theta & \cos\Theta \end{bmatrix}
+\end{equation}
+The matrix product satisfies $\mathbf{R}(\Theta)^T \mathbf{R}(\Theta) = \mathbf{I}_2$. Thus:
+\begin{equation}
+    \|\mathbf{J}'\|_2^2 = (\mathbf{R}\mathbf{J})^T(\mathbf{R}\mathbf{J}) = \mathbf{J}^T \mathbf{R}^T \mathbf{R} \mathbf{J} = \mathbf{J}^T \mathbf{I}_2 \mathbf{J} = \|\mathbf{J}\|_2^2
+\end{equation}
+Hence, no mass, momentum, or energy density is artificially amplified or dampened.
+\end{proof}
+
+\begin{theorem}[Second Law: Entropy Generation Invariance]
+Under Fourier-Fick thermal diffusion $\mathbf{J}_q = -k \nabla T$, the volumetric entropy production rate $\sigma = -\frac{1}{T^2} \mathbf{J}_q \cdot \nabla T \ge 0$ is invariant under Class III rotation.
+\end{theorem}
+\begin{proof}
+Under orthogonal rotation $\mathbf{R}$, both vector fields transform co-directionally: $\mathbf{J}_q' = \mathbf{R}\mathbf{J}_q$ and $\nabla' T = \mathbf{R}\nabla T$. The inner product satisfies:
+\begin{equation}
+    \mathbf{J}_q' \cdot \nabla' T = (\mathbf{R}\mathbf{J}_q)^T (\mathbf{R}\nabla T) = \mathbf{J}_q^T \mathbf{R}^T \mathbf{R} \nabla T = \mathbf{J}_q \cdot \nabla T
+\end{equation}
+Consequently:
+\begin{equation}
+    \sigma' = -\frac{1}{T^2} (\mathbf{J}_q' \cdot \nabla' T) = -\frac{1}{T^2} (\mathbf{J}_q \cdot \nabla T) = \sigma \ge 0
+\end{equation}
+Spurious entropy production or second-law violations are strictly ruled out.
+\end{proof}
+
+\section{Verification \& Numerical Results}
+
+Table~\ref{tab:verification} documents the exact evaluation of $n_{\text{III}}$, raw radians, and wrapped angles across representative resolution leaps.
+
+\begin{table}[htbp]
+\caption{Aperture-7 Class III Step and Angular Values}
+\label{tab:verification}
+\centering
+\begin{tabular}{ccccc}
+\toprule
+$r_1$ & $r_2$ & $n_{\text{III}}$ & Raw Angle (rad) & Normalized Angle (rad) \\
+\midrule
+0 & 0  &  0 & $0.000000000$ & $0.000000000$ \\
+0 & 1  & +1 & $0.333473172$ & $0.333473172$ \\
+1 & 0  & -1 & $-0.333473172$ & $-0.333473172$ \\
+0 & 2  & +1 & $0.333473172$ & $0.333473172$ \\
+1 & 2  &  0 & $0.000000000$ & $0.000000000$ \\
+0 & 3  & +2 & $0.666946345$ & $0.666946345$ \\
+3 & 0  & -2 & $-0.666946345$ & $-0.666946345$ \\
+0 & 7  & +4 & $1.333892689$ & $1.333892689$ \\
+0 & 15 & +8 & $2.667785378$ & $2.667785378$ \\
+15 & 0 & -8 & $-2.667785378$ & $-2.667785378$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Reference Implementation}
+The validated TypeScript reference implementation in \texttt{src/spatial/h3\_adjacency.ts} is:
+
+\begin{verbatim}
+export const APERTURE_7_ROTATION_RAD: number = 
+  0.3334731722918321;
+
+export function countClassIIIApertureSteps(
+  startRes: number, 
+  targetRes: number
+): number {
+  if (!Number.isInteger(startRes) || 
+      startRes < 0 || startRes > 15) {
+    throw new RangeError("startRes invalid");
+  }
+  if (!Number.isInteger(targetRes) || 
+      targetRes < 0 || targetRes > 15) {
+    throw new RangeError("targetRes invalid");
+  }
+  if (startRes === targetRes) return 0;
+  
+  const forward = targetRes > startRes;
+  const min = forward ? startRes : targetRes;
+  const max = forward ? targetRes : startRes;
+  
+  let steps = 0;
+  for (let r = min; r < max; r++) {
+    if ((r + 1) % 2 !== 0) steps++;
+  }
+  return forward ? steps : -steps;
+}
+
+export function computeClassIIIRotationAngleRadians(
+  startRes: number,
+  targetRes: number,
+  normalize: boolean = true
+): number {
+  const steps = countClassIIIApertureSteps(
+    startRes, targetRes
+  );
+  const raw = steps * APERTURE_7_ROTATION_RAD;
+  if (!normalize) return raw;
+  const twoPi = 2 * Math.PI;
+  const wrapped = raw - twoPi * Math.floor(
+    (raw + Math.PI) / twoPi
+  );
+  return wrapped === Math.PI ? -Math.PI : wrapped;
+}
+\end{verbatim}
+
+\section{Conclusion}
+The integration of \texttt{computeClassIIIRotationAngleRadians} in Sprint 095 resolves coordinate disorientation across Aperture-7 multi-resolution hierarchies. By scaling $\theta_{\text{ap7}}$ by discrete parity transitions $n_{\text{III}}$, the \textbf{Web of Life} architecture maintains strict adherence to the First and Second Laws of Thermodynamics across non-uniform global grid networks.
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{1}
+\bibitem{sahr2003}
+K.~Sahr, D.~White, and A.~J.~Kimerling, ``Geodesic discrete global grid systems,'' \emph{Cartography and Geographic Information Science}, vol.~30, no.~2, pp.~121--134, 2003.
+\bibitem{h3uber}
+Uber Technologies, ``H3: Hexagonal hierarchical spatial index,'' \url{https://h3geo.org/}, 2018.
+\bibitem{kondepudi2014}
+D.~Kondepudi and I.~Prigogine, \emph{Modern Thermodynamics: From Heat Engines to Dissipative Structures}, John Wiley \& Sons, 2014.
+\end{thebibliography}
+
+\end{document}

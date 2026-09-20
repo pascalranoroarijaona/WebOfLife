@@ -175,11 +175,11 @@ describe('Sprint 080: assertPentagonalNeighborArrayType & Topology Defensive Gua
             ['n5', { h3Index: 'n5', isPentagon: false, stocks: makeStocks(1) }]
         ]);
         const initialTotalStocks = {
-            carbon: sourceState.stocks.carbon + 5 * (1 * 100),
-            water: sourceState.stocks.water + 5 * (1 * 500),
-            minerals: sourceState.stocks.minerals + 5 * (1 * 50),
-            oxygen: sourceState.stocks.oxygen + 5 * (1 * 200),
-            thermalEnergy: sourceState.stocks.thermalEnergy + 5 * (1 * 1000)
+            carbon: (sourceState.stocks.carbon ?? 0) + 5 * (1 * 100),
+            water: (sourceState.stocks.water ?? 0) + 5 * (1 * 500),
+            minerals: (sourceState.stocks.minerals ?? 0) + 5 * (1 * 50),
+            oxygen: (sourceState.stocks.oxygen ?? 0) + 5 * (1 * 200),
+            thermalEnergy: (sourceState.stocks.thermalEnergy ?? 0) + 5 * (1 * 1000)
         };
         it('should perform conservative advective transfer and verify First Law', () => {
             const monad = PentagonalFluxMonad.of(sourceState, initialNeighbors);
@@ -190,7 +190,7 @@ describe('Sprint 080: assertPentagonalNeighborArrayType & Topology Defensive Gua
             const isConserved = stepped.verifyThermodynamicInvariants(initialTotalStocks, 1e-9);
             assert.strictEqual(isConserved, true);
             const result = stepped.getResult();
-            assert(result.source.stocks.carbon < sourceState.stocks.carbon);
+            assert(result.source.stocks.carbon < (sourceState.stocks.carbon ?? 0));
             const n1 = result.neighbors.get('n1');
             assert(n1 !== undefined);
             assert(n1.stocks.carbon > (initialNeighbors.get('n1')?.stocks.carbon ?? 0));

@@ -1,6 +1,6 @@
 // =============================================================================
 // WEB OF LIFE - SPATIAL H3 GRID BITWISE OPERATORS, PARSERS & MONADS
-// Retro-Compatible Unified Multi-Sprint Specification (Sprints 003 - 090)
+// Retro-Compatible Unified Multi-Sprint Specification (Sprints 003 - 095)
 // =============================================================================
 
 import {
@@ -33,14 +33,14 @@ export {
 };
 
 // =============================================================================
-// SPRINT 090 BITWISE KERNEL
+// BITWISE KERNEL
 // =============================================================================
 
 export function h3ToBigInt(index: H3Index): bigint {
   if (typeof index === 'bigint') {
     return index;
   }
-  const clean = index.trim().replace(/^0x/i, '');
+  const clean = String(index).trim().replace(/^0x/i, '');
   if (!clean || !/^[0-9a-fA-F]+$/.test(clean)) {
     throw new Error(`Invalid H3 index string: "${index}"`);
   }
@@ -1070,7 +1070,7 @@ export function cartesian3DToGeo(v: { x: number; y: number; z: number }): { lat:
 }
 
 export class H3GridUtils {
-  public static isValidCell(index: bigint | string): boolean {
+  public static isValidCell(index: H3Index): boolean {
     try {
       return getMode(index) === H3_CELL_MODE;
     } catch {
@@ -1078,9 +1078,9 @@ export class H3GridUtils {
     }
   }
 
-  public static cellToParent(index: bigint): bigint {
+  public static cellToParent(index: H3Index): bigint {
     const res = getResolution(index);
-    if (res === 0) return index;
+    if (res === 0) return h3ToBigInt(index);
     const parentRes = res - 1;
     let val = h3ToBigInt(index);
     val &= ~(0xFn << 52n);
@@ -1090,7 +1090,7 @@ export class H3GridUtils {
     return val;
   }
 
-  public static cellToChildren(index: bigint | string): bigint[] {
+  public static cellToChildren(index: H3Index): bigint[] {
     const parentBigInt = h3ToBigInt(index);
     const res = getResolution(parentBigInt);
     if (res >= 15) return [parentBigInt];

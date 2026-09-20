@@ -205,8 +205,8 @@ describe('Sprint 094: Aperture-7 Class III Step Counter & Parity Engine', () => 
       const parent = SpatialFluxMonad.projectParentStock(children);
 
       const expectedCarbon = children.reduce((s, c) => s + c.carbonKg, 0);
-      const expectedEnergy = children.reduce((s, c) => s + c.thermalEnergyMJ, 0);
-      const expectedBiomass = children.reduce((s, c) => s + c.biomassKg, 0);
+      const expectedEnergy = children.reduce((s, c) => s + (c.thermalEnergyMJ ?? 0), 0);
+      const expectedBiomass = children.reduce((s, c) => s + (c.biomassKg ?? 0), 0);
 
       assert.strictEqual(parent.carbonKg, expectedCarbon);
       assert.strictEqual(parent.thermalEnergyMJ, expectedEnergy);
@@ -228,8 +228,8 @@ describe('Sprint 094: Aperture-7 Class III Step Counter & Parity Engine', () => 
 
       const reconstructed = SpatialFluxMonad.projectParentStock(children);
       assert.ok(Math.abs(reconstructed.carbonKg - parent.carbonKg) < 1e-9);
-      assert.ok(Math.abs(reconstructed.thermalEnergyMJ - parent.thermalEnergyMJ) < 1e-9);
-      assert.ok(Math.abs(reconstructed.biomassKg - parent.biomassKg) < 1e-9);
+      assert.ok(Math.abs((reconstructed.thermalEnergyMJ ?? 0) - (parent.thermalEnergyMJ ?? 0)) < 1e-9);
+      assert.ok(Math.abs((reconstructed.biomassKg ?? 0) - (parent.biomassKg ?? 0)) < 1e-9);
     });
 
     it('SpatialFluxMonad computeRotatedDivergence runs without synthetic mass creation', () => {

@@ -1,6 +1,6 @@
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 47%
-SPRINT_GOAL: Implement countClassIIIApertureSteps counting odd resolution steps up to target resolution in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 48%
+SPRINT_GOAL: Implement computeClassIIIRotationAngleRadians scaling APERTURE_7_ROTATION_RAD by countClassIIIApertureSteps in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -74,7 +74,8 @@ SPRINT_GOAL: Implement countClassIIIApertureSteps counting odd resolution steps 
 - [x] Implement `getApertureClassForResolution` returning 'CLASS_II' for even resolutions and 'CLASS_III' for odd resolutions in `src/spatial/h3_adjacency.ts`
 - [x] Implement `assertValidApertureResolution` boundary check enforcing non-negative integer resolution in [0, 15] range in `src/spatial/h3_adjacency.ts`
 - [x] Implement `getApertureRotationSequence` returning array of aperture classes from resolution 0 to target resolution in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `countClassIIIApertureSteps` counting odd resolution steps up to target resolution in `src/spatial/h3_adjacency.ts`
+- [x] Implement `countClassIIIApertureSteps` counting odd resolution steps up to target resolution in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `computeClassIIIRotationAngleRadians` scaling APERTURE_7_ROTATION_RAD by countClassIIIApertureSteps in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateApertureCumulativeRotationRadians` computing total aperture orientation tilt angle in radians for a given resolution in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `calculateApertureCumulativeRotationDegrees` converting total aperture orientation tilt angle to decimal degrees in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`

@@ -1,0 +1,185 @@
+@startuml sprint_095_schema
+!theme blueprint
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "JetBrains Mono", "Fira Code", monospace
+skinparam shadowing false
+skinparam monochrome false
+
+title Web of Life - Sprint 095: Aperture-7 Class III Coordinate Rotation & Spatial Flux Architecture
+
+package "src/spatial" {
+    enum H3GridClass {
+        CLASS_II
+        CLASS_III
+    }
+
+    class Vector2D {
+        +u: number
+        +v: number
+        +magnitude(): number
+        +rotate(angleRad: number): Vector2D
+        +dot(other: Vector2D): number
+        +normalize(): Vector2D
+    }
+
+    class H3SpatialTransformationRegistry {
+        -startResolution: number
+        -targetResolution: number
+        -cache: Map<string, number>
+        +getRotationAngle(): number
+        +transformFluxVector(vector: Vector2D): Vector2D
+    }
+
+    class Aperture7GridCoordinateTransformer {
+        +{static} APERTURE_7_ROTATION_RAD: number = 0.3334731722918321
+        -stepsClassIII: number
+        -rotationRad: number
+        -isNormalized: boolean
+        +countClassIIIApertureSteps(startRes: number, targetRes: number): number
+        +computeClassIIIRotationAngleRadians(startRes: number, targetRes: number, normalize?: boolean): number
+        +rotateVector(vec: Vector2D): Vector2D
+        +verifyOrthogonality(matrix: number[][]): boolean
+        +projectTensorToResolution(tensor: H3StateTensor, targetRes: number): H3StateTensor
+    }
+
+    class SpatialFluxMonad<T> {
+        -cellId: bigint
+        -resolution: number
+        -fluxVector: Vector2D
+        -temperatureK: number
+        -exergyDissipation: number
+        +unit(cellId: bigint, res: number, vector: Vector2D): SpatialFluxMonad<T>
+        +bind<U>(fn: (val: T) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+        +transportAcrossBoundary(targetCellId: bigint, targetRes: number): SpatialFluxMonad<T>
+        +assertThermodynamicInvariants(): boolean
+    }
+
+    class H3StateTensor {
+        +h3Index: bigint
+        +resolution: number
+        +temperature: number
+        +energyDensity: number
+        +divergence: number
+        +stateHash: string
+    }
+}
+
+package "db/schema (Relational / Blockchain)" {
+    entity "h3_resolutions" as H3ResolutionsTable {
+        *resolution: SMALLINT [PK] (0..15)
+        --
+        grid_class: h3_grid_class
+        aperture_ratio: NUMERIC(10,4)
+        hex_area_km2: NUMERIC(18,6)
+        hex_edge_km: NUMERIC(18,6)
+        created_at: TIMESTAMPTZ
+    }
+
+    entity "h3_cells" as H3CellsTable {
+        *h3_index: BIGINT [PK]
+        --
+        resolution: SMALLINT [FK]
+        centroid: GEOMETRY(POINT, 4326)
+        surface_temperature_k: NUMERIC(8,4)
+        exergy_potential_joules: NUMERIC(24,6)
+        entropy_generation_rate_w_k: NUMERIC(20,8)
+        last_block_height: BIGINT
+        state_merkle_root: BYTEA
+        updated_at: TIMESTAMPTZ
+    }
+
+    entity "h3_rotation_transforms" as H3RotationTransformsTable {
+        *transform_id: UUID [PK]
+        --
+        start_resolution: SMALLINT [FK]
+        target_resolution: SMALLINT [FK]
+        class_iii_step_count: INT
+        raw_rotation_angle_rad: NUMERIC(16,12)
+        normalized_rotation_angle_rad: NUMERIC(16,12)
+        cos_theta: NUMERIC(16,12)
+        sin_theta: NUMERIC(16,12)
+        orthogonality_check: NUMERIC(16,12)
+        created_at: TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_blocks" as ThermodynamicBlocksTable {
+        *block_height: BIGINT [PK]
+        --
+        block_hash: BYTEA [UQ]
+        parent_hash: BYTEA
+        timestamp: TIMESTAMPTZ
+        total_solar_insolation_joules: NUMERIC(30,6)
+        total_thermal_dissipation_joules: NUMERIC(30,6)
+        net_entropy_production_jk: NUMERIC(30,8)
+        spatial_transformation_merkle_root: BYTEA
+        validator_signature: BYTEA
+        created_at: TIMESTAMPTZ
+    }
+
+    entity "spatial_flux_transactions" as SpatialFluxTransactionsTable {
+        *transaction_id: UUID [PK]
+        --
+        block_height: BIGINT [FK]
+        source_h3_index: BIGINT [FK]
+        target_h3_index: BIGINT [FK]
+        flux_type: spatial_flux_vector_type
+        medium_type: stock_medium_type
+        source_resolution: SMALLINT [FK]
+        target_resolution: SMALLINT [FK]
+        class_iii_step_count: INT
+        rotation_angle_rad: NUMERIC(16,12)
+        source_vector_u: NUMERIC(18,8)
+        source_vector_v: NUMERIC(18,8)
+        source_magnitude: NUMERIC(18,8)
+        transformed_vector_u: NUMERIC(18,8)
+        transformed_vector_v: NUMERIC(18,8)
+        transformed_magnitude: NUMERIC(18,8)
+        norm_divergence: NUMERIC(18,12)
+        entropy_generation_sigma: NUMERIC(24,10)
+        temperature_gradient_k_m: NUMERIC(14,6)
+        tx_signature: BYTEA
+        created_at: TIMESTAMPTZ
+    }
+}
+
+' TypeScript Class Relationships
+H3SpatialTransformationRegistry <|-- Aperture7GridCoordinateTransformer
+Aperture7GridCoordinateTransformer ..> Vector2D : rotates
+Aperture7GridCoordinateTransformer ..> H3StateTensor : projects
+SpatialFluxMonad *-- Vector2D : encapsulates flux
+SpatialFluxMonad ..> Aperture7GridCoordinateTransformer : uses
+H3ResolutionsTable o-- H3GridClass
+
+' Database Schema Relationships
+H3ResolutionsTable ||--o{ H3CellsTable : "defines hierarchy"
+H3ResolutionsTable ||--o{ H3RotationTransformsTable : "start_res"
+H3ResolutionsTable ||--o{ H3RotationTransformsTable : "target_res"
+ThermodynamicBlocksTable ||--o{ SpatialFluxTransactionsTable : "includes"
+H3CellsTable ||--o{ SpatialFluxTransactionsTable : "source cell"
+H3CellsTable ||--o{ SpatialFluxTransactionsTable : "target cell"
+H3RotationTransformsTable ..> SpatialFluxTransactionsTable : "constrains rotation"
+
+' Mapping from Software Entities to Database Ledger
+Aperture7GridCoordinateTransformer .. H3RotationTransformsTable : "persists angle & steps"
+SpatialFluxMonad .. SpatialFluxTransactionsTable : "commits audited flux"
+H3StateTensor .. H3CellsTable : "syncs state"
+
+note right of Aperture7GridCoordinateTransformer
+  <b>First Law Invariant:</b>
+  det(R) = 1, ||R J|| = ||J||
+  Invariant under coordinate frame shift.
+
+  <b>Second Law Invariant:</b>
+  sigma = -(1/T^2) J_q . grad(T) >= 0
+  Rotation does not produce negative entropy.
+end note
+
+note bottom of SpatialFluxTransactionsTable
+  Database trigger enforces:
+  1. Correct step count & angle matching RFC-095
+  2. Orthogonal SO(2) magnitude preservation
+  3. Non-negative entropy dissipation (sigma >= 0)
+end note
+
+@enduml

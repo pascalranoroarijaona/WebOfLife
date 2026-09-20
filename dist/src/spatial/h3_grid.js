@@ -1,19 +1,19 @@
 // =============================================================================
 // WEB OF LIFE - SPATIAL H3 GRID BITWISE OPERATORS, PARSERS & MONADS
-// Retro-Compatible Unified Multi-Sprint Specification (Sprints 003 - 090)
+// Retro-Compatible Unified Multi-Sprint Specification (Sprints 003 - 095)
 // =============================================================================
 import { H3_CELL_MODE, H3_MIN_RESOLUTION, H3_MAX_RESOLUTION, DIRECTION_CENTER, PENTAGON_BASE_CELLS, H3ErrorCode, SpatialGuardClauseException, } from './h3_types.js';
 import { SpatialMonad, transitionSpatialMonad } from '../monads/spatial_monad.js';
 import { EARTH_RADIUS_METERS } from '../thermodynamics/constants.js';
 export { H3ErrorCode, SpatialGuardClauseException, transitionSpatialMonad, };
 // =============================================================================
-// SPRINT 090 BITWISE KERNEL
+// BITWISE KERNEL
 // =============================================================================
 export function h3ToBigInt(index) {
     if (typeof index === 'bigint') {
         return index;
     }
-    const clean = index.trim().replace(/^0x/i, '');
+    const clean = String(index).trim().replace(/^0x/i, '');
     if (!clean || !/^[0-9a-fA-F]+$/.test(clean)) {
         throw new Error(`Invalid H3 index string: "${index}"`);
     }
@@ -898,7 +898,7 @@ export class H3GridUtils {
     static cellToParent(index) {
         const res = getResolution(index);
         if (res === 0)
-            return index;
+            return h3ToBigInt(index);
         const parentRes = res - 1;
         let val = h3ToBigInt(index);
         val &= ~(0xfn << 52n);

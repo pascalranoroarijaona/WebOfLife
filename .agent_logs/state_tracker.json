@@ -1,5 +1,5 @@
 {
-  "current_sprint": 95,
+  "current_sprint": 96,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -470,6 +470,11 @@
       "sprint": 94,
       "goal": "Implement countClassIIIApertureSteps counting odd resolution steps up to target resolution in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-20T06:35:17.188382+00:00"
+    },
+    {
+      "sprint": 95,
+      "goal": "Implement computeClassIIIRotationAngleRadians scaling APERTURE_7_ROTATION_RAD by countClassIIIApertureSteps in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-20T07:03:28.456646+00:00"
     }
   ]
 }

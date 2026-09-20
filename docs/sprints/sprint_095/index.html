@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" />
+<title>Thermodynamic Web of Life - Sprint 088: Center Aperture Invariance & hasZeroApertureSequence</title>
+
+<style>
+:root {
+  --bg: #02050a;
+  --panel: rgba(5, 14, 24, 0.94);
+  --panel-light: rgba(17, 35, 48, 0.92);
+  --text: #c8f5f2;
+  --muted: #7597a8;
+
+  --sun: #ffaa00;
+  --earth: #0088ff;
+  --flora: #00ff66;
+  --fauna: #ff3366;
+  --fungi: #c084fc;
+  --microbe: #64d8ff;
+  --danger: #ff5370;
+  --boundary: #ffe600;
+  --accent-s69: #00ffcc;
+
+  /* Sprint 078-085 Invariants */
+  --pentagon-color: #ff0055;
+  --pentagon-fill: rgba(255, 0, 85, 0.25);
+  --hexagon-color: #00e1ff;
+  --hexagon-fill: rgba(0, 225, 255, 0.12);
+  --disclination-glow: #ff2a6d;
+  --euler-accent: #ffe600;
+  --violation-alert: #ff0033;
+  --type-pass: #00ffa2;
+  --type-fail: #ff2a5f;
+  --coordination-accent: #a855f7;
+
+  /* Sprint 083-087 Directional & Aperture Topology */
+  --omitted-dir: #ff3366;
+  --present-dir: #00ffcc;
+  --facet-outline: #f59e0b;
+  --flux-active: #38bdf8;
+  --flux-forbidden: #ef4444;
+  --topology-gold: #fbbf24;
+  --bitmask-cyan: #38bdf8;
+  --bitmask-active: #10b981;
+  --bitmask-inactive: #334155;
+  --bitmask-border: #0ea5e9;
+  --reciprocal-pink: #ec4899;
+  --nonzero-digit: #f59e0b;
+  --pure-pentagon: #3b82f6;
+  --singularity-glow: #e11d48;
+  --conductance-cor: #10b981;
+  --streamline-cyan: #22d3ee;
+  --bit-header: #38bdf8;
+  --k-axes-gold: #eab308;
+  --zero-flux-barrier: #f43f5e;
+  --conserved-emerald: #10b981;
+  --manifold-indigo: #6366f1;
+
+  /* Sprint 088: Center Aperture Invariance */
+  --center-digit-0: #ffd700;
+  --center-glow: rgba(255, 215, 0, 0.4);
+  --aperture-zoom-fill: rgba(255, 215, 0, 0.15);
+  --lateral-displacement: #f97316;
+  --identity-centroid: #38bdf8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+#simCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  z-index: 1;
+}
+
+#simCanvas:active {
+  cursor: grabbing;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: var(--text);
+  background: #102331;
+  border: 1px solid #315064;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: #18384c;
+  border-color: #00e1ff;
+}
+
+button.active {
+  background: #005060;
+  border-color: var(--accent-s69);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+}
+
+button.s78-violate {
+  background: #44111d;
+  border-color: var(--violation-alert);
+  color: #ff99aa;
+}
+
+button.s78-violate:hover {
+  background: #661828;
+  border-color: #ff3355;
+  color: #ffffff;
+}
+
+#topbar {
+  position: fixed;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  width: min(1040px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+}
+
+#topbar h1 {
+  color: #00ffe1;
+  font-size: 1.05rem;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#topbar h2 {
+  color: var(--sun);
+  font-size: 0.73rem;
+  margin-bottom: 10px;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 20, 35, 0.6);
+  border-radius: 6px;
+  border: 1px solid #14354b;
+}
+
+.metric-item {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-val {
+  font-weight: bold;
+  color: var(--accent-s69);
+}
+
+.badge-pass {
+  color: var(--type-pass);
+  background: rgba(0, 255, 162, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 162, 0.3);
+}
+
+.badge-fail {
+  color: var(--type-fail);
+  background: rgba(255, 42, 95, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 42, 95, 0.3);
+}
+
+.badge-gold {
+  color: var(--center-digit-0);
+  background: rgba(255, 215, 0, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 215, 0, 0.35);
+}
+
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: rgba(8, 24, 38, 0.7);
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid #1a425a;
+}
+
+.control-group input[type="range"] {
+  width: 90px;
+  cursor: pointer;
+  accent-color: var(--accent-s69);
+}
+
+#sidePanel {
+  position: fixed;
+  z-index: 10;
+  right: 16px;
+  top: 16px;
+  width: 320px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid #00e1ff38;
+  border-radius: 10px;
+  box-shadow: 0 0 35px #000000;
+  backdrop-filter: blur(12px);
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+#sidePanel h3 {
+  color: var(--center-digit-0);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #1f4760;
+  padding-bottom: 4px;
+}
+
+.digit-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 2px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.75rem;
+}
+
+.digit-0 {
+  background: rgba(255, 215, 0, 0.25);
+  color: var(--center-digit-0);
+  border: 1px solid var(--center-digit-0);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
+.digit-lateral {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--lateral-displacement);
+  border: 1px solid var(--lateral-displacement);
+}
+
+.info-card {
+  background: rgba(4, 18, 30, 0.7);
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #17384e;
+  margin-top: 10px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 0.7rem;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<header id="topbar">
+  <h1>Thermodynamic Web of Life - Sprint 088</h1>
+  <h2>Center Aperture Invariance &amp; hasZeroApertureSequence (Aperture-7 Centroid Conservation)</h2>
+
+  <div class="metric-strip">
+    <div class="metric-item">
+      <span class="metric-label">Hierarchy Mode:</span>
+      <span class="metric-val" id="modeVal">INVARIANT (000...)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Sequence:</span>
+      <span id="seqBadge" class="badge-gold">0 - 0 - 0 - 0</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">hasZeroApertureSequence:</span>
+      <span id="invarianceStatus" class="badge-pass">PASS (Invariant)</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Lateral Drift |Δr|:</span>
+      <span class="metric-val" id="driftVal">0.0000 µm</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Twist Precession ΣΔθ:</span>
+      <span class="metric-val" id="precessionVal">0.00°</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Area Scale (1/7^k):</span>
+      <span class="metric-val" id="scaleVal">1 / 2401</span>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="btnZeroSeq" class="active">Invariant Sequence [0,0,0,0]</button>
+    <button id="btnMixedSeq">Lateral Mixed [1,3,0,5]</button>
+    <button id="btnToggleFractal">Aperture-7 Sub-Tessellation</button>
+    <button id="btnToggleVectors">Toggle Vectors</button>
+    <button id="btnResetView">Reset View</button>
+
+    <div class="control-group">
+      <label for="sliderDepth">Res Depth:</label>
+      <input type="range" id="sliderDepth" min="1" max="5" value="4" />
+      <span id="depthLabel">4</span>
+    </div>
+
+    <div class="control-group">
+      <label for="sliderMinZeros">Min Zeros:</label>
+      <input type="range" id="sliderMinZeros" min="1" max="4" value="2" />
+      <span id="zerosLabel">2</span>
+    </div>
+  </div>
+</header>
+
+<aside id="sidePanel">
+  <h3>Aperture-7 Invariance Dynamics</h3>
+  <p>
+    In H3 hierarchical hexagonal partitioning, each parent hexagon at resolution <em>r</em> generates 7 children at resolution <em>r+1</em>:
+  </p>
+  <div class="info-card">
+    <strong>Digit 0: Center Child Aperture</strong><br/>
+    Concentric cell with <em>exact centroid identity</em>:
+    <div style="margin: 6px 0;">
+      <span class="digit-box digit-0">0</span> &rarr; Δx = 0, Δy = 0, Δθ = 0
+    </div>
+    Preserves invariant centroid across scale. Consecutive zeros yield <code>hasZeroApertureSequence() = true</code> with strictly zero lateral translational drift.
+  </div>
+
+  <div class="info-card">
+    <strong>Digits 1..6: Lateral Child Hexagons</strong><br/>
+    Surrounding orbits with lateral offset:
+    <div style="margin: 6px 0;">
+      <span class="digit-box digit-lateral">1</span>
+      <span class="digit-box digit-lateral">2</span>
+      <span class="digit-box digit-lateral">3</span>
+      <span class="digit-box digit-lateral">4</span>
+      <span class="digit-box digit-lateral">5</span>
+      <span class="digit-box digit-lateral">6</span>
+    </div>
+    Offset: <em>d = R &times; &radic;(3/7)</em><br/>
+    Precession twist angle: <em>&theta; &approx; 19.1066&deg;</em>
+  </div>
+
+  <div class="info-card">
+    <strong>Legend &amp; Vectors:</strong>
+    <div class="legend-row">
+      <div class="legend-swatch" style="background: var(--center-digit-0);"></div>
+      <span>Digit 0 (Invariant Centroid)</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-swatch" style="background: var(--lateral-displacement);"></div>
+      <span>Digits 1..6 (Lateral Displacement)</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-swatch" style="background: var(--identity-centroid);"></div>
+      <span>Centroid Identity Node</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-swatch" style="background: var(--type-pass);"></div>
+      <span>Conserved Flux Barrier</span>
+    </div>
+  </div>
+</aside>
+
+<script>
+(() => {
+  const canvas = document.getElementById("simCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // UI elements
+  const modeVal = document.getElementById("modeVal");
+  const seqBadge = document.getElementById("seqBadge");
+  const invarianceStatus = document.getElementById("invarianceStatus");
+  const driftVal = document.getElementById("driftVal");
+  const precessionVal = document.getElementById("precessionVal");
+  const scaleVal = document.getElementById("scaleVal");
+
+  const btnZeroSeq = document.getElementById("btnZeroSeq");
+  const btnMixedSeq = document.getElementById("btnMixedSeq");
+  const btnToggleFractal = document.getElementById("btnToggleFractal");
+  const btnToggleVectors = document.getElementById("btnToggleVectors");
+  const btnResetView = document.getElementById("btnResetView");
+
+  const sliderDepth = document.getElementById("sliderDepth");
+  const depthLabel = document.getElementById("depthLabel");
+  const sliderMinZeros = document.getElementById("sliderMinZeros");
+  const zerosLabel = document.getElementById("zerosLabel");
+
+  // State
+  let depth = 4;
+  let minZeros = 2;
+  let mode = "zero"; // "zero" | "mixed"
+  let showFractal = true;
+  let showVectors = true;
+
+  let currentSequence = [0, 0, 0, 0];
+
+  // View transform
+  let view = {
+    x: 0,
+    y: 0,
+    zoom: 1.0,
+    dragging: false,
+    dragStartX: 0,
+    dragStartY: 0
+  };
+
+  const APERTURE_TWIST = Math.asin(Math.sqrt(3) / (2 * Math.sqrt(7))); // ~19.1066 degrees
+
+  function hasZeroApertureSequence(seq, minCount) {
+    let consecutive = 0;
+    for (let i = 0; i < seq.length; i++) {
+      if (seq[i] === 0) {
+        consecutive++;
+        if (consecutive >= minCount) return true;
+      } else {
+        consecutive = 0;
+      }
+    }
+    return false;
+  }
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+    render();
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+
+  function resetView() {
+    view.x = window.innerWidth / 2 - 60;
+    view.y = window.innerHeight / 2 + 20;
+    view.zoom = 1.0;
+  }
+
+  function updateSequence() {
+    if (mode === "zero") {
+      currentSequence = new Array(depth).fill(0);
+    } else {
+      const pattern = [1, 3, 0, 5, 2, 4];
+      currentSequence = [];
+      for (let i = 0; i < depth; i++) {
+        currentSequence.push(pattern[i % pattern.length]);
+      }
+    }
+    updateMetrics();
+  }
+
+  function updateMetrics() {
+    const isInvariant = hasZeroApertureSequence(currentSequence, minZeros);
+
+    modeVal.textContent = mode === "zero" ? "INVARIANT (000...)" : "LATERAL MIXED";
+    seqBadge.textContent = currentSequence.join(" - ");
+    seqBadge.className = mode === "zero" ? "badge-gold" : "badge-fail";
+
+    if (isInvariant) {
+      invarianceStatus.textContent = `PASS (Zeros >= ${minZeros})`;
+      invarianceStatus.className = "badge-pass";
+    } else {
+      invarianceStatus.textContent = `DRIFT (Zeros < ${minZeros})`;
+      invarianceStatus.className = "badge-fail";
+    }
+
+    let drift = 0;
+    let precession = 0;
+    let currentR = 220;
+
+    for (let i = 0; i < currentSequence.length; i++) {
+      const digit = currentSequence[i];
+      if (digit !== 0) {
+        const offsetDist = currentR * Math.sqrt(3 / 7);
+        drift += offsetDist;
+        precession += APERTURE_TWIST * (180 / Math.PI);
+      }
+      currentR /= Math.sqrt(7);
+    }
+
+    driftVal.textContent = `${drift.toFixed(4)} µm`;
+    precessionVal.textContent = `${precession.toFixed(2)}°`;
+    scaleVal.textContent = `1 / ${Math.pow(7, depth)}`;
+  }
+
+  function drawHexagon(cx, cy, radius, rotation, strokeColor, fillColor, lineWidth = 1.5) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = rotation + (i * Math.PI) / 3;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    if (fillColor) {
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+    }
+    if (strokeColor) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+  }
+
+  function getAperture7Children(cx, cy, radius, rotation) {
+    const childRadius = radius / Math.sqrt(7);
+    const childRotation = rotation + APERTURE_TWIST;
+    const offsetDist = radius * Math.sqrt(3 / 7);
+
+    const children = [];
+    // Child 0: Center child (Exact Centroid Identity)
+    children.push({
+      digit: 0,
+      x: cx,
+      y: cy,
+      radius: childRadius,
+      rotation: childRotation,
+      isCenter: true
+    });
+
+    // Children 1..6: Surrounding lateral children
+    for (let d = 1; d <= 6; d++) {
+      const angle = rotation + ((d - 1) * Math.PI) / 3 + Math.PI / 6;
+      children.push({
+        digit: d,
+        x: cx + offsetDist * Math.cos(angle),
+        y: cy + offsetDist * Math.sin(angle),
+        radius: childRadius,
+        rotation: childRotation,
+        isCenter: false
+      });
+    }
+
+    return children;
+  }
+
+  function drawRecursiveGrid(cx, cy, radius, rotation, currentDepth, maxDepth) {
+    if (currentDepth > maxDepth) return;
+
+    const children = getAperture7Children(cx, cy, radius, rotation);
+
+    children.forEach((child) => {
+      const isZero = child.digit === 0;
+      let stroke = isZero ? "rgba(255, 215, 0, 0.4)" : "rgba(0, 225, 255, 0.15)";
+      let fill = isZero ? "rgba(255, 215, 0, 0.04)" : "rgba(0, 225, 255, 0.015)";
+
+      drawHexagon(child.x, child.y, child.radius, child.rotation, stroke, fill, 1);
+
+      if (currentDepth < maxDepth) {
+        drawRecursiveGrid(child.x, child.y, child.radius, child.rotation, currentDepth + 1, maxDepth);
+      }
+    });
+  }
+
+  function render() {
+    ctx.save();
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+    // Apply view pan/zoom
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.zoom, view.zoom);
+
+    const baseRadius = 240;
+    const baseRotation = 0;
+    const originX = 0;
+    const originY = 0;
+
+    // Draw Base Root Hexagon
+    drawHexagon(
+      originX,
+      originY,
+      baseRadius,
+      baseRotation,
+      "rgba(0, 225, 255, 0.6)",
+      "rgba(0, 225, 255, 0.03)",
+      2.5
+    );
+
+    // Draw Aperture-7 Full Tessellation if enabled
+    if (showFractal) {
+      drawRecursiveGrid(originX, originY, baseRadius, baseRotation, 1, Math.min(depth, 3));
+    }
+
+    // Step through the active sequence
+    let curX = originX;
+    let curY = originY;
+    let curRadius = baseRadius;
+    let curRot = baseRotation;
+    const trajectory = [{ x: curX, y: curY, digit: "ROOT" }];
+
+    for (let lvl = 0; lvl < currentSequence.length; lvl++) {
+      const chosenDigit = currentSequence[lvl];
+      const children = getAperture7Children(curX, curY, curRadius, curRot);
+      const chosen = children.find((c) => c.digit === chosenDigit) || children[0];
+
+      // Highlight all siblings at this level
+      children.forEach((c) => {
+        if (c.digit === chosenDigit) {
+          const isZero = c.digit === 0;
+          drawHexagon(
+            c.x,
+            c.y,
+            c.radius,
+            c.rotation,
+            isZero ? "#ffd700" : "#f97316",
+            isZero ? "rgba(255, 215, 0, 0.2)" : "rgba(249, 115, 22, 0.15)",
+            2.5
+          );
+        }
+      });
+
+      curX = chosen.x;
+      curY = chosen.y;
+      curRadius = chosen.radius;
+      curRot = chosen.rotation;
+      trajectory.push({ x: curX, y: curY, digit: chosenDigit });
+    }
+
+    // Draw Invariance Centroid & Trajectory vectors
+    if (showVectors && trajectory.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(trajectory[0].x, trajectory[0].y);
+      for (let i = 1; i < trajectory.length; i++) {
+        ctx.lineTo(trajectory[i].x, trajectory[i].y);
+      }
+      ctx.strokeStyle = mode === "zero" ? "rgba(0, 255, 204, 0.8)" : "rgba(249, 115, 22, 0.8)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      trajectory.forEach((pt, idx) => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, idx === trajectory.length - 1 ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = pt.digit === 0 || pt.digit === "ROOT" ? "#38bdf8" : "#f97316";
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Node Label
+        ctx.font = "10px monospace";
+        ctx.fillStyle = "#c8f5f2";
+        ctx.fillText(`L${idx}: [${pt.digit}]`, pt.x + 8, pt.y - 4);
+      });
+    }
+
+    // Invariant Center Glow
+    if (mode === "zero") {
+      ctx.beginPath();
+      ctx.arc(originX, originY, curRadius * 1.3, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 215, 0, 0.18)";
+      ctx.fill();
+
+      // Axis crosshair
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(originX - 30, originY);
+      ctx.lineTo(originX + 30, originY);
+      ctx.moveTo(originX, originY - 30);
+      ctx.lineTo(originX, originY + 30);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // Interactivity
+  canvas.addEventListener("mousedown", (e) => {
+    view.dragging = true;
+    view.dragStartX = e.clientX - view.x;
+    view.dragStartY = e.clientY - view.y;
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!view.dragging) return;
+    view.x = e.clientX - view.dragStartX;
+    view.y = e.clientY - view.dragStartY;
+    render();
+  });
+
+  window.addEventListener("mouseup", () => {
+    view.dragging = false;
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+
+    view.x = mouseX - (mouseX - view.x) * factor;
+    view.y = mouseY - (mouseY - view.y) * factor;
+    view.zoom *= factor;
+    render();
+  }, { passive: false });
+
+  // Buttons
+  btnZeroSeq.addEventListener("click", () => {
+    mode = "zero";
+    btnZeroSeq.classList.add("active");
+    btnMixedSeq.classList.remove("active");
+    updateSequence();
+    render();
+  });
+
+  btnMixedSeq.addEventListener("click", () => {
+    mode = "mixed";
+    btnMixedSeq.classList.add("active");
+    btnZeroSeq.classList.remove("active");
+    updateSequence();
+    render();
+  });
+
+  btnToggleFractal.addEventListener("click", () => {
+    showFractal = !showFractal;
+    btnToggleFractal.classList.toggle("active", showFractal);
+    render();
+  });
+
+  btnToggleVectors.addEventListener("click", () => {
+    showVectors = !showVectors;
+    btnToggleVectors.classList.toggle("active", showVectors);
+    render();
+  });
+
+  btnResetView.addEventListener("click", () => {
+    resetView();
+    render();
+  });
+
+  sliderDepth.addEventListener("input", (e) => {
+    depth = parseInt(e.target.value, 10);
+    depthLabel.textContent = depth;
+    updateSequence();
+    render();
+  });
+
+  sliderMinZeros.addEventListener("input", (e) => {
+    minZeros = parseInt(e.target.value, 10);
+    zerosLabel.textContent = minZeros;
+    updateMetrics();
+  });
+
+  // Init
+  btnToggleFractal.classList.add("active");
+  btnToggleVectors.classList.add("active");
+  resetView();
+  resizeCanvas();
+  updateSequence();
+  render();
+})();
+</script>
+</body>
+</html>

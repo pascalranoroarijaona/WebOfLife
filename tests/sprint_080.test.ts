@@ -248,11 +248,11 @@ describe('Sprint 080: assertPentagonalNeighborArrayType & Topology Defensive Gua
     ]);
 
     const initialTotalStocks: CellStockVector = {
-      carbon: sourceState.stocks.carbon + 5 * (1 * 100),
-      water: sourceState.stocks.water + 5 * (1 * 500),
-      minerals: sourceState.stocks.minerals + 5 * (1 * 50),
-      oxygen: sourceState.stocks.oxygen + 5 * (1 * 200),
-      thermalEnergy: sourceState.stocks.thermalEnergy + 5 * (1 * 1000)
+      carbon: (sourceState.stocks.carbon ?? 0) + 5 * (1 * 100),
+      water: (sourceState.stocks.water ?? 0) + 5 * (1 * 500),
+      minerals: (sourceState.stocks.minerals ?? 0) + 5 * (1 * 50),
+      oxygen: (sourceState.stocks.oxygen ?? 0) + 5 * (1 * 200),
+      thermalEnergy: (sourceState.stocks.thermalEnergy ?? 0) + 5 * (1 * 1000)
     };
 
     it('should perform conservative advective transfer and verify First Law', () => {
@@ -267,7 +267,7 @@ describe('Sprint 080: assertPentagonalNeighborArrayType & Topology Defensive Gua
       assert.strictEqual(isConserved, true);
 
       const result = stepped.getResult();
-      assert(result.source.stocks.carbon < sourceState.stocks.carbon);
+      assert(result.source.stocks.carbon < (sourceState.stocks.carbon ?? 0));
       const n1 = result.neighbors.get('n1');
       assert(n1 !== undefined);
       assert(n1.stocks.carbon > (initialNeighbors.get('n1')?.stocks.carbon ?? 0));
