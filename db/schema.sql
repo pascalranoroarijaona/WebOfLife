@@ -1,230 +1,186 @@
 -- ============================================================================
--- Web of Life Simulation & Thermodynamic Blockchain Schema
--- Sprint 088: Center Aperture Invariance & hasZeroApertureSequence Verification
--- Dialect: PostgreSQL 15+ (TimescaleDB / PostGIS enabled)
+-- Web of Life: Planetary Discrete Global Grid System (DGGS) & Thermodynamic Schema
+-- Sprint 089: Non-Zero Aperture Digit Predicate for Hierarchical H3 Cells
+-- Architecture: Relational, Spatial Kinematics & Thermodynamic Ledger Schema
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- ----------------------------------------------------------------------------
--- ENUM TYPES: Spatial Apertures, Trophic Layers & Thermodynamic Conservation
+-- 1. H3 Discrete Global Grid System (DGGS) Cell Registry
+-- Stores 64-bit canonical H3 cell indices, base cell identities, and aperture profiles
 -- ----------------------------------------------------------------------------
-
-DO $$ BEGIN
-    CREATE TYPE h3_direction_digit AS ENUM ('0', '1', '2', '3', '4', '5', '6');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE spatial_aperture_mode AS ENUM (
-        'APERTURE_INVARIANT_CENTER', -- Sequences with purely 0 digits; zero lateral flux
-        'LATERAL_DISPLACEMENT',      -- Sequence contains >= 1 non-zero digits (1..6)
-        'VACUOUS_IDENTITY'           -- Length 0 sequence; identity zoom
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE trophic_level_type AS ENUM (
-        'PRIMARY_PRODUCER',
-        'PRIMARY_CONSUMER',
-        'SECONDARY_CONSUMER',
-        'TERTIARY_CONSUMER',
-        'APEX_PREDATOR',
-        'DECOMPOSER_DETRITIVORE'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE flux_direction_type AS ENUM (
-        'INTERNAL_VERTICAL_DISSIPATION',
-        'CONCENTRIC_ACCUMULATION',
-        'LATERAL_HEX_INTERCHANGE',
-        'RADIATIVE_OUTFLOW'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- ----------------------------------------------------------------------------
--- TABLE: h3_hierarchical_cells
--- Spatial multi-resolution hexagonal cells (H3 Aperture 3/7)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_hierarchical_cells (
-    cell_id VARCHAR(19) PRIMARY KEY, -- H3 64-bit hex string representation
-    resolution INT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
-    parent_cell_id VARCHAR(19) REFERENCES h3_hierarchical_cells(cell_id),
-    centroid_geom GEOMETRY(Point, 4326) NOT NULL,
-    boundary_geom GEOMETRY(Polygon, 4326) NOT NULL,
-    is_center_child BOOLEAN NOT NULL DEFAULT FALSE,
-    aperture_digit h3_direction_digit NOT NULL DEFAULT '0',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_h3_cells_parent ON h3_hierarchical_cells(parent_cell_id);
-CREATE INDEX IF NOT EXISTS idx_h3_cells_centroid ON h3_hierarchical_cells USING GIST(centroid_geom);
-CREATE INDEX IF NOT EXISTS idx_h3_cells_boundary ON h3_hierarchical_cells USING GIST(boundary_geom);
-
--- ----------------------------------------------------------------------------
--- TABLE: h3_traversal_paths
--- Records hierarchical traversal paths across resolution scales
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_traversal_paths (
-    path_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    origin_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
-    target_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
-    origin_resolution INT NOT NULL,
-    target_resolution INT NOT NULL,
-    digit_sequence INT[] NOT NULL, -- Array of directional digits (0..6)
-    sequence_length INT GENERATED ALWAYS AS (cardinality(digit_sequence)) STORED,
-    has_zero_aperture_sequence BOOLEAN NOT NULL,
-    aperture_mode spatial_aperture_mode NOT NULL,
-    lateral_displacement_magnitude DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+CREATE TABLE IF NOT EXISTS h3_cell_registry (
+    h3_index BIGINT PRIMARY KEY,
+    h3_index_hex VARCHAR(16) GENERATED ALWAYS AS (TO_HEX(h3_index)) STORED,
+    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
+    base_cell_id SMALLINT NOT NULL CHECK (base_cell_id BETWEEN 0 AND 121),
+    mode SMALLINT NOT NULL DEFAULT 1 CHECK (mode = 1),
+    is_concentric_base_descendant BOOLEAN NOT NULL DEFAULT FALSE,
+    has_nonzero_aperture_digits BOOLEAN NOT NULL DEFAULT FALSE,
+    first_nonzero_aperture_resolution SMALLINT CHECK (first_nonzero_aperture_resolution BETWEEN 1 AND 15),
+    nonzero_aperture_digit_count SMALLINT NOT NULL DEFAULT 0 CHECK (nonzero_aperture_digit_count BETWEEN 0 AND 15),
+    active_aperture_digit_mask BIGINT NOT NULL DEFAULT 0,
+    centroid_geom GEOMETRY(Point, 4326),
+    boundary_geom GEOMETRY(Polygon, 4326),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_digit_domain CHECK (
-        digit_sequence <@ ARRAY[0,1,2,3,4,5,6]::INT[]
-    ),
-    CONSTRAINT chk_zero_aperture_invariant CHECK (
-        (has_zero_aperture_sequence = TRUE AND (lateral_displacement_magnitude = 0.0)) OR
-        (has_zero_aperture_sequence = FALSE AND (sequence_length > 0))
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_concentric_alignment CHECK (
+        (is_concentric_base_descendant = TRUE AND has_nonzero_aperture_digits = FALSE AND first_nonzero_aperture_resolution IS NULL)
+        OR
+        (is_concentric_base_descendant = FALSE AND (has_nonzero_aperture_digits = TRUE OR resolution = 0))
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_traversal_paths_origin ON h3_traversal_paths(origin_cell_id);
-CREATE INDEX IF NOT EXISTS idx_traversal_paths_target ON h3_traversal_paths(target_cell_id);
-CREATE INDEX IF NOT EXISTS idx_traversal_paths_zero_aperture ON h3_traversal_paths(has_zero_aperture_sequence);
+CREATE INDEX IF NOT EXISTS idx_h3_cell_resolution ON h3_cell_registry (resolution);
+CREATE INDEX IF NOT EXISTS idx_h3_cell_base_cell ON h3_cell_registry (base_cell_id);
+CREATE INDEX IF NOT EXISTS idx_h3_cell_aperture_predicate ON h3_cell_registry (resolution, has_nonzero_aperture_digits);
+CREATE INDEX IF NOT EXISTS idx_h3_cell_centroid_spatial ON h3_cell_registry USING GIST (centroid_geom);
 
 -- ----------------------------------------------------------------------------
--- FUNCTION & TRIGGER: Enforce hasZeroApertureSequence Invariants on Insert/Update
+-- 2. Aperture Tier Digit Breakdown (Decomposed 3-bit aperture-7 resolution tiers)
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_validate_h3_traversal_aperture()
+CREATE TABLE IF NOT EXISTS h3_aperture_tier_decompositions (
+    h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index) ON DELETE CASCADE,
+    resolution_tier SMALLINT NOT NULL CHECK (resolution_tier BETWEEN 1 AND 15),
+    aperture_digit SMALLINT NOT NULL CHECK (aperture_digit BETWEEN 0 AND 6),
+    bit_offset SMALLINT NOT NULL,
+    is_central_child BOOLEAN GENERATED ALWAYS AS (aperture_digit = 0) STORED,
+    azimuthal_rotation_deg DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    PRIMARY KEY (h3_index, resolution_tier)
+);
+
+CREATE INDEX IF NOT EXISTS idx_aperture_tier_digit ON h3_aperture_tier_decompositions (resolution_tier, aperture_digit);
+
+-- ----------------------------------------------------------------------------
+-- 3. Thermodynamic Patch State (Monadic Physical Stock)
+-- Tracks First & Second Law conserved properties across discrete H3 cell patches
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_patch_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index) ON DELETE RESTRICT,
+    epoch_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    biomass_kg NUMERIC(28, 12) NOT NULL DEFAULT 0 CHECK (biomass_kg >= 0),
+    enthalpy_joules NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (enthalpy_joules >= 0),
+    entropy_j_k NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (entropy_j_k >= 0),
+    water_liters NUMERIC(28, 12) NOT NULL DEFAULT 0 CHECK (water_liters >= 0),
+    carbon_kg NUMERIC(28, 12) NOT NULL DEFAULT 0 CHECK (carbon_kg >= 0),
+    exergy_joules NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (exergy_joules >= 0),
+    coarsening_scale_factor NUMERIC(8, 4) NOT NULL DEFAULT 1.0 CHECK (coarsening_scale_factor > 0),
+    state_signature BYTEA NOT NULL,
+    CONSTRAINT chk_positive_entropy CHECK (entropy_j_k >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_patch_stocks_h3_epoch ON thermodynamic_patch_stocks (h3_index, epoch_timestamp DESC);
+
+-- ----------------------------------------------------------------------------
+-- 4. Multi-Scale Coarsening & Drift Routing Ledger
+-- Quantifies geometric rotation offsets and radial diffusion optimizations
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spatial_flux_coarsening_routes (
+    route_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
+    target_parent_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
+    source_resolution SMALLINT NOT NULL CHECK (source_resolution BETWEEN 1 AND 15),
+    target_resolution SMALLINT NOT NULL CHECK (target_resolution BETWEEN 0 AND 14),
+    has_rotational_drift BOOLEAN NOT NULL,
+    drift_vector_x DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    drift_vector_y DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    drift_vector_z DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    symmetry_axis_preserved BOOLEAN NOT NULL DEFAULT FALSE,
+    radial_flux_optimization_applied BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_coarsening_resolutions CHECK (source_resolution > target_resolution),
+    CONSTRAINT chk_drift_symmetry CHECK (
+        (has_rotational_drift = FALSE AND symmetry_axis_preserved = TRUE AND drift_vector_x = 0.0 AND drift_vector_y = 0.0 AND drift_vector_z = 0.0)
+        OR
+        (has_rotational_drift = TRUE AND symmetry_axis_preserved = FALSE)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_coarsening_routes_pair ON spatial_flux_coarsening_routes (source_h3_index, target_parent_h3_index);
+
+-- ----------------------------------------------------------------------------
+-- 5. Blockchain Block Ledger (Thermodynamic Proof-of-Conservation)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
+    block_height BIGINT PRIMARY KEY,
+    block_hash BYTEA NOT NULL UNIQUE,
+    parent_block_hash BYTEA NOT NULL,
+    merkle_root_hash BYTEA NOT NULL,
+    thermodynamic_state_root BYTEA NOT NULL,
+    coarsening_flux_root BYTEA NOT NULL,
+    total_biomass_delta_kg NUMERIC(28, 12) NOT NULL DEFAULT 0,
+    total_enthalpy_delta_joules NUMERIC(38, 12) NOT NULL DEFAULT 0,
+    total_entropy_production_j_k NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (total_entropy_production_j_k >= 0),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    validator_signature BYTEA NOT NULL,
+    nonce BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT chk_block_entropy_second_law CHECK (total_entropy_production_j_k >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_block_height_timestamp ON thermodynamic_blocks (block_height, timestamp DESC);
+
+-- ----------------------------------------------------------------------------
+-- 6. Monadic Spatial Flux Transactions (First & Second Law Enforced Transactions)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height),
+    tx_hash BYTEA NOT NULL UNIQUE,
+    source_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
+    target_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
+    route_id UUID REFERENCES spatial_flux_coarsening_routes(route_id),
+    biomass_transferred_kg NUMERIC(28, 12) NOT NULL DEFAULT 0,
+    enthalpy_transferred_joules NUMERIC(38, 12) NOT NULL DEFAULT 0,
+    water_transferred_liters NUMERIC(28, 12) NOT NULL DEFAULT 0,
+    carbon_transferred_kg NUMERIC(28, 12) NOT NULL DEFAULT 0,
+    entropy_generated_j_k NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (entropy_generated_j_k >= 0),
+    dissipated_metabolic_heat_joules NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (dissipated_metabolic_heat_joules >= 0),
+    is_pure_radial_diffusion BOOLEAN NOT NULL DEFAULT FALSE,
+    monad_receipt_signature BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_flux_entropy_generation CHECK (entropy_generated_j_k >= 0),
+    CONSTRAINT chk_flux_metabolic_heat CHECK (dissipated_metabolic_heat_joules >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_tx_block_source ON thermodynamic_stock_transactions (block_height, source_h3_index);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_target ON thermodynamic_stock_transactions (target_h3_index);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_hash ON thermodynamic_stock_transactions (tx_hash);
+
+-- ----------------------------------------------------------------------------
+-- 7. Trigger: First Law Verification (Conservation of Mass in Flux Batches)
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION verify_thermodynamic_block_conservation()
 RETURNS TRIGGER AS $$
 DECLARE
-    d INT;
-    all_zeros BOOLEAN := TRUE;
+    sum_delta_biomass NUMERIC(28, 12);
+    sum_delta_enthalpy NUMERIC(38, 12);
 BEGIN
-    IF NEW.digit_sequence IS NULL OR cardinality(NEW.digit_sequence) = 0 THEN
-        NEW.has_zero_aperture_sequence := TRUE;
-        NEW.aperture_mode := 'VACUOUS_IDENTITY';
-        NEW.lateral_displacement_magnitude := 0.0;
-        RETURN NEW;
+    -- Verify net mass/enthalpy changes within the block boundary balance exactly to zero
+    SELECT COALESCE(SUM(biomass_transferred_kg), 0),
+           COALESCE(SUM(enthalpy_transferred_joules), 0)
+    INTO sum_delta_biomass, sum_delta_enthalpy
+    FROM thermodynamic_stock_transactions
+    WHERE block_height = NEW.block_height;
+
+    IF NEW.total_biomass_delta_kg <> 0 THEN
+        RAISE EXCEPTION 'First Law Violation: Non-zero net biomass variation (%) in block %',
+            NEW.total_biomass_delta_kg, NEW.block_height;
     END IF;
 
-    FOREACH d IN ARRAY NEW.digit_sequence LOOP
-        IF d <> 0 THEN
-            all_zeros := FALSE;
-            EXIT;
-        END IF;
-    END LOOP;
-
-    NEW.has_zero_aperture_sequence := all_zeros;
-    IF all_zeros THEN
-        NEW.aperture_mode := 'APERTURE_INVARIANT_CENTER';
-        NEW.lateral_displacement_magnitude := 0.0;
-    ELSE
-        NEW.aperture_mode := 'LATERAL_DISPLACEMENT';
+    IF NEW.total_entropy_production_j_k < 0 THEN
+        RAISE EXCEPTION 'Second Law Violation: Negative net entropy production (%) in block %',
+            NEW.total_entropy_production_j_k, NEW.block_height;
     END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_validate_h3_traversal_aperture ON h3_traversal_paths;
-CREATE TRIGGER trg_validate_h3_traversal_aperture
-BEFORE INSERT OR UPDATE ON h3_traversal_paths
-FOR EACH ROW
-EXECUTE FUNCTION fn_validate_h3_traversal_aperture();
-
--- ----------------------------------------------------------------------------
--- TABLE: thermodynamic_monad_stocks
--- State tensor for localized trophic & exergy balance within spatial hexagons
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_monad_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
-    trophic_tier trophic_level_type NOT NULL,
-    epoch_timestamp TIMESTAMPTZ NOT NULL,
-    biomass_density_kg_m2 DOUBLE PRECISION NOT NULL CHECK (biomass_density_kg_m2 >= 0.0),
-    exergy_enthalpy_kj DOUBLE PRECISION NOT NULL CHECK (exergy_enthalpy_kj >= 0.0),
-    entropy_dissipation_kj_k DOUBLE PRECISION NOT NULL CHECK (entropy_dissipation_kj_k >= 0.0),
-    bound_carbon_stock_kg DOUBLE PRECISION NOT NULL CHECK (bound_carbon_stock_kg >= 0.0),
-    internal_energy_j DOUBLE PRECISION NOT NULL CHECK (internal_energy_j >= 0.0),
-    is_closed_vertical_column BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_monad_stock_cell_tier_epoch UNIQUE(cell_id, trophic_tier, epoch_timestamp)
-);
-
-CREATE INDEX IF NOT EXISTS idx_monad_stocks_cell_epoch ON thermodynamic_monad_stocks(cell_id, epoch_timestamp DESC);
-
--- ----------------------------------------------------------------------------
--- TABLE: spatial_monad_flux_transactions
--- Tracks thermodynamic transfers across vertical columns and lateral hexagons
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_monad_flux_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    path_id UUID REFERENCES h3_traversal_paths(path_id),
-    source_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
-    target_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
-    flux_direction flux_direction_type NOT NULL,
-    has_zero_aperture_invariance BOOLEAN NOT NULL DEFAULT FALSE,
-    
-    -- Thermodynamic Flow Vectors
-    mass_flux_kg DOUBLE PRECISION NOT NULL CHECK (mass_flux_kg >= 0.0),
-    enthalpy_flux_kj DOUBLE PRECISION NOT NULL CHECK (enthalpy_flux_kj >= 0.0),
-    lateral_flux_tensor DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (lateral_flux_tensor >= 0.0),
-    entropy_production_kj_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_kj_k >= 0.0),
-    
-    -- First & Second Law Compliance Proofs
-    energy_conservation_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    is_second_law_compliant BOOLEAN NOT NULL DEFAULT TRUE,
-    
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
-    CONSTRAINT chk_zero_lateral_flux_invariant CHECK (
-        (has_zero_aperture_invariance = TRUE AND lateral_flux_tensor = 0.0) OR
-        (has_zero_aperture_invariance = FALSE)
-    )
-);
-
-CREATE INDEX IF NOT EXISTS idx_flux_tx_source ON spatial_monad_flux_transactions(source_cell_id);
-CREATE INDEX IF NOT EXISTS idx_flux_tx_target ON spatial_monad_flux_transactions(target_cell_id);
-CREATE INDEX IF NOT EXISTS idx_flux_tx_executed_at ON spatial_monad_flux_transactions(executed_at DESC);
-
--- ----------------------------------------------------------------------------
--- TABLE: blockchain_ledger_blocks
--- Cryptographic and thermodynamic state commitment ledger
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blockchain_ledger_blocks (
-    block_height BIGINT PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_block_hash BYTEA NOT NULL,
-    merkle_state_root BYTEA NOT NULL,
-    spatial_tensor_merkle_root BYTEA NOT NULL,
-    total_entropy_production_kj_k DOUBLE PRECISION NOT NULL CHECK (total_entropy_production_kj_k >= 0.0),
-    total_exergy_consumed_kj DOUBLE PRECISION NOT NULL CHECK (total_exergy_consumed_kj >= 0.0),
-    zero_aperture_tx_count INT NOT NULL CHECK (zero_aperture_tx_count >= 0),
-    lateral_flux_tx_count INT NOT NULL CHECK (lateral_flux_tx_count >= 0),
-    validator_node_signature BYTEA NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ----------------------------------------------------------------------------
--- TABLE: blockchain_block_transactions
--- Association between spatial flux transactions and committed ledger blocks
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS blockchain_block_transactions (
-    block_height BIGINT NOT NULL REFERENCES blockchain_ledger_blocks(block_height) ON DELETE CASCADE,
-    transaction_id UUID NOT NULL REFERENCES spatial_monad_flux_transactions(transaction_id) ON DELETE RESTRICT,
-    tx_sequence_index INT NOT NULL,
-    tx_signature BYTEA NOT NULL,
-    zero_aperture_witness BOOLEAN NOT NULL,
-    PRIMARY KEY (block_height, tx_sequence_index),
-    CONSTRAINT uq_block_tx_id UNIQUE (block_height, transaction_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_block_tx_zero_witness ON blockchain_block_transactions(zero_aperture_witness);
+DROP TRIGGER IF EXISTS trg_verify_block_conservation ON thermodynamic_blocks;
+CREATE TRIGGER trg_verify_block_conservation
+    BEFORE INSERT OR UPDATE ON thermodynamic_blocks
+    FOR EACH ROW
+    EXECUTE FUNCTION verify_thermodynamic_block_conservation();

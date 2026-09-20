@@ -1,0 +1,204 @@
+```Code snippet
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam packageStyle rectangle
+skinparam roundCorner 8
+skinparam shadowing false
+skinparam monochrome false
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam classFontName "JetBrains Mono", "Courier New", monospace
+
+title Web of Life - Hierarchical H3 DGGS & Thermodynamic Blockchain Schema (Sprint 089)
+
+package "Spatial DGGS Kinematics (src/spatial/)" {
+    interface IH3ApertureInspector {
+        + hasNonZeroApertureDigits(index: bigint | string, resolution?: number): boolean
+        + getFirstNonZeroApertureResolution(index: bigint | string): number | null
+        + getApertureDigit(index: bigint | string, resolution: number): number
+        + analyzeApertureStructure(index: bigint | string): ApertureAnalysisResult
+    }
+
+    class ApertureAnalysisResult <<ValueObject>> {
+        + index: string
+        + resolution: number
+        + hasNonZeroDigits: boolean
+        + firstNonZeroResolution: number | null
+        + nonZeroDigitCount: number
+        + digitSequence: readonly number[]
+    }
+
+    class H3AdjacencyCoordinator implements IH3ApertureInspector {
+        - adjacencyMatrixMap: Map<string, string[]>
+        - resolutionCache: Map<string, number>
+        + hasNonZeroApertureDigits(index: bigint | string, resolution?: number): boolean
+        + getFirstNonZeroApertureResolution(index: bigint | string): number | null
+        + getApertureDigit(index: bigint | string, resTier: number): number
+        + analyzeApertureStructure(index: bigint | string): ApertureAnalysisResult
+        + getNeighbors(index: bigint | string): string[]
+        + computeBitwiseApertureMask(resolution: number): bigint
+    }
+
+    class Vector3D <<ValueObject>> {
+        + x: number
+        + y: number
+        + z: number
+        + {static} ZERO: Vector3D
+        + magnitude(): number
+        + add(v: Vector3D): Vector3D
+    }
+}
+
+package "Monadic Thermodynamic Stocks & Fluxes (src/monads/)" {
+    class SpatialMonad<TStock> {
+        + patchIndex: string
+        + stock: TStock
+        + timestamp: Date
+        + map<U>(fn: (stock: TStock) => U): SpatialMonad<U>
+        + flatMap<U>(fn: (stock: TStock) => SpatialMonad<U>): SpatialMonad<U>
+    }
+
+    class ThermodynamicStock <<Entity>> {
+        + biomassKg: number
+        + enthalpyJoules: number
+        + entropyJK: number
+        + waterLiters: number
+        + carbonKg: number
+        + isConservedWith(other: ThermodynamicStock): boolean
+    }
+
+    class SpatialFluxMonad {
+        + sourceCell: string
+        + targetParentCell: string
+        + transferredStock: ThermodynamicStock
+        + driftVector: Vector3D
+        + computeCoarseningDriftVector(source: string, target: string): Vector3D
+        + executeConservativeTransfer(): SpatialMonad<ThermodynamicStock>
+    }
+}
+
+package "Relational Database Schema (db/schema.sql)" {
+    class h3_cell_registry <<Table>> {
+        + h3_index: BIGINT [PK]
+        + h3_index_hex: VARCHAR(16)
+        + resolution: SMALLINT
+        + base_cell_id: SMALLINT
+        + mode: SMALLINT
+        + is_concentric_base_descendant: BOOLEAN
+        + has_nonzero_aperture_digits: BOOLEAN
+        + first_nonzero_aperture_resolution: SMALLINT
+        + nonzero_aperture_digit_count: SMALLINT
+        + active_aperture_digit_mask: BIGINT
+        + centroid_geom: GEOMETRY(Point, 4326)
+        + boundary_geom: GEOMETRY(Polygon, 4326)
+    }
+
+    class h3_aperture_tier_decompositions <<Table>> {
+        + h3_index: BIGINT [PK, FK]
+        + resolution_tier: SMALLINT [PK]
+        + aperture_digit: SMALLINT
+        + bit_offset: SMALLINT
+        + is_central_child: BOOLEAN
+        + azimuthal_rotation_deg: DOUBLE PRECISION
+    }
+
+    class thermodynamic_patch_stocks <<Table>> {
+        + stock_id: UUID [PK]
+        + h3_index: BIGINT [FK]
+        + epoch_timestamp: TIMESTAMPTZ
+        + biomass_kg: NUMERIC(28, 12)
+        + enthalpy_joules: NUMERIC(38, 12)
+        + entropy_j_k: NUMERIC(38, 12)
+        + water_liters: NUMERIC(28, 12)
+        + carbon_kg: NUMERIC(28, 12)
+        + exergy_joules: NUMERIC(38, 12)
+        + coarsening_scale_factor: NUMERIC(8, 4)
+        + state_signature: BYTEA
+    }
+
+    class spatial_flux_coarsening_routes <<Table>> {
+        + route_id: UUID [PK]
+        + source_h3_index: BIGINT [FK]
+        + target_parent_h3_index: BIGINT [FK]
+        + source_resolution: SMALLINT
+        + target_resolution: SMALLINT
+        + has_rotational_drift: BOOLEAN
+        + drift_vector_x: DOUBLE PRECISION
+        + drift_vector_y: DOUBLE PRECISION
+        + drift_vector_z: DOUBLE PRECISION
+        + symmetry_axis_preserved: BOOLEAN
+        + radial_flux_optimization_applied: BOOLEAN
+    }
+
+    class thermodynamic_blocks <<Table>> {
+        + block_height: BIGINT [PK]
+        + block_hash: BYTEA
+        + parent_block_hash: BYTEA
+        + merkle_root_hash: BYTEA
+        + thermodynamic_state_root: BYTEA
+        + coarsening_flux_root: BYTEA
+        + total_biomass_delta_kg: NUMERIC(28, 12)
+        + total_enthalpy_delta_joules: NUMERIC(38, 12)
+        + total_entropy_production_j_k: NUMERIC(38, 12)
+        + timestamp: TIMESTAMPTZ
+        + validator_signature: BYTEA
+        + nonce: BIGINT
+    }
+
+    class thermodynamic_stock_transactions <<Table>> {
+        + transaction_id: UUID [PK]
+        + block_height: BIGINT [FK]
+        + tx_hash: BYTEA
+        + source_h3_index: BIGINT [FK]
+        + target_h3_index: BIGINT [FK]
+        + route_id: UUID [FK]
+        + biomass_transferred_kg: NUMERIC(28, 12)
+        + enthalpy_transferred_joules: NUMERIC(38, 12)
+        + water_transferred_liters: NUMERIC(28, 12)
+        + carbon_transferred_kg: NUMERIC(28, 12)
+        + entropy_generated_j_k: NUMERIC(38, 12)
+        + dissipated_metabolic_heat_joules: NUMERIC(38, 12)
+        + is_pure_radial_diffusion BOOLEAN
+        + monad_receipt_signature: BYTEA
+    }
+}
+
+' Relations: DGGS Kinematics and Structural Decompositions
+H3AdjacencyCoordinator ..> ApertureAnalysisResult : produces
+H3AdjacencyCoordinator ..> Vector3D : resolves offset
+h3_cell_registry "1" *-- "0..15" h3_aperture_tier_decompositions : contains tiers
+h3_cell_registry "1" *-- "0..*" thermodynamic_patch_stocks : tracks historical states
+
+' Relations: Thermodynamic Stocks, Monads and Routes
+SpatialMonad *-- ThermodynamicStock : wraps immutable state
+SpatialFluxMonad --> H3AdjacencyCoordinator : queries hasNonZeroApertureDigits()
+SpatialFluxMonad ..> Vector3D : calculates drift
+spatial_flux_coarsening_routes "0..*" --> "1" h3_cell_registry : source cell
+spatial_flux_coarsening_routes "0..*" --> "1" h3_cell_registry : target parent cell
+
+' Relations: Blockchain Ledger and Thermodynamic Transactions
+thermodynamic_blocks "1" *-- "0..*" thermodynamic_stock_transactions : anchors transactions
+thermodynamic_stock_transactions --> h3_cell_registry : source cell
+thermodynamic_stock_transactions --> h3_cell_registry : destination cell
+thermodynamic_stock_transactions --> spatial_flux_coarsening_routes : guided by route
+
+' Architectural Annotations
+note top of IH3ApertureInspector
+  <b>Aperture-7 Predicate Contract</b>
+  Bitmask: M(r) = (2^(3r) - 1) * 2^(45 - 3r)
+  P_non-zero(h, r) = (I(h) & M(r)) != 0
+  - Resolution 0: always FALSE
+  - Concentric descendants (all d_k=0): FALSE
+  - Non-zero aperture (exists d_k>0): TRUE
+end note
+
+note right of thermodynamic_blocks
+  <b>Thermodynamic Conservation Invariants</b>
+  1. First Law: Sum(biomass_transferred_kg) = 0
+  2. First Law: Sum(enthalpy_transferred_joules) = 0
+  3. Second Law: total_entropy_production_j_k >= 0
+  4. Radial Optimization: Pure diffusion if hasNonZeroApertureDigits == false
+end note
+
+@enduml

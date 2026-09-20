@@ -1,5 +1,5 @@
 {
-  "current_sprint": 89,
+  "current_sprint": 90,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -440,6 +440,11 @@
       "sprint": 88,
       "goal": "Implement hasZeroApertureSequence testing whether an array of directional digits contains exclusively center direction (0) digits in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-20T03:34:01.615869+00:00"
+    },
+    {
+      "sprint": 89,
+      "goal": "Implement hasNonZeroApertureDigits predicate checking whether any directional digit in active resolution tiers is non-zero in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-20T03:48:00.371062+00:00"
     }
   ]
 }

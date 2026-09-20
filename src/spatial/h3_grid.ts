@@ -563,6 +563,24 @@ export class H3Grid<T = any> {
   public getNeighbors(_id: string): string[] {
     return ['cell_2'];
   }
+
+  public projectCentroid(
+    origin: { latitude: number; longitude: number },
+    path: readonly number[]
+  ): { latitude: number; longitude: number } {
+    let lat = origin.latitude;
+    let lon = origin.longitude;
+    for (let i = 0; i < path.length; i++) {
+      const d = path[i];
+      if (d !== 0) {
+        const angle = ((d - 1) * 60 * Math.PI) / 180;
+        const scale = 0.05 / Math.pow(Math.sqrt(7), i + 1);
+        lat += scale * Math.sin(angle);
+        lon += scale * Math.cos(angle);
+      }
+    }
+    return { latitude: lat, longitude: lon };
+  }
 }
 
 export class H3GridManager {
