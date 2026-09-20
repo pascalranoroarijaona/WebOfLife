@@ -1,171 +1,230 @@
--- Web of Life / Gaia Platform - Thermodynamic DGGS Ledger Schema
--- Sprint 087: Pentagon Base Cell Missing Direction Mapping & Zero-Flux Topological Invariants
--- Canonical Base Cell Partition: 122 Base Cells (110 Hexagons, 12 Pentagons)
+-- ============================================================================
+-- Web of Life Simulation & Thermodynamic Blockchain Schema
+-- Sprint 088: Center Aperture Invariance & hasZeroApertureSequence Verification
+-- Dialect: PostgreSQL 15+ (TimescaleDB / PostGIS enabled)
+-- ============================================================================
 
--- Extension requirements
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ============================================================================
--- ENUMS & DOMAINS
--- ============================================================================
+-- ----------------------------------------------------------------------------
+-- ENUM TYPES: Spatial Apertures, Trophic Layers & Thermodynamic Conservation
+-- ----------------------------------------------------------------------------
 
-CREATE TYPE h3_direction AS ENUM (
-    'CENTER',    -- 0: Self
-    'K_AXES',    -- 1: +k axis
-    'J_AXES',    -- 2: +j axis
-    'JK_AXES',   -- 3: +j + k axis
-    'I_AXES',    -- 4: +i axis
-    'IK_AXES',   -- 5: +i + k axis
-    'IJ_AXES',   -- 6: +i + j axis
-    'INVALID'    -- 7: Omitted / Out-of-bounds defect direction
+DO $$ BEGIN
+    CREATE TYPE h3_direction_digit AS ENUM ('0', '1', '2', '3', '4', '5', '6');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE spatial_aperture_mode AS ENUM (
+        'APERTURE_INVARIANT_CENTER', -- Sequences with purely 0 digits; zero lateral flux
+        'LATERAL_DISPLACEMENT',      -- Sequence contains >= 1 non-zero digits (1..6)
+        'VACUOUS_IDENTITY'           -- Length 0 sequence; identity zoom
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE trophic_level_type AS ENUM (
+        'PRIMARY_PRODUCER',
+        'PRIMARY_CONSUMER',
+        'SECONDARY_CONSUMER',
+        'TERTIARY_CONSUMER',
+        'APEX_PREDATOR',
+        'DECOMPOSER_DETRITIVORE'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE flux_direction_type AS ENUM (
+        'INTERNAL_VERTICAL_DISSIPATION',
+        'CONCENTRIC_ACCUMULATION',
+        'LATERAL_HEX_INTERCHANGE',
+        'RADIATIVE_OUTFLOW'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- ----------------------------------------------------------------------------
+-- TABLE: h3_hierarchical_cells
+-- Spatial multi-resolution hexagonal cells (H3 Aperture 3/7)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS h3_hierarchical_cells (
+    cell_id VARCHAR(19) PRIMARY KEY, -- H3 64-bit hex string representation
+    resolution INT NOT NULL CHECK (resolution >= 0 AND resolution <= 15),
+    parent_cell_id VARCHAR(19) REFERENCES h3_hierarchical_cells(cell_id),
+    centroid_geom GEOMETRY(Point, 4326) NOT NULL,
+    boundary_geom GEOMETRY(Polygon, 4326) NOT NULL,
+    is_center_child BOOLEAN NOT NULL DEFAULT FALSE,
+    aperture_digit h3_direction_digit NOT NULL DEFAULT '0',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TYPE cell_topology_class AS ENUM (
-    'HEXAGON',   -- Degree 6 regular base cell
-    'PENTAGON'   -- Degree 5 topological defect (singular vertex)
-);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_parent ON h3_hierarchical_cells(parent_cell_id);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_centroid ON h3_hierarchical_cells USING GIST(centroid_geom);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_boundary ON h3_hierarchical_cells USING GIST(boundary_geom);
 
-CREATE TYPE thermodynamic_stock_type AS ENUM (
-    'BIOMASS_CARBON_KG',
-    'SOIL_ORGANIC_CARBON_KG',
-    'HYDROLOGY_WATER_KG',
-    'ENTHALPY_SENSIBLE_JOULES',
-    'ENTHALPY_LATENT_JOULES',
-    'NITROGEN_POOL_KG'
-);
-
--- ============================================================================
--- BASE TOPOLOGY REGISTRY (Static DGGS Invariants)
--- ============================================================================
-
-CREATE TABLE dggs_base_cells (
-    base_cell_id SMALLINT PRIMARY KEY CHECK (base_cell_id BETWEEN 0 AND 121),
-    topology_class cell_topology_class NOT NULL,
-    is_pentagon BOOLEAN GENERATED ALWAYS AS (topology_class = 'PENTAGON') STORED,
-    omitted_direction h3_direction NOT NULL DEFAULT 'INVALID',
-    valid_neighbor_count SMALLINT NOT NULL CHECK (valid_neighbor_count IN (5, 6)),
-    icosahedral_faces SMALLINT[] NOT NULL,
-    polar_equator_zone VARCHAR(32) NOT NULL,
+-- ----------------------------------------------------------------------------
+-- TABLE: h3_traversal_paths
+-- Records hierarchical traversal paths across resolution scales
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS h3_traversal_paths (
+    path_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    origin_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
+    target_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
+    origin_resolution INT NOT NULL,
+    target_resolution INT NOT NULL,
+    digit_sequence INT[] NOT NULL, -- Array of directional digits (0..6)
+    sequence_length INT GENERATED ALWAYS AS (cardinality(digit_sequence)) STORED,
+    has_zero_aperture_sequence BOOLEAN NOT NULL,
+    aperture_mode spatial_aperture_mode NOT NULL,
+    lateral_displacement_magnitude DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
-    -- Invariant: Hexagonal base cells must have omitted_direction = 'INVALID' and degree 6.
-    -- Pentagons must have a valid omitted direction (K_AXES in H3 canonical) and degree 5.
-    CONSTRAINT chk_pentagon_omitted_dir CHECK (
-        (topology_class = 'HEXAGON' AND omitted_direction = 'INVALID' AND valid_neighbor_count = 6) OR
-        (topology_class = 'PENTAGON' AND omitted_direction = 'K_AXES' AND valid_neighbor_count = 5)
+    CONSTRAINT chk_digit_domain CHECK (
+        digit_sequence <@ ARRAY[0,1,2,3,4,5,6]::INT[]
+    ),
+    CONSTRAINT chk_zero_aperture_invariant CHECK (
+        (has_zero_aperture_sequence = TRUE AND (lateral_displacement_magnitude = 0.0)) OR
+        (has_zero_aperture_sequence = FALSE AND (sequence_length > 0))
     )
 );
 
--- Seed canonical pentagonal base cells: {4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117}
-INSERT INTO dggs_base_cells (base_cell_id, topology_class, omitted_direction, valid_neighbor_count, icosahedral_faces, polar_equator_zone)
-VALUES
-    (4,   'PENTAGON', 'K_AXES', 5, '{0,1,2,3,4}',        'North Polar Cap'),
-    (14,  'PENTAGON', 'K_AXES', 5, '{0,1,5,6,10}',       'Northern Temperate Ring'),
-    (24,  'PENTAGON', 'K_AXES', 5, '{1,2,6,7,11}',       'Northern Temperate Ring'),
-    (38,  'PENTAGON', 'K_AXES', 5, '{2,3,7,8,12}',       'Northern Temperate Ring'),
-    (49,  'PENTAGON', 'K_AXES', 5, '{3,4,8,9,13}',       'Northern Temperate Ring'),
-    (58,  'PENTAGON', 'K_AXES', 5, '{4,0,9,5,14}',       'Northern Temperate Ring'),
-    (63,  'PENTAGON', 'K_AXES', 5, '{14,15,9,19,18}',    'Southern Temperate Ring'),
-    (72,  'PENTAGON', 'K_AXES', 5, '{10,16,5,15,19}',    'Southern Temperate Ring'),
-    (83,  'PENTAGON', 'K_AXES', 5, '{11,17,6,16,15}',    'Southern Temperate Ring'),
-    (97,  'PENTAGON', 'K_AXES', 5, '{12,18,7,17,16}',    'Southern Temperate Ring'),
-    (107, 'PENTAGON', 'K_AXES', 5, '{13,19,8,18,17}',    'Southern Temperate Ring'),
-    (117, 'PENTAGON', 'K_AXES', 5, '{15,16,17,18,19}',   'South Polar Cap')
-ON CONFLICT (base_cell_id) DO NOTHING;
+CREATE INDEX IF NOT EXISTS idx_traversal_paths_origin ON h3_traversal_paths(origin_cell_id);
+CREATE INDEX IF NOT EXISTS idx_traversal_paths_target ON h3_traversal_paths(target_cell_id);
+CREATE INDEX IF NOT EXISTS idx_traversal_paths_zero_aperture ON h3_traversal_paths(has_zero_aperture_sequence);
 
--- Adjacency lookup table defining the 6-directional topological connections
-CREATE TABLE dggs_base_cell_adjacencies (
-    source_base_cell SMALLINT NOT NULL REFERENCES dggs_base_cells(base_cell_id),
-    direction h3_direction NOT NULL,
-    target_base_cell SMALLINT CHECK (target_base_cell BETWEEN 0 AND 121),
-    is_omitted_defect BOOLEAN NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (source_base_cell, direction),
+-- ----------------------------------------------------------------------------
+-- FUNCTION & TRIGGER: Enforce hasZeroApertureSequence Invariants on Insert/Update
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_validate_h3_traversal_aperture()
+RETURNS TRIGGER AS $$
+DECLARE
+    d INT;
+    all_zeros BOOLEAN := TRUE;
+BEGIN
+    IF NEW.digit_sequence IS NULL OR cardinality(NEW.digit_sequence) = 0 THEN
+        NEW.has_zero_aperture_sequence := TRUE;
+        NEW.aperture_mode := 'VACUOUS_IDENTITY';
+        NEW.lateral_displacement_magnitude := 0.0;
+        RETURN NEW;
+    END IF;
 
-    -- Missing direction must yield no target cell and be flagged as omitted defect
-    CONSTRAINT chk_defect_adjacency CHECK (
-        (is_omitted_defect = TRUE AND target_base_cell IS NULL) OR
-        (is_omitted_defect = FALSE AND target_base_cell IS NOT NULL)
-    )
-);
+    FOREACH d IN ARRAY NEW.digit_sequence LOOP
+        IF d <> 0 THEN
+            all_zeros := FALSE;
+            EXIT;
+        END IF;
+    END LOOP;
 
-CREATE INDEX idx_dggs_adj_target ON dggs_base_cell_adjacencies(target_base_cell);
+    NEW.has_zero_aperture_sequence := all_zeros;
+    IF all_zeros THEN
+        NEW.aperture_mode := 'APERTURE_INVARIANT_CENTER';
+        NEW.lateral_displacement_magnitude := 0.0;
+    ELSE
+        NEW.aperture_mode := 'LATERAL_DISPLACEMENT';
+    END IF;
 
--- ============================================================================
--- THERMODYNAMIC STOCK REGISTRY (EarthPod State Vector)
--- ============================================================================
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-CREATE TABLE earthpod_stock_states (
-    state_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    base_cell_id SMALLINT NOT NULL REFERENCES dggs_base_cells(base_cell_id),
-    stock_type thermodynamic_stock_type NOT NULL,
-    quantity NUMERIC(38, 18) NOT NULL CHECK (quantity >= 0),
-    chemical_potential NUMERIC(38, 18) NOT NULL DEFAULT 0.0,
-    entropy_j_per_k NUMERIC(38, 18) NOT NULL DEFAULT 0.0,
+DROP TRIGGER IF EXISTS trg_validate_h3_traversal_aperture ON h3_traversal_paths;
+CREATE TRIGGER trg_validate_h3_traversal_aperture
+BEFORE INSERT OR UPDATE ON h3_traversal_paths
+FOR EACH ROW
+EXECUTE FUNCTION fn_validate_h3_traversal_aperture();
+
+-- ----------------------------------------------------------------------------
+-- TABLE: thermodynamic_monad_stocks
+-- State tensor for localized trophic & exergy balance within spatial hexagons
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thermodynamic_monad_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
+    trophic_tier trophic_level_type NOT NULL,
     epoch_timestamp TIMESTAMPTZ NOT NULL,
+    biomass_density_kg_m2 DOUBLE PRECISION NOT NULL CHECK (biomass_density_kg_m2 >= 0.0),
+    exergy_enthalpy_kj DOUBLE PRECISION NOT NULL CHECK (exergy_enthalpy_kj >= 0.0),
+    entropy_dissipation_kj_k DOUBLE PRECISION NOT NULL CHECK (entropy_dissipation_kj_k >= 0.0),
+    bound_carbon_stock_kg DOUBLE PRECISION NOT NULL CHECK (bound_carbon_stock_kg >= 0.0),
+    internal_energy_j DOUBLE PRECISION NOT NULL CHECK (internal_energy_j >= 0.0),
+    is_closed_vertical_column BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_base_cell_stock_time UNIQUE (base_cell_id, stock_type, epoch_timestamp)
+    CONSTRAINT uq_monad_stock_cell_tier_epoch UNIQUE(cell_id, trophic_tier, epoch_timestamp)
 );
 
-CREATE INDEX idx_earthpod_cell_stock ON earthpod_stock_states(base_cell_id, stock_type);
-CREATE INDEX idx_earthpod_epoch ON earthpod_stock_states(epoch_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_monad_stocks_cell_epoch ON thermodynamic_monad_stocks(cell_id, epoch_timestamp DESC);
 
--- ============================================================================
--- SPATIAL FLUX MONAD TRANSACTIONS & ZERO-FLUX BOUNDARY BARRIERS
--- ============================================================================
-
-CREATE TABLE spatial_flux_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_base_cell SMALLINT NOT NULL REFERENCES dggs_base_cells(base_cell_id),
-    direction h3_direction NOT NULL,
-    target_base_cell SMALLINT REFERENCES dggs_base_cells(base_cell_id),
-    stock_type thermodynamic_stock_type NOT NULL,
-    flux_quantity NUMERIC(38, 18) NOT NULL,
-    onsager_conductance NUMERIC(38, 18) NOT NULL CHECK (onsager_conductance >= 0),
-    potential_gradient NUMERIC(38, 18) NOT NULL,
-    entropy_production NUMERIC(38, 18) NOT NULL CHECK (entropy_production >= 0),
-    is_zero_flux_boundary BOOLEAN NOT NULL DEFAULT FALSE,
-    block_height BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    -- FIRST LAW ENFORCEMENT: Flux along omitted pentagon direction MUST be strictly zero
-    CONSTRAINT chk_first_law_zero_flux CHECK (
-        (is_zero_flux_boundary = TRUE AND flux_quantity = 0.0 AND target_base_cell IS NULL) OR
-        (is_zero_flux_boundary = FALSE AND flux_quantity >= 0.0 AND target_base_cell IS NOT NULL)
+-- ----------------------------------------------------------------------------
+-- TABLE: spatial_monad_flux_transactions
+-- Tracks thermodynamic transfers across vertical columns and lateral hexagons
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spatial_monad_flux_transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    path_id UUID REFERENCES h3_traversal_paths(path_id),
+    source_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
+    target_cell_id VARCHAR(19) NOT NULL REFERENCES h3_hierarchical_cells(cell_id),
+    flux_direction flux_direction_type NOT NULL,
+    has_zero_aperture_invariance BOOLEAN NOT NULL DEFAULT FALSE,
+    
+    -- Thermodynamic Flow Vectors
+    mass_flux_kg DOUBLE PRECISION NOT NULL CHECK (mass_flux_kg >= 0.0),
+    enthalpy_flux_kj DOUBLE PRECISION NOT NULL CHECK (enthalpy_flux_kj >= 0.0),
+    lateral_flux_tensor DOUBLE PRECISION NOT NULL DEFAULT 0.0 CHECK (lateral_flux_tensor >= 0.0),
+    entropy_production_kj_k DOUBLE PRECISION NOT NULL CHECK (entropy_production_kj_k >= 0.0),
+    
+    -- First & Second Law Compliance Proofs
+    energy_conservation_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    is_second_law_compliant BOOLEAN NOT NULL DEFAULT TRUE,
+    
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    
+    CONSTRAINT chk_zero_lateral_flux_invariant CHECK (
+        (has_zero_aperture_invariance = TRUE AND lateral_flux_tensor = 0.0) OR
+        (has_zero_aperture_invariance = FALSE)
     )
 );
 
-CREATE INDEX idx_flux_tx_block ON spatial_flux_transactions(block_height);
-CREATE INDEX idx_flux_tx_source_dir ON spatial_flux_transactions(source_base_cell, direction);
+CREATE INDEX IF NOT EXISTS idx_flux_tx_source ON spatial_monad_flux_transactions(source_cell_id);
+CREATE INDEX IF NOT EXISTS idx_flux_tx_target ON spatial_monad_flux_transactions(target_cell_id);
+CREATE INDEX IF NOT EXISTS idx_flux_tx_executed_at ON spatial_monad_flux_transactions(executed_at DESC);
 
--- ============================================================================
--- BLOCKCHAIN LEDGER: CONSENSUS & FIRST/SECOND LAW CONSERVATION PROOFS
--- ============================================================================
-
-CREATE TABLE thermodynamic_blocks (
+-- ----------------------------------------------------------------------------
+-- TABLE: blockchain_ledger_blocks
+-- Cryptographic and thermodynamic state commitment ledger
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS blockchain_ledger_blocks (
     block_height BIGINT PRIMARY KEY,
-    prev_block_hash CHAR(64) NOT NULL,
-    merkle_root CHAR(64) NOT NULL,
-    state_delta_hash CHAR(64) NOT NULL,
-    total_mass_invariant_kg NUMERIC(38, 18) NOT NULL,
-    total_energy_invariant_j NUMERIC(38, 18) NOT NULL,
-    total_entropy_production_j_per_k NUMERIC(38, 18) NOT NULL CHECK (total_entropy_production_j_per_k >= 0),
-    mass_conservation_delta_kg NUMERIC(38, 18) NOT NULL DEFAULT 0.0,
-    energy_conservation_delta_j NUMERIC(38, 18) NOT NULL DEFAULT 0.0,
-    is_conservation_proven BOOLEAN GENERATED ALWAYS AS (
-        ABS(mass_conservation_delta_kg) < 1e-12 AND
-        ABS(energy_conservation_delta_j) < 1e-9
-    ) STORED,
-    validator_node_id VARCHAR(128) NOT NULL,
-    block_signature TEXT NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT chk_block_first_law_conserved CHECK (is_conservation_proven = TRUE)
+    block_hash BYTEA NOT NULL UNIQUE,
+    parent_block_hash BYTEA NOT NULL,
+    merkle_state_root BYTEA NOT NULL,
+    spatial_tensor_merkle_root BYTEA NOT NULL,
+    total_entropy_production_kj_k DOUBLE PRECISION NOT NULL CHECK (total_entropy_production_kj_k >= 0.0),
+    total_exergy_consumed_kj DOUBLE PRECISION NOT NULL CHECK (total_exergy_consumed_kj >= 0.0),
+    zero_aperture_tx_count INT NOT NULL CHECK (zero_aperture_tx_count >= 0),
+    lateral_flux_tx_count INT NOT NULL CHECK (lateral_flux_tx_count >= 0),
+    validator_node_signature BYTEA NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_block_prev_hash ON thermodynamic_blocks(prev_block_hash);
+-- ----------------------------------------------------------------------------
+-- TABLE: blockchain_block_transactions
+-- Association between spatial flux transactions and committed ledger blocks
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS blockchain_block_transactions (
+    block_height BIGINT NOT NULL REFERENCES blockchain_ledger_blocks(block_height) ON DELETE CASCADE,
+    transaction_id UUID NOT NULL REFERENCES spatial_monad_flux_transactions(transaction_id) ON DELETE RESTRICT,
+    tx_sequence_index INT NOT NULL,
+    tx_signature BYTEA NOT NULL,
+    zero_aperture_witness BOOLEAN NOT NULL,
+    PRIMARY KEY (block_height, tx_sequence_index),
+    CONSTRAINT uq_block_tx_id UNIQUE (block_height, transaction_id)
+);
 
--- Foreign key linking flux transactions to verified block
-ALTER TABLE spatial_flux_transactions
-    ADD CONSTRAINT fk_flux_block
-    FOREIGN KEY (block_height) REFERENCES thermodynamic_blocks(block_height);
+CREATE INDEX IF NOT EXISTS idx_block_tx_zero_witness ON blockchain_block_transactions(zero_aperture_witness);

@@ -1,0 +1,162 @@
+```Code snippet
+@startuml sprint_088_schema
+!theme vibrant
+title Web of Life - Center Aperture Invariance & Spatial Monad Schema (Sprint 088)
+
+enum H3DirectionDigit {
+    CENTER_0 = 0
+    AXIS_1 = 1
+    AXIS_2 = 2
+    AXIS_3 = 3
+    AXIS_4 = 4
+    AXIS_5 = 5
+    AXIS_6 = 6
+}
+
+enum SpatialApertureMode {
+    APERTURE_INVARIANT_CENTER
+    LATERAL_DISPLACEMENT
+    VACUOUS_IDENTITY
+}
+
+enum TrophicLevelType {
+    PRIMARY_PRODUCER
+    PRIMARY_CONSUMER
+    SECONDARY_CONSUMER
+    TERTIARY_CONSUMER
+    APEX_PREDATOR
+    DECOMPOSER_DETRITIVORE
+}
+
+enum FluxDirectionType {
+    INTERNAL_VERTICAL_DISSIPATION
+    CONCENTRIC_ACCUMULATION
+    LATERAL_HEX_INTERCHANGE
+    RADIATIVE_OUTFLOW
+}
+
+class "H3Adjacency" as H3Adjacency <<utility>> {
+    +hasZeroApertureSequence(digits: readonly number[]): boolean
+    +computeLateralDisplacement(path: readonly number[]): number
+    +isParentCentroidPreserved(path: readonly number[]): boolean
+}
+
+class "H3HierarchicalCell" as H3HierarchicalCell {
+    +cell_id: string [PK]
+    +resolution: int
+    +parent_cell_id: string [FK]
+    +centroid_geom: Point
+    +boundary_geom: Polygon
+    +is_center_child: boolean
+    +aperture_digit: H3DirectionDigit
+    +created_at: timestamp
+}
+
+class "H3TraversalPath" as H3TraversalPath {
+    +path_id: UUID [PK]
+    +origin_cell_id: string [FK]
+    +target_cell_id: string [FK]
+    +origin_resolution: int
+    +target_resolution: int
+    +digit_sequence: int[]
+    +sequence_length: int
+    +has_zero_aperture_sequence: boolean
+    +aperture_mode: SpatialApertureMode
+    +lateral_displacement_magnitude: double
+    +created_at: timestamp
+    +verifyInvariance(): boolean
+}
+
+class "SpatialFluxMonad<T>" as SpatialFluxMonad {
+    -state: T
+    -apertureInvariant: boolean
+    -lateralFluxTensor: double
+    +unit(value: T): SpatialFluxMonad<T>
+    +bind<U>(transform: (v: T) => SpatialFluxMonad<U>): SpatialFluxMonad<U>
+    +enforceZeroApertureConservation(): boolean
+    +evaluateNoLateralFlux(): boolean
+}
+
+class "ThermodynamicMonadStock" as ThermodynamicMonadStock {
+    +stock_id: UUID [PK]
+    +cell_id: string [FK]
+    +trophic_tier: TrophicLevelType
+    +epoch_timestamp: timestamp
+    +biomass_density_kg_m2: double
+    +exergy_enthalpy_kj: double
+    +entropy_dissipation_kj_k: double
+    +bound_carbon_stock_kg: double
+    +internal_energy_j: double
+    +is_closed_vertical_column: boolean
+}
+
+class "SpatialMonadFluxTransaction" as SpatialMonadFluxTransaction {
+    +transaction_id: UUID [PK]
+    +path_id: UUID [FK]
+    +source_cell_id: string [FK]
+    +target_cell_id: string [FK]
+    +flux_direction: FluxDirectionType
+    +has_zero_aperture_invariance: boolean
+    +mass_flux_kg: double
+    +enthalpy_flux_kj: double
+    +lateral_flux_tensor: double
+    +entropy_production_kj_k: double
+    +energy_conservation_delta: double
+    +is_second_law_compliant: boolean
+    +executed_at: timestamp
+    +assertFirstLaw(): boolean
+}
+
+class "BlockchainLedgerBlock" as BlockchainLedgerBlock {
+    +block_height: bigint [PK]
+    +block_hash: bytea
+    +parent_block_hash: bytea
+    +merkle_state_root: bytea
+    +spatial_tensor_merkle_root: bytea
+    +total_entropy_production_kj_k: double
+    +total_exergy_consumed_kj: double
+    +zero_aperture_tx_count: int
+    +lateral_flux_tx_count: int
+    +validator_node_signature: bytea
+    +timestamp: timestamp
+}
+
+class "BlockchainBlockTransaction" as BlockchainBlockTransaction {
+    +block_height: bigint [FK]
+    +transaction_id: UUID [FK]
+    +tx_sequence_index: int
+    +tx_signature: bytea
+    +zero_aperture_witness: boolean
+}
+
+' Relationships & Associations
+H3HierarchicalCell "1" <-- "0..*" H3HierarchicalCell : parent_child
+H3HierarchicalCell "1" <-- "0..*" H3TraversalPath : origin
+H3HierarchicalCell "1" <-- "0..*" H3TraversalPath : target
+H3TraversalPath "1" <-- "0..*" SpatialMonadFluxTransaction : traverses_via
+
+H3HierarchicalCell "1" <-- "0..*" ThermodynamicMonadStock : maintains_stocks
+ThermodynamicMonadStock "1" <-- "0..*" SpatialFluxMonad : wraps_state
+
+SpatialMonadFluxTransaction "1" <-- "0..*" BlockchainBlockTransaction : committed_in
+BlockchainLedgerBlock "1" *-- "1..*" BlockchainBlockTransaction : aggregates
+
+H3Adjacency ..> H3TraversalPath : validates_digit_sequence
+SpatialFluxMonad ..> SpatialMonadFluxTransaction : synthesizes_flux
+
+note right of H3Adjacency::hasZeroApertureSequence
+  RFC-088 Invariant:
+  Phi_zero(d) <=> forall i in [1..m], d_i == 0
+  Empty sequence returns true (vacuous truth).
+  If true, J_lateral = 0 and centroid
+  coordinates are preserved across aperture zoom.
+end note
+
+note bottom of SpatialMonadFluxTransaction
+  Conservation Constraint:
+  has_zero_aperture_invariance == true 
+    ==> lateral_flux_tensor == 0.0
+  (Concentric column adiabatic/isolated boundary)
+end note
+
+@enduml
