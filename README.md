@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 43%
-SPRINT_GOAL: Implement isPurePentagonResolutionIndex checking if pentagonal cell retains base cell orientation without aperture rotation in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 44%
+SPRINT_GOAL: Implement getApertureClassForResolution returning 'CLASS_II' for even resolutions and 'CLASS_III' for odd resolutions in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -276,7 +276,8 @@ SPRINT_GOAL: Implement isPurePentagonResolutionIndex checking if pentagonal cell
 - [x] Implement `determinePentagonBaseCellMissingDirection` mapping icosahedral base cell to omitted direction in `src/spatial/h3_adjacency.ts`
 - [x] Implement `hasZeroApertureSequence` testing whether an array of directional digits contains exclusively center direction (0) digits in `src/spatial/h3_adjacency.ts`
 - [x] Implement `hasNonZeroApertureDigits` predicate checking whether any directional digit in active resolution tiers is non-zero in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `isPurePentagonResolutionIndex` checking if pentagonal cell retains base cell orientation without aperture rotation in `src/spatial/h3_adjacency.ts`
+- [x] Implement `isPurePentagonResolutionIndex` checking if pentagonal cell retains base cell orientation without aperture rotation in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `getApertureClassForResolution` returning 'CLASS_II' for even resolutions and 'CLASS_III' for odd resolutions in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `getApertureRotationSequence` determining class II vs class III aperture orientation per resolution tier in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `buildPentagonalDirectionalTopology` returning PentagonDirectionalTopology with present and omitted directions in `src/spatial/h3_adjacency.ts`

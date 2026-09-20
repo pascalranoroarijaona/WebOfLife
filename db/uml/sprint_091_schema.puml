@@ -1,0 +1,140 @@
+```Code snippet
+@startuml sprint_091_schema
+!theme plain
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "JetBrains Mono", "Courier New", monospace
+skinparam monochrome false
+
+title Gaia Web of Life - Sprint 091: H3 Aperture Classification & Hexagonal Orientation Architecture
+
+enum H3ApertureClass {
+  CLASS_II
+  CLASS_III
+}
+
+enum StockCarrierType {
+  CARBON
+  NITROGEN
+  WATER
+  PHOSPHORUS
+  EXERGY
+}
+
+interface IH3ResolutionApertureInfo {
+  +resolution: number
+  +apertureClass: H3ApertureClass
+  +rotationAngleDegrees: number
+  +isRotated: boolean
+}
+
+abstract class SpatialAdjacencyGraph {
+  {abstract} +getNeighbors(index: string): string[]
+  {abstract} +getDirectedEdges(index: string): any[]
+}
+
+class H3AdjacencyGraph {
+  +getNeighbors(index: string): string[]
+  +getDirectedEdges(index: string): DirectedEdge[]
+  +getResolutionApertureClass(resolution: number): H3ApertureClass
+  +computeBoundaryNormal(edgeIndex: number, res: number): Vector2D
+}
+
+class ApertureDynamics <<Utility>> {
+  +getApertureClassForResolution(res: number): H3ApertureClass
+  +getRotationAngle(res: number): number
+  +getFaceNormalVector(edgeIndex: number, res: number): Vector2D
+}
+
+class ThermodynamicStockMonad<M> {
+  -cellIndex: string
+  -carrier: StockCarrierType
+  -stockAmountMol: number
+  -temperatureKelvin: number
+  -entropyJperK: number
+  +bind<N>(f: (val: M) => ThermodynamicStockMonad<N>): ThermodynamicStockMonad<N>
+  +applyDiffusion(flux: BoundaryFluxTransaction): ThermodynamicStockMonad<M>
+  +verifyConservation(): boolean
+}
+
+class BoundaryFluxTransaction {
+  +fluxId: string
+  +originH3: string
+  +destinationH3: string
+  +carrier: StockCarrierType
+  +apertureClass: H3ApertureClass
+  +fluxMagnitudeMol: number
+  +projectionCosFactor: number
+  +effectiveFluxMol: number
+  +entropyGenerationRate: number
+  +computeEffectiveFlux(): number
+}
+
+class H3Cell {
+  +h3Index: bigint
+  +hexIndexHex: string
+  +resolution: number
+  +centroidLat: number
+  +centroidLon: number
+  +normalAzimuthRad: number
+  +getApertureClass(): H3ApertureClass
+}
+
+class BlockchainBlock {
+  +height: bigint
+  +blockHash: string
+  +parentHash: string
+  +apertureAuditRoot: string
+  +stateMerkleRoot: string
+  +fluxMerkleRoot: string
+  +totalCarbonStockMol: number
+  +totalEntropyGenerated: number
+  +verifyBlockPhysics(): boolean
+}
+
+class StateTransitionReceipt {
+  +receiptId: bigint
+  +blockHeight: bigint
+  +cellIndex: string
+  +carrier: StockCarrierType
+  +deltaStockMol: number
+  +inboundFluxSumMol: number
+  +outboundFluxSumMol: number
+  +sourceSinkReactionMol: number
+  +assertConservation(): void
+}
+
+' Relationships & Dependencies
+SpatialAdjacencyGraph <|-- H3AdjacencyGraph
+H3AdjacencyGraph ..> ApertureDynamics : delegates to
+ApertureDynamics ..> H3ApertureClass : produces
+ApertureDynamics ..> IH3ResolutionApertureInfo : creates
+H3Cell --> H3ApertureClass : typed by
+H3Cell "1" *-- "many" ThermodynamicStockMonad : contains
+H3AdjacencyGraph "1" o-- "many" BoundaryFluxTransaction : calculates
+
+BoundaryFluxTransaction --> H3ApertureClass : incorporates rotation
+BoundaryFluxTransaction --> StockCarrierType : transports
+ThermodynamicStockMonad --> StockCarrierType : tracks
+
+BlockchainBlock "1" *-- "many" BoundaryFluxTransaction : commits
+BlockchainBlock "1" *-- "many" StateTransitionReceipt : verifies
+
+StateTransitionReceipt --> StockCarrierType : audits
+
+note right of ApertureDynamics
+  <b>RFC-091 Invariant Formula:</b>
+  res % 2 == 0 => CLASS_II (θ = 0°)
+  res % 2 == 1 => CLASS_III (θ ≈ 19.1063°)
+  Enforces face-normal rotation:
+  n_k(r) = R((r % 2) * α) * n_k(0)
+end note
+
+note bottom of StateTransitionReceipt
+  <b>First Law of Thermodynamics:</b>
+  ΔM = ∑ J_in - ∑ J_out + S
+  <b>Second Law of Thermodynamics:</b>
+  ΔS_universe >= 0
+end note
+
+@enduml

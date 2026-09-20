@@ -1,5 +1,5 @@
 {
-  "current_sprint": 91,
+  "current_sprint": 92,
   "completed_sprints": [
     {
       "sprint": 1,
@@ -450,6 +450,11 @@
       "sprint": 90,
       "goal": "Implement isPurePentagonResolutionIndex checking if pentagonal cell retains base cell orientation without aperture rotation in src/spatial/h3_adjacency.ts.",
       "timestamp": "2026-09-20T04:13:41.511669+00:00"
+    },
+    {
+      "sprint": 91,
+      "goal": "Implement getApertureClassForResolution returning 'CLASS_II' for even resolutions and 'CLASS_III' for odd resolutions in src/spatial/h3_adjacency.ts.",
+      "timestamp": "2026-09-20T05:03:56.779639+00:00"
     }
   ]
 }

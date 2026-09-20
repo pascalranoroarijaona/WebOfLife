@@ -1,159 +1,196 @@
--- Web of Life Thermodynamic Blockchain Schema
--- Sprint 090: Pure Pentagon Resolution Index & Aperture Orientation Invariance Engine
--- Governance: First Law (Mass-Energy Conservation) & Second Law (Non-Negative Entropy Production)
+-- ============================================================================
+-- Gaia Web of Life - Spatial-Thermodynamic Blockchain & DGGS Schema
+-- Sprint 091: H3 Aperture Classification & Hexagonal Orientation Dynamics
+-- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable PostGIS & Cryptographic extensions if supported
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Enumerations for Spatial Topology & Aperture Symmetry Classes
+-- ----------------------------------------------------------------------------
+-- 1. Enumerations and Custom Domain Types
+-- ----------------------------------------------------------------------------
+
 DO $$ BEGIN
-    CREATE TYPE aperture_class_enum AS ENUM (
-        'CLASS_II_UNROTATED', -- Even resolutions (r % 2 == 0), net aperture rotation = 0 rad
-        'CLASS_III_ROTATED'   -- Odd resolutions (r % 2 == 1), net aperture rotation = ±arcsin(sqrt(3)/(2*sqrt(7)))
+    CREATE TYPE h3_aperture_class AS ENUM ('CLASS_II', 'CLASS_III');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE stock_carrier_type AS ENUM (
+        'CARBON',
+        'NITROGEN',
+        'WATER',
+        'PHOSPHORUS',
+        'EXERGY'
     );
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE cell_topology_enum AS ENUM (
-        'HEXAGON',
-        'PENTAGON_SINGULARITY'
+    CREATE TYPE flux_directionality AS ENUM (
+        'ISOTROPIC_DIFFUSION',
+        'ANISOTROPIC_ADVECTION',
+        'NORMAL_SURFACE_TRANSPORT'
     );
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
-DO $$ BEGIN
-    CREATE TYPE thermodynamic_flux_type AS ENUM (
-        'MASS_DIFFUSIVE',
-        'ENTHALPY_ADVECTIVE',
-        'VORTICITY_CORRECTED',
-        'ISOTROPIC_ISOTHERMAL'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- ----------------------------------------------------------------------------
+-- 2. DGGS Resolution Aperture Hierarchy
+-- ----------------------------------------------------------------------------
 
--- 1. Discrete Global Grid System (DGGS) Cell Registry
-CREATE TABLE IF NOT EXISTS h3_spatial_cells (
-    cell_index BIGINT PRIMARY KEY,
-    hex_string VARCHAR(16) NOT NULL UNIQUE,
-    resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
-    base_cell_id SMALLINT NOT NULL CHECK (base_cell_id BETWEEN 0 AND 121),
-    topology cell_topology_enum NOT NULL,
-    aperture_class aperture_class_enum NOT NULL,
-    net_aperture_rotation_rad NUMERIC(12, 10) NOT NULL DEFAULT 0.0000000000,
-    is_pure_pentagon BOOLEAN GENERATED ALWAYS AS (
-        (topology = 'PENTAGON_SINGULARITY') AND (resolution % 2 = 0)
-    ) STORED,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_h3_spatial_cells_pure_pentagon 
-    ON h3_spatial_cells (is_pure_pentagon) WHERE is_pure_pentagon = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_h3_spatial_cells_res_topology 
-    ON h3_spatial_cells (resolution, topology);
-
--- 2. Base Cell Topological Invariants (12 Pentagons of icosahedral vertices)
-CREATE TABLE IF NOT EXISTS h3_base_cell_topology (
-    base_cell_id SMALLINT PRIMARY KEY CHECK (base_cell_id BETWEEN 0 AND 121),
-    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
-    meridian_angle_rad NUMERIC(12, 10) NOT NULL,
-    icosahedron_vertex_id SMALLINT CHECK (icosahedron_vertex_id BETWEEN 0 AND 11),
-    CONSTRAINT chk_base_cell_pentagon_vertices CHECK (
-        (is_pentagon = TRUE AND base_cell_id IN (4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117) AND icosahedron_vertex_id IS NOT NULL) OR
-        (is_pentagon = FALSE AND icosahedron_vertex_id IS NULL)
+CREATE TABLE IF NOT EXISTS dggs_resolution_apertures (
+    resolution SMALLINT PRIMARY KEY,
+    aperture_class h3_aperture_class NOT NULL,
+    rotation_angle_degrees NUMERIC(9, 6) NOT NULL,
+    is_rotated BOOLEAN NOT NULL,
+    area_scaling_factor NUMERIC(24, 12) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_h3_resolution_bounds CHECK (resolution >= 0 AND resolution <= 15),
+    CONSTRAINT chk_aperture_parity CHECK (
+        (resolution % 2 = 0 AND aperture_class = 'CLASS_II' AND rotation_angle_degrees = 0.000000 AND is_rotated = FALSE) OR
+        (resolution % 2 = 1 AND aperture_class = 'CLASS_III' AND rotation_angle_degrees = 19.106262 AND is_rotated = TRUE)
     )
 );
 
--- Seed base cell pentagon singularities if not existing
-INSERT INTO h3_base_cell_topology (base_cell_id, is_pentagon, meridian_angle_rad, icosahedron_vertex_id)
-VALUES 
-    (4,   TRUE, 0.0000000000, 0),
-    (14,  TRUE, 0.6283185307, 1),
-    (24,  TRUE, 1.2566370614, 2),
-    (38,  TRUE, 1.8849555922, 3),
-    (49,  TRUE, 2.5132741229, 4),
-    (58,  TRUE, 3.1415926536, 5),
-    (63,  TRUE, 3.7699111843, 6),
-    (72,  TRUE, 4.3982297150, 7),
-    (83,  TRUE, 5.0265482457, 8),
-    (97,  TRUE, 5.6548667765, 9),
-    (107, TRUE, 6.2831853072, 10),
-    (117, TRUE, 0.0000000000, 11)
-ON CONFLICT (base_cell_id) DO NOTHING;
+-- Seed static resolution records from Resolution 0 to 15
+INSERT INTO dggs_resolution_apertures (resolution, aperture_class, rotation_angle_degrees, is_rotated, area_scaling_factor)
+SELECT
+    r,
+    CASE WHEN (r % 2 = 0) THEN 'CLASS_II'::h3_aperture_class ELSE 'CLASS_III'::h3_aperture_class END,
+    CASE WHEN (r % 2 = 0) THEN 0.000000 ELSE 19.106262 END,
+    CASE WHEN (r % 2 = 0) THEN FALSE ELSE TRUE END,
+    POWER(7.0::numeric, (-1 * r)::numeric)
+FROM generate_series(0, 15) AS r
+ON CONFLICT (resolution) DO UPDATE SET
+    aperture_class = EXCLUDED.aperture_class,
+    rotation_angle_degrees = EXCLUDED.rotation_angle_degrees,
+    is_rotated = EXCLUDED.is_rotated,
+    area_scaling_factor = EXCLUDED.area_scaling_factor;
 
--- 3. Cell Thermodynamic Stock States (Monadic Conservation Targets)
-CREATE TABLE IF NOT EXISTS h3_thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    cell_index BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
-    block_height BIGINT NOT NULL,
-    epoch_timestamp TIMESTAMPTZ NOT NULL,
-    mass_kg NUMERIC(24, 8) NOT NULL CHECK (mass_kg >= 0),
-    internal_energy_j NUMERIC(28, 8) NOT NULL CHECK (internal_energy_j >= 0),
-    enthalpy_j NUMERIC(28, 8) NOT NULL,
-    entropy_j_per_k NUMERIC(24, 8) NOT NULL CHECK (entropy_j_per_k >= 0),
-    temperature_k NUMERIC(10, 4) NOT NULL CHECK (temperature_k > 0),
-    spurious_vorticity_curl NUMERIC(16, 12) NOT NULL DEFAULT 0.000000000000,
-    CONSTRAINT chk_stock_vorticity_at_pure_pentagon CHECK (
-        -- Pure pentagons require pristine vorticity = 0 (no numerical curl)
-        spurious_vorticity_curl = 0.000000000000 OR spurious_vorticity_curl BETWEEN -1e-12 AND 1e-12
-    ),
-    CONSTRAINT uq_cell_epoch_stock UNIQUE (cell_index, block_height)
+-- ----------------------------------------------------------------------------
+-- 3. H3 Spatial Hexagonal Cells & Geometric Alignments
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS h3_cells (
+    h3_index BIGINT PRIMARY KEY,
+    hex_index_hex VARCHAR(16) NOT NULL UNIQUE,
+    resolution SMALLINT NOT NULL REFERENCES dggs_resolution_apertures(resolution),
+    centroid_lat NUMERIC(10, 7) NOT NULL,
+    centroid_lon NUMERIC(10, 7) NOT NULL,
+    normal_azimuth_rad NUMERIC(10, 8) NOT NULL,
+    elevation_m NUMERIC(8, 2) NOT NULL DEFAULT 0.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_lat_range CHECK (centroid_lat >= -90.0 AND centroid_lat <= 90.0),
+    CONSTRAINT chk_lon_range CHECK (centroid_lon >= -180.0 AND centroid_lon <= 180.0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_thermo_stocks_cell_epoch 
-    ON h3_thermodynamic_stocks (cell_index, epoch_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_h3_cells_res_coord ON h3_cells(resolution, centroid_lat, centroid_lon);
 
--- 4. Spatial Flux Ledgers (Inter-Cell Finite Volume Boundary Transfers)
-CREATE TABLE IF NOT EXISTS h3_spatial_flux_ledgers (
-    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT NOT NULL,
-    source_cell BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
-    target_cell BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
-    boundary_edge_index SMALLINT NOT NULL CHECK (boundary_edge_index BETWEEN 0 AND 5),
-    flux_type thermodynamic_flux_type NOT NULL,
-    aperture_correction_applied BOOLEAN NOT NULL,
-    rotation_correction_rad NUMERIC(12, 10) NOT NULL DEFAULT 0.0000000000,
-    mass_flux_kg_per_sec NUMERIC(24, 8) NOT NULL,
-    enthalpy_flux_w NUMERIC(28, 8) NOT NULL,
-    entropy_production_w_per_k NUMERIC(24, 8) NOT NULL CHECK (entropy_production_w_per_k >= -1e-14), -- Second Law: Delta S >= 0
-    tx_hash VARCHAR(64) NOT NULL,
-    CONSTRAINT chk_pure_pentagon_no_rotation_correction CHECK (
-        (aperture_correction_applied = FALSE AND rotation_correction_rad = 0.0000000000) OR
-        (aperture_correction_applied = TRUE AND rotation_correction_rad != 0.0000000000)
-    )
+-- ----------------------------------------------------------------------------
+-- 4. Directed Adjacency Graph & Face-Normal Boundary Metric
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS h3_directed_adjacency_edges (
+    edge_id BIGSERIAL PRIMARY KEY,
+    origin_h3 BIGINT NOT NULL REFERENCES h3_cells(h3_index),
+    destination_h3 BIGINT NOT NULL REFERENCES h3_cells(h3_index),
+    resolution SMALLINT NOT NULL REFERENCES dggs_resolution_apertures(resolution),
+    aperture_class h3_aperture_class NOT NULL,
+    edge_index_boundary SMALLINT NOT NULL, -- Hex face normal: 0 through 5
+    face_normal_theta_rad NUMERIC(10, 8) NOT NULL,
+    face_length_meters NUMERIC(12, 4) NOT NULL,
+    conductance_coefficient NUMERIC(12, 6) NOT NULL DEFAULT 1.000000,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_edge_origin_dest UNIQUE (origin_h3, destination_h3),
+    CONSTRAINT chk_edge_index_bounds CHECK (edge_index_boundary >= 0 AND edge_index_boundary <= 5)
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_spatial_flux_src_dst 
-    ON h3_spatial_flux_ledgers (source_cell, target_cell, block_height);
+CREATE INDEX IF NOT EXISTS idx_adj_origin ON h3_directed_adjacency_edges(origin_h3);
+CREATE INDEX IF NOT EXISTS idx_adj_destination ON h3_directed_adjacency_edges(destination_h3);
+CREATE INDEX IF NOT EXISTS idx_adj_resolution_aperture ON h3_directed_adjacency_edges(resolution, aperture_class);
 
--- 5. Blockchain Block Headers & Singularity Invariance Proofs
-CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
-    block_height BIGINT PRIMARY KEY,
-    previous_block_hash VARCHAR(64) NOT NULL,
+-- ----------------------------------------------------------------------------
+-- 5. Conserved Thermodynamic Stocks (State Monad Storage)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS cell_thermodynamic_stocks (
+    stock_id BIGSERIAL PRIMARY KEY,
+    h3_index BIGINT NOT NULL REFERENCES h3_cells(h3_index),
+    carrier stock_carrier_type NOT NULL,
+    amount_mol NUMERIC(28, 10) NOT NULL,
+    temperature_kelvin NUMERIC(10, 4) NOT NULL DEFAULT 298.1500,
+    chemical_potential_j_per_mol NUMERIC(16, 6) NOT NULL DEFAULT 0.0,
+    entropy_j_per_kelvin NUMERIC(24, 8) NOT NULL,
+    last_block_height BIGINT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_cell_carrier UNIQUE (h3_index, carrier),
+    CONSTRAINT chk_amount_non_negative CHECK (amount_mol >= 0.0),
+    CONSTRAINT chk_abs_zero CHECK (temperature_kelvin > 0.0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stocks_h3_carrier ON cell_thermodynamic_stocks(h3_index, carrier);
+
+-- ----------------------------------------------------------------------------
+-- 6. Thermodynamic Flux Transactions across Oriented Hexagonal Boundaries
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS boundary_flux_transactions (
+    flux_id BIGSERIAL PRIMARY KEY,
+    block_height BIGINT NOT NULL,
+    edge_id BIGINT NOT NULL REFERENCES h3_directed_adjacency_edges(edge_id),
+    carrier stock_carrier_type NOT NULL,
+    aperture_class h3_aperture_class NOT NULL,
+    flux_magnitude_mol NUMERIC(24, 10) NOT NULL,
+    advective_velocity_m_per_s NUMERIC(12, 6) NOT NULL DEFAULT 0.0,
+    projection_cos_factor NUMERIC(8, 6) NOT NULL, -- cos(face_normal_theta - flow_direction)
+    effective_flux_mol NUMERIC(24, 10) GENERATED ALWAYS AS (flux_magnitude_mol * projection_cos_factor) STORED,
+    entropy_generation_rate_j_per_k NUMERIC(20, 8) NOT NULL,
+    transaction_signature VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_entropy_non_negative CHECK (entropy_generation_rate_j_per_k >= 0.0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_flux_block_height ON boundary_flux_transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_flux_edge_id ON boundary_flux_transactions(edge_id);
+
+-- ----------------------------------------------------------------------------
+-- 7. Blockchain Consensus Blocks & Ledger State Merkle Proofs
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS blockchain_blocks (
+    height BIGINT PRIMARY KEY,
     block_hash VARCHAR(64) NOT NULL UNIQUE,
+    parent_hash VARCHAR(64) NOT NULL,
+    aperture_audit_root VARCHAR(64) NOT NULL,
     state_merkle_root VARCHAR(64) NOT NULL,
-    pure_pentagon_invariant_root VARCHAR(64) NOT NULL,
-    total_entropy_production_w_per_k NUMERIC(28, 8) NOT NULL CHECK (total_entropy_production_w_per_k >= 0),
-    total_energy_drift_j NUMERIC(28, 8) NOT NULL CHECK (total_energy_drift_j BETWEEN -1e-8 AND 1e-8), -- First Law
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    flux_merkle_root VARCHAR(64) NOT NULL,
+    total_carbon_stock_mol NUMERIC(36, 10) NOT NULL,
+    total_entropy_generated_j_k NUMERIC(32, 8) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    nonce BIGINT NOT NULL,
+    CONSTRAINT chk_block_height_pos CHECK (height >= 0)
 );
 
--- 6. Singularity Verification Proof Records
-CREATE TABLE IF NOT EXISTS pure_pentagon_invariance_proofs (
-    proof_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height),
-    cell_index BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
-    resolution SMALLINT NOT NULL CHECK (resolution % 2 = 0),
-    adjacent_directional_count SMALLINT NOT NULL CHECK (adjacent_directional_count = 5),
-    net_aperture_rotation NUMERIC(12, 10) NOT NULL CHECK (net_aperture_rotation = 0.0000000000),
-    boundary_mass_residual_kg NUMERIC(24, 14) NOT NULL CHECK (boundary_mass_residual_kg BETWEEN -1e-14 AND 1e-14),
-    boundary_enthalpy_residual_w NUMERIC(24, 14) NOT NULL CHECK (boundary_enthalpy_residual_w BETWEEN -1e-14 AND 1e-14),
-    cryptographic_sig VARCHAR(128) NOT NULL,
-    verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS stock_state_transition_receipts (
+    receipt_id BIGSERIAL PRIMARY KEY,
+    block_height BIGINT NOT NULL REFERENCES blockchain_blocks(height),
+    h3_index BIGINT NOT NULL REFERENCES h3_cells(h3_index),
+    carrier stock_carrier_type NOT NULL,
+    delta_stock_mol NUMERIC(28, 10) NOT NULL,
+    delta_entropy_j_k NUMERIC(24, 8) NOT NULL,
+    inbound_flux_sum_mol NUMERIC(28, 10) NOT NULL,
+    outbound_flux_sum_mol NUMERIC(28, 10) NOT NULL,
+    source_sink_reaction_mol NUMERIC(28, 10) NOT NULL,
+    state_proof_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Invariant: First Law conservation (delta_M = inbound - outbound + source/sink)
+    CONSTRAINT chk_first_law_conservation CHECK (
+        ROUND(delta_stock_mol, 8) = ROUND((inbound_flux_sum_mol - outbound_flux_sum_mol + source_sink_reaction_mol), 8)
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_proofs_block_cell 
-    ON pure_pentagon_invariance_proofs (block_height, cell_index);
+CREATE INDEX IF NOT EXISTS idx_receipts_block_h3 ON stock_state_transition_receipts(block_height, h3_index);
