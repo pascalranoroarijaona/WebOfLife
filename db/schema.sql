@@ -1,237 +1,255 @@
--- ============================================================================
--- Web of Life: Planetary Simulation Engine & Thermodynamic Blockchain Schema
--- Sprint 092: Spatial Aperture Resolution Boundary Enforcement ([0, 15] DGGS)
--- ============================================================================
+-- Web of Life: Planetary Scale Thermodynamic Ledger & Spatial DGGS Schema
+-- Sprint 093: Aperture Rotation Sequence Resolution for H3 Hierarchical Tessellation
+-- Standard ISO-SQL / PostgreSQL 15+ compatible with TimescaleDB & PostGIS hooks
 
--- Extensions for cryptographic proofs and time-series spatial analysis
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ----------------------------------------------------------------------------
--- Domain Types & Enumerations
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 1. ENUMERATIONS & DOMAIN DEFINITIONS
+-- ============================================================================
 
--- Strict aperture resolution domain enforcing H3 integer aperture levels [0, 15]
 DO $$ BEGIN
-    CREATE DOMAIN h3_aperture_resolution AS SMALLINT
+    CREATE TYPE aperture_class_enum AS ENUM ('CLASS_II', 'CLASS_III');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE thermodynamic_flux_carrier_enum AS ENUM (
+        'BIOMASS',
+        'LIQUID_WATER',
+        'WATER_VAPOR',
+        'SENSIBLE_HEAT',
+        'LATENT_HEAT',
+        'DISSOLVED_NUTRIENT',
+        'ENTROPY_DISSIPATION'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE spatial_parity_status_enum AS ENUM (
+        'PARITY_ALIGNED',
+        'ROTATION_TRANSFORMED',
+        'CROSS_RESOLUTION_PROJECTED'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Domain for discrete H3 resolutions [0, 15]
+CREATE DOMAIN h3_resolution_level AS SMALLINT
     CHECK (VALUE >= 0 AND VALUE <= 15);
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
 
--- Thermodynamic Stock Classification
-DO $$ BEGIN
-    CREATE TYPE thermodynamic_stock_type AS ENUM (
-        'THERMAL_HEAT',      -- Sensible and latent heat energy (Joules)
-        'HYDROLOGICAL_MASS', -- Liquid, vapor, and ice water mass (kg)
-        'CARBON_MASS',       -- Organic and inorganic carbon (kg C)
-        'NITROGEN_MASS',     -- Reactive nitrogen species (kg N)
-        'TROPHIC_BIOMASS'    -- Phytoplankton/terrestrial biomass dry weight (kg)
-    );
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+-- Domain for non-negative mass/energy quantities
+CREATE DOMAIN non_negative_double AS DOUBLE PRECISION
+    CHECK (VALUE >= 0.0);
 
--- Spatial Adjacency Topological Stencil Status
-DO $$ BEGIN
-    CREATE TYPE stencil_topological_state AS ENUM (
-        'PRISTINE',
-        'SYMMETRIC_POSITIVE_SEMIDEFINITE',
-        'DEGENERATE',
-        'REBALANCED'
-    );
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+-- ============================================================================
+-- 2. H3 APERTURE REFERENCE & RESOLUTION LOOKUP
+-- ============================================================================
 
--- ----------------------------------------------------------------------------
--- 1. Spatial Tessellation & DGGS Topology Register
--- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS dggs_aperture_resolutions (
-    resolution h3_aperture_resolution PRIMARY KEY,
-    characteristic_spacing_m DOUBLE PRECISION NOT NULL,
-    average_area_m2 DOUBLE PRECISION NOT NULL,
-    dilation_factor DOUBLE PRECISION NOT NULL DEFAULT 7.0,
-    theoretical_cell_count BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_aperture_scaling CHECK (average_area_m2 > 0 AND characteristic_spacing_m > 0)
+CREATE TABLE IF NOT EXISTS dggs_aperture_resolution_ref (
+    resolution h3_resolution_level PRIMARY KEY,
+    aperture_class aperture_class_enum NOT NULL,
+    cumulative_rotation_deg DOUBLE PRECISION NOT NULL,
+    rotation_offset_rad DOUBLE PRECISION NOT NULL,
+    scaling_ratio DOUBLE PRECISION NOT NULL DEFAULT 7.0,
+    nominal_area_km2 DOUBLE PRECISION NOT NULL,
+    is_class_ii BOOLEAN GENERATED ALWAYS AS (aperture_class = 'CLASS_II') STORED,
+    is_class_iii BOOLEAN GENERATED ALWAYS AS (aperture_class = 'CLASS_III') STORED,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
--- Seed H3 Discrete Hierarchical Levels 0 through 15
-INSERT INTO dggs_aperture_resolutions (resolution, characteristic_spacing_m, average_area_m2, dilation_factor, theoretical_cell_count)
-VALUES
-    (0,  1107712.59, 4357449416078.0, 7.0, 122),
-    (1,  418676.01,  608207059440.0,  7.0, 842),
-    (2,  158244.75,  86886722777.0,   7.0, 5882),
-    (3,  59810.87,   12412388968.0,   7.0, 41162),
-    (4,  22606.38,   1773198424.0,    7.0, 288122),
-    (5,  8544.47,    253314060.6,     7.0, 2016842),
-    (6,  3229.48,    36187722.94,     7.0, 14117882),
-    (7,  1220.63,    5169674.71,      7.0, 98825162),
-    (8,  461.35,     738524.96,       7.0, 691776122),
-    (9,  174.37,     105503.57,       7.0, 4842432842),
-    (10, 65.91,      15071.94,        7.0, 33897029882),
-    (11, 24.91,      2153.13,         7.0, 237279209162),
-    (12, 9.41,       307.59,          7.0, 1660954464122),
-    (13, 3.56,       43.94,           7.0, 11626681248842),
-    (14, 1.35,       6.28,            7.0, 81386768741882),
-    (15, 0.51,       0.90,            7.0, 569707381193162)
-ON CONFLICT (resolution) DO UPDATE
-SET characteristic_spacing_m = EXCLUDED.characteristic_spacing_m,
-    average_area_m2 = EXCLUDED.average_area_m2;
+-- Pre-seed deterministic resolutions [0, 15] conforming to RFC-093
+INSERT INTO dggs_aperture_resolution_ref (
+    resolution, aperture_class, cumulative_rotation_deg, rotation_offset_rad, nominal_area_km2
+) VALUES
+    (0,  'CLASS_II',   0.0000000000,  0.000000000000000, 4357449.416078383),
+    (1,  'CLASS_III', 19.1066053509,  0.333473172224027,  609788.441835441),
+    (2,  'CLASS_II',   0.0000000000,  0.000000000000000,   86801.780345479),
+    (3,  'CLASS_III', 19.1066053509,  0.333473172224027,   12393.939055462),
+    (4,  'CLASS_II',   0.0000000000,  0.000000000000000,    1770.386981881),
+    (5,  'CLASS_III', 19.1066053509,  0.333473172224027,     252.906979685),
+    (6,  'CLASS_II',   0.0000000000,  0.000000000000000,      36.129462529),
+    (7,  'CLASS_III', 19.1066053509,  0.333473172224027,       5.161343714),
+    (8,  'CLASS_II',   0.0000000000,  0.000000000000000,       0.737334778),
+    (9,  'CLASS_III', 19.1066053509,  0.333473172224027,       0.105333539),
+    (10, 'CLASS_II',   0.0000000000,  0.000000000000000,       0.015047648),
+    (11, 'CLASS_III', 19.1066053509,  0.333473172224027,       0.002149664),
+    (12, 'CLASS_II',   0.0000000000,  0.000000000000000,       0.000307095),
+    (13, 'CLASS_III', 19.1066053509,  0.333473172224027,       0.000043871),
+    (14, 'CLASS_II',   0.0000000000,  0.000000000000000,       0.000006267),
+    (15, 'CLASS_III', 19.1066053509,  0.333473172224027,       0.000000895)
+ON CONFLICT (resolution) DO UPDATE SET
+    aperture_class = EXCLUDED.aperture_class,
+    cumulative_rotation_deg = EXCLUDED.cumulative_rotation_deg,
+    rotation_offset_rad = EXCLUDED.rotation_offset_rad;
 
-CREATE TABLE IF NOT EXISTS spatial_h3_cells (
-    cell_index VARCHAR(16) PRIMARY KEY,
-    resolution h3_aperture_resolution NOT NULL,
-    parent_index VARCHAR(16),
-    centroid_lat DOUBLE PRECISION NOT NULL,
-    centroid_lon DOUBLE PRECISION NOT NULL,
-    boundary_wkt TEXT NOT NULL,
-    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_h3_hex_length CHECK (length(cell_index) BETWEEN 15 AND 16),
-    CONSTRAINT fk_cell_resolution FOREIGN KEY (resolution) REFERENCES dggs_aperture_resolutions (resolution),
-    CONSTRAINT chk_lat_bounds CHECK (centroid_lat >= -90.0 AND centroid_lat <= 90.0),
-    CONSTRAINT chk_lon_bounds CHECK (centroid_lon >= -180.0 AND centroid_lon <= 180.0)
+-- ============================================================================
+-- 3. H3 SPATIAL MONAD CELL REGISTRY
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS spatial_monad_cells (
+    h3_index BIGINT PRIMARY KEY,
+    resolution h3_resolution_level NOT NULL,
+    base_cell_num SMALLINT NOT NULL CHECK (base_cell_num >= 0 AND base_cell_num <= 121),
+    aperture_class aperture_class_enum NOT NULL,
+    aperture_sequence aperture_class_enum[] NOT NULL,
+    sequence_hash CHAR(64) NOT NULL,
+    centroid_geom GEOMETRY(Point, 4326),
+    boundary_geom GEOMETRY(Polygon, 4326),
+    current_state_root CHAR(64) NOT NULL,
+    last_block_height BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT fk_monad_cell_resolution FOREIGN KEY (resolution)
+        REFERENCES dggs_aperture_resolution_ref (resolution)
 );
 
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_res ON spatial_h3_cells (resolution);
-CREATE INDEX IF NOT EXISTS idx_spatial_h3_parent ON spatial_h3_cells (parent_index);
+CREATE INDEX IF NOT EXISTS idx_spatial_monad_cells_res ON spatial_monad_cells(resolution);
+CREATE INDEX IF NOT EXISTS idx_spatial_monad_cells_class ON spatial_monad_cells(aperture_class);
+CREATE INDEX IF NOT EXISTS idx_spatial_monad_cells_geom ON spatial_monad_cells USING GIST (boundary_geom);
 
--- ----------------------------------------------------------------------------
--- 2. Hexagonal Adjacency Graph & Laplacian Conductance Stencils
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 4. THERMODYNAMIC STATE STOCKS
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS spatial_adjacency_matrices (
-    matrix_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    resolution h3_aperture_resolution NOT NULL,
-    epoch_timestamp TIMESTAMPTZ NOT NULL,
-    cell_count INTEGER NOT NULL CHECK (cell_count > 0),
-    stencil_state stencil_topological_state NOT NULL DEFAULT 'SYMMETRIC_POSITIVE_SEMIDEFINITE',
-    matrix_digest_sha256 BYTEA NOT NULL,
-    is_symmetric BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_matrix_resolution FOREIGN KEY (resolution) REFERENCES dggs_aperture_resolutions (resolution)
+CREATE TABLE IF NOT EXISTS monad_thermodynamic_stocks (
+    stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    h3_index BIGINT NOT NULL REFERENCES spatial_monad_cells(h3_index) ON DELETE CASCADE,
+    block_height BIGINT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    mass_dry_biomass_kg non_negative_double NOT NULL DEFAULT 0.0,
+    mass_liquid_water_kg non_negative_double NOT NULL DEFAULT 0.0,
+    mass_water_vapor_kg non_negative_double NOT NULL DEFAULT 0.0,
+    enthalpy_joules DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    entropy_joules_per_kelvin non_negative_double NOT NULL DEFAULT 0.0,
+    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin >= 0.0),
+    pressure_pascals DOUBLE PRECISION NOT NULL CHECK (pressure_pascals >= 0.0),
+    stock_checksum CHAR(64) NOT NULL,
+    CONSTRAINT uq_monad_stock_height UNIQUE (h3_index, block_height)
 );
 
-CREATE TABLE IF NOT EXISTS spatial_adjacency_edges (
-    edge_id BIGSERIAL PRIMARY KEY,
-    matrix_id UUID NOT NULL,
-    resolution h3_aperture_resolution NOT NULL,
-    origin_cell VARCHAR(16) NOT NULL,
-    neighbor_cell VARCHAR(16) NOT NULL,
-    k_ring_distance SMALLINT NOT NULL CHECK (k_ring_distance >= 1),
-    conductance_kappa DOUBLE PRECISION NOT NULL CHECK (conductance_kappa >= 0.0),
-    distance_metric_m DOUBLE PRECISION NOT NULL CHECK (distance_metric_m > 0.0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_edge_matrix FOREIGN KEY (matrix_id) REFERENCES spatial_adjacency_matrices (matrix_id) ON DELETE CASCADE,
-    CONSTRAINT fk_edge_origin FOREIGN KEY (origin_cell) REFERENCES spatial_h3_cells (cell_index),
-    CONSTRAINT fk_edge_neighbor FOREIGN KEY (neighbor_cell) REFERENCES spatial_h3_cells (cell_index),
-    CONSTRAINT uq_origin_neighbor_per_matrix UNIQUE (matrix_id, origin_cell, neighbor_cell)
+CREATE INDEX IF NOT EXISTS idx_thermo_stocks_h3_time ON monad_thermodynamic_stocks(h3_index, timestamp DESC);
+
+-- ============================================================================
+-- 5. CROSS-RESOLUTION & ADJACENCY ROTATION TRANSFORMS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS aperture_flux_rotations (
+    rotation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_resolution h3_resolution_level NOT NULL,
+    target_resolution h3_resolution_level NOT NULL,
+    source_class aperture_class_enum NOT NULL,
+    target_class aperture_class_enum NOT NULL,
+    delta_rotation_rad DOUBLE PRECISION NOT NULL,
+    cos_theta DOUBLE PRECISION NOT NULL,
+    sin_theta DOUBLE PRECISION NOT NULL,
+    parity_status spatial_parity_status_enum NOT NULL,
+    CONSTRAINT fk_rot_src_res FOREIGN KEY (source_resolution) REFERENCES dggs_aperture_resolution_ref(resolution),
+    CONSTRAINT fk_rot_tgt_res FOREIGN KEY (target_resolution) REFERENCES dggs_aperture_resolution_ref(resolution),
+    CONSTRAINT uq_flux_rotation_res UNIQUE (source_resolution, target_resolution)
 );
 
-CREATE INDEX IF NOT EXISTS idx_edges_res_origin ON spatial_adjacency_edges (resolution, origin_cell);
-CREATE INDEX IF NOT EXISTS idx_edges_matrix_pair ON spatial_adjacency_edges (matrix_id, origin_cell, neighbor_cell);
+-- Populate standard rotation lookup for adjacent resolutions
+INSERT INTO aperture_flux_rotations (
+    source_resolution, target_resolution, source_class, target_class,
+    delta_rotation_rad, cos_theta, sin_theta, parity_status
+)
+SELECT 
+    r1.resolution AS source_resolution,
+    r2.resolution AS target_resolution,
+    r1.aperture_class AS source_class,
+    r2.aperture_class AS target_class,
+    (r2.rotation_offset_rad - r1.rotation_offset_rad) AS delta_rotation_rad,
+    COS(r2.rotation_offset_rad - r1.rotation_offset_rad) AS cos_theta,
+    SIN(r2.rotation_offset_rad - r1.rotation_offset_rad) AS sin_theta,
+    CASE 
+        WHEN r1.aperture_class = r2.aperture_class THEN 'PARITY_ALIGNED'::spatial_parity_status_enum
+        ELSE 'ROTATION_TRANSFORMED'::spatial_parity_status_enum
+    END AS parity_status
+FROM dggs_aperture_resolution_ref r1
+CROSS JOIN dggs_aperture_resolution_ref r2
+WHERE ABS(r1.resolution - r2.resolution) <= 1
+ON CONFLICT (source_resolution, target_resolution) DO UPDATE SET
+    delta_rotation_rad = EXCLUDED.delta_rotation_rad,
+    cos_theta = EXCLUDED.cos_theta,
+    sin_theta = EXCLUDED.sin_theta,
+    parity_status = EXCLUDED.parity_status;
 
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Monad Stocks (Mass & Energy Conservation)
--- ----------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS thermodynamic_stocks (
-    stock_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cell_index VARCHAR(16) NOT NULL,
-    resolution h3_aperture_resolution NOT NULL,
-    stock_type thermodynamic_stock_type NOT NULL,
-    current_value DOUBLE PRECISION NOT NULL CHECK (current_value >= 0.0),
-    temperature_kelvin DOUBLE PRECISION NOT NULL CHECK (temperature_kelvin > 0.0),
-    entropy_j_per_k DOUBLE PRECISION NOT NULL,
-    epoch_sequence BIGINT NOT NULL,
-    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_stock_cell FOREIGN KEY (cell_index) REFERENCES spatial_h3_cells (cell_index),
-    CONSTRAINT fk_stock_resolution FOREIGN KEY (resolution) REFERENCES dggs_aperture_resolutions (resolution),
-    CONSTRAINT uq_cell_stock_epoch UNIQUE (cell_index, stock_type, epoch_sequence)
-);
-
-CREATE INDEX IF NOT EXISTS idx_stocks_epoch_res ON thermodynamic_stocks (resolution, epoch_sequence);
-
--- ----------------------------------------------------------------------------
--- 4. Spatial Flux Transactions (First & Second Law Verification)
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 6. DIRECTIONAL SPATIAL FLUX FLOW TRANSACTIONS
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS spatial_flux_transactions (
-    flux_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    resolution h3_aperture_resolution NOT NULL,
-    epoch_sequence BIGINT NOT NULL,
-    source_cell VARCHAR(16) NOT NULL,
-    target_cell VARCHAR(16) NOT NULL,
-    stock_type thermodynamic_stock_type NOT NULL,
+    tx_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL,
+    source_h3_index BIGINT NOT NULL REFERENCES spatial_monad_cells(h3_index),
+    target_h3_index BIGINT NOT NULL REFERENCES spatial_monad_cells(h3_index),
+    source_resolution h3_resolution_level NOT NULL,
+    target_resolution h3_resolution_level NOT NULL,
+    source_aperture_class aperture_class_enum NOT NULL,
+    target_aperture_class aperture_class_enum NOT NULL,
+    carrier_type thermodynamic_flux_carrier_enum NOT NULL,
+    raw_vector_norm DOUBLE PRECISION NOT NULL,
+    transformed_vector_norm DOUBLE PRECISION NOT NULL,
+    flux_vector_x DOUBLE PRECISION NOT NULL,
+    flux_vector_y DOUBLE PRECISION NOT NULL,
     flux_magnitude DOUBLE PRECISION NOT NULL,
-    source_temp_kelvin DOUBLE PRECISION NOT NULL CHECK (source_temp_kelvin > 0.0),
-    target_temp_kelvin DOUBLE PRECISION NOT NULL CHECK (target_temp_kelvin > 0.0),
-    entropy_production_rate DOUBLE PRECISION NOT NULL CHECK (entropy_production_rate >= 0.0),
-    first_law_residual DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_flux_resolution FOREIGN KEY (resolution) REFERENCES dggs_aperture_resolutions (resolution),
-    CONSTRAINT fk_flux_source FOREIGN KEY (source_cell) REFERENCES spatial_h3_cells (cell_index),
-    CONSTRAINT fk_flux_target FOREIGN KEY (target_cell) REFERENCES spatial_h3_cells (cell_index),
-    CONSTRAINT chk_clausius_duhem CHECK (entropy_production_rate >= 0.0)
+    enthalpy_transferred_joules DOUBLE PRECISION NOT NULL,
+    entropy_generated_joules_per_kelvin non_negative_double NOT NULL,
+    norm_conservation_delta DOUBLE PRECISION NOT NULL,
+    tx_signature CHAR(128) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_first_law_flux_norm CHECK (ABS(raw_vector_norm - transformed_vector_norm) <= 1e-9),
+    CONSTRAINT chk_second_law_dissipation CHECK (entropy_generated_joules_per_kelvin >= 0.0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_flux_tx_epoch_res ON spatial_flux_transactions (epoch_sequence, resolution);
+CREATE INDEX IF NOT EXISTS idx_spatial_flux_source ON spatial_flux_transactions(source_h3_index, block_height);
+CREATE INDEX IF NOT EXISTS idx_spatial_flux_target ON spatial_flux_transactions(target_h3_index, block_height);
+CREATE INDEX IF NOT EXISTS idx_spatial_flux_block ON spatial_flux_transactions(block_height);
 
--- ----------------------------------------------------------------------------
--- 5. Blockchain Blocks & Merkle Verification Receipts
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 7. THERMODYNAMIC BLOCKCHAIN LEDGER BLOCKS & PROOFS
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS spatial_blockchain_blocks (
-    block_height BIGSERIAL PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_hash BYTEA NOT NULL,
-    resolution_level h3_aperture_resolution NOT NULL,
-    merkle_root_stocks BYTEA NOT NULL,
-    merkle_root_fluxes BYTEA NOT NULL,
-    thermodynamic_state_hash BYTEA NOT NULL,
-    total_entropy_production DOUBLE PRECISION NOT NULL CHECK (total_entropy_production >= 0.0),
-    first_law_divergence_norm DOUBLE PRECISION NOT NULL CHECK (first_law_divergence_norm < 1e-9),
-    validator_signature BYTEA NOT NULL,
-    timestamp_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_block_resolution FOREIGN KEY (resolution_level) REFERENCES dggs_aperture_resolutions (resolution)
+CREATE TABLE IF NOT EXISTS thermodynamic_spatial_blocks (
+    block_height BIGINT PRIMARY KEY,
+    parent_block_hash CHAR(64) NOT NULL,
+    block_hash CHAR(64) NOT NULL UNIQUE,
+    state_merkle_root CHAR(64) NOT NULL,
+    flux_transactions_root CHAR(64) NOT NULL,
+    aperture_sequence_root CHAR(64) NOT NULL,
+    total_mass_balance_error DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_enthalpy_balance_error DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_entropy_generated DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    validator_node_id VARCHAR(128) NOT NULL,
+    consensus_signature CHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_closed_boundary_mass_balance CHECK (ABS(total_mass_balance_error) <= 1e-6),
+    CONSTRAINT chk_closed_boundary_enthalpy_balance CHECK (ABS(total_enthalpy_balance_error) <= 1e-6),
+    CONSTRAINT chk_non_negative_global_entropy CHECK (total_entropy_generated >= 0.0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_blockchain_res_height ON spatial_blockchain_blocks (resolution_level, block_height);
+CREATE INDEX IF NOT EXISTS idx_thermo_blocks_hash ON thermodynamic_spatial_blocks(block_hash);
 
--- ----------------------------------------------------------------------------
--- 6. Trigger Enforcement: Aperture Resolution Guard & Flux Balance
--- ----------------------------------------------------------------------------
+-- ============================================================================
+-- 8. APERTURE SEQUENCE AUDIT LOGS
+-- ============================================================================
 
-CREATE OR REPLACE FUNCTION verify_flux_resolution_parity()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Verify resolution integrity across edge boundaries
-    IF (SELECT resolution FROM spatial_h3_cells WHERE cell_index = NEW.source_cell) <> NEW.resolution THEN
-        RAISE EXCEPTION 'Flux resolution % does not match source cell % aperture resolution', NEW.resolution, NEW.source_cell;
-    END IF;
+CREATE TABLE IF NOT EXISTS aperture_sequence_audit_log (
+    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    target_resolution h3_resolution_level NOT NULL,
+    sequence_elements aperture_class_enum[] NOT NULL,
+    sequence_length INT GENERATED ALWAYS AS (array_length(sequence_elements, 1)) STORED,
+    expected_length INT GENERATED ALWAYS AS (target_resolution + 1) STORED,
+    verified_base_parity BOOLEAN NOT NULL DEFAULT true,
+    verified_alternating_parity BOOLEAN NOT NULL,
+    merkle_leaf_hash CHAR(64) NOT NULL,
+    audited_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_sequence_length_alignment CHECK (array_length(sequence_elements, 1) = (target_resolution + 1))
+);
 
-    IF (SELECT resolution FROM spatial_h3_cells WHERE cell_index = NEW.target_cell) <> NEW.resolution THEN
-        RAISE EXCEPTION 'Flux resolution % does not match target cell % aperture resolution', NEW.resolution, NEW.target_cell;
-    END IF;
-
-    -- Clausius-Duhem inequality validation: sigma = J * (1/T_target - 1/T_source) >= 0
-    IF NEW.flux_magnitude > 0 THEN
-        IF NEW.entropy_production_rate < 0.0 THEN
-            RAISE EXCEPTION 'Thermodynamic violation: Local entropy production cannot be negative (Clausius-Duhem inequality violated). Value: %', NEW.entropy_production_rate;
-        END IF;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_verify_flux_resolution ON spatial_flux_transactions;
-CREATE TRIGGER trg_verify_flux_resolution
-BEFORE INSERT OR UPDATE ON spatial_flux_transactions
-FOR EACH ROW EXECUTE FUNCTION verify_flux_resolution_parity();
-```
-
-***
+CREATE INDEX IF NOT EXISTS idx_aperture_audit_res ON aperture_sequence_audit_log(target_resolution);

@@ -1,0 +1,218 @@
+@startuml sprint_093_schema
+!theme plain
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName "Courier"
+
+title Web of Life - Sprint 093: Aperture Rotation Sequence & Thermodynamic Spatial Flux Architecture
+
+package "Domain Types & Enumerations (src/spatial/h3_types.ts)" {
+    enum ApertureClass <<enumeration>> {
+        CLASS_II
+        CLASS_III
+    }
+
+    enum ThermodynamicFluxCarrier <<enumeration>> {
+        BIOMASS
+        LIQUID_WATER
+        WATER_VAPOR
+        SENSIBLE_HEAT
+        LATENT_HEAT
+        DISSOLVED_NUTRIENT
+        ENTROPY_DISSIPATION
+    }
+
+    enum SpatialParityStatus <<enumeration>> {
+        PARITY_ALIGNED
+        ROTATION_TRANSFORMED
+        CROSS_RESOLUTION_PROJECTED
+    }
+
+    interface IApertureRotationSequence {
+        +targetResolution: number
+        +sequence: readonly ApertureClass[]
+    }
+}
+
+package "Spatial DGGS & Hierarchy Service (src/spatial/)" {
+    class H3AdjacencyService {
+        +getApertureClass(resolution: number): ApertureClass
+        +getApertureRotationSequence(targetResolution: number): ApertureClass[]
+        +isClassII(resolution: number): boolean
+        +isClassIII(resolution: number): boolean
+        +computeCoordinateRotationAngle(rSource: number, rTarget: number): number
+        +buildRotationMatrix(deltaTheta: number): Float64Array
+    }
+
+    class SpatialFluxMonad {
+        -h3Index: bigint
+        -resolution: number
+        -apertureClass: ApertureClass
+        -apertureSequence: ApertureClass[]
+        -tangentFluxVector: Vector2D
+        +bind<B>(fn: (a: SpatialFluxMonad) => SpatialFluxMonad): SpatialFluxMonad
+        +transformCoordinateBasis(targetRes: number): SpatialFluxMonad
+        +computeDirectionalFluxVector(targetCell: SpatialFluxMonad): Vector2D
+        +assertNormConservation(rawVector: Vector2D, rotatedVector: Vector2D): boolean
+        +calculateEnthalpyFlux(carrier: ThermodynamicFluxCarrier, gradient: number): number
+        +calculateEntropyGeneration(): number
+        +commitToLedger(): FluxTransactionRecord
+    }
+
+    class Vector2D {
+        +x: number
+        +y: number
+        +norm(): number
+        +rotate(thetaRad: number): Vector2D
+        +dot(other: Vector2D): number
+    }
+}
+
+package "Thermodynamic Blockchain & Relational Ledger (db/schema.sql)" {
+    entity "dggs_aperture_resolution_ref" as DggsResolutionRef {
+        *resolution: h3_resolution_level <<PK>>
+        --
+        *aperture_class: aperture_class_enum
+        *cumulative_rotation_deg: float8
+        *rotation_offset_rad: float8
+        *scaling_ratio: float8
+        *nominal_area_km2: float8
+        *is_class_ii: boolean
+        *is_class_iii: boolean
+        *created_at: timestamptz
+    }
+
+    entity "spatial_monad_cells" as SpatialMonadCell {
+        *h3_index: int8 <<PK>>
+        --
+        *resolution: h3_resolution_level <<FK>>
+        *base_cell_num: int2
+        *aperture_class: aperture_class_enum
+        *aperture_sequence: aperture_class_enum[]
+        *sequence_hash: char(64)
+        centroid_geom: geometry(Point, 4326)
+        boundary_geom: geometry(Polygon, 4326)
+        *current_state_root: char(64)
+        *last_block_height: int8
+        *updated_at: timestamptz
+    }
+
+    entity "monad_thermodynamic_stocks" as MonadThermoStocks {
+        *stock_id: uuid <<PK>>
+        --
+        *h3_index: int8 <<FK>>
+        *block_height: int8
+        *timestamp: timestamptz
+        *mass_dry_biomass_kg: float8
+        *mass_liquid_water_kg: float8
+        *mass_water_vapor_kg: float8
+        *enthalpy_joules: float8
+        *entropy_joules_per_kelvin: float8
+        *temperature_kelvin: float8
+        *pressure_pascals: float8
+        *stock_checksum: char(64)
+    }
+
+    entity "aperture_flux_rotations" as ApertureFluxRotations {
+        *rotation_id: uuid <<PK>>
+        --
+        *source_resolution: h3_resolution_level <<FK>>
+        *target_resolution: h3_resolution_level <<FK>>
+        *source_class: aperture_class_enum
+        *target_class: aperture_class_enum
+        *delta_rotation_rad: float8
+        *cos_theta: float8
+        *sin_theta: float8
+        *parity_status: spatial_parity_status_enum
+    }
+
+    entity "spatial_flux_transactions" as SpatialFluxTx {
+        *tx_id: uuid <<PK>>
+        --
+        *block_height: int8 <<FK>>
+        *source_h3_index: int8 <<FK>>
+        *target_h3_index: int8 <<FK>>
+        *source_resolution: h3_resolution_level
+        *target_resolution: h3_resolution_level
+        *source_aperture_class: aperture_class_enum
+        *target_aperture_class: aperture_class_enum
+        *carrier_type: thermodynamic_flux_carrier_enum
+        *raw_vector_norm: float8
+        *transformed_vector_norm: float8
+        *flux_vector_x: float8
+        *flux_vector_y: float8
+        *flux_magnitude: float8
+        *enthalpy_transferred_joules: float8
+        *entropy_generated_joules_per_kelvin: float8
+        *norm_conservation_delta: float8
+        *tx_signature: char(128)
+        *timestamp: timestamptz
+    }
+
+    entity "thermodynamic_spatial_blocks" as ThermoBlocks {
+        *block_height: int8 <<PK>>
+        --
+        *parent_block_hash: char(64)
+        *block_hash: char(64)
+        *state_merkle_root: char(64)
+        *flux_transactions_root: char(64)
+        *aperture_sequence_root: char(64)
+        *total_mass_balance_error: float8
+        *total_enthalpy_balance_error: float8
+        *total_entropy_generated: float8
+        *validator_node_id: varchar(128)
+        *consensus_signature: char(128)
+        *created_at: timestamptz
+    }
+
+    entity "aperture_sequence_audit_log" as ApertureAuditLog {
+        *audit_id: uuid <<PK>>
+        --
+        *target_resolution: h3_resolution_level
+        *sequence_elements: aperture_class_enum[]
+        *sequence_length: int4
+        *expected_length: int4
+        *verified_base_parity: boolean
+        *verified_alternating_parity: boolean
+        *merkle_leaf_hash: char(64)
+        *audited_at: timestamptz
+    }
+}
+
+' ============================================================================
+' RELATIONSHIPS & CONSTRAINTS
+' ============================================================================
+
+DggsResolutionRef "1" <-- "0..*" SpatialMonadCell : resolution ref
+SpatialMonadCell "1" *-- "1..*" MonadThermoStocks : tracks thermodynamic stocks
+SpatialMonadCell "1" <-- "0..*" SpatialFluxTx : source cell
+SpatialMonadCell "1" <-- "0..*" SpatialFluxTx : target cell
+ThermoBlocks "1" *-- "0..*" SpatialFluxTx : aggregates in block
+DggsResolutionRef "1" <-- "0..*" ApertureFluxRotations : source
+DggsResolutionRef "1" <-- "0..*" ApertureFluxRotations : target
+
+H3AdjacencyService ..|> IApertureRotationSequence : produces
+H3AdjacencyService --> ApertureClass : evaluates
+SpatialFluxMonad o-- Vector2D : holds
+SpatialFluxMonad --> H3AdjacencyService : queries rotation sequence
+SpatialFluxMonad ..> SpatialFluxTx : persists state flows
+SpatialFluxMonad --> ApertureClass : tagged with
+
+note right of H3AdjacencyService
+  **RFC-093 Invariant Formulation:**
+  Even resolution r: ApertureClass.CLASS_II
+  Odd resolution r: ApertureClass.CLASS_III
+  |Sequence(R_target)| = R_target + 1
+  delta_theta = arcsin(sqrt(3) / (2 * sqrt(7))) ≈ 19.106605°
+end note
+
+note right of SpatialFluxTx
+  **Thermodynamic Integrity Constraints:**
+  First Law: ||J_raw||_2 == ||J_transformed||_2 (error <= 1e-9)
+  Closed Boundary: sum(div(J)) == 0
+  Second Law: sigma_entropy >= 0
+end note
+
+@enduml

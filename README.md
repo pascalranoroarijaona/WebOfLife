@@ -205,8 +205,8 @@ python agent_orchestrator.py --wipe
 
 <!-- BACKLOG_START -->
 <!-- Verified, Groomed, and Prioritized Backlog -->
-Roadmap Completion: 45%
-SPRINT_GOAL: Implement assertValidApertureResolution boundary check enforcing non-negative integer resolution in [0, 15] range in src/spatial/h3_adjacency.ts.
+Roadmap Completion: 46%
+SPRINT_GOAL: Implement getApertureRotationSequence returning array of aperture classes from resolution 0 to target resolution in src/spatial/h3_adjacency.ts.
 
 ### Phase 1: Foundational Thermodynamics & Spatial Core
 - [x] Abstract root class `ThermodynamicStructure` with stock, inboundFlows, outboundFlows, and entropyState (`src/earth_pod.ts`)
@@ -278,8 +278,9 @@ SPRINT_GOAL: Implement assertValidApertureResolution boundary check enforcing no
 - [x] Implement `hasNonZeroApertureDigits` predicate checking whether any directional digit in active resolution tiers is non-zero in `src/spatial/h3_adjacency.ts`
 - [x] Implement `isPurePentagonResolutionIndex` checking if pentagonal cell retains base cell orientation without aperture rotation in `src/spatial/h3_adjacency.ts`
 - [x] Implement `getApertureClassForResolution` returning 'CLASS_II' for even resolutions and 'CLASS_III' for odd resolutions in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `assertValidApertureResolution` boundary check enforcing non-negative integer resolution in [0, 15] range in `src/spatial/h3_adjacency.ts`
-- [ ] Implement `getApertureRotationSequence` determining class II vs class III aperture orientation per resolution tier in `src/spatial/h3_adjacency.ts`
+- [x] Implement `assertValidApertureResolution` boundary check enforcing non-negative integer resolution in [0, 15] range in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `getApertureRotationSequence` returning array of aperture classes from resolution 0 to target resolution in `src/spatial/h3_adjacency.ts`
+- [ ] Implement `calculateApertureCumulativeRotationRadians` computing total aperture orientation tilt angle in radians for a given resolution in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `identifyPentagonMissingDirection` identifying the omitted aperture index for an icosahedral pentagon cell in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `buildPentagonalDirectionalTopology` returning PentagonDirectionalTopology with present and omitted directions in `src/spatial/h3_adjacency.ts`
 - [ ] Implement `validatePentagonalCellCoordination` 5-neighbor topology and boundary continuity validator for pentagons in `src/spatial/h3_adjacency.ts`

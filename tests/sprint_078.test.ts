@@ -185,9 +185,11 @@ describe('Sprint 078: Pentagonal Coordination Invariant Enforcement in DGGS', ()
         thermalDiffusivity: 1.5
       };
 
-      const initialTotalC = initialStocks.get(pCell)!.carbonMol + initialStocks.get(hCell)!.carbonMol;
-      const initialTotalW = initialStocks.get(pCell)!.waterKg + initialStocks.get(hCell)!.waterKg;
-      const initialTotalU = initialStocks.get(pCell)!.thermalJoules + initialStocks.get(hCell)!.thermalJoules;
+      const stockP = initialStocks.get(pCell)!;
+      const stockH = initialStocks.get(hCell)!;
+      const initialTotalC = (stockP.carbonMol ?? 0) + (stockH.carbonMol ?? 0);
+      const initialTotalW = (stockP.waterKg ?? 0) + (stockH.waterKg ?? 0);
+      const initialTotalU = (stockP.thermalJoules ?? 0) + (stockH.thermalJoules ?? 0);
 
       const monad = SpatialFluxMonad.of({
         stocks: initialStocks,
@@ -198,9 +200,9 @@ describe('Sprint 078: Pentagonal Coordination Invariant Enforcement in DGGS', ()
       const finalP = finalState.stocks.get(pCell)!;
       const finalH = finalState.stocks.get(hCell)!;
 
-      const finalTotalC = finalP.carbonMol + finalH.carbonMol;
-      const finalTotalW = finalP.waterKg + finalH.waterKg;
-      const finalTotalU = finalP.thermalJoules + finalH.thermalJoules;
+      const finalTotalC = (finalP.carbonMol ?? 0) + (finalH.carbonMol ?? 0);
+      const finalTotalW = (finalP.waterKg ?? 0) + (finalH.waterKg ?? 0);
+      const finalTotalU = (finalP.thermalJoules ?? 0) + (finalH.thermalJoules ?? 0);
 
       assert.ok(Math.abs(finalTotalC - initialTotalC) < 1e-6);
       assert.ok(Math.abs(finalTotalW - initialTotalW) < 1e-6);
