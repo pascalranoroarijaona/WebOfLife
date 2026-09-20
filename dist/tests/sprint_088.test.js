@@ -87,13 +87,13 @@ describe('Sprint 088: Aperture Digit Sequence Invariance & Hierarchical Projecti
             // C consumed from biomass
             assert.strictEqual(state.carbonBiomassKg, initialStocks.carbonBiomassKg - carbonRespired);
             // O2 consumed: 120 * (32 / 12) = 320 kg O2
-            assert.strictEqual(state.oxygenKg, initialStocks.oxygenKg - 320.0);
-            // CO2 emitted to atm: 120 * (44 / 12) = 440 kg CO2
-            assert.strictEqual(state.carbonAtmKg, initialStocks.carbonAtmKg + 440.0);
-            // Metabolic water produced: 120 * (18 / 12) = 180 kg H2O
-            assert.strictEqual(state.waterLiquidKg, initialStocks.waterLiquidKg + 180.0);
-            // Respiration exothermic release: 120 kg * 38.92 MJ/kg = 4.6704e9 Joules
-            assert.strictEqual(state.thermalEnergyJoules, initialStocks.thermalEnergyJoules + 120.0 * 38.92e6);
+            assert.strictEqual(state.oxygenKg, initialStocks.oxygenKg - (carbonRespired * 32.0) / 12.0);
+            // CO2 produced: 120 * (44 / 12) = 440 kg CO2
+            assert.strictEqual(state.carbonAtmKg, initialStocks.carbonAtmKg + (carbonRespired * 44.0) / 12.0);
+            // H2O produced: 120 * (18 / 12) = 180 kg H2O
+            assert.strictEqual(state.waterLiquidKg, initialStocks.waterLiquidKg + (carbonRespired * 18.0) / 12.0);
+            // Metabolic heat dissipation
+            assert.strictEqual(state.thermalEnergyJoules, initialStocks.thermalEnergyJoules + carbonRespired * 38.92e6);
         });
     });
 });

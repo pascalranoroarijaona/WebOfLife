@@ -219,7 +219,7 @@ describe('Sprint 075: Topological Adjacency & isExpectedNeighborCount', () => {
       reverseMap.set(cellA, stateA);
       for (const other of neighborState.neighbors.slice(1)) {
         reverseMap.set(other as string, {
-          cellIndex: other,
+          cellIndex: other as string,
           stocks: { water: 100, carbon: 50, oxygen: 20, minerals: 10, enthalpy: 200 },
           neighbors: [
             neighborState.cellIndex, '8031fffffffffff', '8033fffffffffff',
@@ -252,8 +252,8 @@ describe('Sprint 075: Topological Adjacency & isExpectedNeighborCount', () => {
       const defectiveMap = new Map<string, SpatialFluxState>();
       // Provide neighbor with defective neighbor count (only 4 neighbors)
       for (const n of stateA.neighbors) {
-        defectiveMap.set(n, {
-          cellIndex: n,
+        defectiveMap.set(n as string, {
+          cellIndex: n as string,
           stocks: { water: 100, carbon: 50, oxygen: 20, minerals: 10, enthalpy: 200 },
           neighbors: ['8001fffffffffff', '8021fffffffffff', '8023fffffffffff', '8025fffffffffff'] // 4 neighbors, defect!
         });

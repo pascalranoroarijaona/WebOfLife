@@ -1,0 +1,152 @@
+```Code snippet
+@startuml
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam roundcorner 6
+skinparam defaultFontName "JetBrains Mono", "Courier New", monospace
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+
+package "Spatial DGGS Adjacency & Aperture Hierarchy" #EFEFEF {
+    enum ApertureClass {
+        CLASS_II_UNROTATED
+        CLASS_III_ROTATED
+    }
+
+    enum CellTopology {
+        HEXAGON
+        PENTAGON_SINGULARITY
+    }
+
+    class H3CellIndex <<ValueObject>> {
+        +rawIndex: bigint
+        +hexString: string
+        +mode: number
+        +resolution: number
+        +baseCellId: number
+        +digits: number[]
+        +isValid(): boolean
+        +getResolution(): number
+        +getBaseCell(): number
+        +getDigit(level: number): number
+    }
+
+    class H3AdjacencyOps <<DomainService>> {
+        +PENTAGON_BASE_CELLS: ReadonlySet<number>
+        +APERTURE_ROTATION_RAD: number = 0.333473172
+        +isPentagon(target: bigint | string): boolean
+        +isPurePentagonResolutionIndex(target: string | bigint | number, resolution?: number): boolean
+        +getAdjacentDirections(cell: H3CellIndex): number[]
+        +computeApertureSkew(resolution: number): number
+    }
+
+    class PentagonBaseCellRegistry <<StaticCatalog>> {
+        +BASE_CELLS: number[12] = {4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117}
+        +meridianAngle(baseCellId: number): number
+        +isBasePentagon(baseCellId: number): boolean
+    }
+}
+
+package "Thermodynamic State & Finite Volume Tensor" #EBF3FB {
+    class ThermodynamicStock <<Entity>> {
+        +stockId: UUID
+        +cellIndex: bigint
+        +massKg: number
+        +internalEnergyJ: number
+        +enthalpyJ: number
+        +entropyJPerK: number
+        +temperatureK: number
+        +spuriousVorticityCurl: number
+        +verifyFirstLawInvariance(deltaM: number, deltaH: number): boolean
+        +verifySecondLawInvariance(deltaS: number): boolean
+    }
+
+    class SpatialFluxMonad <<Monad>> {
+        -sourceStock: ThermodynamicStock
+        -neighborStocks: Map<number, ThermodynamicStock>
+        +computeBoundaryFlux(cell: H3CellIndex): SpatialFluxMonad
+        +applyUnalignedPentagonFlux(cell: H3CellIndex): FluxLedgerEntry[]
+        +applyRotatedPentagonFlux(cell: H3CellIndex, rotationRad: number): FluxLedgerEntry[]
+        +run(): Map<number, ThermodynamicStock>
+    }
+
+    class FluxLedgerEntry <<ValueObject>> {
+        +fluxId: UUID
+        +sourceCell: bigint
+        +targetCell: bigint
+        +edgeIndex: number
+        +massFluxKgPerSec: number
+        +enthalpyFluxW: number
+        +apertureCorrectionApplied: boolean
+        +rotationCorrectionRad: number
+        +entropyProductionWPerK: number
+    }
+}
+
+package "Blockchain Consensus & Singularity Ledger" #F5EFEB {
+    class ThermodynamicBlock <<AggregateRoot>> {
+        +blockHeight: bigint
+        +previousBlockHash: string
+        +blockHash: string
+        +stateMerkleRoot: string
+        +purePentagonInvariantRoot: string
+        +totalEntropyProduction: number
+        +totalEnergyDrift: number
+        +timestamp: Date
+        +validateBlock(): boolean
+    }
+
+    class PurePentagonInvarianceProof <<Entity>> {
+        +proofId: UUID
+        +blockHeight: bigint
+        +cellIndex: bigint
+        +resolution: number
+        +netApertureRotation: number
+        +boundaryMassResidualKg: number
+        +boundaryEnthalpyResidualW: number
+        +cryptographicSig: string
+        +verifyProof(): boolean
+    }
+
+    class H3SpatialCellRecord <<ActiveRecord>> {
+        +cellIndex: bigint
+        +hexString: string
+        +resolution: number
+        +baseCellId: number
+        +topology: CellTopology
+        +apertureClass: ApertureClass
+        +netApertureRotationRad: number
+        +isPurePentagon: boolean
+    }
+}
+
+' Relationships & Invariant Dependencies
+H3CellIndex --> CellTopology : categorizes
+H3CellIndex --> ApertureClass : exhibits
+H3AdjacencyOps ..> H3CellIndex : parses & evaluates
+H3AdjacencyOps ..> PentagonBaseCellRegistry : validates singularity against
+SpatialFluxMonad ..> H3AdjacencyOps : invokes isPurePentagonResolutionIndex()
+SpatialFluxMonad --> ThermodynamicStock : mutates state tensors
+SpatialFluxMonad --> FluxLedgerEntry : outputs boundary transfers
+ThermodynamicBlock "1" *-- "many" FluxLedgerEntry : batches
+ThermodynamicBlock "1" *-- "12" PurePentagonInvarianceProof : seals singularity proofs
+PurePentagonInvarianceProof --> H3SpatialCellRecord : attests zero aperture skew
+H3SpatialCellRecord "1" -- "1" ThermodynamicStock : tracks current state
+
+note right of H3AdjacencyOps::isPurePentagonResolutionIndex
+  **Pure Pentagon Resolution Invariance Condition**:
+  1. BaseCell in {4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117}
+  2. All directional child digits d_k == 0 (CENTER_DIGIT)
+  3. Resolution r % 2 == 0 (Class II, net aperture rotation = 0)
+  **Thermodynamic Consequence**:
+  Bypasses coordinate aperture rotation matrix, eliminating
+  numerical vorticity (curl J == 0) & guaranteeing Delta S >= 0.
+end note
+
+note bottom of SpatialFluxMonad
+  First Law: sum(J_i * A_i) = -dM_pent/dt
+  Second Law: Sigma_production >= -1e-14 W/K
+  Pure pentagon boundaries maintain geodesic radial alignment.
+end note
+
+@enduml

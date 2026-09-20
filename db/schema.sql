@@ -1,186 +1,159 @@
--- ============================================================================
--- Web of Life: Planetary Discrete Global Grid System (DGGS) & Thermodynamic Schema
--- Sprint 089: Non-Zero Aperture Digit Predicate for Hierarchical H3 Cells
--- Architecture: Relational, Spatial Kinematics & Thermodynamic Ledger Schema
--- ============================================================================
+-- Web of Life Thermodynamic Blockchain Schema
+-- Sprint 090: Pure Pentagon Resolution Index & Aperture Orientation Invariance Engine
+-- Governance: First Law (Mass-Energy Conservation) & Second Law (Non-Negative Entropy Production)
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ----------------------------------------------------------------------------
--- 1. H3 Discrete Global Grid System (DGGS) Cell Registry
--- Stores 64-bit canonical H3 cell indices, base cell identities, and aperture profiles
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_cell_registry (
-    h3_index BIGINT PRIMARY KEY,
-    h3_index_hex VARCHAR(16) GENERATED ALWAYS AS (TO_HEX(h3_index)) STORED,
+-- Enumerations for Spatial Topology & Aperture Symmetry Classes
+DO $$ BEGIN
+    CREATE TYPE aperture_class_enum AS ENUM (
+        'CLASS_II_UNROTATED', -- Even resolutions (r % 2 == 0), net aperture rotation = 0 rad
+        'CLASS_III_ROTATED'   -- Odd resolutions (r % 2 == 1), net aperture rotation = ±arcsin(sqrt(3)/(2*sqrt(7)))
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE cell_topology_enum AS ENUM (
+        'HEXAGON',
+        'PENTAGON_SINGULARITY'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE thermodynamic_flux_type AS ENUM (
+        'MASS_DIFFUSIVE',
+        'ENTHALPY_ADVECTIVE',
+        'VORTICITY_CORRECTED',
+        'ISOTROPIC_ISOTHERMAL'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- 1. Discrete Global Grid System (DGGS) Cell Registry
+CREATE TABLE IF NOT EXISTS h3_spatial_cells (
+    cell_index BIGINT PRIMARY KEY,
+    hex_string VARCHAR(16) NOT NULL UNIQUE,
     resolution SMALLINT NOT NULL CHECK (resolution BETWEEN 0 AND 15),
     base_cell_id SMALLINT NOT NULL CHECK (base_cell_id BETWEEN 0 AND 121),
-    mode SMALLINT NOT NULL DEFAULT 1 CHECK (mode = 1),
-    is_concentric_base_descendant BOOLEAN NOT NULL DEFAULT FALSE,
-    has_nonzero_aperture_digits BOOLEAN NOT NULL DEFAULT FALSE,
-    first_nonzero_aperture_resolution SMALLINT CHECK (first_nonzero_aperture_resolution BETWEEN 1 AND 15),
-    nonzero_aperture_digit_count SMALLINT NOT NULL DEFAULT 0 CHECK (nonzero_aperture_digit_count BETWEEN 0 AND 15),
-    active_aperture_digit_mask BIGINT NOT NULL DEFAULT 0,
-    centroid_geom GEOMETRY(Point, 4326),
-    boundary_geom GEOMETRY(Polygon, 4326),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_concentric_alignment CHECK (
-        (is_concentric_base_descendant = TRUE AND has_nonzero_aperture_digits = FALSE AND first_nonzero_aperture_resolution IS NULL)
-        OR
-        (is_concentric_base_descendant = FALSE AND (has_nonzero_aperture_digits = TRUE OR resolution = 0))
+    topology cell_topology_enum NOT NULL,
+    aperture_class aperture_class_enum NOT NULL,
+    net_aperture_rotation_rad NUMERIC(12, 10) NOT NULL DEFAULT 0.0000000000,
+    is_pure_pentagon BOOLEAN GENERATED ALWAYS AS (
+        (topology = 'PENTAGON_SINGULARITY') AND (resolution % 2 = 0)
+    ) STORED,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_h3_spatial_cells_pure_pentagon 
+    ON h3_spatial_cells (is_pure_pentagon) WHERE is_pure_pentagon = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_h3_spatial_cells_res_topology 
+    ON h3_spatial_cells (resolution, topology);
+
+-- 2. Base Cell Topological Invariants (12 Pentagons of icosahedral vertices)
+CREATE TABLE IF NOT EXISTS h3_base_cell_topology (
+    base_cell_id SMALLINT PRIMARY KEY CHECK (base_cell_id BETWEEN 0 AND 121),
+    is_pentagon BOOLEAN NOT NULL DEFAULT FALSE,
+    meridian_angle_rad NUMERIC(12, 10) NOT NULL,
+    icosahedron_vertex_id SMALLINT CHECK (icosahedron_vertex_id BETWEEN 0 AND 11),
+    CONSTRAINT chk_base_cell_pentagon_vertices CHECK (
+        (is_pentagon = TRUE AND base_cell_id IN (4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117) AND icosahedron_vertex_id IS NOT NULL) OR
+        (is_pentagon = FALSE AND icosahedron_vertex_id IS NULL)
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_h3_cell_resolution ON h3_cell_registry (resolution);
-CREATE INDEX IF NOT EXISTS idx_h3_cell_base_cell ON h3_cell_registry (base_cell_id);
-CREATE INDEX IF NOT EXISTS idx_h3_cell_aperture_predicate ON h3_cell_registry (resolution, has_nonzero_aperture_digits);
-CREATE INDEX IF NOT EXISTS idx_h3_cell_centroid_spatial ON h3_cell_registry USING GIST (centroid_geom);
+-- Seed base cell pentagon singularities if not existing
+INSERT INTO h3_base_cell_topology (base_cell_id, is_pentagon, meridian_angle_rad, icosahedron_vertex_id)
+VALUES 
+    (4,   TRUE, 0.0000000000, 0),
+    (14,  TRUE, 0.6283185307, 1),
+    (24,  TRUE, 1.2566370614, 2),
+    (38,  TRUE, 1.8849555922, 3),
+    (49,  TRUE, 2.5132741229, 4),
+    (58,  TRUE, 3.1415926536, 5),
+    (63,  TRUE, 3.7699111843, 6),
+    (72,  TRUE, 4.3982297150, 7),
+    (83,  TRUE, 5.0265482457, 8),
+    (97,  TRUE, 5.6548667765, 9),
+    (107, TRUE, 6.2831853072, 10),
+    (117, TRUE, 0.0000000000, 11)
+ON CONFLICT (base_cell_id) DO NOTHING;
 
--- ----------------------------------------------------------------------------
--- 2. Aperture Tier Digit Breakdown (Decomposed 3-bit aperture-7 resolution tiers)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS h3_aperture_tier_decompositions (
-    h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index) ON DELETE CASCADE,
-    resolution_tier SMALLINT NOT NULL CHECK (resolution_tier BETWEEN 1 AND 15),
-    aperture_digit SMALLINT NOT NULL CHECK (aperture_digit BETWEEN 0 AND 6),
-    bit_offset SMALLINT NOT NULL,
-    is_central_child BOOLEAN GENERATED ALWAYS AS (aperture_digit = 0) STORED,
-    azimuthal_rotation_deg DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    PRIMARY KEY (h3_index, resolution_tier)
-);
-
-CREATE INDEX IF NOT EXISTS idx_aperture_tier_digit ON h3_aperture_tier_decompositions (resolution_tier, aperture_digit);
-
--- ----------------------------------------------------------------------------
--- 3. Thermodynamic Patch State (Monadic Physical Stock)
--- Tracks First & Second Law conserved properties across discrete H3 cell patches
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_patch_stocks (
+-- 3. Cell Thermodynamic Stock States (Monadic Conservation Targets)
+CREATE TABLE IF NOT EXISTS h3_thermodynamic_stocks (
     stock_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index) ON DELETE RESTRICT,
-    epoch_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    biomass_kg NUMERIC(28, 12) NOT NULL DEFAULT 0 CHECK (biomass_kg >= 0),
-    enthalpy_joules NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (enthalpy_joules >= 0),
-    entropy_j_k NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (entropy_j_k >= 0),
-    water_liters NUMERIC(28, 12) NOT NULL DEFAULT 0 CHECK (water_liters >= 0),
-    carbon_kg NUMERIC(28, 12) NOT NULL DEFAULT 0 CHECK (carbon_kg >= 0),
-    exergy_joules NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (exergy_joules >= 0),
-    coarsening_scale_factor NUMERIC(8, 4) NOT NULL DEFAULT 1.0 CHECK (coarsening_scale_factor > 0),
-    state_signature BYTEA NOT NULL,
-    CONSTRAINT chk_positive_entropy CHECK (entropy_j_k >= 0)
+    cell_index BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
+    block_height BIGINT NOT NULL,
+    epoch_timestamp TIMESTAMPTZ NOT NULL,
+    mass_kg NUMERIC(24, 8) NOT NULL CHECK (mass_kg >= 0),
+    internal_energy_j NUMERIC(28, 8) NOT NULL CHECK (internal_energy_j >= 0),
+    enthalpy_j NUMERIC(28, 8) NOT NULL,
+    entropy_j_per_k NUMERIC(24, 8) NOT NULL CHECK (entropy_j_per_k >= 0),
+    temperature_k NUMERIC(10, 4) NOT NULL CHECK (temperature_k > 0),
+    spurious_vorticity_curl NUMERIC(16, 12) NOT NULL DEFAULT 0.000000000000,
+    CONSTRAINT chk_stock_vorticity_at_pure_pentagon CHECK (
+        -- Pure pentagons require pristine vorticity = 0 (no numerical curl)
+        spurious_vorticity_curl = 0.000000000000 OR spurious_vorticity_curl BETWEEN -1e-12 AND 1e-12
+    ),
+    CONSTRAINT uq_cell_epoch_stock UNIQUE (cell_index, block_height)
 );
 
-CREATE INDEX IF NOT EXISTS idx_patch_stocks_h3_epoch ON thermodynamic_patch_stocks (h3_index, epoch_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_h3_thermo_stocks_cell_epoch 
+    ON h3_thermodynamic_stocks (cell_index, epoch_timestamp DESC);
 
--- ----------------------------------------------------------------------------
--- 4. Multi-Scale Coarsening & Drift Routing Ledger
--- Quantifies geometric rotation offsets and radial diffusion optimizations
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS spatial_flux_coarsening_routes (
-    route_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    source_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
-    target_parent_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
-    source_resolution SMALLINT NOT NULL CHECK (source_resolution BETWEEN 1 AND 15),
-    target_resolution SMALLINT NOT NULL CHECK (target_resolution BETWEEN 0 AND 14),
-    has_rotational_drift BOOLEAN NOT NULL,
-    drift_vector_x DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    drift_vector_y DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    drift_vector_z DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    symmetry_axis_preserved BOOLEAN NOT NULL DEFAULT FALSE,
-    radial_flux_optimization_applied BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_coarsening_resolutions CHECK (source_resolution > target_resolution),
-    CONSTRAINT chk_drift_symmetry CHECK (
-        (has_rotational_drift = FALSE AND symmetry_axis_preserved = TRUE AND drift_vector_x = 0.0 AND drift_vector_y = 0.0 AND drift_vector_z = 0.0)
-        OR
-        (has_rotational_drift = TRUE AND symmetry_axis_preserved = FALSE)
+-- 4. Spatial Flux Ledgers (Inter-Cell Finite Volume Boundary Transfers)
+CREATE TABLE IF NOT EXISTS h3_spatial_flux_ledgers (
+    flux_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    block_height BIGINT NOT NULL,
+    source_cell BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
+    target_cell BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
+    boundary_edge_index SMALLINT NOT NULL CHECK (boundary_edge_index BETWEEN 0 AND 5),
+    flux_type thermodynamic_flux_type NOT NULL,
+    aperture_correction_applied BOOLEAN NOT NULL,
+    rotation_correction_rad NUMERIC(12, 10) NOT NULL DEFAULT 0.0000000000,
+    mass_flux_kg_per_sec NUMERIC(24, 8) NOT NULL,
+    enthalpy_flux_w NUMERIC(28, 8) NOT NULL,
+    entropy_production_w_per_k NUMERIC(24, 8) NOT NULL CHECK (entropy_production_w_per_k >= -1e-14), -- Second Law: Delta S >= 0
+    tx_hash VARCHAR(64) NOT NULL,
+    CONSTRAINT chk_pure_pentagon_no_rotation_correction CHECK (
+        (aperture_correction_applied = FALSE AND rotation_correction_rad = 0.0000000000) OR
+        (aperture_correction_applied = TRUE AND rotation_correction_rad != 0.0000000000)
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_coarsening_routes_pair ON spatial_flux_coarsening_routes (source_h3_index, target_parent_h3_index);
+CREATE INDEX IF NOT EXISTS idx_h3_spatial_flux_src_dst 
+    ON h3_spatial_flux_ledgers (source_cell, target_cell, block_height);
 
--- ----------------------------------------------------------------------------
--- 5. Blockchain Block Ledger (Thermodynamic Proof-of-Conservation)
--- ----------------------------------------------------------------------------
+-- 5. Blockchain Block Headers & Singularity Invariance Proofs
 CREATE TABLE IF NOT EXISTS thermodynamic_blocks (
     block_height BIGINT PRIMARY KEY,
-    block_hash BYTEA NOT NULL UNIQUE,
-    parent_block_hash BYTEA NOT NULL,
-    merkle_root_hash BYTEA NOT NULL,
-    thermodynamic_state_root BYTEA NOT NULL,
-    coarsening_flux_root BYTEA NOT NULL,
-    total_biomass_delta_kg NUMERIC(28, 12) NOT NULL DEFAULT 0,
-    total_enthalpy_delta_joules NUMERIC(38, 12) NOT NULL DEFAULT 0,
-    total_entropy_production_j_k NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (total_entropy_production_j_k >= 0),
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    validator_signature BYTEA NOT NULL,
-    nonce BIGINT NOT NULL DEFAULT 0,
-    CONSTRAINT chk_block_entropy_second_law CHECK (total_entropy_production_j_k >= 0)
+    previous_block_hash VARCHAR(64) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL UNIQUE,
+    state_merkle_root VARCHAR(64) NOT NULL,
+    pure_pentagon_invariant_root VARCHAR(64) NOT NULL,
+    total_entropy_production_w_per_k NUMERIC(28, 8) NOT NULL CHECK (total_entropy_production_w_per_k >= 0),
+    total_energy_drift_j NUMERIC(28, 8) NOT NULL CHECK (total_energy_drift_j BETWEEN -1e-8 AND 1e-8), -- First Law
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_block_height_timestamp ON thermodynamic_blocks (block_height, timestamp DESC);
-
--- ----------------------------------------------------------------------------
--- 6. Monadic Spatial Flux Transactions (First & Second Law Enforced Transactions)
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS thermodynamic_stock_transactions (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- 6. Singularity Verification Proof Records
+CREATE TABLE IF NOT EXISTS pure_pentagon_invariance_proofs (
+    proof_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     block_height BIGINT NOT NULL REFERENCES thermodynamic_blocks(block_height),
-    tx_hash BYTEA NOT NULL UNIQUE,
-    source_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
-    target_h3_index BIGINT NOT NULL REFERENCES h3_cell_registry(h3_index),
-    route_id UUID REFERENCES spatial_flux_coarsening_routes(route_id),
-    biomass_transferred_kg NUMERIC(28, 12) NOT NULL DEFAULT 0,
-    enthalpy_transferred_joules NUMERIC(38, 12) NOT NULL DEFAULT 0,
-    water_transferred_liters NUMERIC(28, 12) NOT NULL DEFAULT 0,
-    carbon_transferred_kg NUMERIC(28, 12) NOT NULL DEFAULT 0,
-    entropy_generated_j_k NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (entropy_generated_j_k >= 0),
-    dissipated_metabolic_heat_joules NUMERIC(38, 12) NOT NULL DEFAULT 0 CHECK (dissipated_metabolic_heat_joules >= 0),
-    is_pure_radial_diffusion BOOLEAN NOT NULL DEFAULT FALSE,
-    monad_receipt_signature BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_flux_entropy_generation CHECK (entropy_generated_j_k >= 0),
-    CONSTRAINT chk_flux_metabolic_heat CHECK (dissipated_metabolic_heat_joules >= 0)
+    cell_index BIGINT NOT NULL REFERENCES h3_spatial_cells(cell_index),
+    resolution SMALLINT NOT NULL CHECK (resolution % 2 = 0),
+    adjacent_directional_count SMALLINT NOT NULL CHECK (adjacent_directional_count = 5),
+    net_aperture_rotation NUMERIC(12, 10) NOT NULL CHECK (net_aperture_rotation = 0.0000000000),
+    boundary_mass_residual_kg NUMERIC(24, 14) NOT NULL CHECK (boundary_mass_residual_kg BETWEEN -1e-14 AND 1e-14),
+    boundary_enthalpy_residual_w NUMERIC(24, 14) NOT NULL CHECK (boundary_enthalpy_residual_w BETWEEN -1e-14 AND 1e-14),
+    cryptographic_sig VARCHAR(128) NOT NULL,
+    verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_stock_tx_block_source ON thermodynamic_stock_transactions (block_height, source_h3_index);
-CREATE INDEX IF NOT EXISTS idx_stock_tx_target ON thermodynamic_stock_transactions (target_h3_index);
-CREATE INDEX IF NOT EXISTS idx_stock_tx_hash ON thermodynamic_stock_transactions (tx_hash);
-
--- ----------------------------------------------------------------------------
--- 7. Trigger: First Law Verification (Conservation of Mass in Flux Batches)
--- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION verify_thermodynamic_block_conservation()
-RETURNS TRIGGER AS $$
-DECLARE
-    sum_delta_biomass NUMERIC(28, 12);
-    sum_delta_enthalpy NUMERIC(38, 12);
-BEGIN
-    -- Verify net mass/enthalpy changes within the block boundary balance exactly to zero
-    SELECT COALESCE(SUM(biomass_transferred_kg), 0),
-           COALESCE(SUM(enthalpy_transferred_joules), 0)
-    INTO sum_delta_biomass, sum_delta_enthalpy
-    FROM thermodynamic_stock_transactions
-    WHERE block_height = NEW.block_height;
-
-    IF NEW.total_biomass_delta_kg <> 0 THEN
-        RAISE EXCEPTION 'First Law Violation: Non-zero net biomass variation (%) in block %',
-            NEW.total_biomass_delta_kg, NEW.block_height;
-    END IF;
-
-    IF NEW.total_entropy_production_j_k < 0 THEN
-        RAISE EXCEPTION 'Second Law Violation: Negative net entropy production (%) in block %',
-            NEW.total_entropy_production_j_k, NEW.block_height;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_verify_block_conservation ON thermodynamic_blocks;
-CREATE TRIGGER trg_verify_block_conservation
-    BEFORE INSERT OR UPDATE ON thermodynamic_blocks
-    FOR EACH ROW
-    EXECUTE FUNCTION verify_thermodynamic_block_conservation();
+CREATE INDEX IF NOT EXISTS idx_proofs_block_cell 
+    ON pure_pentagon_invariance_proofs (block_height, cell_index);
