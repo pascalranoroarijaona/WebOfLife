@@ -1,0 +1,227 @@
+@startuml sprint_092_schema
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam linetype ortho
+
+title Web of Life - Sprint 092: DGGS Aperture Resolution Boundary & Thermodynamic Architecture
+
+package "Domain Exceptions & Validation" {
+    class RangeError <<StandardLibrary>>
+
+    class InvalidApertureResolutionError {
+        +resolution: unknown
+        +reason: string
+        +constructor(resolution: unknown, reason: string)
+    }
+    RangeError <|-- InvalidApertureResolutionError
+
+    class ApertureResolutionGuard <<Singleton / PureFunction>> {
+        +{static} assertValidApertureResolution(resolution: number): asserts resolution is H3Resolution
+        -{static} isInteger(res: number): boolean
+        -{static} isInBounds(res: number): boolean
+    }
+    ApertureResolutionGuard ..> InvalidApertureResolutionError : "throws on invalid input"
+}
+
+package "Spatial Monads & Discrete Global Grid System" {
+    enum H3Resolution <<Type Alias>> {
+        0 (Global Icosahedron)
+        1
+        2
+        3
+        4
+        5
+        6
+        7
+        8
+        9
+        10
+        11
+        12
+        13
+        14
+        15 (Sub-meter Tessellation)
+    }
+
+    class H3Cell {
+        +cellIndex: string
+        +resolution: H3Resolution
+        +centroidLat: number
+        +centroidLon: number
+        +isPentagon: boolean
+        +getNeighbors(): H3Cell[]
+    }
+
+    class H3AdjacencyGraph {
+        +resolution: H3Resolution
+        +stencilMatrix: SparseWeightMatrix
+        +epochTimestamp: Date
+        +{static} forResolution(resolution: number): H3AdjacencyGraph
+        +getNeighborsAtResolution(cellIndex: string, targetResolution: number): string[]
+        +computeAdjacencyWeights(cells: string[], resolution: number): SparseWeightMatrix
+        +validateSymmetry(): boolean
+    }
+
+    class SparseWeightMatrix {
+        +originIndices: string[]
+        +neighborIndices: string[]
+        +conductances: Float64Array
+        +isSymmetricPositiveSemidefinite: boolean
+    }
+
+    H3AdjacencyGraph ..> ApertureResolutionGuard : "asserts bounds via"
+    H3AdjacencyGraph o-- H3Resolution
+    H3AdjacencyGraph *-- SparseWeightMatrix
+    H3Cell o-- H3Resolution
+}
+
+package "Thermodynamic Stock Monads" {
+    enum ThermodynamicStockType {
+        THERMAL_HEAT
+        HYDROLOGICAL_MASS
+        CARBON_MASS
+        NITROGEN_MASS
+        TROPHIC_BIOMASS
+    }
+
+    class ThermodynamicStock<S> {
+        +stockType: ThermodynamicStockType
+        +cellIndex: string
+        +resolution: H3Resolution
+        +stockValue: S
+        +temperatureKelvin: number
+        +entropyJoulePerKelvin: number
+    }
+
+    class SpatialFluxMonad<S> {
+        -stock: ThermodynamicStock<S>
+        -resolution: H3Resolution
+        +{static} of(stock: ThermodynamicStock<S>, res: number): SpatialFluxMonad<S>
+        +bindAtResolution<U>(transform: (s: S) => SpatialFluxMonad<U>, res: number): SpatialFluxMonad<U>
+        +diffuse(graph: H3AdjacencyGraph): SpatialFluxMonad<S>
+        +computeEntropyProduction(neighborTemp: number, flux: number): number
+        +verifyFirstLawConservation(incoming: number, outgoing: number): boolean
+    }
+
+    SpatialFluxMonad ..> ApertureResolutionGuard : "guards resolution level"
+    SpatialFluxMonad *-- ThermodynamicStock
+    SpatialFluxMonad ..> H3AdjacencyGraph : "executes discrete Laplacian diffusion on"
+}
+
+package "Relational Persistence & Blockchain Ledger" {
+    entity "dggs_aperture_resolutions" as T_Resolutions {
+        * resolution: SMALLINT [PK, [0..15]]
+        --
+        characteristic_spacing_m: FLOAT
+        average_area_m2: FLOAT
+        dilation_factor: FLOAT
+        theoretical_cell_count: BIGINT
+    }
+
+    entity "spatial_h3_cells" as T_Cells {
+        * cell_index: VARCHAR(16) [PK]
+        --
+        resolution: SMALLINT [FK -> dggs_aperture_resolutions]
+        parent_index: VARCHAR(16)
+        centroid_lat: DOUBLE PRECISION
+        centroid_lon: DOUBLE PRECISION
+        boundary_wkt: TEXT
+        is_pentagon: BOOLEAN
+    }
+
+    entity "spatial_adjacency_matrices" as T_AdjacencyMatrices {
+        * matrix_id: UUID [PK]
+        --
+        resolution: SMALLINT [FK -> dggs_aperture_resolutions]
+        epoch_timestamp: TIMESTAMPTZ
+        cell_count: INTEGER
+        stencil_state: ENUM
+        matrix_digest_sha256: BYTEA
+        is_symmetric: BOOLEAN
+    }
+
+    entity "spatial_adjacency_edges" as T_Edges {
+        * edge_id: BIGSERIAL [PK]
+        --
+        matrix_id: UUID [FK]
+        resolution: SMALLINT
+        origin_cell: VARCHAR(16) [FK]
+        neighbor_cell: VARCHAR(16) [FK]
+        k_ring_distance: SMALLINT
+        conductance_kappa: DOUBLE PRECISION
+        distance_metric_m: DOUBLE PRECISION
+    }
+
+    entity "thermodynamic_stocks" as T_Stocks {
+        * stock_id: UUID [PK]
+        --
+        cell_index: VARCHAR(16) [FK]
+        resolution: SMALLINT [FK]
+        stock_type: ENUM
+        current_value: DOUBLE PRECISION
+        temperature_kelvin: DOUBLE PRECISION
+        entropy_j_per_k: DOUBLE PRECISION
+        epoch_sequence: BIGINT
+    }
+
+    entity "spatial_flux_transactions" as T_FluxTx {
+        * flux_id: UUID [PK]
+        --
+        resolution: SMALLINT [FK]
+        epoch_sequence: BIGINT
+        source_cell: VARCHAR(16) [FK]
+        target_cell: VARCHAR(16) [FK]
+        stock_type: ENUM
+        flux_magnitude: DOUBLE PRECISION
+        source_temp_kelvin: DOUBLE PRECISION
+        target_temp_kelvin: DOUBLE PRECISION
+        entropy_production_rate: DOUBLE PRECISION (>= 0.0)
+        first_law_residual: DOUBLE PRECISION (= 0.0)
+    }
+
+    entity "spatial_blockchain_blocks" as T_Blocks {
+        * block_height: BIGSERIAL [PK]
+        --
+        block_hash: BYTEA
+        parent_hash: BYTEA
+        resolution_level: SMALLINT [FK]
+        merkle_root_stocks: BYTEA
+        merkle_root_fluxes: BYTEA
+        thermodynamic_state_hash: BYTEA
+        total_entropy_production: DOUBLE PRECISION (>= 0.0)
+        first_law_divergence_norm: DOUBLE PRECISION (< 1e-9)
+        validator_signature: BYTEA
+        timestamp_utc: TIMESTAMPTZ
+    }
+
+    T_Resolutions ||--o{ T_Cells : "governs"
+    T_Resolutions ||--o{ T_AdjacencyMatrices : "parameterizes"
+    T_AdjacencyMatrices ||--o{ T_Edges : "contains"
+    T_Cells ||--o{ T_Edges : "spans origin/target"
+    T_Cells ||--o{ T_Stocks : "stores physical inventory"
+    T_Stocks ||--o{ T_FluxTx : "drives flux balances"
+    T_Resolutions ||--o{ T_Blocks : "binds scale"
+    T_FluxTx }o--|| T_Blocks : "hashed into Merkle receipt"
+}
+
+' System Interactions and Guard Invariants
+SpatialFluxMonad ..> T_FluxTx : "persists conservative transitions"
+H3AdjacencyGraph ..> T_AdjacencyMatrices : "manifests topological stencils"
+ThermodynamicStock ..> T_Stocks : "synchronizes state vectors"
+
+note right of ApertureResolutionGuard
+  **Fail-Fast Boundary Invariants**
+  1. typeof resolution === 'number'
+  2. Number.isFinite(resolution)
+  3. Number.isInteger(resolution)
+  4. resolution >= 0 && resolution <= 15
+  Guarantees:
+  - Conserved flux divergence: sum(J_ij) = 0
+  - Strictly non-negative entropy: sigma >= 0
+end note
+
+@enduml

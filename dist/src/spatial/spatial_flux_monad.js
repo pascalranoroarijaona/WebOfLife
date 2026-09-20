@@ -1,8 +1,8 @@
 /**
  * Web of Life - Spatial Flux Monad
- * Unified Multi-Sprint Implementation (Sprints 069 - 091)
+ * Unified Multi-Sprint Implementation (Sprints 069 - 092)
  */
-import { hasZeroApertureSequence } from './h3_adjacency.js';
+import { hasZeroApertureSequence, assertValidApertureResolution } from './h3_adjacency.js';
 import { validatePentagonTopology, } from './h3_types.js';
 import { isPentagonCell, isBaseCellPentagon, areCartesianUnitVectorsEqual3D, PentagonalCoordinationViolationError, HexagonalCoordinationViolationError, assertValidNeighborCountForCell, assertPentagonalNeighborArrayType, assertPentagonDegree, isExpectedNeighborCount, isExpectedNeighborCountForCell, extractH3IndexApertureDigits, H3AdjacencyService, } from './h3_adjacency.js';
 import { H3GridUtils } from './h3_grid.js';
@@ -234,14 +234,14 @@ export class PentagonalFluxMonad {
             delta.water += f.delta.water;
             delta.minerals += f.delta.minerals;
             delta.oxygen += f.delta.oxygen;
-            delta.energy += f.delta.energy;
+            delta.energy = (delta.energy ?? 0) + (f.delta.energy ?? 0);
         }
         for (const f of outbound) {
             delta.carbon -= f.delta.carbon;
             delta.water -= f.delta.water;
             delta.minerals -= f.delta.minerals;
             delta.oxygen -= f.delta.oxygen;
-            delta.energy -= f.delta.energy;
+            delta.energy = (delta.energy ?? 0) - (f.delta.energy ?? 0);
         }
         return delta;
     }
@@ -265,8 +265,9 @@ export class PentagonalFluxMonad {
         for (const [k, v] of this.neighborMap.entries()) {
             nMap.set(k, JSON.parse(JSON.stringify(v)));
         }
-        for (let i = 0; i < neighborIds.length; i++) {
-            const nId = neighborIds[i];
+        const neighborArray = neighborIds;
+        for (let i = 0; i < neighborArray.length; i++) {
+            const nId = String(neighborArray[i]);
             const nCell = nMap.get(nId);
             if (!nCell)
                 continue;
@@ -382,6 +383,7 @@ export class SpatialFluxMonad {
     value;
     cellIndex;
     stocks;
+    resolution;
     apertureData;
     neighborsList;
     initialStocks;
@@ -458,9 +460,12 @@ export class SpatialFluxMonad {
     static unit(val) {
         return new SpatialFluxMonad(val);
     }
-    // ===========================================================================
-    // SPRINT 070: Static computeFacetTransfer
-    // ===========================================================================
+    static bindAtResolution(val, res) {
+        assertValidApertureResolution(res);
+        const m = new SpatialFluxMonad(val);
+        m.resolution = res;
+        return m;
+    }
     static computeFacetTransfer(originStock, neighborStock, facet, dt) {
         const isV1Pair = areCartesianUnitVectorsEqual3D(facet.originV1, facet.neighborV2, 1e-5);
         const isV2Pair = areCartesianUnitVectorsEqual3D(facet.originV2, facet.neighborV1, 1e-5);
@@ -522,9 +527,6 @@ export class SpatialFluxMonad {
             entropyProductionJPerK: entropy,
         };
     }
-    // ===========================================================================
-    // SPRINT 075: Static validateCellTopology
-    // ===========================================================================
     static validateCellTopology(state) {
         const exp = isPentagonCell(state.cellIndex) ? 5 : 6;
         if (state.neighbors.length !== exp) {
@@ -544,9 +546,6 @@ export class SpatialFluxMonad {
             unwrapErr: () => null,
         };
     }
-    // ===========================================================================
-    // SPRINT 086: Static applyExchange & computeFacetFlux
-    // ===========================================================================
     static computeFacetFlux(source, neighbor, direction, _dt) {
         const isPent = isPentagonCell(source.h3Index);
         if (isPent && direction === 1) {
@@ -614,9 +613,6 @@ export class SpatialFluxMonad {
             },
         };
     }
-    // ===========================================================================
-    // SPRINT 069: System Mass & Interfacial Transfer
-    // ===========================================================================
     totalSystemMass() {
         const val = this.value;
         let h2o = 0, carbon = 0, oxygen = 0, minerals = 0;
@@ -648,9 +644,6 @@ export class SpatialFluxMonad {
             }
         }
     }
-    // ===========================================================================
-    // SPRINT 071: computeConservativeBoundaryFlux
-    // ===========================================================================
     computeConservativeBoundaryFlux(edge, layerHeight, bulkVel, coeffs, dt) {
         const val = this.value;
         const cells = val.cells;
@@ -667,9 +660,6 @@ export class SpatialFluxMonad {
             flux,
         };
     }
-    // ===========================================================================
-    // SPRINT 072: step & getCellState
-    // ===========================================================================
     step(dt) {
         if (this.cellStates.size >= 2) {
             const keys = Array.from(this.cellStates.keys());
@@ -695,9 +685,6 @@ export class SpatialFluxMonad {
     getCellState(id) {
         return this.cellStates.get(id);
     }
-    // ===========================================================================
-    // SPRINT 073: initCellStock, totalMassWater, totalThermalEnergy, applyExchange
-    // ===========================================================================
     initCellStock(stock) {
         this.cellStocksMap.set(stock.cellId, { ...stock });
     }
@@ -732,9 +719,6 @@ export class SpatialFluxMonad {
             cB.thermalEnergyJoules = (cB.thermalEnergyJoules ?? 0) + flux.thermalEnergyDeltaJoules.v;
         }
     }
-    // ===========================================================================
-    // SPRINT 074: assertTopologicalInvariants & computeIntercellFluxes
-    // ===========================================================================
     assertTopologicalInvariants() {
         if (this.statesMap && this.adjacencyMap) {
             for (const [id, state] of this.statesMap.entries()) {
@@ -774,9 +758,6 @@ export class SpatialFluxMonad {
         }
         return fluxes;
     }
-    // ===========================================================================
-    // SPRINT 075: verifyNeighborhoodTopology & computeHarmonizedFluxDeltas
-    // ===========================================================================
     verifyNeighborhoodTopology() {
         const res = SpatialFluxMonad.validateCellTopology(this.value);
         if (res.isErr()) {
@@ -787,15 +768,9 @@ export class SpatialFluxMonad {
     computeHarmonizedFluxDeltas(map, dt) {
         return computeHarmonizedFluxDeltas(this.value, map, dt);
     }
-    // ===========================================================================
-    // SPRINT 076: validateKernelTopology
-    // ===========================================================================
     validateKernelTopology(cellId, neighbors) {
         return isExpectedNeighborCountForCell(cellId, neighbors);
     }
-    // ===========================================================================
-    // SPRINT 078: validateTopology, getError, run, stepDiffusion
-    // ===========================================================================
     validateTopology() {
         const val = this.value;
         if (val && val.geometries) {
@@ -864,9 +839,6 @@ export class SpatialFluxMonad {
             geometries,
         });
     }
-    // ===========================================================================
-    // SPRINT 081: distributePentagonalFlux
-    // ===========================================================================
     distributePentagonalFlux(fluxTensors) {
         const totalCarbon = fluxTensors.reduce((sum, f) => sum + f.carbonKg, 0);
         if (this.initialStocks && totalCarbon > this.initialStocks.carbonKg) {
@@ -879,15 +851,9 @@ export class SpatialFluxMonad {
         }
         return res;
     }
-    // ===========================================================================
-    // SPRINT 083: routePentagonFlux
-    // ===========================================================================
     routePentagonFlux(inbound, outbound) {
         return PentagonalFluxMonad.computePentagonDeltas(this.value, inbound, outbound);
     }
-    // ===========================================================================
-    // SPRINT 085: partitionStocksToChildren, routeDirectionalAdvectiveFlux, receiveAdvectiveFlux
-    // ===========================================================================
     partitionStocksToChildren(weights) {
         const children = H3GridUtils.cellToChildren(this.cellIndex);
         const defaultW = 1.0 / children.length;
@@ -950,9 +916,6 @@ export class SpatialFluxMonad {
         };
         return SpatialFluxMonad.of(this.cellIndex, nextStocks);
     }
-    // ===========================================================================
-    // SPRINT 087: routeConservedFlux
-    // ===========================================================================
     routeConservedFlux(baseCell, flux) {
         const isPent = isBaseCellPentagon(baseCell);
         const activeDirs = isPent ? [2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
@@ -963,9 +926,6 @@ export class SpatialFluxMonad {
         }
         return res;
     }
-    // ===========================================================================
-    // SPRINT 088: projectHierarchicalPath & stepInSituMetabolism
-    // ===========================================================================
     projectHierarchicalPath(path) {
         const isCenter = hasZeroApertureSequence(path);
         const source = this.value;
@@ -1043,10 +1003,16 @@ export class SpatialFluxMonad {
         return this.value;
     }
     map(fn) {
-        return new SpatialFluxMonad(fn(this.value));
+        const next = new SpatialFluxMonad(fn(this.value));
+        next.resolution = this.resolution;
+        return next;
     }
     flatMap(fn) {
-        return fn(this.value);
+        const next = fn(this.value);
+        if (next.resolution === undefined) {
+            next.resolution = this.resolution;
+        }
+        return next;
     }
     bind(fn) {
         return fn(this.value);

@@ -1,15 +1,19 @@
 // =============================================================================
-// WEB OF LIFE - H3 SPATIAL TYPINGS & DATA CONTRACTS (RETRO-COMPATIBLE KERNEL)
-// Unified Architecture: Sprints 002 through 091
+// WEB OF LIFE - SPATIAL DGGS & THERMODYNAMIC TYPES (RETRO-COMPATIBLE ENGINE)
+// Sprints 002 - 092 Unified Specification
 // =============================================================================
 export const H3_CELL_MODE = 1;
 export const H3_MIN_RESOLUTION = 0;
 export const H3_MAX_RESOLUTION = 15;
 export const DIRECTION_CENTER = 0;
-export const PENTAGON_BASE_CELLS_SET = new Set([
-    4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117
-]);
-export const PENTAGON_BASE_CELLS = Object.assign([4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117], { has: (val) => PENTAGON_BASE_CELLS_SET.has(val) });
+const PENTAGON_BASE_ARRAY = [4, 14, 24, 38, 49, 58, 63, 72, 83, 97, 107, 117];
+export const PENTAGON_BASE_CELLS = Object.assign(PENTAGON_BASE_ARRAY, {
+    has(val) {
+        return PENTAGON_BASE_ARRAY.includes(val);
+    },
+});
+export const PENTAGON_BASE_CELL_SET = new Set(PENTAGON_BASE_CELLS);
+export const TOTAL_BASE_CELLS = 122;
 export var H3ErrorCode;
 (function (H3ErrorCode) {
     H3ErrorCode["SUCCESS"] = "H3_SUCCESS";
@@ -20,28 +24,31 @@ export var H3ErrorCode;
     H3ErrorCode["NULL_INDEX"] = "H3_ERR_NULL_INDEX";
 })(H3ErrorCode || (H3ErrorCode = {}));
 export class SpatialGuardClauseException extends Error {
-    constructor(message) {
+    constructor(message = 'H3 Index cannot be null, undefined, or empty.') {
         super(`[SpatialGuardClauseException] ${message}`);
         this.name = 'SpatialGuardClauseException';
         Object.setPrototypeOf(this, SpatialGuardClauseException.prototype);
     }
 }
 export class InvalidH3ModeError extends Error {
-    constructor(message = 'Invalid H3 mode') {
+    constructor(message = 'Invalid H3 cell mode') {
         super(message);
         this.name = 'InvalidH3ModeError';
+        Object.setPrototypeOf(this, InvalidH3ModeError.prototype);
     }
 }
 export class InvalidH3BaseCellError extends Error {
     constructor(message = 'Invalid H3 base cell') {
         super(message);
         this.name = 'InvalidH3BaseCellError';
+        Object.setPrototypeOf(this, InvalidH3BaseCellError.prototype);
     }
 }
 export class InvalidH3PaddingError extends Error {
-    constructor(message = 'Invalid H3 padding bits') {
+    constructor(message = 'Invalid H3 padding digits') {
         super(message);
         this.name = 'InvalidH3PaddingError';
+        Object.setPrototypeOf(this, InvalidH3PaddingError.prototype);
     }
 }
 export class Vector3D {
@@ -52,30 +59,20 @@ export class Vector3D {
         this.x = x;
         this.y = y;
         this.z = z;
-        Object.defineProperty(this, 0, {
-            get: () => this.x,
-            set: (v) => { this.x = v; },
-            enumerable: true,
-            configurable: true,
-        });
-        Object.defineProperty(this, 1, {
-            get: () => this.y,
-            set: (v) => { this.y = v; },
-            enumerable: true,
-            configurable: true,
-        });
-        Object.defineProperty(this, 2, {
-            get: () => this.z,
-            set: (v) => { this.z = v; },
-            enumerable: true,
-            configurable: true,
-        });
+        this[0] = x;
+        this[1] = y;
+        this[2] = z;
     }
     magnitude() {
         return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
     }
+    *[Symbol.iterator]() {
+        yield this.x;
+        yield this.y;
+        yield this.z;
+    }
 }
-export function createVec3D(x, y, z = 0) {
+export function createVec3D(x = 0, y = 0, z = 0) {
     return new Vector3D(x, y, z);
 }
 export var ThermodynamicChannel;
@@ -91,15 +88,13 @@ export var ThermodynamicChannel;
     ThermodynamicChannel[ThermodynamicChannel["CHANNEL_COUNT"] = 8] = "CHANNEL_COUNT";
 })(ThermodynamicChannel || (ThermodynamicChannel = {}));
 export const THERMODYNAMIC_CONSTANTS = {
-    MIN_TEMPERATURE_KELVIN: 2.7315,
-    DEFAULT_REGOLITH_MASS_KG: 50000.0,
     SPECIFIC_HEAT: {
-        REGOLITH: 840.0,
         WATER: 4184.0,
         SOIL_ORGANIC_CARBON: 1800.0,
         VEGETATION_BIOMASS: 1900.0,
         ATMOSPHERIC_CO2: 846.0,
         MINERAL_NITROGEN: 1200.0,
+        REGOLITH: 840.0,
     },
     SPECIFIC_ENTHALPY: {
         WATER: -15.87e6,
@@ -108,11 +103,100 @@ export const THERMODYNAMIC_CONSTANTS = {
         ATMOSPHERIC_CO2: -8.94e6,
         MINERAL_NITROGEN: -2.85e6,
     },
+    MIN_TEMPERATURE_KELVIN: 2.7315,
+    DEFAULT_REGOLITH_MASS_KG: 1e5,
+};
+export const ALL_H3_DIRECTIONS = [1, 2, 3, 4, 5, 6];
+export var Direction;
+(function (Direction) {
+    Direction[Direction["CENTER"] = 0] = "CENTER";
+    Direction[Direction["K_AXES"] = 1] = "K_AXES";
+    Direction[Direction["J_AXES"] = 2] = "J_AXES";
+    Direction[Direction["JK_AXES"] = 3] = "JK_AXES";
+    Direction[Direction["I_AXES"] = 4] = "I_AXES";
+    Direction[Direction["IK_AXES"] = 5] = "IK_AXES";
+    Direction[Direction["IJ_AXES"] = 6] = "IJ_AXES";
+    Direction[Direction["INVALID"] = 7] = "INVALID";
+})(Direction || (Direction = {}));
+export function createPentagonTopology(omittedDirection) {
+    const present = ALL_H3_DIRECTIONS.filter((d) => d !== omittedDirection);
+    return {
+        presentDirections: present,
+        omittedDirection,
+    };
+}
+export function validatePentagonTopology(topology) {
+    if (!topology || !Array.isArray(topology.presentDirections))
+        return false;
+    if (topology.presentDirections.length !== 5)
+        return false;
+    if (topology.presentDirections.includes(topology.omittedDirection))
+        return false;
+    const unique = new Set(topology.presentDirections);
+    if (unique.size !== 5)
+        return false;
+    for (const d of topology.presentDirections) {
+        if (d < 1 || d > 6)
+            return false;
+    }
+    return topology.omittedDirection >= 1 && topology.omittedDirection <= 6;
+}
+export const H3DirectionBitmask = {
+    DIRECTION_0: 1 << 0,
+    DIRECTION_1: 1 << 1,
+    DIRECTION_2: 1 << 2,
+    DIRECTION_3: 1 << 3,
+    DIRECTION_4: 1 << 4,
+    DIRECTION_5: 1 << 5,
+    NONE: 0,
+    ALL: 63,
+    BY_INDEX: [1, 2, 4, 8, 16, 32],
+    hasDirection(mask, dir) {
+        return (mask & (1 << dir)) !== 0;
+    },
+    setDirection(mask, dir) {
+        return mask | (1 << dir);
+    },
+    clearDirection(mask, dir) {
+        return mask & ~(1 << dir);
+    },
+    oppositeDirection(dir) {
+        return ((dir + 3) % 6);
+    },
+    invertMask(mask) {
+        let inv = 0;
+        for (let d = 0; d < 6; d++) {
+            if ((mask & (1 << d)) !== 0) {
+                inv |= 1 << ((d + 3) % 6);
+            }
+        }
+        return inv;
+    },
+};
+export const DirectionalFluxOperator = {
+    isChannelPermeable(srcMask, tgtMask, dir) {
+        const opp = (dir + 3) % 6;
+        return H3DirectionBitmask.hasDirection(srcMask, dir) && H3DirectionBitmask.hasDirection(tgtMask, opp);
+    },
+    computeEdgeTransfer(stateI, stateJ, srcMask, tgtMask, dir, vel, _diff, _cond, geom, dt) {
+        if (!this.isChannelPermeable(srcMask, tgtMask, dir)) {
+            return { dWaterKg: 0, dCarbonKg: 0, dMineralsKg: 0, dOxygenKg: 0, dEnergyJoules: 0 };
+        }
+        const area = (geom.edgeLengthM ?? 1000) * (geom.layerHeightM ?? 10);
+        const frac = Math.min(0.2, (vel * area * dt) / (stateI.volumeM3 ?? 100));
+        return {
+            dWaterKg: stateI.waterKg * frac,
+            dCarbonKg: stateI.carbonKg * frac,
+            dMineralsKg: stateI.mineralsKg * frac,
+            dOxygenKg: stateI.oxygenKg * frac,
+            dEnergyJoules: stateI.internalEnergyJoules * frac,
+        };
+    },
 };
 export var CellTopologyType;
 (function (CellTopologyType) {
-    CellTopologyType["HEXAGON"] = "HEXAGON";
     CellTopologyType["PENTAGON"] = "PENTAGON";
+    CellTopologyType["HEXAGON"] = "HEXAGON";
 })(CellTopologyType || (CellTopologyType = {}));
 export function createH3CellInterfaceMetrics(params) {
     if (params.originIndex === params.neighborIndex) {
@@ -141,117 +225,26 @@ export function createReciprocalInterfaceMetrics(m) {
         geometricConductance: m.geometricConductance,
     };
 }
-export function computeInterfaceFlux(sA, sB, metrics, dt, params) {
-    const dHead = (sA.elevationMeters ?? 0) - (sB.elevationMeters ?? 0);
-    const kWater = params.kSatPorous ?? 1e-4;
-    const waterFlow = kWater * (dHead / metrics.centroidDistanceMeters) * metrics.subterraneanContactAreaM2 * dt * 1000.0;
-    const tA = sA.temperatureKelvin ?? 295.15;
-    const tB = sB.temperatureKelvin ?? 295.15;
-    const cond = params.eddyDiffusivityHeat ?? 15.0;
-    const heatFlow = cond * ((tA - tB) / metrics.centroidDistanceMeters) * metrics.atmosphericContactAreaM2 * dt;
-    const dC = (sA.carbonMassKg ?? 0) * 0.001 * (waterFlow > 0 ? 1 : -1);
-    const dMin = (sA.mineralMassKg ?? 0) * 0.001 * (waterFlow > 0 ? 1 : -1);
-    const entropyProducedJPerK = Math.abs(heatFlow) * Math.abs(1 / Math.min(tA, tB) - 1 / Math.max(tA, tB));
+export function computeInterfaceFlux(stateA, stateB, metrics, dt, params) {
+    const cond = (params?.eddyDiffusivityHeat ?? 15.0) * metrics.geometricConductance;
+    const tempDiff = stateA.temperatureKelvin - stateB.temperatureKelvin;
+    const dEnthalpy = cond * tempDiff * dt;
+    const kSat = params?.kSatPorous ?? 1e-4;
+    const dWater = kSat * (stateA.waterMassKg - stateB.waterMassKg) * metrics.geometricConductance * 0.1 * dt;
+    const dCarbon = 0.001 * dWater * (stateA.carbonMassKg / (stateA.waterMassKg || 1));
+    const dMineral = 0.0005 * dWater * (stateA.mineralMassKg / (stateA.waterMassKg || 1));
+    const tA = Math.max(stateA.temperatureKelvin, 1);
+    const tB = Math.max(stateB.temperatureKelvin, 1);
+    const entropy = Math.abs(dEnthalpy) * Math.abs(1 / Math.min(tA, tB) - 1 / Math.max(tA, tB));
     return {
-        deltaWaterKg: waterFlow,
-        deltaEnthalpyJoules: heatFlow,
-        deltaCarbonKg: dC,
-        deltaMineralKg: dMin,
-        entropyProducedJPerK,
+        deltaWaterKg: -dWater,
+        deltaEnthalpyJoules: -dEnthalpy,
+        deltaCarbonKg: -dCarbon,
+        deltaMineralKg: -dMineral,
+        entropyProducedJPerK: entropy,
     };
 }
-export const ALL_H3_DIRECTIONS = [1, 2, 3, 4, 5, 6];
-export function validatePentagonTopology(topology) {
-    if (!topology || !Array.isArray(topology.presentDirections))
-        return false;
-    if (topology.presentDirections.length !== 5)
-        return false;
-    const dirSet = new Set(topology.presentDirections);
-    if (dirSet.size !== 5)
-        return false;
-    if (dirSet.has(topology.omittedDirection))
-        return false;
-    for (const d of topology.presentDirections) {
-        if (!ALL_H3_DIRECTIONS.includes(d))
-            return false;
-    }
-    return ALL_H3_DIRECTIONS.includes(topology.omittedDirection);
-}
-export function createPentagonTopology(omittedDirection) {
-    const presentDirections = ALL_H3_DIRECTIONS.filter((d) => d !== omittedDirection);
-    return {
-        presentDirections,
-        omittedDirection,
-    };
-}
-export const H3DirectionBitmask = {
-    NONE: 0,
-    DIRECTION_0: 1 << 0,
-    DIRECTION_1: 1 << 1,
-    DIRECTION_2: 1 << 2,
-    DIRECTION_3: 1 << 3,
-    DIRECTION_4: 1 << 4,
-    DIRECTION_5: 1 << 5,
-    ALL: 63,
-    BY_INDEX: [1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5],
-    hasDirection(mask, dir) {
-        return (mask & (1 << dir)) !== 0;
-    },
-    setDirection(mask, dir) {
-        return mask | (1 << dir);
-    },
-    clearDirection(mask, dir) {
-        return mask & ~(1 << dir);
-    },
-    oppositeDirection(dir) {
-        return ((dir + 3) % 6);
-    },
-    invertMask(mask) {
-        let res = 0;
-        for (let d = 0; d < 6; d++) {
-            if ((mask & (1 << d)) !== 0) {
-                const opp = (d + 3) % 6;
-                res |= 1 << opp;
-            }
-        }
-        return res;
-    },
+export const CellNode = class {
 };
-export class DirectionalFluxOperator {
-    static isChannelPermeable(srcMask, tgtMask, dir) {
-        const opp = H3DirectionBitmask.oppositeDirection(dir);
-        return H3DirectionBitmask.hasDirection(srcMask, dir) && H3DirectionBitmask.hasDirection(tgtMask, opp);
-    }
-    static computeEdgeTransfer(sI, sJ, srcMask, tgtMask, dir, vel, _diff, _cond, geom, dt) {
-        if (!this.isChannelPermeable(srcMask, tgtMask, dir)) {
-            return {
-                dWaterKg: 0,
-                dCarbonKg: 0,
-                dMineralsKg: 0,
-                dOxygenKg: 0,
-                dEnergyJoules: 0,
-            };
-        }
-        const area = geom.edgeLengthM * geom.layerHeightM;
-        const vol = vel * area * dt;
-        const frac = Math.min(0.2, vol / (sI.volumeM3 ?? 100));
-        return {
-            dWaterKg: (sI.waterKg ?? 0) * frac,
-            dCarbonKg: (sI.carbonKg ?? 0) * frac,
-            dMineralsKg: (sI.mineralsKg ?? 0) * frac,
-            dOxygenKg: (sI.oxygenKg ?? 0) * frac,
-            dEnergyJoules: (sI.internalEnergyJoules ?? 0) * frac,
-        };
-    }
-}
-export var Direction;
-(function (Direction) {
-    Direction[Direction["CENTER"] = 0] = "CENTER";
-    Direction[Direction["K_AXES"] = 1] = "K_AXES";
-    Direction[Direction["J_AXES"] = 2] = "J_AXES";
-    Direction[Direction["JK_AXES"] = 3] = "JK_AXES";
-    Direction[Direction["I_AXES"] = 4] = "I_AXES";
-    Direction[Direction["IK_AXES"] = 5] = "IK_AXES";
-    Direction[Direction["IJ_AXES"] = 6] = "IJ_AXES";
-    Direction[Direction["INVALID"] = 7] = "INVALID";
-})(Direction || (Direction = {}));
+export const SpatialStockState = class {
+};

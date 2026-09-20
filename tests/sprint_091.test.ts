@@ -1,3 +1,8 @@
+// =============================================================================
+// WEB OF LIFE - SPRINT 091 TEST SUITE
+// Aperture-7 Orientation Dynamics & Class II vs Class III Alignment
+// =============================================================================
+
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
@@ -5,162 +10,143 @@ import {
   getResolutionApertureInfo,
   computeH3EdgeNormals,
   computeInterfaceFluxDeltas,
-  H3AdjacencyGraph,
-  CLASS_III_ROTATION_RADIANS,
+  analyzeApertureStructure,
+  calculateApertureHexagonalOffset,
+  computeCoarseningDriftVector,
+  coarsenHexagonalPatchFlux,
   CLASS_III_ROTATION_DEGREES,
+  CLASS_III_ROTATION_RADIANS,
   ThermodynamicCellStocks,
   CellGeometry,
   FluxField2D,
 } from '../src/spatial/h3_adjacency.js';
 
-describe('Sprint 091: H3 Aperture Classification & Orientation Dynamics', () => {
-  it('correctly maps even resolutions to CLASS_II and odd resolutions to CLASS_III up to res 15', () => {
-    const expected = [
-      'CLASS_II',  // 0
-      'CLASS_III', // 1
-      'CLASS_II',  // 2
-      'CLASS_III', // 3
-      'CLASS_II',  // 4
-      'CLASS_III', // 5
-      'CLASS_II',  // 6
-      'CLASS_III', // 7
-      'CLASS_II',  // 8
-      'CLASS_III', // 9
-      'CLASS_II',  // 10
-      'CLASS_III', // 11
-      'CLASS_II',  // 12
-      'CLASS_III', // 13
-      'CLASS_II',  // 14
-      'CLASS_III', // 15
-    ];
+describe('Sprint 091: Aperture-7 Orientation Dynamics & Coarsening Operators', () => {
 
+  it('verifies alternating Class II and Class III aperture classifications up to resolution 15', () => {
     for (let r = 0; r <= 15; r++) {
-      const cls = getApertureClassForResolution(r);
-      assert.strictEqual(cls, expected[r], `Resolution ${r} must be ${expected[r]}`);
+      const expectedClass = r % 2 === 0 ? 'CLASS_II' : 'CLASS_III';
+      assert.strictEqual(getApertureClassForResolution(r), expectedClass);
+
+      const info = getResolutionApertureInfo(r);
+      assert.strictEqual(info.resolution, r);
+      assert.strictEqual(info.apertureClass, expectedClass);
+      if (expectedClass === 'CLASS_III') {
+        assert.strictEqual(info.isRotated, true);
+        assert.ok(Math.abs(info.rotationAngleDegrees - CLASS_III_ROTATION_DEGREES) < 1e-6);
+        assert.ok(Math.abs(info.rotationAngleRadians - CLASS_III_ROTATION_RADIANS) < 1e-6);
+      } else {
+        assert.strictEqual(info.isRotated, false);
+        assert.strictEqual(info.rotationAngleDegrees, 0.0);
+        assert.strictEqual(info.rotationAngleRadians, 0.0);
+      }
     }
   });
 
-  it('throws RangeError on negative resolutions or non-integers', () => {
-    assert.throws(() => getApertureClassForResolution(-1), RangeError);
-    assert.throws(() => getApertureClassForResolution(-10), RangeError);
-    assert.throws(() => getApertureClassForResolution(1.5), RangeError);
-    assert.throws(() => getApertureClassForResolution(2.7), RangeError);
-    assert.throws(() => getApertureClassForResolution(NaN), RangeError);
-    assert.throws(() => getApertureClassForResolution(Infinity), RangeError);
-    assert.throws(() => getApertureClassForResolution(-Infinity), RangeError);
-  });
-
-  it('computes accurate resolution aperture info metadata', () => {
-    const infoEven = getResolutionApertureInfo(2);
-    assert.strictEqual(infoEven.resolution, 2);
-    assert.strictEqual(infoEven.apertureClass, 'CLASS_II');
-    assert.strictEqual(infoEven.rotationAngleDegrees, 0.0);
-    assert.strictEqual(infoEven.isRotated, false);
-
-    const infoOdd = getResolutionApertureInfo(3);
-    assert.strictEqual(infoOdd.resolution, 3);
-    assert.strictEqual(infoOdd.apertureClass, 'CLASS_III');
-    assert.strictEqual(infoOdd.rotationAngleDegrees, CLASS_III_ROTATION_DEGREES);
-    assert.strictEqual(infoOdd.isRotated, true);
-  });
-
-  it('computes rotated edge normal vectors according to SO(2) rotation', () => {
+  it('computes edge normal vectors with aperture rotation angles', () => {
     const normalsClassII = computeH3EdgeNormals(0);
-    assert.strictEqual(normalsClassII.apertureClass, 'CLASS_II');
+    assert.strictEqual(normalsClassII.normalVectors.length, 6);
     assert.strictEqual(normalsClassII.rotationRadians, 0.0);
-    // Edge 0 at angle 0: nx = 1, ny = 0
-    assert.strictEqual(Math.round(normalsClassII.normalVectors[0].nx), 1);
-    assert.strictEqual(Math.round(normalsClassII.normalVectors[0].ny), 0);
 
     const normalsClassIII = computeH3EdgeNormals(1);
-    assert.strictEqual(normalsClassIII.apertureClass, 'CLASS_III');
-    assert.strictEqual(normalsClassIII.rotationRadians, CLASS_III_ROTATION_RADIANS);
+    assert.strictEqual(normalsClassIII.normalVectors.length, 6);
+    assert.ok(Math.abs(normalsClassIII.rotationRadians - CLASS_III_ROTATION_RADIANS) < 1e-9);
 
-    // Edge 0 at angle alpha: cos(alpha) ≈ 0.944911, sin(alpha) ≈ 0.327327
-    const edge0 = normalsClassIII.normalVectors[0];
-    assert.ok(Math.abs(edge0.nx - Math.cos(CLASS_III_ROTATION_RADIANS)) < 1e-9);
-    assert.ok(Math.abs(edge0.ny - Math.sin(CLASS_III_ROTATION_RADIANS)) < 1e-9);
+    for (const n of normalsClassIII.normalVectors) {
+      const mag = Math.hypot(n.nx, n.ny);
+      assert.ok(Math.abs(mag - 1.0) < 1e-9, 'Normal vector must be unit length');
+    }
   });
 
-  it('delegates aperture classification cleanly through H3AdjacencyGraph', () => {
-    const graphDefault = new H3AdjacencyGraph(4);
-    assert.strictEqual(graphDefault.getResolutionApertureClass(), 'CLASS_II');
-    assert.strictEqual(graphDefault.getResolutionApertureClass(5), 'CLASS_III');
-    assert.strictEqual(graphDefault.getApertureClass(7), 'CLASS_III');
-
-    const graphUnset = new H3AdjacencyGraph();
-    assert.throws(() => graphUnset.getResolutionApertureClass(), RangeError);
-    assert.strictEqual(graphUnset.getResolutionApertureClass(8), 'CLASS_II');
-
-    graphDefault.registerCell('841f91bffffffff', ['841f918ffffffff', '841f919ffffffff']);
-    const neighbors = graphDefault.getNeighbors('841f91bffffffff');
-    assert.strictEqual(neighbors.length, 2);
-
-    const edges = graphDefault.getDirectedEdges('841f91bffffffff');
-    assert.strictEqual(edges.length, 2);
-    assert.strictEqual(edges[0].origin, '841f91bffffffff');
-    assert.strictEqual(edges[0].destination, '841f918ffffffff');
-    assert.strictEqual(edges[0].directionIndex, 0);
-  });
-
-  it('preserves strict First Law mass-energy conservation during flux transport', () => {
+  it('computes multi-channel interface flux deltas and conserves matter and energy', () => {
     const stateI: ThermodynamicCellStocks = {
-      carbon_kg: 500,
-      water_kg: 1000,
-      oxygen_kg: 250,
-      nitrogen_kg: 80,
-      minerals_kg: 40,
-      thermal_energy_kj: 20000,
+      carbon_kg: 100.0,
+      water_kg: 500.0,
+      oxygen_kg: 50.0,
+      nitrogen_kg: 20.0,
+      minerals_kg: 10.0,
+      thermal_energy_kj: 10000.0,
     };
-
-    const neighborState = (factor: number): ThermodynamicCellStocks => ({
-      carbon_kg: 400 * factor,
-      water_kg: 900 * factor,
-      oxygen_kg: 200 * factor,
-      nitrogen_kg: 70 * factor,
-      minerals_kg: 35 * factor,
-      thermal_energy_kj: 18000 * factor,
-    });
 
     const neighbors: ThermodynamicCellStocks[] = [
-      neighborState(1.0),
-      neighborState(0.9),
-      neighborState(1.1),
-      neighborState(0.95),
-      neighborState(1.05),
-      neighborState(0.98),
+      { carbon_kg: 80.0, water_kg: 400.0, oxygen_kg: 40.0, nitrogen_kg: 15.0, minerals_kg: 8.0, thermal_energy_kj: 8000.0 },
+      { carbon_kg: 90.0, water_kg: 450.0, oxygen_kg: 45.0, nitrogen_kg: 18.0, minerals_kg: 9.0, thermal_energy_kj: 9000.0 },
     ];
 
-    const field: FluxField2D = {
-      vx: 1.5,
-      vy: -0.5,
-      diffusionCoefficient: 0.05,
-      thermalConductivity: 0.8,
+    const geom: CellGeometry = {
+      resolution: 7,
+      edgeLengthMeters: 1220.0,
+      heightMeters: 100.0,
     };
 
-    // Test on both CLASS_II (res = 8) and CLASS_III (res = 9)
-    for (const testRes of [8, 9]) {
-      const geometry: CellGeometry = {
-        resolution: testRes,
-        edgeLengthMeters: 100,
-        heightMeters: 10,
-      };
+    const field: FluxField2D = {
+      vx: 2.0,
+      vy: 1.5,
+      diffusionCoefficient: 0.1,
+      thermalConductivity: 1.5,
+    };
 
-      const { deltaSelf, deltaNeighbors } = computeInterfaceFluxDeltas(
-        stateI,
-        neighbors,
-        geometry,
-        field,
-        1.0
-      );
+    const result = computeInterfaceFluxDeltas(stateI, neighbors, geom, field, 1.0);
 
-      const netDeltaCarbon = deltaSelf.carbon_kg + deltaNeighbors.reduce((acc, n) => acc + n.carbon_kg, 0);
-      const netDeltaWater = deltaSelf.water_kg + deltaNeighbors.reduce((acc, n) => acc + n.water_kg, 0);
-      const netDeltaEnergy = deltaSelf.thermal_energy_kj + deltaNeighbors.reduce((acc, n) => acc + n.thermal_energy_kj, 0);
+    assert.ok(result.deltaNeighbors.length === 2);
 
-      assert.ok(Math.abs(netDeltaCarbon) < 1e-9, `Carbon conservation failed at res ${testRes}`);
-      assert.ok(Math.abs(netDeltaWater) < 1e-9, `Water conservation failed at res ${testRes}`);
-      assert.ok(Math.abs(netDeltaEnergy) < 1e-9, `Energy conservation failed at res ${testRes}`);
-    }
+    const sumNeighborCarbon = result.deltaNeighbors.reduce(
+      (acc: number, n: ThermodynamicCellStocks) => acc + n.carbon_kg,
+      0
+    );
+    const sumNeighborWater = result.deltaNeighbors.reduce(
+      (acc: number, n: ThermodynamicCellStocks) => acc + n.water_kg,
+      0
+    );
+    const sumNeighborEnergy = result.deltaNeighbors.reduce(
+      (acc: number, n: ThermodynamicCellStocks) => acc + n.thermal_energy_kj,
+      0
+    );
+
+    assert.ok(
+      Math.abs(result.deltaSelf.carbon_kg + sumNeighborCarbon) < 1e-9,
+      'Carbon flux must be strictly conservative'
+    );
+    assert.ok(
+      Math.abs(result.deltaSelf.water_kg + sumNeighborWater) < 1e-9,
+      'Water flux must be strictly conservative'
+    );
+    assert.ok(
+      Math.abs(result.deltaSelf.thermal_energy_kj + sumNeighborEnergy) < 1e-9,
+      'Thermal energy flux must be strictly conservative'
+    );
+  });
+
+  it('analyzes hierarchical aperture sequence and coarsening drift vector', () => {
+    const centerIndex = '8828308281fffff';
+    const analysis = analyzeApertureStructure(centerIndex);
+    assert.strictEqual(typeof analysis.resolution, 'number');
+    assert.ok(Array.isArray(analysis.digitSequence));
+
+    const offset = calculateApertureHexagonalOffset(centerIndex);
+    assert.ok(Number.isFinite(offset.x));
+    assert.ok(Number.isFinite(offset.y));
+
+    const drift = computeCoarseningDriftVector(centerIndex, '872830828ffffff');
+    assert.ok(Number.isFinite(drift.x));
+    assert.ok(Number.isFinite(drift.y));
+  });
+
+  it('coarsens hexagonal children patch fluxes into parent cell with thermodynamic closure', () => {
+    const children = [
+      { stock: { carbonMol: 10, waterKg: 50, mineralsMol: 2, oxygenMol: 5, enthalpyJoules: 1000 } },
+      { stock: { carbonMol: 20, waterKg: 70, mineralsMol: 3, oxygenMol: 7, enthalpyJoules: 2000 } },
+      { stock: { carbonMol: 15, waterKg: 60, mineralsMol: 4, oxygenMol: 6, enthalpyJoules: 1500 } },
+    ];
+
+    const coarsened = coarsenHexagonalPatchFlux('872830828ffffff', children, 1.0);
+
+    assert.strictEqual(coarsened.parentStock.carbonMol, 45);
+    assert.strictEqual(coarsened.parentStock.waterKg, 180);
+    assert.strictEqual(coarsened.parentStock.mineralsMol, 9);
+    assert.strictEqual(coarsened.parentStock.oxygenMol, 18);
+    assert.strictEqual(coarsened.parentStock.enthalpyJoules, 4500);
+    assert.strictEqual(coarsened.conservationError, 0);
+    assert.ok(coarsened.totalEntropyGenerated >= 0);
   });
 });

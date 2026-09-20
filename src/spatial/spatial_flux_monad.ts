@@ -1,9 +1,9 @@
 /**
  * Web of Life - Spatial Flux Monad
- * Unified Multi-Sprint Implementation (Sprints 069 - 091)
+ * Unified Multi-Sprint Implementation (Sprints 069 - 092)
  */
 
-import { hasZeroApertureSequence } from './h3_adjacency.js';
+import { hasZeroApertureSequence, assertValidApertureResolution } from './h3_adjacency.js';
 import {
   H3DirectionDigit,
   BiophysicalStockVector,
@@ -457,14 +457,14 @@ export class PentagonalFluxMonad<T = any> {
       delta.water += f.delta.water;
       delta.minerals += f.delta.minerals;
       delta.oxygen += f.delta.oxygen;
-      delta.energy += f.delta.energy;
+      delta.energy = (delta.energy ?? 0) + (f.delta.energy ?? 0);
     }
     for (const f of outbound) {
       delta.carbon -= f.delta.carbon;
       delta.water -= f.delta.water;
       delta.minerals -= f.delta.minerals;
       delta.oxygen -= f.delta.oxygen;
-      delta.energy -= f.delta.energy;
+      delta.energy = (delta.energy ?? 0) - (f.delta.energy ?? 0);
     }
 
     return delta;
@@ -492,8 +492,9 @@ export class PentagonalFluxMonad<T = any> {
       nMap.set(k, JSON.parse(JSON.stringify(v)));
     }
 
-    for (let i = 0; i < neighborIds.length; i++) {
-      const nId = neighborIds[i];
+    const neighborArray = neighborIds as string[];
+    for (let i = 0; i < neighborArray.length; i++) {
+      const nId = String(neighborArray[i]);
       const nCell = nMap.get(nId);
       if (!nCell) continue;
       const coeff = transferCoeffs[i] ?? 0.02;
@@ -627,6 +628,7 @@ export class SpatialFluxMonad<T = any> {
   public readonly value: T;
   public cellIndex?: any;
   public stocks?: any;
+  public resolution?: number;
   public apertureData?: any;
   public neighborsList?: string[];
   public initialStocks?: any;
@@ -715,9 +717,13 @@ export class SpatialFluxMonad<T = any> {
     return new SpatialFluxMonad<U>(val);
   }
 
-  // ===========================================================================
-  // SPRINT 070: Static computeFacetTransfer
-  // ===========================================================================
+  public static bindAtResolution<U = any>(val: U, res: number): SpatialFluxMonad<U> {
+    assertValidApertureResolution(res);
+    const m = new SpatialFluxMonad<U>(val);
+    m.resolution = res;
+    return m;
+  }
+
   public static computeFacetTransfer(
     originStock: CellBiogeochemicalStock,
     neighborStock: CellBiogeochemicalStock,
@@ -790,9 +796,6 @@ export class SpatialFluxMonad<T = any> {
     };
   }
 
-  // ===========================================================================
-  // SPRINT 075: Static validateCellTopology
-  // ===========================================================================
   public static validateCellTopology(state: SpatialFluxState) {
     const exp = isPentagonCell(state.cellIndex) ? 5 : 6;
     if (state.neighbors.length !== exp) {
@@ -818,9 +821,6 @@ export class SpatialFluxMonad<T = any> {
     };
   }
 
-  // ===========================================================================
-  // SPRINT 086: Static applyExchange & computeFacetFlux
-  // ===========================================================================
   public static computeFacetFlux(
     source: CellSpatialContext,
     neighbor: CellSpatialContext,
@@ -905,9 +905,6 @@ export class SpatialFluxMonad<T = any> {
     };
   }
 
-  // ===========================================================================
-  // SPRINT 069: System Mass & Interfacial Transfer
-  // ===========================================================================
   public totalSystemMass(): { h2o: number; carbon: number; oxygen: number; minerals: number } {
     const val = this.value as any;
     let h2o = 0, carbon = 0, oxygen = 0, minerals = 0;
@@ -941,9 +938,6 @@ export class SpatialFluxMonad<T = any> {
     }
   }
 
-  // ===========================================================================
-  // SPRINT 071: computeConservativeBoundaryFlux
-  // ===========================================================================
   public computeConservativeBoundaryFlux(
     edge: any,
     layerHeight: number,
@@ -970,9 +964,6 @@ export class SpatialFluxMonad<T = any> {
     };
   }
 
-  // ===========================================================================
-  // SPRINT 072: step & getCellState
-  // ===========================================================================
   public step(dt: number): void {
     if (this.cellStates.size >= 2) {
       const keys = Array.from(this.cellStates.keys());
@@ -997,9 +988,6 @@ export class SpatialFluxMonad<T = any> {
     return this.cellStates.get(id);
   }
 
-  // ===========================================================================
-  // SPRINT 073: initCellStock, totalMassWater, totalThermalEnergy, applyExchange
-  // ===========================================================================
   public initCellStock(stock: any): void {
     this.cellStocksMap.set(stock.cellId, { ...stock });
   }
@@ -1040,9 +1028,6 @@ export class SpatialFluxMonad<T = any> {
     }
   }
 
-  // ===========================================================================
-  // SPRINT 074: assertTopologicalInvariants & computeIntercellFluxes
-  // ===========================================================================
   public assertTopologicalInvariants(): void {
     if (this.statesMap && this.adjacencyMap) {
       for (const [id, state] of this.statesMap.entries()) {
@@ -1082,9 +1067,6 @@ export class SpatialFluxMonad<T = any> {
     return fluxes;
   }
 
-  // ===========================================================================
-  // SPRINT 075: verifyNeighborhoodTopology & computeHarmonizedFluxDeltas
-  // ===========================================================================
   public verifyNeighborhoodTopology(): boolean {
     const res = SpatialFluxMonad.validateCellTopology(this.value as any);
     if (res.isErr()) {
@@ -1097,16 +1079,10 @@ export class SpatialFluxMonad<T = any> {
     return computeHarmonizedFluxDeltas(this.value as any, map, dt);
   }
 
-  // ===========================================================================
-  // SPRINT 076: validateKernelTopology
-  // ===========================================================================
   public validateKernelTopology(cellId: string, neighbors: string[]): boolean {
     return isExpectedNeighborCountForCell(cellId, neighbors);
   }
 
-  // ===========================================================================
-  // SPRINT 078: validateTopology, getError, run, stepDiffusion
-  // ===========================================================================
   public validateTopology(): SpatialFluxMonad<T> {
     const val = this.value as any;
     if (val && val.geometries) {
@@ -1176,9 +1152,6 @@ export class SpatialFluxMonad<T = any> {
     });
   }
 
-  // ===========================================================================
-  // SPRINT 081: distributePentagonalFlux
-  // ===========================================================================
   public distributePentagonalFlux(fluxTensors: ConservedStockDelta[]): Map<string, ConservedStockDelta> {
     const totalCarbon = fluxTensors.reduce((sum, f) => sum + f.carbonKg, 0);
     if (this.initialStocks && totalCarbon > this.initialStocks.carbonKg) {
@@ -1193,16 +1166,10 @@ export class SpatialFluxMonad<T = any> {
     return res;
   }
 
-  // ===========================================================================
-  // SPRINT 083: routePentagonFlux
-  // ===========================================================================
   public routePentagonFlux(inbound: DirectionalFlux[], outbound: DirectionalFlux[]): StockVector {
     return PentagonalFluxMonad.computePentagonDeltas(this.value as any, inbound, outbound);
   }
 
-  // ===========================================================================
-  // SPRINT 085: partitionStocksToChildren, routeDirectionalAdvectiveFlux, receiveAdvectiveFlux
-  // ===========================================================================
   public partitionStocksToChildren(weights?: number[]): Array<{ childIndex: bigint; childStocks: BiophysicalStockVector }> {
     const children = H3GridUtils.cellToChildren(this.cellIndex);
     const defaultW = 1.0 / children.length;
@@ -1279,9 +1246,6 @@ export class SpatialFluxMonad<T = any> {
     return SpatialFluxMonad.of(this.cellIndex, nextStocks);
   }
 
-  // ===========================================================================
-  // SPRINT 087: routeConservedFlux
-  // ===========================================================================
   public routeConservedFlux(baseCell: number, flux: number): Map<number, number> {
     const isPent = isBaseCellPentagon(baseCell);
     const activeDirs = isPent ? [2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
@@ -1293,9 +1257,6 @@ export class SpatialFluxMonad<T = any> {
     return res;
   }
 
-  // ===========================================================================
-  // SPRINT 088: projectHierarchicalPath & stepInSituMetabolism
-  // ===========================================================================
   public projectHierarchicalPath(path: H3DirectionDigit[]): HierarchicalProjectionResult {
     const isCenter = hasZeroApertureSequence(path);
     const source = this.value as EcologicalStockState;
@@ -1376,11 +1337,17 @@ export class SpatialFluxMonad<T = any> {
   }
 
   public map<U>(fn: (val: T) => U): SpatialFluxMonad<U> {
-    return new SpatialFluxMonad<U>(fn(this.value));
+    const next = new SpatialFluxMonad<U>(fn(this.value));
+    next.resolution = this.resolution;
+    return next;
   }
 
   public flatMap<U>(fn: (val: T) => SpatialFluxMonad<U>): SpatialFluxMonad<U> {
-    return fn(this.value);
+    const next = fn(this.value);
+    if (next.resolution === undefined) {
+      next.resolution = this.resolution;
+    }
+    return next;
   }
 
   public bind<U>(fn: (val: T) => SpatialFluxMonad<U>): SpatialFluxMonad<U> {
