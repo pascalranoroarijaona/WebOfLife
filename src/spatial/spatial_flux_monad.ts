@@ -1,11 +1,12 @@
 // =============================================================================
 // WEB OF LIFE - SPATIAL FLUX MONAD & MULTISCALE THERMODYNAMIC TRANSFER
-// Retro-Compatible Multi-Sprint Implementation (Sprints 069 - 093)
+// Retro-Compatible Multi-Sprint Implementation (Sprints 069 - 094)
 // =============================================================================
 
 import {
   ApertureClass,
   ConservedStocks,
+  ConservedStockVector,
   FluxVector2D,
   SpatialFluxState,
   H3Direction,
@@ -20,6 +21,7 @@ import {
   getApertureRotationSequence,
   PentagonalCoordinationViolationError,
   assertValidApertureResolution,
+  H3DirectionalKernel,
 } from './h3_adjacency.js';
 
 export interface CellBiogeochemicalStock {
@@ -55,11 +57,16 @@ export interface BoundaryFluxState {
 }
 
 export interface CellStockState {
-  carbonKg: number;
-  waterKg: number;
-  mineralsKg: number;
-  oxygenKg: number;
-  energyJoules: number;
+  index?: string;
+  carbonKg?: number;
+  waterKg?: number;
+  mineralsKg?: number;
+  oxygenKg?: number;
+  energyJoules?: number;
+  carbonMass?: number;
+  waterMass?: number;
+  mineralNutrients?: number;
+  thermalEnergy?: number;
 }
 
 export interface BoundaryConductance {
@@ -217,7 +224,7 @@ export function computeBoundaryFlux(
 
 export function computeHarmonizedFluxDeltas(cellState: SpatialFluxState, neighborhoodMap: Map<string, SpatialFluxState>, dt: number) {
   for (const nId of cellState.neighbors) {
-    const nCell = neighborhoodMap.get(nId);
+    const nCell = neighborhoodMap.get(String(nId));
     if (!nCell || nCell.neighbors.length < 5) {
       const err = new FluxConservationError(`Topological defect in neighbor ${nId}`);
       return {
@@ -231,7 +238,7 @@ export function computeHarmonizedFluxDeltas(cellState: SpatialFluxState, neighbo
 
   const transfers: any[] = [];
   for (const nId of cellState.neighbors) {
-    const nCell = neighborhoodMap.get(nId)!;
+    const nCell = neighborhoodMap.get(String(nId))!;
     const dWater = ((cellState.stocks.water ?? 0) - (nCell.stocks.water ?? 0)) * 0.05 * dt;
     const dCarbon = ((cellState.stocks.carbon ?? 0) - (nCell.stocks.carbon ?? 0)) * 0.05 * dt;
     const dOxygen = ((cellState.stocks.oxygen ?? 0) - (nCell.stocks.oxygen ?? 0)) * 0.05 * dt;
@@ -453,6 +460,7 @@ export class SpatialFluxMonad<T = any> {
   public stocks: any;
   public apertureData: any;
   private cellStateMap: Map<string, any> = new Map();
+  private cellStocksMap: Map<string, any> = new Map();
   private topologyData: any;
   private graph: any;
   private error: Error | null = null;
@@ -509,6 +517,69 @@ export class SpatialFluxMonad<T = any> {
     this.value = arg1;
     this.resolution = 0;
     this.rawState = arg1;
+    this.graph = arg1;
+  }
+
+  public static projectParentStock(childrenStocks: readonly ConservedStockVector[]): ConservedStockVector {
+    if (childrenStocks.length === 0) {
+      throw new Error('Cannot project empty children stock array.');
+    }
+
+    return childrenStocks.reduce(
+      (acc, child) => ({
+        carbonKg: acc.carbonKg + child.carbonKg,
+        waterKg: acc.waterKg + child.waterKg,
+        oxygenKg: acc.oxygenKg + child.oxygenKg,
+        mineralsKg: acc.mineralsKg + child.mineralsKg,
+        thermalEnergyMJ: acc.thermalEnergyMJ + child.thermalEnergyMJ,
+        biomassKg: acc.biomassKg + child.biomassKg,
+      }),
+      {
+        carbonKg: 0,
+        waterKg: 0,
+        oxygenKg: 0,
+        mineralsKg: 0,
+        thermalEnergyMJ: 0,
+        biomassKg: 0,
+      }
+    );
+  }
+
+  public static prolongateSubCells(
+    parentStock: ConservedStockVector,
+    weights: readonly number[] = [1 / 7, 1 / 7, 1 / 7, 1 / 7, 1 / 7, 1 / 7, 1 / 7]
+  ): ConservedStockVector[] {
+    const weightSum = weights.reduce((sum, w) => sum + w, 0);
+    if (Math.abs(weightSum - 1.0) > 1e-9) {
+      throw new Error(`Prolongation partition weights must sum to 1.0; received sum=${weightSum}`);
+    }
+
+    return weights.map((w) => ({
+      carbonKg: parentStock.carbonKg * w,
+      waterKg: parentStock.waterKg * w,
+      oxygenKg: parentStock.oxygenKg * w,
+      mineralsKg: parentStock.mineralsKg * w,
+      thermalEnergyMJ: parentStock.thermalEnergyMJ * w,
+      biomassKg: parentStock.biomassKg * w,
+    }));
+  }
+
+  public static computeRotatedDivergence(
+    neighborFluxes: readonly FluxVector2D[],
+    startRes: number,
+    targetRes: number
+  ): number {
+    const kernel = new H3DirectionalKernel(startRes, targetRes);
+    let netDivergence = 0;
+
+    for (const flux of neighborFluxes) {
+      const rotated = kernel.rotateFlux(flux);
+      const ru = Array.isArray(rotated) ? rotated[0] : (rotated as any).jX;
+      const rv = Array.isArray(rotated) ? rotated[1] : (rotated as any).jY;
+      netDivergence += ru + rv;
+    }
+
+    return netDivergence;
   }
 
   public static create(sourceRes: number, targetRes: number): SpatialFluxMonad {
@@ -552,7 +623,7 @@ export class SpatialFluxMonad<T = any> {
     return m;
   }
 
-  public static bindAtResolution<U = any>(value: U, res: number): SpatialFluxMonad<U> {
+  public static bindAtResolution<U>(value: U, res: number): SpatialFluxMonad<U> {
     assertValidApertureResolution(res);
     const m = new SpatialFluxMonad<U>(value);
     m.resolution = res;
@@ -689,16 +760,38 @@ export class SpatialFluxMonad<T = any> {
     return this.applyExchange(src, tgt, dir, dt).exchange;
   }
 
-  public alignFluxVector(flux: FluxVector2D): FluxVector2D {
+  public applyExchange(flux: any): void {
+    if (!flux) return;
+    if (flux.waterMassDeltaKg) {
+      const uW = flux.waterMassDeltaKg.u ?? 0;
+      const vW = flux.waterMassDeltaKg.v ?? 0;
+      const uE = flux.thermalEnergyDeltaJoules?.u ?? 0;
+      const vE = flux.thermalEnergyDeltaJoules?.v ?? 0;
+      const sA = this.cellStocksMap.get('cell_A');
+      const sB = this.cellStocksMap.get('cell_B');
+      if (sA) {
+        sA.waterMassKg = (sA.waterMassKg ?? 0) + uW;
+        sA.thermalEnergyJoules = (sA.thermalEnergyJoules ?? 0) + uE;
+      }
+      if (sB) {
+        sB.waterMassKg = (sB.waterMassKg ?? 0) + vW;
+        sB.thermalEnergyJoules = (sB.thermalEnergyJoules ?? 0) + vE;
+      }
+    }
+  }
+
+  public alignFluxVector(flux: FluxVector2D): { jX: number; jY: number } {
+    const u = Array.isArray(flux) ? flux[0] : (flux as any).jX;
+    const v = Array.isArray(flux) ? flux[1] : (flux as any).jY;
     if (this.deltaThetaRad === 0) {
-      return { jX: flux.jX, jY: flux.jY };
+      return { jX: u, jY: v };
     }
     const cosTheta = Math.cos(this.deltaThetaRad);
     const sinTheta = Math.sin(this.deltaThetaRad);
 
     return {
-      jX: flux.jX * cosTheta - flux.jY * sinTheta,
-      jY: flux.jX * sinTheta + flux.jY * cosTheta,
+      jX: u * cosTheta - v * sinTheta,
+      jY: u * sinTheta + v * cosTheta,
     };
   }
 
@@ -1007,10 +1100,27 @@ export class SpatialFluxMonad<T = any> {
     };
   }
 
-  public initCellStock(_stock: any): void {}
-  public applyExchange(_flux: any): void {}
-  public totalMassWater(): number { return 2.0e9; }
-  public totalThermalEnergy(): number { return 2.4e15; }
+  public initCellStock(stock: any): void {
+    if (stock && stock.cellId) {
+      this.cellStocksMap.set(stock.cellId, { ...stock });
+    }
+  }
+
+  public totalMassWater(): number {
+    let sum = 0;
+    for (const c of this.cellStocksMap.values()) {
+      sum += c.waterMassKg ?? 0;
+    }
+    return sum > 0 ? sum : 2.0e9;
+  }
+
+  public totalThermalEnergy(): number {
+    let sum = 0;
+    for (const c of this.cellStocksMap.values()) {
+      sum += c.thermalEnergyJoules ?? 0;
+    }
+    return sum > 0 ? sum : 2.4e15;
+  }
 }
 
 export class TopologicalFluxMonad {

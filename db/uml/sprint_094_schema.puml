@@ -1,0 +1,203 @@
+@startuml sprint_094_schema
+!theme vibrant
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing true
+
+title Web of Life Engine - Sprint 094\nAperture-7 Class III Step Counter & Hierarchical Orientation Parity
+
+package "Domain Types & Interfaces (src/spatial/h3_types.ts)" {
+    enum ApertureClass {
+        CLASS_II
+        CLASS_III
+    }
+
+    enum SpatialTransformDirection {
+        PROJECTION
+        RESTRICTION
+        LATERAL_DIFFUSION
+    }
+
+    interface ApertureStepOptions <<interface>> {
+        +startResolution: number
+    }
+
+    interface ApertureClassProfile <<interface>> {
+        +startResolution: number
+        +targetResolution: number
+        +classIIISteps: number
+        +classIISteps: number
+        +totalSteps: number
+        +isTargetClassIII: boolean
+    }
+}
+
+package "Spatial Hierarchy & Parity Functions (src/spatial/h3_adjacency.ts)" {
+    class H3AdjacencyCalculator <<module>> {
+        +countClassIIIApertureSteps(targetResolution: number, startResolution?: number): number
+        +getApertureClassProfile(targetResolution: number, startResolution?: number): ApertureClassProfile
+        +isClassIIIResolution(resolution: number): boolean
+        -validateResolution(resolution: number, fieldName: string): void
+    }
+
+    class H3DirectionalKernel {
+        -sourceResolution: number
+        -targetResolution: number
+        -classIIISteps: number
+        -rotationAngleRad: number
+        -rotationMatrix: number[][]
+        +constructor(sourceRes: number, targetRes: number)
+        +rotateVector(vector: number[]): number[]
+        +getOrientationParity(): number
+        +getStencils(): Map<number, number[]>
+    }
+
+    class SpatialFluxMonad<T> {
+        -resolution: number
+        -cellState: Map<bigint, T>
+        -profile: ApertureClassProfile
+        +constructor(resolution: number, cellState: Map<bigint, T>)
+        +bind<R>(fn: (state: T) => SpatialFluxMonad<R>): SpatialFluxMonad<R>
+        +projectTo(targetResolution: number, kernel: H3DirectionalKernel): SpatialFluxMonad<T>
+        +restrictTo(targetResolution: number, kernel: H3DirectionalKernel): SpatialFluxMonad<T>
+        +computeDivergence(): Map<bigint, number>
+    }
+}
+
+package "Thermodynamic State & Stocks (src/thermo/)" {
+    class HexCellStock {
+        +h3Index: bigint
+        +resolution: number
+        +biomassKg: number
+        +internalEnergyJoules: number
+        +temperatureKelvin: number
+        +entropyJPerK: number
+        +massHash: string
+        +verifyFirstLaw(): boolean
+    }
+
+    class ThermodynamicState {
+        +timestamp: Date
+        +stocks: Map<bigint, HexCellStock>
+        +totalInternalEnergy: number
+        +totalEntropyProduction: number
+    }
+}
+
+package "Thermodynamic Blockchain Ledger (db/schema.sql)" {
+    entity "h3_resolution_parity_registry" as ResRegistry {
+        *resolution : SMALLINT <<PK>>
+        --
+        *aperture_class : h3_aperture_class
+        *cumulative_class_iii_steps : SMALLINT
+        *cumulative_class_ii_steps : SMALLINT
+        *nominal_rotation_rad : DOUBLE PRECISION
+        *nominal_rotation_deg : DOUBLE PRECISION
+        *average_area_m2 : DOUBLE PRECISION
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "spatial_rotation_kernels" as RotationKernels {
+        *kernel_id : UUID <<PK>>
+        --
+        *source_resolution : SMALLINT <<FK>>
+        *target_resolution : SMALLINT <<FK>>
+        *class_iii_steps : SMALLINT
+        *class_ii_steps : SMALLINT
+        *net_rotation_parity : SMALLINT
+        *transform_direction : spatial_transform_direction
+        *affine_matrix : DOUBLE PRECISION[2][2]
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "h3_cell_thermodynamic_stocks" as CellStocks {
+        *h3_index : BIGINT <<PK>>
+        *snapshot_timestamp : TIMESTAMPTZ <<PK>>
+        --
+        *resolution : SMALLINT <<FK>>
+        *trophic_biomass_kg : DOUBLE PRECISION
+        *internal_energy_joules : DOUBLE PRECISION
+        *temperature_kelvin : DOUBLE PRECISION
+        *entropy_j_per_k : DOUBLE PRECISION
+        *mass_conservation_hash : BYTEA
+    }
+
+    entity "spatial_flux_transitions" as FluxTransitions {
+        *transition_id : UUID <<PK>>
+        --
+        *source_h3 : BIGINT
+        *target_h3 : BIGINT
+        *kernel_id : UUID <<FK>>
+        *flux_type : thermodynamic_flux_type
+        *transferred_mass_kg : DOUBLE PRECISION
+        *transferred_energy_joules : DOUBLE PRECISION
+        *entropy_dissipation_joules_per_k : DOUBLE PRECISION
+        *class_iii_step_count : SMALLINT
+        *is_orientation_parity_preserved : BOOLEAN
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "thermodynamic_blocks" as Blocks {
+        *block_height : BIGINT <<PK>>
+        --
+        *block_hash : BYTEA
+        *parent_hash : BYTEA
+        *merkle_root : BYTEA
+        *spatial_flux_root : BYTEA
+        *total_entropy_production_j_per_k : DOUBLE PRECISION
+        *total_energy_delta_joules : DOUBLE PRECISION
+        *timestamp : TIMESTAMPTZ
+        *validator_signature : BYTEA
+    }
+
+    entity "thermodynamic_spatial_transactions" as TxLedger {
+        *tx_hash : BYTEA <<PK>>
+        --
+        *block_height : BIGINT <<FK>>
+        *tx_sequence : INTEGER
+        *source_resolution : SMALLINT <<FK>>
+        *target_resolution : SMALLINT <<FK>>
+        *class_iii_steps_traversed : SMALLINT
+        *input_energy_joules : DOUBLE PRECISION
+        *output_energy_joules : DOUBLE PRECISION
+        *dissipation_entropy_production : DOUBLE PRECISION
+        *is_first_law_satisfied : BOOLEAN
+        *is_second_law_satisfied : BOOLEAN
+        transition_id : UUID <<FK>>
+        *signature : BYTEA
+    }
+}
+
+' Relationships & Invariant Bindings
+H3AdjacencyCalculator ..> ApertureClassProfile : constructs
+H3AdjacencyCalculator ..> ApertureStepOptions : uses
+H3DirectionalKernel --> H3AdjacencyCalculator : computes rotation via countClassIIIApertureSteps()
+SpatialFluxMonad --> H3DirectionalKernel : applies rotation matrix
+SpatialFluxMonad *-- HexCellStock : wraps cell stocks
+ThermodynamicState o-- HexCellStock : aggregates
+
+ResRegistry "1" <-- "many" RotationKernels : references source/target
+RotationKernels "1" <-- "many" FluxTransitions : stencils
+ResRegistry "1" <-- "many" CellStocks : spatial scale
+Blocks "1" *-- "many" TxLedger : contains
+FluxTransitions "1" <-- "0..1" TxLedger : commits spatial flux
+ResRegistry "1" <-- "many" TxLedger : references resolutions
+
+note right of H3AdjacencyCalculator
+  <b>Class III Step Formulation</b>
+  N_{Class III}(start, target) =
+    |floor((target + 1)/2) - floor((start + 1)/2)|
+  Guarantees:
+  - Res 0 -> Res 1 : 1 Class III step (tilted)
+  - Res 1 -> Res 2 : 0 Class III steps (aligned back to Class II)
+  - Invertible & additive across multi-scale hierarchies
+end note
+
+note bottom of FluxTransitions
+  <b>Thermodynamic Invariants</b>
+  1. First Law: Enthalpy & Mass conservation.
+  2. Second Law: Local dissipation \sigma >= 0.
+  Rotation transforms prevent artificial negative diffusion.
+end note
+
+@enduml
